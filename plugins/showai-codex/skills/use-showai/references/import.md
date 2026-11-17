@@ -1,6 +1,6 @@
 # 导入与导入器
 
-用户要把其他应用里的内容搬进 ShowAI（Notion 导出、Word 文档、Markdown 文件夹），或者希望以后能导入某种新格式时，读这份说明。完整规则用 `guide({topic:"import"})` 读取。
+用户要把其他应用里的内容搬进 ShowAI（Notion 导出、Word 文档、Markdown 文件夹），或者希望以后能导入某种新格式时，读这份说明。创建与导入参数以 `page_create`、`catalog_list`、`catalog_describe` 和 `catalog_version` 的实际 inputSchema 为准。
 
 ## 导入
 

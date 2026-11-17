@@ -26,7 +26,7 @@ export const TEMPLATE_WORKFLOW_CAPABILITIES = Object.freeze({
   schemaVersion: TEMPLATE_SCHEMA_VERSION,
   legacySchemaVersions: [1, 2, 3],
   systemBaselineRequired: true,
-  systemBaseline: "show-document Skill; guide topic presentation without Skills",
+  systemBaseline: "show-document Skill",
   guideDisclosure: "whole-template",
   contextBinding: "explicit-exact-refs",
   directoryImport: "local-cli",

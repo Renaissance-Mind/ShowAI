@@ -63,7 +63,7 @@ Edit workflows in `plugins/showai/skills` and host delivery contracts in `plugin
 | Antigravity | `plugins/showai-antigravity` | Bundled offline Artifact and inline embed |
 | DeepSeek Harness | Prepared bundle directory | Automatic tool-result preview |
 | Kimi Work | `plugins-kimi/showai` | Offline Widget workspace and display action |
-| Remote MCP Apps | Remote package or built-in HTTP guides | Attached native view |
+| Remote MCP Apps | Remote plugin with installed Skills | Attached native view |
 
 The marketplace identity stays `showai@renaissance-mind`. The generated Codex and Claude directories are committed so Git-backed marketplace installation also works in a fresh checkout. Regenerate them when changing shared source; do not edit generated Skills or launchers. `host-profile.json` records the profile, declared display and shared-file fingerprints. App installation binds the same adapters from bundled source resources. Each host must reload its installed plugin and reconnect separately; updating source does not replace an already running MCP process.
 
@@ -78,7 +78,7 @@ The marketplace identity stays `showai@renaissance-mind`. The generated Codex an
 | [create-template](skills/create-template/SKILL.md)       | Reusable template folders and methods                                |
 | [collaborate-canvas](skills/collaborate-canvas/SKILL.md) | Co-editing on canvases, multi-device pairing                         |
 
-Agent document operations use MCP. Begin with guide() and capability/project discovery. Formal work is saved in the selected project before page_present. render_document serves explicitly standalone delivery. Detailed methods remain in the canonical Skills; this README is the installation entrypoint.
+Agent document operations use MCP. Read the installed use-showai Skill and discover the required project. Query showai_capabilities once when the current connection is unknown or changes. Formal work is saved in the selected project before page_present. render_document serves explicitly standalone delivery. Detailed methods remain in the canonical Skills; this README is the installation entrypoint.
 
 ## Runtime and library
 
@@ -102,7 +102,7 @@ Follow the distribution’s bound host adapter for display. The shared workflows
 
 ## ChatGPT web and remote packages
 
-For regular ChatGPT web use, add the hosted MCP connection and read workflows through guide; a local Skill installation or ZIP is unnecessary. Follow [ChatGPT setup](https://github.com/Renaissance-Mind/ShowAI/blob/main/docs/chatgpt.md).
+For ChatGPT web use, install the complete ShowAI plugin with its Skills and connect its hosted MCP app. Follow [ChatGPT setup](https://github.com/Renaissance-Mind/ShowAI/blob/main/docs/chatgpt.md).
 
 Operators can generate an HTTP/OAuth package from the same Skills:
 

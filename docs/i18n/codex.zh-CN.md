@@ -48,7 +48,7 @@ Agent 应当调用 ShowAI 工具、保存页面并展示出来。「设置 → �
 
 导出是快照，源页面后续修改不会更新旧的导出文件。预览过大时，Agent 展示选定的内容块，同时保留完整页面交付。**用户明确只要独立文件时**才用 `render_document`，它不保存到项目。
 
-基于 ShowAI 开发 Agent 时，先调用 `guide()`，再调用 `showai_capabilities` 和 `project_context`，确认实际连接。
+基于 ShowAI 开发 Agent 时，先读已安装的 use-showai Skill；连接信息未知或变化时查询一次 showai_capabilities，复用能力结果，并用 project_context 或 projects_list 核对目标项目。
 
 ## 从源码安装
 

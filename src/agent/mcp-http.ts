@@ -41,13 +41,7 @@ import { inlinePresentation, inlineReader } from "./presentation";
 import { serverBaseUrl } from "../sync/server-url";
 import { FileStore } from "../core/store";
 import type { CloudBrowserCheck } from "./cloud-browser-check";
-import { getMcpGuide } from "./mcp-guides";
 import { McpCallLog, type McpLogResponse } from "./mcp-call-log";
-import {
-  mcpSkillGuide,
-  mcpSkillNames,
-  remoteSkillInstructions,
-} from "./mcp-skill-guides";
 
 const writeTools = new Set([
   ...organizationWriteTools,
@@ -69,7 +63,6 @@ const localOnly = new Set([
   "workspace_resolve",
 ]);
 const publicTools = new Set([
-  "guide",
   "showai_capabilities",
   "public_catalog_list",
   "public_catalog_describe",
@@ -243,13 +236,6 @@ export async function createMcpHttpApp(options: McpHttpOptions) {
     context?: RemoteWorkspaceContext,
     grant?: ProjectGrant,
   ) {
-    const remoteTools = new Set([
-      ...publicTools,
-      "projects_list",
-      ...(!options.local || options.local.access === "all"
-        ? ["project_create"]
-        : []),
-    ]);
     const server = createMcpServer({
       root: context?.root ?? join(state, "public"),
       projectId: context?.projectId ?? "unselected",
@@ -261,7 +247,7 @@ export async function createMcpHttpApp(options: McpHttpOptions) {
         channel: "mcp",
         ...(grant ? { readerId: `grant:${grant.id}` } : {}),
       },
-      instructions: remoteSkillInstructions,
+      instructions: "Read use-showai Skill. HTTP; authorized projects.",
       presentation: {
         transport: "http",
         storePresentation: (value) => storePresentation(value, true),
@@ -272,57 +258,6 @@ export async function createMcpHttpApp(options: McpHttpOptions) {
       decorateTool(name: string, tool: RegisteredTool) {
         if (localOnly.has(name)) {
           tool.remove();
-          return;
-        }
-        remoteTools.add(name);
-        if (name === "guide") {
-          const shape = getObjectShape(tool.inputSchema);
-          if (!shape) throw new Error("Missing guide input schema.");
-          const original = tool.handler as ToolCallback<z.ZodRawShape>;
-          tool.update({
-            description:
-              "Start every ShowAI task with guide() to read the shared Skill entrypoint and task routes. Then use skill to read one workflow, or skill/file to read an exact referenced file. No installed plugin or local files are needed. topic still reads runtime operation guides; topic presentation is the presentation workflow for hosts without the show-document Skill. knownHash is only for exact content already held this turn.",
-            paramsSchema: {
-              ...shape,
-              skill: z.enum(mcpSkillNames).optional(),
-              file: z.string().min(1).max(500).optional(),
-              section: z.string().min(1).max(500).optional(),
-            },
-            _meta: { securitySchemes: [{ type: "noauth" }] },
-            callback: async (args, extra) => {
-              if ("topic" in args && args.topic) {
-                if (args.skill || args.file || args.section)
-                  return mcpFailure(
-                    new Error("Choose either topic or skill/file, not both."),
-                  );
-                return original(args, extra);
-              }
-              if ((args.file || args.section) && !args.skill)
-                return mcpFailure(new Error("file and section require skill."));
-              try {
-                return mcpSuccess({
-                  ...mcpSkillGuide(args),
-                  connection: {
-                    mcpUrl: `${origin}/mcp`,
-                    ...(options.local
-                      ? {
-                          storage: "local",
-                          authorization: options.local.accessKeyOnly
-                            ? "This direct LAN connection uses an access key created in desktop ShowAI. Configure the client Authorization: Bearer header. Keys follow the desktop project policy, expire after 90 days, and can be revoked in ShowAI. Writes save directly in the desktop library. Do not use device filesystem paths."
-                            : "Approve the matching connection request in the desktop ShowAI App; the OAuth page returns automatically. Older versions may use a pairing code. Access follows the desktop library policy and OAuth grant. Full-library grants include future projects and project creation; selected grants stay restricted. Writes save directly in the desktop library; no cloud synchronization is required. Do not use device filesystem paths.",
-                        }
-                      : {}),
-                    tools: [...remoteTools].sort(),
-                    discovery:
-                      "These tools are exposed by this exact MCP server. The host may load only a subset initially. Use its tool discovery for the selected connection to load a listed tool before declaring it missing. Never substitute a similarly named connection. A listed tool does not imply the account has its required OAuth scope or project permission.",
-                  },
-                  ...(!args.skill ? { operationGuides: getMcpGuide() } : {}),
-                });
-              } catch (error) {
-                return mcpFailure(error);
-              }
-            },
-          });
           return;
         }
         const shape = getObjectShape(tool.inputSchema);

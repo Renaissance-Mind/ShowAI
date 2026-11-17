@@ -1,0 +1,238 @@
+{
+  "changes": [
+    {
+      "date": "2026-11-17",
+      "version": "0.12.0",
+      "before": "guide MCP tool and mandatory guide-first discovery",
+      "now": "Read the installed ShowAI Skills and their bundled operation formats. The guide MCP tool has been removed; catalog guide views and the operator CLI guide remain available. showai_capabilities reports connection capabilities without workflow instructions."
+    },
+    {
+      "date": "2026-11-16",
+      "version": "0.12.0",
+      "before": "show_component only returns complete presentations",
+      "now": "Optional live:true with local MCP Apps adds stable viewId/revision; show_component_update/read/close operate on the same temporary view. Omitted live retains existing behavior. No old call translation is required."
+    },
+    {
+      "date": "2026-11-16",
+      "version": "0.12.0",
+      "before": "page_read image/html: only full-height capture",
+      "now": "page_read adds capture:\"viewport\"|\"full\" (default full), scrollToBlockId and inspect:{layout:true,blockIds?}. Old calls keep their full capture; no translation required."
+    },
+    {
+      "date": "2026-10-23",
+      "version": "0.10.0",
+      "before": "dataset_list",
+      "now": "dataset_read {action:\"list\"}"
+    },
+    {
+      "date": "2026-10-23",
+      "version": "0.10.0",
+      "before": "dataset_read {datasetId,path?}",
+      "now": "dataset_read {action:\"read\",datasetId,path?}"
+    },
+    {
+      "date": "2026-10-23",
+      "version": "0.10.0",
+      "before": "dataset_create",
+      "now": "dataset_write {action:\"create\",...}"
+    },
+    {
+      "date": "2026-10-23",
+      "version": "0.10.0",
+      "before": "dataset_apply",
+      "now": "dataset_write {action:\"apply\",...}"
+    },
+    {
+      "date": "2026-10-23",
+      "version": "0.10.0",
+      "before": "dataset_link",
+      "now": "dataset_write {action:\"link\",...}"
+    },
+    {
+      "date": "2026-10-23",
+      "version": "0.10.0",
+      "before": "folders_list",
+      "now": "organization_read {action:\"folders\"}"
+    },
+    {
+      "date": "2026-10-23",
+      "version": "0.10.0",
+      "before": "folder_create",
+      "now": "organization_update {action:\"create_folder\",...}"
+    },
+    {
+      "date": "2026-10-23",
+      "version": "0.10.0",
+      "before": "folder_update",
+      "now": "organization_update {action:\"update_folder\",...}"
+    },
+    {
+      "date": "2026-10-23",
+      "version": "0.10.0",
+      "before": "project_update",
+      "now": "organization_update {action:\"update_project\",...}"
+    },
+    {
+      "date": "2026-10-23",
+      "version": "0.10.0",
+      "before": "directory_sort",
+      "now": "organization_update {action:\"sort\",...}"
+    },
+    {
+      "date": "2026-10-23",
+      "version": "0.10.0",
+      "before": "entry_move",
+      "now": "organization_update {action:\"move\",...}"
+    },
+    {
+      "date": "2026-10-23",
+      "version": "0.10.0",
+      "before": "sidebar_read",
+      "now": "organization_read {action:\"sidebar\"}"
+    },
+    {
+      "date": "2026-10-23",
+      "version": "0.10.0",
+      "before": "sidebar_group_create",
+      "now": "organization_update {action:\"create_group\",...}"
+    },
+    {
+      "date": "2026-10-23",
+      "version": "0.10.0",
+      "before": "sidebar_group_update",
+      "now": "organization_update {action:\"update_group\",...}"
+    },
+    {
+      "date": "2026-10-23",
+      "version": "0.10.0",
+      "before": "sidebar_project_move",
+      "now": "organization_update {action:\"move_project\",...}"
+    },
+    {
+      "date": "2026-10-23",
+      "version": "0.10.0",
+      "before": "drafts_list",
+      "now": "draft_read {action:\"list\",...}"
+    },
+    {
+      "date": "2026-10-23",
+      "version": "0.10.0",
+      "before": "draft_read {draftId}",
+      "now": "draft_read {action:\"read\",draftId}"
+    },
+    {
+      "date": "2026-10-23",
+      "version": "0.10.0",
+      "before": "draft_save",
+      "now": "draft_write {action:\"save\",...}"
+    },
+    {
+      "date": "2026-10-23",
+      "version": "0.10.0",
+      "before": "draft_complete",
+      "now": "draft_write {action:\"complete\",...}"
+    },
+    {
+      "date": "2026-10-23",
+      "version": "0.10.0",
+      "before": "workspace_conflicts",
+      "now": "workspace_conflict {action:\"list\"}"
+    },
+    {
+      "date": "2026-10-23",
+      "version": "0.10.0",
+      "before": "workspace_conflict {id}",
+      "now": "workspace_conflict {action:\"read\",id}"
+    },
+    {
+      "date": "2026-10-23",
+      "version": "0.10.0",
+      "before": "workspace_resolve {id,resolution}",
+      "now": "workspace_resolve {action:\"resolve\",id,resolution}"
+    },
+    {
+      "date": "2026-10-23",
+      "version": "0.10.0",
+      "before": "workspace_recover_package {conflictId,clientId}",
+      "now": "workspace_resolve {action:\"recover_package\",id,clientId}"
+    },
+    {
+      "date": "2026-10-23",
+      "version": "0.10.0",
+      "before": "catalog_fork",
+      "now": "catalog_version {action:\"fork\",...}"
+    },
+    {
+      "date": "2026-10-23",
+      "version": "0.10.0",
+      "before": "catalog_merge_resolve",
+      "now": "catalog_version {action:\"merge\",...}"
+    },
+    {
+      "date": "2026-10-23",
+      "version": "0.10.0",
+      "before": "component_import {directory}",
+      "now": "component_save {directory,legacy:true}"
+    },
+    {
+      "date": "2026-10-23",
+      "version": "0.10.0",
+      "before": "board_read tilePixels/overlapPixels/maxImages/pageLimit/elementLimit/margin/imageScope/theme",
+      "now": "removed: board_read uses fixed capture settings (ignored when sent)"
+    },
+    {
+      "date": "2026-10-23",
+      "version": "0.10.0",
+      "before": "page_read out/overwrite",
+      "now": "removed on every connection"
+    },
+    {
+      "date": "2026-10-28",
+      "version": "0.10.0",
+      "before": "page_read out/overwrite",
+      "now": "restored on local connections: writes the read to a file and returns its path, sha256, hash and revision"
+    },
+    {
+      "date": "2026-10-28",
+      "version": "0.10.0",
+      "before": "page_apply operations only inline",
+      "now": "page_apply operationsFile (local): a JSON file with the operations array"
+    },
+    {
+      "date": "2026-10-28",
+      "version": "0.10.0",
+      "before": "dataset_write value/operations only inline",
+      "now": "dataset_write valueFile / operationsFile (local)"
+    },
+    {
+      "date": "2026-10-28",
+      "version": "0.10.0",
+      "before": "component_save directory for legacy packages only",
+      "now": "component_save directory for any package (manifest.documentation required unless legacy:true)"
+    },
+    {
+      "date": "2026-10-28",
+      "version": "0.10.0",
+      "before": "dataset_read {action:\"read\"} returns the whole value",
+      "now": "dataset_read read also takes sinceHash (record-level changes, paged with offset/limit) and out (local)"
+    },
+    {
+      "date": "2026-10-28",
+      "version": "0.10.0",
+      "before": "catalog_describe view source only inline",
+      "now": "catalog_describe view source with out (local): writes the package folder for component_save directory"
+    },
+    {
+      "date": "2026-10-28",
+      "version": "0.10.0",
+      "before": "page_diff {pageId,sinceHash} with whole field values",
+      "now": "page_diff record-level entries, paged with offset/limit/nextOffset, blockIds, out (local)"
+    },
+    {
+      "date": "2026-10-28",
+      "version": "0.10.0",
+      "before": "upgrading a component: block.remove + component.insert with all props",
+      "now": "page_apply {type:\"component.ref.set\",blockId,version,integrity,componentId?} keeps block id and props"
+    }
+  ]
+}

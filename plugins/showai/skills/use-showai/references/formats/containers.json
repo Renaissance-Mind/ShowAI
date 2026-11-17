@@ -1,0 +1,43 @@
+{
+  "operations": [
+    {
+      "type": "surface.upgrade"
+    },
+    {
+      "type": "surface.create",
+      "kind": "board",
+      "nodeId": "analysis",
+      "name": "Analysis"
+    },
+    {
+      "type": "surface.create",
+      "kind": "page",
+      "parentId": "analysis",
+      "nodeId": "evidence",
+      "name": "Evidence"
+    },
+    {
+      "type": "surface.layout.set",
+      "nodeId": "analysis",
+      "layout": {
+        "x": 0,
+        "y": 0,
+        "width": 800,
+        "height": 460,
+        "heightMode": "fixed"
+      }
+    },
+    {
+      "type": "surface.view.save",
+      "surfaceId": "analysis",
+      "view": {
+        "id": "reading",
+        "name": "Evidence",
+        "targets": [
+          "evidence"
+        ]
+      },
+      "initial": true
+    }
+  ]
+}

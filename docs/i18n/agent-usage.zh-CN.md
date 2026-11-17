@@ -157,4 +157,4 @@ Codex 插件声明 `SHOWAI_HOST_DISPLAY=mcp-app`。`show_component` 的 `deliver
 
 绑定内部对象前，先读 showai_capabilities.componentRuntime，再以 catalog_describe view:"contract" 查询精确组件版本。返回的是编译器与阅读器共用的契约；没有声明的包标为 legacy，不根据可点击画面推断事件能力。传 instance:{pageId,blockId} 枚举页面实际对象，objectOffset/objectLimit 分页，共享数据也会先解析。
 
-CLI 使用 showai catalog describe ID --view contract --project PROJECT --page PAGE --block BLOCK --json。没有 instance 时对象来自 defaultData，不代表当前页面。新组件提供 contract version 1；声明对象、事件、子内容与动作前，读取 guide component 的 input.runtimeContractSchema 和 create-component Skill。数据仍通过已有 Page 操作编辑，保持业务 ID 稳定；内容块引用沿声明更新。组件版本保持不可变；升级事件契约时，必要的父级绑定修改应放在同一页面变更中。旧组件和页面保留原编译包，通过兼容入口运行。
+CLI 使用 showai catalog describe ID --view contract --project PROJECT --page PAGE --block BLOCK --json。没有 instance 时对象来自 defaultData，不代表当前页面。新组件提供 contract version 1；声明对象、事件、子内容与动作前，读取已安装的 create-component Skill 及其组件制作格式中的 runtimeContractSchema。数据仍通过已有 Page 操作编辑，保持业务 ID 稳定；内容块引用沿声明更新。组件版本保持不可变；升级事件契约时，必要的父级绑定修改应放在同一页面变更中。旧组件和页面保留原编译包，通过兼容入口运行。

@@ -54,9 +54,19 @@ test("library discovery is read-only; parallel project calls retain explicit ide
     "showai-mcp-v1",
   );
   expect((await call(c, "project_context")).scope).toBe("library");
-  const guide = await call(c, "guide", { topic: "authoring" });
-  expect(guide.commands).toBeUndefined();
-  expect(guide.tools).toContain("page_save");
+  expect((await c.listTools()).tools.map((tool) => tool.name)).not.toContain("guide");
+  expect(c.getInstructions()).toContain("Read use-showai Skill");
+  const capabilities = await call(c, "showai_capabilities");
+  expect(capabilities).not.toHaveProperty("workflow");
+  expect(capabilities).not.toHaveProperty("next");
+  expect(capabilities.templateWorkflow).not.toHaveProperty("baseline");
+  expect(capabilities.authoring).not.toHaveProperty("migrations");
+  expect(capabilities.datasets).not.toHaveProperty("guide");
+  expect(capabilities.authoring.workRecords.available).toBe(true);
+  expect(capabilities.presentation.show.maxComponents).toBe(5);
+  const removed = await c.callTool({ name: "guide", arguments: {} });
+  expect(removed.isError).toBe(true);
+  expect((removed.structuredContent as any).error.nextStep).toContain("installed ShowAI Skills");
   expect(await call(c, "projects_list")).toEqual([]);
   const paths = [join(root, "host-a"), join(root, "host-b")];
   await Promise.all(paths.map((p) => mkdir(p)));

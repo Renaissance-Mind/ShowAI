@@ -1,0 +1,6 @@
+{
+  "document": "Complete Page/Board document",
+  "componentSources": "Editable component packages, optional",
+  "display": "Determined by the harness",
+  "synchronization": "Determined by the project connection"
+}

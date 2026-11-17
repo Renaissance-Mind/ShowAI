@@ -116,7 +116,7 @@
   },
   {
     "name": "dataset_write",
-    "description": "Change shared datasets (guide datasets). create: value, or fromBlock {pageId,blockId,baseHash} to share and bind a block's props. apply: read baseHash + operations {op:\"set\",path,value}, {op:\"remove\",path}, {op:\"insert\",path:list,value,after?}, {op:\"move\",path:item,after}; path selects records by id ([id=t1]). link url: online json/csv/tsv/xlsx, read-only. transform: read-only data from script \"function transform(inputs, helpers)\", inputs {name:datasetId}; dryRun:true runs it unsaved. link path: value in a local json/csv/tsv file (xlsx read-only); path:null copies it back. *File fields read from a file. Actions: create{name,datasetId?,description?,value?,valueFile?,schema?,fromBlock?}; apply{datasetId,baseHash,operations?,operationsFile?,name?,description?,schema?}; link{datasetId?,path?,url?,format?,refreshSeconds?,use?,name?,description?,value?,valueFile?,schema?,baseHash?}; transform{datasetId?,baseHash?,name?,description?,schema?,inputs?,script?,scriptFile?,dryRun?}.",
+    "description": "Change shared datasets; see use-showai. create: value, or fromBlock {pageId,blockId,baseHash} to share and bind a block's props. apply: read baseHash + operations {op:\"set\",path,value}, {op:\"remove\",path}, {op:\"insert\",path:list,value,after?}, {op:\"move\",path:item,after}; path selects records by id ([id=t1]). link url: online json/csv/tsv/xlsx, read-only. transform: read-only data from script \"function transform(inputs, helpers)\", inputs {name:datasetId}; dryRun:true runs it unsaved. link path: value in a local json/csv/tsv file (xlsx read-only); path:null copies it back. *File fields read from a file. Actions: create{name,datasetId?,description?,value?,valueFile?,schema?,fromBlock?}; apply{datasetId,baseHash,operations?,operationsFile?,name?,description?,schema?}; link{datasetId?,path?,url?,format?,refreshSeconds?,use?,name?,description?,value?,valueFile?,schema?,baseHash?}; transform{datasetId?,baseHash?,name?,description?,schema?,inputs?,script?,scriptFile?,dryRun?}.",
     "inputSchema": {
       "type": "object",
       "properties": {
@@ -920,54 +920,6 @@
     }
   },
   {
-    "name": "guide",
-    "description": "Read a focused ShowAI guide; without topic, list the guides.",
-    "inputSchema": {
-      "type": "object",
-      "properties": {
-        "topic": {
-          "type": "string",
-          "enum": [
-            "presentation",
-            "integration",
-            "workspace",
-            "authoring",
-            "reading",
-            "document",
-            "datasets",
-            "whiteboard",
-            "containers",
-            "catalog",
-            "component",
-            "templates",
-            "template-extraction",
-            "versions",
-            "recovery",
-            "sync",
-            "export",
-            "publish",
-            "import",
-            "migrations"
-          ]
-        },
-        "knownHash": {
-          "type": "string",
-          "pattern": "^[a-f0-9]{64}$"
-        }
-      },
-      "$schema": "http://json-schema.org/draft-07/schema#",
-      "additionalProperties": false
-    },
-    "annotations": {
-      "readOnlyHint": true,
-      "destructiveHint": false,
-      "openWorldHint": false
-    },
-    "execution": {
-      "taskSupport": "forbidden"
-    }
-  },
-  {
     "name": "template_context",
     "description": "Read the selected templates whole for this task: README, every guide and the template component index, with exact refs. templates:[] records only the system workflow ref.",
     "inputSchema": {
@@ -1090,7 +1042,7 @@
   },
   {
     "name": "page_read",
-    "description": "Read Page JSON/image/html; capture/inspect: guide reading. out writes a file.",
+    "description": "Read Page JSON/image/html; capture and inspection follow the installed use-showai Skill. out writes a file.",
     "inputSchema": {
       "type": "object",
       "properties": {
@@ -1554,7 +1506,7 @@
   },
   {
     "name": "page_create",
-    "description": "Create a Page or Board. Prefer blocks:[{kind,data}] in reading order, e.g. {kind:\"text\",data:{format:\"markdown\",content:\"...\"}}, and add more with page_apply component.insert. import:{source, importer?, dryRun?} imports a file, folder or zip path into parentId instead (guide import).",
+    "description": "Create a Page or Board. Prefer blocks:[{kind,data}] in reading order, e.g. {kind:\"text\",data:{format:\"markdown\",content:\"...\"}}, and add more with page_apply component.insert. import:{source, importer?, dryRun?} imports a file, folder or zip path into parentId instead (see the installed use-showai import reference).",
     "inputSchema": {
       "type": "object",
       "properties": {
@@ -1770,7 +1722,7 @@
   },
   {
     "name": "page_apply",
-    "description": "Apply operations by stable block id with the Page's baseHash. Insert components with {type:\"component.insert\",kind,data,parentId?,afterId?}, change their data with {type:\"component.props.set\",blockId,props} and switch a custom component to another revision with {type:\"component.ref.set\",blockId,version,integrity,componentId?} (keeps id and props). Comment with {type:\"comment\",text,blockId?,quote?} or {type:\"comment\",threadId,text?,resolved?}; page_read returns open comments. Other operations: guide authoring. Replies with a receipt whose changedBlocks.added lists new block ids; response:\"source\" adds the document. operationsFile reads the operations array from a JSON file.",
+    "description": "Apply operations by stable block id with the Page's baseHash. Insert components with {type:\"component.insert\",kind,data,parentId?,afterId?}, change their data with {type:\"component.props.set\",blockId,props} and switch a custom component to another revision with {type:\"component.ref.set\",blockId,version,integrity,componentId?} (keeps id and props). Comment with {type:\"comment\",text,blockId?,quote?} or {type:\"comment\",threadId,text?,resolved?}; page_read returns open comments. Other operations: the installed use-showai authoring reference. Replies with a receipt whose changedBlocks.added lists new block ids; response:\"source\" adds the document. operationsFile reads the operations array from a JSON file.",
     "inputSchema": {
       "type": "object",
       "properties": {
@@ -2391,7 +2343,7 @@
   },
   {
     "name": "catalog_version",
-    "description": "Save a project-owned revision (fork an exact revision, or save a reviewed merge), or remove a revision; remove without version removes every revision in that scope and refuses with IN_USE while pages, packages or publications use it. importer saves an importer (guide import). Actions: importer{manifest,script}; remove{kind,id,version?,scope?}; fork{ref,id?,version,name?}; merge{base,ours,theirs,id?,version,resolved}.",
+    "description": "Save a project-owned revision (fork an exact revision, or save a reviewed merge), or remove a revision; remove without version removes every revision in that scope and refuses with IN_USE while pages, packages or publications use it. importer saves an importer (see the installed use-showai import reference). Actions: importer{manifest,script}; remove{kind,id,version?,scope?}; fork{ref,id?,version,name?}; merge{base,ours,theirs,id?,version,resolved}.",
     "inputSchema": {
       "type": "object",
       "properties": {
@@ -3420,7 +3372,7 @@
       "type": "object",
       "properties": {
         "document": {
-          "description": "ShowAI document; format: guide(document).",
+          "description": "ShowAI document; see the installed use-showai Skill's document format reference.",
           "type": "object",
           "propertyNames": {
             "type": "string"

@@ -494,8 +494,7 @@ test("two pages share one dataset; both write, merge and conflict at the field",
     protocol: "showai-datasets-v1",
     available: true,
   });
-  const guide = await ok("guide", { topic: "datasets" });
-  expect(guide.tools).toContain("dataset_write");
+  expect(capabilities.datasets.tools).toContain("dataset_write");
 }, 240_000);
 
 test("sharing a database without a local list keeps its views with the block", async () => {

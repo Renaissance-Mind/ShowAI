@@ -54,7 +54,7 @@ guides 按阅读顺序列出 `guides/` 下的 Markdown 指南，最多 20 个，
 
 按阶段组织的旧模板继续可读。schemaVersion 3 把理解意图、收集材料、呈现逻辑、设计稿四个阶段分别映射到指南；schemaVersion 1、2 声明六个阶段（intent、evidence、understanding、design、authoring、review），schemaVersion 1 还可带 page.json 骨架。template_context 按阶段顺序返回它们的指南；六阶段模板只返回 intent、evidence、understanding 与 design 指南，不返回 authoring 与 review。新模板使用 schemaVersion 4。
 
-每个任务上下文都包含 system-presentation 引用。它的 README 与指南从同一来源嵌入 show-document Skill；无本机 Skill 的宿主用 `guide({topic:"presentation"})` 读取同样的内容。项目模板不能替代或关闭 system-presentation。模板指南通过 template_context 读取，不安装为 Skill。旧 document/composition/contentGuide 模板继续可读。
+每个任务上下文都包含 system-presentation 引用。它的 README 与指南从同一来源嵌入已安装的 show-document Skill。项目模板不能替代或关闭 system-presentation。模板指南通过 template_context 读取，不安装为 Skill。旧 document/composition/contentGuide 模板继续可读。
 
 ## 内置模板
 
@@ -77,7 +77,7 @@ guides 按阅读顺序列出 `guides/` 下的 Markdown 指南，最多 20 个，
 ## MCP 工作流
 
 1. 检查 templateWorkflow.protocol 为 showai-template-workflow-v3，并确定真实授权项目。
-2. 一次读完制作流程：已加载的 show-document Skill 包含全文；无 Skill 的宿主调用 `guide({topic:"presentation"})`。
+2. 一次读完已安装的 show-document Skill，其中包含完整的制作流程。
 3. 按 scenarios 从 `catalog_list({kind:"template",projectId})` 中选择模板，没有合适的就不用模板。`template_context({projectId,templates:[{id,scope,version?,integrity?}]})` 返回每个所选模板的 README、全部指南和带精确引用的分页组件目录。一次读完，在各环节叠加使用。knownHash 仅用于实际持有的上下文，按 componentPage.next 继续。
 4. 把各环节的记录写进 `showai_capabilities.authoring.workRecords` 返回的记录目录，每份作品一个文件夹：`brief.md`（读者简报）、`material.md`（材料底稿）、`presentation-plan.json`（nodes 为呈现规划，scenes 为设计稿）和 `review.md`（评审记录）。第一次写入页面之前，用 show-document Skill 的 `scripts/check_plan.py` 检查规划。没有文件系统的远程连接把记录写在对话里。
 5. template_apply 应用模板（绑定精确引用的空白 Page），或遵循用户的空白页选择；按设计稿制作页面。
@@ -102,4 +102,4 @@ showai mcp --project PROJECT --templates my-template@1.0.0
 
 启动 --templates 需要 --project；library/HTTP 用工具选择。插件支持 SHOWAI_TEMPLATES 与 SHOWAI_PROJECT_ID。CLI 管理本机目录，Agent 文档操作使用 MCP。
 
-Codex 包使用 plugin.json/mcp.json，Claude Code 使用 .claude-plugin/plugin.json/.mcp.json。远程包改用 HTTPS；ChatGPT 直接从 endpoint 读取制作流程与模板指南，并按 OAuth 权限操作，无需本机插件。更新 Skill 不自动更新已运行软件/MCP；launcher 会检查协议并报告不兼容。
+Codex 包使用 plugin.json/mcp.json，Claude Code 使用 .claude-plugin/plugin.json/.mcp.json。远程包改用 HTTPS；ChatGPT 网页安装包含完整 Skill 与连接映射的插件，并按 OAuth 权限操作。更新 Skill 不自动更新已运行软件/MCP。

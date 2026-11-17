@@ -65,6 +65,6 @@ node dist-runtime/scripts/cli.mjs guide --json
 node dist-runtime/scripts/cli.mjs runtime info --json
 ```
 
-For installed applications, use the actual command from Settings or the selected library's `agent-runtime.json`. Agent document operations use MCP. Hosted ChatGPT connections obtain shared workflow text through `guide`; no local Skill installation is required.
+For installed applications, use the actual command from Settings or the selected library's `agent-runtime.json`. Agent document operations use MCP, and workflows come from the installed ShowAI Skills for both local and hosted connections.
 
 Report documentation problems through [GitHub Issues](https://github.com/Renaissance-Mind/ShowAI/issues), including the affected language, guide and runtime version. When contributing, update the paired English/Chinese guide and both indexes.

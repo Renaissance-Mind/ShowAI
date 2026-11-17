@@ -1,51 +1,5 @@
 [
   {
-    "name": "guide",
-    "description": "Read a focused ShowAI authoring or integration guide.",
-    "inputSchema": {
-      "type": "object",
-      "properties": {
-        "topic": {
-          "type": "string",
-          "enum": [
-            "presentation",
-            "integration",
-            "workspace",
-            "authoring",
-            "reading",
-            "document",
-            "datasets",
-            "whiteboard",
-            "containers",
-            "catalog",
-            "component",
-            "templates",
-            "template-extraction",
-            "versions",
-            "recovery",
-            "sync",
-            "export",
-            "publish",
-            "import",
-            "migrations"
-          ]
-        },
-        "knownHash": {
-          "type": "string",
-          "pattern": "^[a-f0-9]{64}$"
-        }
-      },
-      "$schema": "http://json-schema.org/draft-07/schema#",
-      "additionalProperties": false
-    },
-    "annotations": {
-      "readOnlyHint": true
-    },
-    "execution": {
-      "taskSupport": "forbidden"
-    }
-  },
-  {
     "name": "showai_capabilities",
     "description": "Return this connection's ShowAI capabilities.",
     "inputSchema": {
@@ -214,7 +168,7 @@
       "type": "object",
       "properties": {
         "document": {
-          "description": "ShowAI document; format: guide(document).",
+          "description": "ShowAI document; see the installed use-showai Skill's document format reference.",
           "type": "object",
           "propertyNames": {
             "type": "string"

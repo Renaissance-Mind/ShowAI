@@ -1216,7 +1216,7 @@ const AGENT_GUIDANCE: Record<string, { nextStep: string; userMessage: string }> 
     },
     INVALID_DATA: {
       nextStep:
-        "Correct the input described in message and call the same tool again; read guide for the expected format.",
+        "Correct the input described in message and call the same tool again; read the installed ShowAI Skill reference for the expected format.",
       userMessage:
         "ShowAI rejected part of the request as invalid. Nothing was saved.",
     },

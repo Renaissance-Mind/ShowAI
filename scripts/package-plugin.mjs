@@ -11,12 +11,14 @@ import {
 import { dirname, resolve, join, relative, sep, isAbsolute } from "node:path";
 import { fileURLToPath } from "node:url";
 import { parseTemplateReadme } from "../src/portable/template-bundle.mjs";
+import { packageSkillFormats } from "./package-skill-formats.mjs";
 import {
   bindHostSkills,
   stageHostPlugin,
 } from "../src/plugin/host-package.mjs";
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const plugin = join(root, "plugins/showai");
+await packageSkillFormats();
 const args = process.argv.slice(2);
 const settings = {};
 for (let i = 0; i < args.length; i += 2) {

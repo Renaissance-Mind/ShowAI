@@ -37,8 +37,11 @@ async function compare(file: string, actual: string) {
   }
   expect(actual).toBe(await readFile(path, "utf8"));
 }
-const listing = async (client: Client) =>
-  JSON.stringify((await client.listTools()).tools, null, 2) + "\n";
+const listing = async (client: Client) => {
+  const tools = (await client.listTools()).tools;
+  expect(tools.map((tool) => tool.name)).not.toContain("guide");
+  return JSON.stringify(tools, null, 2) + "\n";
+};
 async function inMemory(server: McpServer) {
   const [left, right] = InMemoryTransport.createLinkedPair();
   const client = new Client({ name: "entry-baselines", version: "1" });

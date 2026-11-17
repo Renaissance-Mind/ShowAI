@@ -17,8 +17,6 @@ import {
   inspectComponentDirectory,
   writeComponentDirectory,
 } from "../component-directory";
-import { GUIDE_TOPICS } from "../guides";
-import { getMcpGuide } from "../mcp-guides";
 import {
   changeSchema,
   jsonObject,
@@ -33,17 +31,6 @@ const revisionId = z.string().optional();
 const revisionVersion = z.string();
 
 export const contextTools: ToolDeclaration[] = [
-  {
-    name: "guide",
-    access: "read",
-    description: "Read a focused ShowAI guide; without topic, list the guides.",
-    input: () => ({
-      topic: z.enum(GUIDE_TOPICS).optional(),
-      knownHash: knownHash(),
-    }),
-    run: ({ call }, { topic, knownHash }) =>
-      call(async () => getMcpGuide(topic, knownHash)),
-  },
   {
     name: "template_context",
     access: "read",
@@ -83,7 +70,6 @@ export const contextTools: ToolDeclaration[] = [
           projectId,
           knownCatalogRevision,
         ),
-        next: "guide workspace",
       })),
   },
 ];
@@ -221,7 +207,7 @@ export const catalogTools: ToolDeclaration[] = [
           if (!manifest.documentation && legacy !== true)
             throw new CoreError(
               "INVALID_DATA",
-              `${String(directory)}/manifest.json has no documentation. New components need manifest.documentation version 2 (guide component); pass legacy:true only to import an existing package that predates it.`,
+              `${String(directory)}/manifest.json has no documentation. New components need manifest.documentation version 2 (see the installed create-component Skill); pass legacy:true only to import an existing package that predates it.`,
             );
           return service.importComponent(String(directory), projectId);
         }
@@ -236,7 +222,7 @@ export const catalogTools: ToolDeclaration[] = [
         )
           throw new CoreError(
             "INVALID_DATA",
-            `New component authoring requires manifest.documentation. Read guide component for the contract${localFiles ? "; an existing package that predates it is imported with directory and legacy:true" : ""}.`,
+            `New component authoring requires manifest.documentation. Read the installed create-component Skill and its bundled component format${localFiles ? "; an existing package that predates it is imported with directory and legacy:true" : ""}.`,
           );
         return service.saveComponent(
           projectId,
@@ -322,7 +308,7 @@ export const catalogTools: ToolDeclaration[] = [
     name: "catalog_version",
     access: "write",
     summary:
-      "Save a project-owned revision (fork an exact revision, or save a reviewed merge), or remove a revision; remove without version removes every revision in that scope and refuses with IN_USE while pages, packages or publications use it. importer saves an importer (guide import).",
+      "Save a project-owned revision (fork an exact revision, or save a reviewed merge), or remove a revision; remove without version removes every revision in that scope and refuses with IN_USE while pages, packages or publications use it. importer saves an importer (see the installed use-showai import reference).",
     actions: ({ service, projectId, call }) => ({
       importer: {
         fields: {

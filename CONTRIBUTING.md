@@ -73,7 +73,7 @@ Check every documented command against the code that implements it, and say whic
 
 ## Agent plugin and Skills
 
-The plugin source is `plugins/showai/`: Skills, host adapters and the MCP launcher. `npm run package:plugin` (also part of `npm run build`) checks each Skill's frontmatter and relative links, then regenerates the host packages `plugins/showai-codex`, `plugins/showai-claude`, `plugins/showai-antigravity` and `plugins-kimi/showai`. Edit only `plugins/showai/` and commit the regenerated copies with it. After adding or removing a Skill file, also run `node scripts/mcp-skill-source.mjs` so the hosted MCP gateway serves the same files.
+The plugin source is `plugins/showai/`: Skills, host adapters and the MCP launcher. `npm run package:plugin` (also part of `npm run build`) checks each Skill's frontmatter and relative links, then regenerates the host packages `plugins/showai-codex`, `plugins/showai-claude`, `plugins/showai-antigravity` and `plugins-kimi/showai`. Edit only `plugins/showai/` and commit the regenerated copies with it. Packaging also generates the Skill operation-format resources from the source contracts.
 
 A Skill's `description` decides when an Agent loads it, and its body is read by an Agent that has no other context. After changing either, give a fresh Agent session the installed Skills and a few realistic requests, and check which Skill it picks and whether it can tell what to do next from the text alone. Describe these requests and the result in the pull request.
 

@@ -74,8 +74,8 @@ test("two real stdio sessions retain different pinned templates and read them wh
   expect(blank.context.templates).toEqual([]);
   expect(blank.system.required).toBe(true);
   expect(blank.templates).toEqual([]);
-  const workflow = await call(a, "guide", { topic: "presentation" });
-  expect(workflow.markdown).toContain("环节四：设计稿");
+  expect(tools).not.toContain("guide");
+  expect(blank.system.read).toContain("installed show-document Skill");
   expect((await call(a, "template_context")).context).toEqual(first.context);
   expect(
     (await call(a, "template_context", { knownHash: first.context.hash }))

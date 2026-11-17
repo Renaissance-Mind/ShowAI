@@ -17,9 +17,9 @@ Agent 运行期间，人可以继续书写、画画、选择对象和切换对�
 
 ## 组织 Page 与组件
 
-Board 中的新文字、数据图表和交互组件等目录组件放在 Page 容器中；同一段讲解的多个组件尽量放进同一个 Page，让文字顺序和宽度一致。使用当前连接 `guide` 的 containers/authoring 说明及组件 Schema；`component.insert` 的 `kind:"page"` 创建原生 Page，后续插入明确使用该 Page 的稳定 ID。宿主的组件插入会为 Board 上的普通组件建立 Page 外层。手写笔迹、箭头和形状保留画布对象语义。
+Board 中的新文字、数据图表和交互组件等目录组件放在 Page 容器中；同一段讲解的多个组件尽量放进同一个 Page，让文字顺序和宽度一致。使用[原生容器格式](../use-showai/references/formats/containers.json)、[页面操作格式](../use-showai/references/formats/authoring.json)及组件 Schema；`component.insert` 的 `kind:"page"` 创建原生 Page，后续插入明确使用该 Page 的稳定 ID。宿主的组件插入会为 Board 上的普通组件建立 Page 外层。手写笔迹、箭头和形状保留画布对象语义。
 
-图形自己的文字写进矩形、椭圆或箭头的 `attrs.label`，不另建 Page 叠在图形上；方框加箭头的草图用一次 `diagram.insert` 写入。图形文字、字号、可省略字段、连线绑定，以及原生图形与流程图组件的取舍见 [Board 对象编辑](../use-showai/references/board-authoring.md)，操作字段读取 `guide` 的 whiteboard 说明。用户正在调整的图只改其请求涉及的图形和连线，保留其余位置；用户要求整理连好的图形时，对涉及的对象用 `diagram.arrange` 沿连线重新排布。
+图形自己的文字写进矩形、椭圆或箭头的 `attrs.label`，不另建 Page 叠在图形上；方框加箭头的草图用一次 `diagram.insert` 写入。图形文字、字号、可省略字段、连线绑定，以及原生图形与流程图组件的取舍见 [Board 对象编辑](../use-showai/references/board-authoring.md)，操作字段见[白板操作格式](../use-showai/references/formats/whiteboard.json)。用户正在调整的图只改其请求涉及的图形和连线，保留其余位置；用户要求整理连好的图形时，对涉及的对象用 `diagram.arrange` 沿连线重新排布。
 
 需要融入画布时，原生 Page 的 `attrs.frameless:true` 去掉边框、背景和标题行；它仍保留内容结构和直接编辑能力。按用户要求整理散落的组件时，保留各对象的稳定 ID、内部内容、阅读顺序和连线关系，先读取再移动外框，不在查找任务中自动搬动整个画布。
 

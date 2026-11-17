@@ -43,9 +43,8 @@ export function createLibraryMcpServer(options: {
     projectId: "unselected",
     projectAccess: "library",
     sourceContext: inherited,
-    instructions: "guide first; projectId for projects.",
+    instructions: "Read use-showai Skill.",
     decorateTool(name, tool) {
-      if (name === "guide") return;
       if (name === "project_context") {
         tool.update({
           paramsSchema: {

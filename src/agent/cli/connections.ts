@@ -65,7 +65,7 @@ export const connectionCommands: CommandDeclaration[] = [
         requireCount(args, 1);
         if (option(args, "project") || option(args, "templates"))
           throw new Error(
-            "Public MCP does not accept project/session template bindings. Use public catalogs and guide presentation.",
+            "Public MCP does not accept project/session template bindings. Use public catalogs and the installed show-document Skill.",
           );
         const { startPublicMcp } = await import("../mcp");
         await startPublicMcp(service.store.root);

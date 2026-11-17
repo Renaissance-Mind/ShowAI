@@ -78,13 +78,13 @@ test.each(["library", "project", "public"])(
     transport.stderr?.on("data", () => {});
     await client.connect(transport);
     expect(
-      (await client.callTool({ name: "guide", arguments: {} })).isError,
+      (await client.callTool({ name: "showai_capabilities", arguments: {} })).isError,
     ).not.toBe(true);
     expect(
       (
         await client.callTool({
-          name: "guide",
-          arguments: { topic: "invalid-topic" },
+          name: "showai_capabilities",
+          arguments: { unsupported: "invalid-field" },
         })
       ).isError,
     ).toBe(true);
@@ -105,7 +105,7 @@ test.each(["library", "project", "public"])(
       client: "stdio-log-acceptance",
       pluginVersion: "log-test",
       host: "builtin",
-      tool: "guide",
+      tool: "showai_capabilities",
     });
     expect(saved[1].outputBytes).toBeGreaterThan(0);
     expect(saved[3]).toMatchObject({
@@ -144,7 +144,7 @@ test.each([false, true])(
       new StreamableHTTPClientTransport(new URL(http.url + "/mcp")),
     );
     expect(
-      (await client.callTool({ name: "guide", arguments: {} })).isError,
+      (await client.callTool({ name: "showai_capabilities", arguments: {} })).isError,
     ).not.toBe(true);
     const call = async (id: number, name: string, args = {}) => {
       const response = await fetch(http.url + "/mcp", {
@@ -174,7 +174,7 @@ test.each([false, true])(
     const saved = await logs(directory);
     expect(saved.filter((r) => r.event === "completed")).toHaveLength(3);
     expect(
-      saved.find((r) => r.event === "completed" && r.tool === "guide"),
+      saved.find((r) => r.event === "completed" && r.tool === "showai_capabilities"),
     ).toMatchObject({ status: "success", transport: "http", httpStatus: 200 });
     expect(
       saved.find((r) => r.event === "completed" && r.tool === "pages_list"),
@@ -222,12 +222,12 @@ test("HTTP completion reflects a real durable checkpoint failure", async () => {
   await rm(objects, { recursive: true });
   await writeFile(objects, "storage-is-now-a-file");
   await expect(
-    client.callTool({ name: "guide", arguments: {} }),
+    client.callTool({ name: "showai_capabilities", arguments: {} }),
   ).rejects.toThrow();
   const saved = await logs(join(state, "logs", "mcp"));
   expect(saved.filter((r) => r.event === "completed")).toHaveLength(1);
   expect(saved.at(-1)).toMatchObject({
-    tool: "guide",
+    tool: "showai_capabilities",
     status: "error",
     errorCode: "ENOTDIR",
     httpStatus: 500,

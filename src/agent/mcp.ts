@@ -21,8 +21,6 @@ import {
   type FailedOperation,
 } from "./service";
 import { followAppLanguage } from "../core/app-language";
-import { GUIDE_TOPICS } from "./guides";
-import { getMcpGuide } from "./mcp-guides";
 import { join, resolve } from "node:path";
 import { writeCachedPresentation } from "./presentation-cache";
 import type { TemplateSelection } from "./template-workflow";
@@ -49,50 +47,48 @@ export function createMcpServer(options: McpServerOptions): McpServer {
       {
         instructions:
           options.instructions ??
-          `ShowAI project ${projectId}. Call guide first.`,
+          `Read use-showai Skill. Bound project: ${projectId}.`,
       },
     ),
   );
   const register: McpServer["registerTool"] = (name, config, callback) => {
     const tool = server.registerTool(name, config, callback);
-    if (name !== "guide") {
-      const shape = getObjectShape(tool.inputSchema);
-      if (!shape) throw new Error(`Missing input schema: ${name}`);
-      const original = tool.handler as ToolCallback<z.ZodRawShape>;
-      const operation: FailedOperation | undefined =
-        name === "page_export"
-          ? "export"
-          : name === "page_present"
-            ? "present"
-            : config.annotations?.readOnlyHint
-              ? undefined
-              : "save";
-      const handle: ToolCallback<z.ZodRawShape> = async (
-        { projectId: selected, ...args },
-        extra,
-      ) => {
-        if (selected !== undefined && selected !== projectId)
-          return mcpFailure(
-            new Error("This MCP connection is bound to another project."),
-          );
-        await followAppLanguage(service.store.root);
-        if (!options.pageWriteDirectory) return original(args, extra);
-        const writes: PageWrite[] = [];
-        const result = await pageWriteCapture.run(writes, () =>
-          original(args, extra),
+    const shape = getObjectShape(tool.inputSchema);
+    if (!shape) throw new Error(`Missing input schema: ${name}`);
+    const original = tool.handler as ToolCallback<z.ZodRawShape>;
+    const operation: FailedOperation | undefined =
+      name === "page_export"
+        ? "export"
+        : name === "page_present"
+          ? "present"
+          : config.annotations?.readOnlyHint
+            ? undefined
+            : "save";
+    const handle: ToolCallback<z.ZodRawShape> = async (
+      { projectId: selected, ...args },
+      extra,
+    ) => {
+      if (selected !== undefined && selected !== projectId)
+        return mcpFailure(
+          new Error("This MCP connection is bound to another project."),
         );
-        if (!result.isError)
-          await savePageWrites(options.pageWriteDirectory, writes);
-        return result;
-      };
-      tool.update({
-        paramsSchema: { ...shape, projectId: z.string().min(1).optional() },
-        callback: operation
-          ? (args, extra) =>
-              failedOperation.run(operation, () => handle(args, extra))
-          : handle,
-      });
-    }
+      await followAppLanguage(service.store.root);
+      if (!options.pageWriteDirectory) return original(args, extra);
+      const writes: PageWrite[] = [];
+      const result = await pageWriteCapture.run(writes, () =>
+        original(args, extra),
+      );
+      if (!result.isError)
+        await savePageWrites(options.pageWriteDirectory, writes);
+      return result;
+    };
+    tool.update({
+      paramsSchema: { ...shape, projectId: z.string().min(1).optional() },
+      callback: operation
+        ? (args, extra) =>
+            failedOperation.run(operation, () => handle(args, extra))
+        : handle,
+    });
     options.decorateTool?.(name, tool);
     return tool;
   };
@@ -233,31 +229,9 @@ export async function startPublicMcp(root: string) {
       { name: "showai", version: packageMetadata.version },
       {
         instructions:
-          "ShowAI public components and templates, without a project. Call guide first.",
+          "Read use-showai Skill. Public catalogs and rendering only.",
       },
     ),
-  );
-  server.registerTool(
-    "guide",
-    {
-      description: "Read a focused ShowAI authoring or integration guide.",
-      inputSchema: {
-        topic: z.enum(GUIDE_TOPICS).optional(),
-        knownHash: z
-          .string()
-          .regex(/^[a-f0-9]{64}$/)
-          .optional(),
-      },
-      annotations: { readOnlyHint: true },
-    },
-    async ({ topic, knownHash }) => ({
-      content: [
-        {
-          type: "text",
-          text: JSON.stringify(getMcpGuide(topic, knownHash)),
-        },
-      ],
-    }),
   );
   registerPresentationTools(server, {
     transport: "stdio",

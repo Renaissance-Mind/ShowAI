@@ -319,7 +319,7 @@ export async function checkArguments(
         }
       : {}),
     nextStep:
-      'Call again with the expected arguments (the tool\'s inputSchema is authoritative). guide({topic:"migrations"}) lists recent tool changes.',
+      "Call again with the expected arguments from this tool's inputSchema. Read the installed ShowAI Skills for operation formats.",
   };
 }
 
@@ -342,7 +342,7 @@ function withMigration(
       arguments: outline(migration.use.arguments),
     },
     changes: migration.changes,
-    guide: "guide migrations",
+    reference: "use-showai/references/formats/migrations.json",
   };
   const structured = result.structuredContent as
     Record<string, unknown> | undefined;
@@ -452,7 +452,7 @@ export function installToolCompatibility(
           tool: params.name,
           similar: suggestions(params.name, tools),
           nextStep:
-            'Use only tools listed by this connection. guide({topic:"migrations"}) lists renamed tools.',
+            "Use only tools listed by this connection and read the installed ShowAI Skills. Operation formats are included in their references.",
         });
       const callArgs = migration?.use.arguments ?? args;
       const local = !!tools.get("project_sync_status");

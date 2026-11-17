@@ -9,7 +9,7 @@ description: 创作或修改要保存的作品：可交互报告、讲解页面�
 
 这份 Skill 是制作作品的完整流程，开头一次读完，不用再读其他流程 Skill。还没读过 [use-showai](../use-showai/SKILL.md) 时先读它，核对连接、项目归属和保存规则。用户只要对话讨论时直接回答；只想在对话里看一两个图表、示意或模拟时用 [show-visual](../show-visual/SKILL.md)。用户只要规划或设计稿时，做到相应环节为止，不实现成品：记录照常写进记录文件夹（presentation-plan.json 顶层写 title，以后没有 pageId 也能按标题找到），在对话里给出读者简报、规划与设计稿的可读版本，并告诉用户记录文件夹的位置；之后要实现时沿用这份记录。用户要求评审已有页面时，读回页面后直接进入评审环节。
 
-用户要求翻译、转述或整理一篇原文时，保持原文的顺序与完整内容并注明出处；补充的解读另行标注（例如组件标题以「解读」开头），不改写原文结构；原文顺序优先于设计稿中关于章节编排的建议，各环节的判断用于决定在哪里补充解读。
+用户明确要求忠实翻译、转述或按原文顺序整理时，保持原文顺序与完整内容并注明出处；补充解读单独标明（例如组件标题以「解读」开头）。论文讲解作品按读者任务组织，引用和翻译的片段保持原意并注明出处。
 
 组合已有组件前核对精确版本的 view:"contract"，绑定公开对象事件；编辑时保留稳定 ID，升级契约时检查父级绑定。新组件按 create-component 的统一契约创作。保存仍以页面 hash/revision 为基线；组件运行时回执不代替正式保存回执。
 
@@ -155,7 +155,7 @@ description: 创作或修改要保存的作品：可交互报告、讲解页面�
 
 ### 开始
 
-核对 `showai_capabilities.templateWorkflow.protocol` 为 `showai-template-workflow-v3`。老运行时返回 v2 时，template_context 只给出模板的 README，改用它提供的 `template_guide` 按阶段读取模板指南，并告诉用户运行时需要更新；不能声称仅安装 Skill 就升级了工具。
+核对 `showai_capabilities.templateWorkflow.protocol` 为 `showai-template-workflow-v3`。协议版本不兼容时说明需要更新 ShowAI 运行时；安装 Skill 不会升级工具。
 
 新作品先按 use-showai 确定项目；只要规划或设计稿时也先确定项目，查模板需要它。续改已有作品时先 `page_read({projectId,pageId,rendered:false,response:"source"})` 读回原 Page，取它的 `templateContext`（源超过 256 KiB 的大页这样读只返回大纲窗口，要取 templateContext 时加 `detail:"full"`，本机连接也可用 `out` 写入文件再读），并在记录目录中查找 presentation-plan.json 里写有这个 pageId 的记录；找到就沿用其中的读者简报、规划和设计稿，只重做受影响的部分；找不到时从页面本身和用户说明反推，新建一个记录文件夹：brief.md 标明内容是反推的，presentation-plan.json 只为本次要改的部分写节点和幕（含现有块的 blockIds），check_plan 与评审以这部分为准。
 

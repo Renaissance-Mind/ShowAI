@@ -8,8 +8,7 @@ import type { RegisteredTool } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { createLibraryMcpServer } from "./mcp-library";
 import { actionFields, registeredTools, RENAMED_TOOLS } from "./mcp-compat";
-import { getMcpGuide } from "./mcp-guides";
-import { GUIDE_TOPICS } from "./guides";
+import { getGuide, GUIDE_TOPICS } from "./guides";
 import { PAGE_OPERATION_FIELDS } from "../core/model";
 import { openLibrary } from "../core/open-library";
 import { syncManager } from "../sync/manager";
@@ -178,9 +177,7 @@ const unwrap = (schema: unknown): z.ZodType => {
     else return current;
   }
 };
-const HOSTED_ARGUMENTS: Record<string, string[]> = {
-  guide: ["skill", "file", "section"],
-};
+const HOSTED_ARGUMENTS: Record<string, string[]> = {};
 const enumValues = (schema: unknown): string[] | undefined => {
   const inner = unwrap(schema);
   return inner instanceof z.ZodEnum
@@ -217,7 +214,7 @@ function checkCall(
 ) {
   if (RENAMED_TOOLS[name]) {
     problems.push(
-      `${where}: ${name} was replaced by ${RENAMED_TOOLS[name]} (guide migrations)`,
+      `${where}: ${name} was replaced by ${RENAMED_TOOLS[name]} (Skill migration reference)`,
     );
     return;
   }
@@ -347,10 +344,13 @@ async function documentSources(): Promise<Source[]> {
 
 test("documented tool calls match the live tool schemas", async () => {
   const names = [...new Set([...tools.keys(), ...Object.keys(RENAMED_TOOLS)])];
+  const skillSources = await documentSources();
+  for (const source of skillSources)
+    expect(source.text, source.name).not.toMatch(/\bguide\s*\(/);
   const sources: Source[] = [
-    ...(await documentSources()),
+    ...skillSources,
     ...GUIDE_TOPICS.filter((topic) => topic !== "migrations").map((topic) => {
-      const guide = getMcpGuide(topic) as Record<string, unknown>;
+      const guide = getGuide(topic) as Record<string, unknown>;
       return {
         name: `guide ${topic}`,
         text: JSON.stringify({ rules: guide.rules, input: guide.input })
@@ -392,7 +392,7 @@ test("the checker reports stale examples", () => {
     names,
   );
   expect(problems).toEqual([
-    "fixture:1: dataset_create was replaced by dataset_write (guide migrations)",
+    "fixture:1: dataset_create was replaced by dataset_write (Skill migration reference)",
     "fixture:2: dataset_read needs action (list, read)",
     "fixture:3: page_read response must be one of full, source, receipt, not everything",
     "fixture:4: organization_update action sort has no argument name",

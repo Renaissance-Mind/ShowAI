@@ -65,6 +65,6 @@ node dist-runtime/scripts/cli.mjs guide --json
 node dist-runtime/scripts/cli.mjs runtime info --json
 ```
 
-已安装软件使用设置或目标库 agent-runtime.json 中的真实命令。Agent 文档操作使用 MCP；ChatGPT 托管连接通过 guide 获取共享流程，无需本机 Skill 安装。
+已安装软件使用设置或目标库 agent-runtime.json 中的真实命令。Agent 文档操作使用 MCP，本机与托管连接的工作流均从已安装的 ShowAI Skill 读取。
 
 可通过 [GitHub Issues](https://github.com/Renaissance-Mind/ShowAI/issues) 报告文档问题，注明语言、指南与运行时版本。贡献修改时同步中英文对应指南及两个目录。

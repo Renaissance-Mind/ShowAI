@@ -1,6 +1,6 @@
 # 组件参数契约
 
-使用当前 guide component 的 documentationSchema，确认能力 componentParameters.protocol 为 showai-component-parameters-v1。新创作使用 documentation.version=2；旧 v1 可兼容读取，参数参考明确缺项，不自动宣称完整或改写旧版本。
+使用[组件制作格式](../../use-showai/references/formats/component.json)的 documentationSchema，确认能力 componentParameters.protocol 为 showai-component-parameters-v1。新创作使用 documentation.version=2；旧 v1 可兼容读取，参数参考明确缺项，不自动宣称完整或改写旧版本。
 
 类型、必填、枚举、范围、长度及结构来自 props.schema.json。读者交给对话的探索状态（`onContext`）与读者的视图状态（`onViewState`）都不是参数：不写入 schema、defaultData 或例子，只在 usage.interactions 说明。usage.inputs 记录 path、meaning，以及需要时的 units、coordinateSystem；路径可以用 dotted[] 或转义的 JSON pointer，数组元素用 *。没有参数的固定组件可用空inputs与封闭的空对象schema；不能把任意自由输入伪装成无参数。父参数的单位和坐标系可由子字段继承，单字段查询也保留该上下文。公开字段的含义要有明确说明，schema.description 可提供含义；数组的纯值元素可沿用数组含义。自由 JSON/对象必须说明 opaque:true 的外部格式与边界，不能把故意留空的 schema 当作严格校验。
 

@@ -185,70 +185,22 @@ afterAll(async () => {
   if (directory) await rm(directory, { recursive: true, force: true });
 });
 
-test("remote guide delivers the full shared Skill workflow anonymously and retains runtime topics", async () => {
+test("remote clients use installed Skills and receive capability facts without a guide tool", async () => {
   const anonymous = await client();
-  expect(anonymous.getInstructions()).toContain(
-    "Start every ShowAI task by calling guide()",
-  );
+  expect(anonymous.getInstructions()).toContain("Read use-showai Skill");
+  expect(anonymous.getInstructions()).not.toContain("guide()");
   const tools = await anonymous.listTools();
-  const guide = tools.tools.find((tool) => tool.name === "guide")!;
-  expect(guide.inputSchema.properties).toHaveProperty("skill");
-  expect(guide.annotations?.readOnlyHint).toBe(true);
-  const entry = data(
-    await anonymous.callTool({ name: "guide", arguments: {} }),
-  );
-  expect(entry.protocol).toBe("showai-remote-skills-v1");
-  expect(entry.markdown).toContain("选择路径");
-  expect(entry.skills).toHaveLength(6);
-  expect(entry.connection).toMatchObject({
-    mcpUrl: http.url + "/mcp",
-    tools: tools.tools.map((tool) => tool.name).sort(),
+  expect(tools.tools.map((tool) => tool.name)).not.toContain("guide");
+  const capabilities = data(await anonymous.callTool({ name: "showai_capabilities", arguments: {} }));
+  expect(capabilities).toMatchObject({
+    transport: "http",
+    projects: { access: "authorized" },
+    templateWorkflow: { systemBaseline: "show-document Skill" },
   });
-  for (const skill of entry.skills as { name: string }[]) {
-    const detail = data(
-      await anonymous.callTool({
-        name: "guide",
-        arguments: { skill: skill.name },
-      }),
-    );
-    expect(detail.source).toMatchObject({
-      path: `plugins/showai/skills/${skill.name}/SKILL.md`,
-    });
-    expect(detail.markdown).toBeTruthy();
-    expect(
-      data(
-        await anonymous.callTool({
-          name: "guide",
-          arguments: { skill: skill.name, knownHash: detail.hash },
-        }),
-      ).unchanged,
-    ).toBe(true);
-  }
-  const reference = data(
-    await anonymous.callTool({
-      name: "guide",
-      arguments: {
-        skill: "create-template",
-        file: "references/template-creation.md",
-      },
-    }),
-  );
-  expect(reference.markdown).toContain("template");
-  const presentation = data(
-    await anonymous.callTool({
-      name: "guide",
-      arguments: { topic: "presentation" },
-    }),
-  );
-  expect(presentation.markdown).toContain("环节四：设计稿");
-  for (const args of [
-    { skill: "use-showai", file: "../package.json" },
-    { skill: "use-showai", topic: "reading" },
-    { file: "SKILL.md" },
-  ]) {
-    const result = await anonymous.callTool({ name: "guide", arguments: args });
-    expect(result.isError).toBe(true);
-  }
+  expect(capabilities).not.toHaveProperty("workflow");
+  expect(capabilities).not.toHaveProperty("next");
+  const removed = await anonymous.callTool({ name: "guide", arguments: {} });
+  expect(removed.isError).toBe(true);
 });
 
 test("authorized Board reads deliver overlapping images without exposing local cache paths", async () => {
@@ -748,13 +700,6 @@ test("OAuth scope, resource binding, refresh rotation and revocation are enforce
 test("authorized HTTP clients use portable template folders, exact stage refs and compact source receipts", async () => {
   const credentials = await authorize(),
     remote = await client(credentials.access_token);
-  const baseline = data(
-    await remote.callTool({
-      name: "guide",
-      arguments: { topic: "presentation" },
-    }),
-  );
-  expect(baseline.required).toBe(true);
   const saved = data(
     await remote.callTool({
       name: "template_save",

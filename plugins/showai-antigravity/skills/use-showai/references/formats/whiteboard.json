@@ -1,0 +1,45 @@
+{
+  "operations": [
+    {
+      "type": "diagram.insert",
+      "direction": "right",
+      "nodes": [
+        {
+          "id": "client",
+          "label": "Client"
+        },
+        {
+          "id": "api",
+          "label": "API service",
+          "fillColor": "#ede9fe"
+        },
+        {
+          "id": "cache",
+          "label": "Cache"
+        },
+        {
+          "id": "db",
+          "label": "Database",
+          "shape": "ellipse"
+        }
+      ],
+      "edges": [
+        {
+          "from": "client",
+          "to": "api",
+          "label": "request"
+        },
+        {
+          "from": "api",
+          "to": "cache",
+          "label": "1 read cache"
+        },
+        {
+          "from": "api",
+          "to": "db",
+          "label": "2 on miss"
+        }
+      ]
+    }
+  ]
+}

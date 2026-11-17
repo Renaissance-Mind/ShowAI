@@ -1,0 +1,132 @@
+{
+  "fromBlock": {
+    "fromBlock": {
+      "pageId": "PAGE",
+      "blockId": "OKR_BLOCK",
+      "baseHash": "PAGE_HASH",
+      "local": [
+        "title"
+      ]
+    }
+  },
+  "datasetOperations": [
+    {
+      "op": "set",
+      "path": "objectives[id=o1].keyResults[id=k1].tasks[id=t1].due",
+      "value": "2026-10-24"
+    },
+    {
+      "op": "insert",
+      "path": "objectives[id=o1].keyResults[id=k1].tasks",
+      "value": {
+        "id": "t9",
+        "title": "New task"
+      },
+      "after": "t1"
+    },
+    {
+      "op": "remove",
+      "path": "objectives[id=o2]"
+    }
+  ],
+  "insertBoundDatabase": [
+    {
+      "type": "component.insert",
+      "kind": "database",
+      "data": {
+        "title": "Calendar",
+        "view": "calendar",
+        "calendar": {
+          "dateColumn": "due"
+        },
+        "$binding": {
+          "dataset": "DATASET",
+          "props": {
+            "local": [
+              "title",
+              "view",
+              "groupBy",
+              "calendar",
+              "views"
+            ]
+          }
+        }
+      }
+    }
+  ],
+  "bindDatabase": [
+    {
+      "type": "component.binding.set",
+      "blockId": "SCHEDULE_DATABASE",
+      "binding": {
+        "dataset": "DATASET",
+        "collections": [
+          {
+            "key": "task",
+            "into": "rows",
+            "from": "objectives[*].keyResults[*].tasks[*]",
+            "where": {
+              "field": "due",
+              "exists": true
+            },
+            "label": "全景 · 任务",
+            "fields": {
+              "title": "title",
+              "date": {
+                "from": "due",
+                "empty": "remove"
+              },
+              "done": "done"
+            },
+            "derived": {
+              "project": "../../title",
+              "cat": {
+                "lookup": "areas",
+                "by": "../../area",
+                "field": "name"
+              },
+              "source": {
+                "template": "全景 · {../title}"
+              }
+            },
+            "defaults": {
+              "kind": "截止"
+            }
+          },
+          {
+            "key": "kr",
+            "into": "rows",
+            "from": "objectives[*].keyResults[*]",
+            "where": {
+              "field": "due",
+              "exists": true
+            },
+            "fields": {
+              "title": "title",
+              "date": {
+                "from": "due",
+                "empty": "remove"
+              },
+              "done": {
+                "from": "status",
+                "map": {
+                  "true": "done",
+                  "false": "todo"
+                },
+                "otherwise": false
+              }
+            },
+            "derived": {
+              "project": "../title",
+              "cat": {
+                "lookup": "areas",
+                "by": "../area",
+                "field": "name"
+              }
+            }
+          }
+        ]
+      }
+    }
+  ]
+}

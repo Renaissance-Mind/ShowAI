@@ -14,15 +14,11 @@ MCP 网关与内容服务分别部署。网关使用 Worker、Durable Object、�
 
 构建把 CPU 无关资源放在构建平台生成，仅 npm ci 使用目标 linux/amd64，避免 Vite 仿真。dugite Git 预下载使用锁定包的架构与 SHA-256，带有界重试/临时文件；npm 生命周期脚本保持启用。最终镜像实际执行 Git，并核对完整 Docker COPY 输入与源覆盖。
 
-## 共享 Skill 指南
+## 安装 Skill 与连接远程 MCP
 
-HTTP guide 从 plugins/showai/skills 提供入口与七条流程，ChatGPT 无需本机 Skill 包。初始化要求 guide()；这是工具提供的指导，不是在宿主注册原生 Skill。
+安装包含六个 Skill 与远程 MCP 连接的完整 ShowAI 插件。已安装的 use-showai Skill 负责请求分流，其余 Skill 提供对应工作流和参考文件。网关提供工具、授权、存储与渲染；showai_capabilities 返回当前连接的实际能力与限制。
 
-`guide({skill:"show-document"})` 读取流程，`guide({skill:"use-showai",file:"references/runtime.md",section:"远程"})` 读取引用。响应给出源路径/SHA-256、交付文本 hash 与文件列表，相对链接转为可调用引用。knownHash 仅用于已持有相同文本。topic/stage 与 skill/file 不混用。
-
-响应包含当前 MCP 地址及工具名；宿主可能延迟加载，需在当前连接内发现工具。工具发现不授予 OAuth 或成员权限。build:cloud-mcp 将同源指南嵌入网关，不安装本机插件；没有脚本执行能力的宿主按手工检查说明操作。
-
-网关更新后刷新 ChatGPT 连接并新建对话。分别验证指南加载、只读查询、页面创建/续改、局部展示、组件/模板以及不可用操作的说明；保存、同步与实际显示各自核验。
+npm run package:plugin 分发共享 Skill，并从源码契约生成操作格式资源；npm run build:cloud-mcp 构建网关与阅读器。更新网关后刷新宿主工具，另行核验安装的 Skill 文件和任务分流。覆盖只读查找、页面创作与续改、对话展示、组件与模板开发、受限项目访问和保留历史的边界。宿主工具发现与 OAuth、项目权限错误分别检查。
 
 ## 构建与运行检查
 

@@ -349,7 +349,6 @@ export function registerPresentationTools(
         templateWorkflow: {
           ...TEMPLATE_WORKFLOW_CAPABILITIES,
           taskContexts: options.privateProjects !== false,
-          baseline: { tool: "guide", arguments: { topic: "presentation" } },
         },
         componentParameters: COMPONENT_PARAMETER_CAPABILITIES,
         componentRuntime: {
@@ -383,7 +382,6 @@ export function registerPresentationTools(
             paths: "absolute",
           },
           pageDiff: { entries: "record", paged: true },
-          migrations: { guide: "migrations" },
           workRecords:
             options.transport !== "http" && options.componentLibrary
               ? {
@@ -391,14 +389,8 @@ export function registerPresentationTools(
                   ...(await workRecordsLocation(
                     options.componentLibrary.root,
                   )),
-                  layout:
-                    "One folder per work: <directory>/<YYYYMMDD-HHmm>-<short name>-<8 random hex>/ with brief.md, material.md, presentation-plan.json and review.md.",
                 }
-              : {
-                  available: false,
-                  reason:
-                    "This connection has no device file system; keep stage records in the conversation.",
-                },
+              : { available: false },
         },
         boardReading: {
           protocol: "showai-board-reading-v1",
@@ -419,7 +411,6 @@ export function registerPresentationTools(
         datasets: {
           protocol: "showai-datasets-v1",
           available: options.privateProjects !== false,
-          guide: "datasets",
           tools: ["dataset_read", "dataset_write", "dataset_delete"],
           externalFiles: {
             available: options.transport !== "http",
@@ -543,8 +534,6 @@ export function registerPresentationTools(
             preservesPageWorkflow: true,
           },
           declaredHostDisplay: declaredDisplay ?? "undeclared",
-          hostDisplay:
-            "The harness determines whether inline or MCP Apps can be displayed. show_component follows the plugin's declared host display; documents always preserve a usable file or project receipt.",
         },
         projects: {
           available: options.privateProjects ?? true,
@@ -560,9 +549,6 @@ export function registerPresentationTools(
           sharedSynchronization: true,
           htmlDisplayRequired: false,
         },
-        workflow:
-          "Use MCP for all Agent document operations. The use-showai Skill (guide() without Skills) is the entry and decides the route by the result the user wants: discussion is answered in text; a visualization the user only wants to see now follows show-visual (show_component, 1–5 components, nothing saved); creating or revising a work follows show-document, whose presentation workflow is guide topic presentation without Skills; finding, reading and managing existing content stays in use-showai. render_document is for a complete standalone document that is not saved. Do not switch connection, library or persistence mode after a failure.",
-        next: `For a conversation visualization: public_catalog_describe (or catalog_describe) view=guide for the chosen component → show_component. For a complete standalone document: public_catalog_list → public_catalog_describe → render_document. ${options.privateProjects === false ? "This connection has no private project entry; use a project connection when persistence is requested." : `For project work: ${options.transport === "http" ? "projects_list" : "project_context"} → page_read/create/apply/save. Display is optional; check synchronization separately.`}`,
       }),
   );
   server.registerTool(

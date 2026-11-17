@@ -52,7 +52,7 @@ Choose **ChatGPT** after a public connection passes its check. The guide has thr
 
 An existing plugin can be reopened to connect again. A duplicate name can use a device suffix. If an authorization window expires, start a new request in ChatGPT and approve it in ShowAI.
 
-**Install complete Skills (optional)** exports the full ShowAI Personal plugin. First create the MCP connection above; open its plugin page and give that complete page link to the export dialog once. The ZIP includes six Skills, references, icons and the registered connection mapping, without a local launcher, project content or credentials. Import it from ChatGPT Plugins. Plugin upload depends on account and workspace policy; importing a ZIP alone does not prove successful authorization or tool use.
+Install the complete ShowAI Skills for Agent workflows using **Install complete Skills (optional)**, which exports the full ShowAI Personal plugin. First create the MCP connection above; open its plugin page and give that complete page link to the export dialog once. The ZIP includes six Skills, references, icons and the registered connection mapping, without a local launcher, project content or credentials. Import it from ChatGPT Plugins. Plugin upload depends on account and workspace policy; importing a ZIP alone does not prove successful authorization or tool use.
 
 Pages save directly in the local ShowAI library with normal version and conflict checks. Full-library grants automatically discover later projects; `project_create` creates a local project. Reuse the same operationId and name only when retrying the same creation after an uncertain response. Cloud synchronization, if configured separately, has its own status.
 

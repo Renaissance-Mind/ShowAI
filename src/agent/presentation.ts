@@ -39,7 +39,7 @@ export const presentationSchema = {
   document: object
     .optional()
     .describe(
-      "ShowAI document; format: guide(document).",
+      "ShowAI document; see the installed use-showai Skill's document format reference.",
     ),
   templateId: z.string().optional().describe("Public template ID."),
   templateVersion: z.string().optional(),

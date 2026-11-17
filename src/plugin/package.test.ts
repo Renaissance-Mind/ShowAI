@@ -1,14 +1,24 @@
 import { execFile } from "node:child_process";
-import { copyFile, cp, mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { copyFile, cp, mkdir, mkdtemp, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
+import { build } from "esbuild";
 import { afterEach, describe, expect, it } from "vitest";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 const execute = promisify(execFile);
 const fixtures: string[] = [];
+const formatSources = build({
+  absWorkingDir: root,
+  entryPoints: ["src/agent/guides.ts"],
+  bundle: true,
+  platform: "node",
+  format: "esm",
+  write: false,
+  metafile: true,
+}).then((result) => Object.keys(result.metafile.inputs).filter((name) => name.startsWith("src/")));
 
 afterEach(async () => {
   await Promise.all(
@@ -28,6 +38,7 @@ async function packageSkill(
       "src/desktop/assets",
       "src/portable",
       "src/plugin",
+      "src/agent",
       "plugins-kimi/showai",
       "resources/templates/system-presentation",
       "plugins/showai/skills/show-document",
@@ -41,6 +52,15 @@ async function packageSkill(
     join(root, "scripts/package-plugin.mjs"),
     join(fixture, "scripts/package-plugin.mjs"),
   );
+  await copyFile(
+    join(root, "scripts/package-skill-formats.mjs"),
+    join(fixture, "scripts/package-skill-formats.mjs"),
+  );
+  for (const file of await formatSources) {
+    await mkdir(dirname(join(fixture, file)), { recursive: true });
+    await copyFile(join(root, file), join(fixture, file));
+  }
+  await symlink(join(root, "node_modules"), join(fixture, "node_modules"), process.platform === "win32" ? "junction" : "dir");
   await cp(
     join(root, "plugins/showai/host-adapters"),
     join(fixture, "plugins/showai/host-adapters"),

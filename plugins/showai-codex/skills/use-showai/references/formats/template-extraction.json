@@ -1,0 +1,20 @@
+{
+  "id": "reusable-report",
+  "version": "1.0.0",
+  "name": "Report",
+  "description": "Reusable content structure",
+  "scenarios": [
+    "REPORT_CONTEXT"
+  ],
+  "contentGuide": [
+    {
+      "title": "Evidence",
+      "instructions": [
+        "Fill with source-backed observations"
+      ]
+    }
+  ],
+  "related": [],
+  "examples": [],
+  "document": "ABSTRACTED_DOCUMENT_FROM_SELECTED_PAGE"
+}

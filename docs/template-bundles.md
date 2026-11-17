@@ -61,7 +61,7 @@ Describe what the template produces, how it works through the stages for this ki
 
 Earlier staged bundles remain readable. `schemaVersion` 3 mapped the four stages intent, material, logic and design to guides. `schemaVersion` 1 and 2 declared six stages (intent, evidence, understanding, design, authoring, review), and `schemaVersion` 1 could carry a `page.json` skeleton. `template_context` returns their stage guides in stage order; six-stage bundles disclose their intent, evidence, understanding and design guides and leave out authoring and review. New templates use `schemaVersion` 4.
 
-Every task context includes the `system-presentation` reference. Its README and guides are embedded in the `show-document` Skill from the same source, and hosts without local Skill files read the same text with `guide({topic:"presentation"})`. A project template cannot replace or disable `system-presentation`. Template guides are read through `template_context`; they are not installed as Skills.
+Every task context includes the `system-presentation` reference. Its README and guides are embedded in the installed `show-document` Skill from the same source. A project template cannot replace or disable `system-presentation`. Template guides are read through `template_context`; they are not installed as Skills.
 
 ## Builtin templates
 
@@ -84,7 +84,7 @@ Directory import rejects symlinks, path traversal, unsafe names and case-insensi
 ## MCP workflow
 
 1. Check `showai_capabilities.templateWorkflow.protocol` for `showai-template-workflow-v3`; resolve the actual authorized project.
-2. Read the presentation workflow once. The loaded `show-document` Skill contains it; hosts without Skills call `guide({topic:"presentation"})`.
+2. Read the installed `show-document` Skill once for the complete presentation workflow.
 3. Choose a template from `catalog_list({kind:"template",projectId})` by its scenarios, or work without one. `template_context({projectId,templates:[{id,scope,version?,integrity?}]})` returns each selected template's README, every guide and a paged component index with exact references. Read it whole, once, and apply its methods at each stage. Use `knownHash` only for an already held context. Follow `componentPage.next` when more component entries are needed.
 4. Write the stage records into one folder per work under the directory returned by `showai_capabilities.authoring.workRecords`: `brief.md` (reader brief), `material.md` (source notes), `presentation-plan.json` (the plan as `nodes`, the design draft as `scenes`) and `review.md` (review record). Before the first write to the Page, check the plan with `scripts/check_plan.py` from the `show-document` Skill. Remote connections without a file system keep the records in the conversation.
 5. Apply the template with `template_apply` (an empty Page bound to the exact refs), or use the user's blank-page choice; author the Page from the design draft.
@@ -109,4 +109,4 @@ showai mcp --project PROJECT --templates my-template@1.0.0
 
 Startup `--templates` requires a bound `--project`; library and HTTP connections select with tools. CLI import/export manages local folders; Agent document operations use MCP. Plugin launch also accepts `SHOWAI_TEMPLATES` together with `SHOWAI_PROJECT_ID`, without changing the registered library runtime or other sessions.
 
-The plugin shares the same skills and launcher across Codex and Claude Code. Packaging supplies Codex `plugin.json`/`mcp.json` and Claude Code `.claude-plugin/plugin.json`/`.mcp.json`. Remote packages replace the transport with the configured HTTPS endpoint. ChatGPT web clients read the presentation workflow and template guides through that endpoint and use its OAuth/project grants; they do not require a local plugin directory. Updating a skill package does not update an already running application or MCP server. The launcher checks the workflow protocol and reports an incompatible runtime before use.
+The plugin shares the same Skills across Codex, Claude Code and remote hosts. Packaging supplies Codex `plugin.json`/`mcp.json` and Claude Code `.claude-plugin/plugin.json`/`.mcp.json`. Remote packages use the configured HTTPS endpoint with its OAuth/project grants. ChatGPT web users install the complete plugin with its Skills and connection mapping. Updating a Skill package does not update an already running application or MCP server.

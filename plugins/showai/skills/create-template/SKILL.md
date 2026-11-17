@@ -15,7 +15,7 @@ Agent 选用模板时调用一次 template_context，一次读完 README 和全�
 
 ## 文件夹与元信息
 
-先读 guide({topic:"templates"}) 的当前格式。模板是一个文件夹：README.md 的严格 JSON frontmatter 加概览正文；guides/ 下的若干 Markdown 指南；components/ 的可选组件包。元信息包含 format、schemaVersion（当前为 4）、id、name、version、description、scenarios、guides、components。guides 是按阅读顺序排列的指南路径列表，可以为空；README 正文与全部指南合计控制在 48 KiB 以内。系统呈现规则由运行时提供，项目模板不能替换或关闭它。内置的 `paper-explainer` 是按本技能写成的完整示例，用 template_context 读取它的 README 与全部指南作为参照。
+模板是一个文件夹：README.md 的严格 JSON frontmatter 加概览正文；guides/ 下的若干 Markdown 指南；components/ 的可选组件包。元信息包含 format、schemaVersion（当前为 4）、id、name、version、description、scenarios、guides、components。guides 是按阅读顺序排列的指南路径列表，可以为空；README 正文与全部指南合计控制在 48 KiB 以内。系统呈现规则由运行时提供，项目模板不能替换或关闭它。内置的 `paper-explainer` 是按本技能写成的完整示例，用 template_context 读取它的 README 与全部指南作为参照。
 
 ## 怎样写才算教判断
 

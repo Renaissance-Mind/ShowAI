@@ -1,0 +1,22 @@
+{
+  "ref": {
+    "kind": "component",
+    "id": "COMPONENT_ID",
+    "version": "1.0.0",
+    "integrity": "EXACT_INTEGRITY",
+    "scope": "project",
+    "projectId": "PROJECT"
+  },
+  "preview": {
+    "base": "EXACT_REF",
+    "ours": "EXACT_REF",
+    "theirs": "EXACT_REF"
+  },
+  "resolve": {
+    "base": "EXACT_REF",
+    "ours": "EXACT_REF",
+    "theirs": "EXACT_REF",
+    "version": "NEW_VERSION",
+    "resolved": "EDITABLE_PACKAGE_FROM_REVIEWED_PREVIEW"
+  }
+}

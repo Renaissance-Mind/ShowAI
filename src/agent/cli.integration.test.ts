@@ -2287,10 +2287,7 @@ test("bound MCP discloses catalog details on demand and cannot mutate shared or 
           tool.name.includes("register"),
       ),
     ).toBe(false);
-    const guide = data(
-      await client.callTool({ name: "guide", arguments: { topic: "catalog" } }),
-    ).data;
-    expect(guide.purpose).toContain("summaries");
+    expect(tools.tools.map((tool) => tool.name)).not.toContain("guide");
     const summary = data(
       await client.callTool({
         name: "catalog_describe",

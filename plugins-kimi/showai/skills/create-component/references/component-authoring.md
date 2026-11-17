@@ -1,6 +1,6 @@
 # 组件设计与验证
 
-用 MCP 的 `guide({topic:"component"})` 获取当前命令与结构；组件 schema 和示例由目录动态返回。
+组件包、运行时契约与制作索引的准确结构见[组件制作格式](../../use-showai/references/formats/component.json)；组件参数 schema 和示例由目录动态返回。
 
 新组件使用 documentation.version=2；按 [参数契约](parameter-contract.md) 同步 schema、字段语义、遗漏行为、示例及关系约束。结构检查与实际交互分别验证，不把例子中的初始值称为自动默认值。
 
@@ -8,7 +8,7 @@
 
 包包含 `manifest.json`、`props.schema.json` 和 manifest.entry 指定的本地文件。manifest 记录 id、name、version、description、scenarios、entry、defaultData、examples。输入与示例保留可用的最小实例；参考本次真实内容验证较复杂情况，不为未知事实生成示例测量。
 
-组件需要专门的制作流程时，先读 `catalog_describe(view="guide")` 返回的 `authoringReference`。它沿用该组件的 scope、version、integrity，并指向源码包中的制作索引。documentation.version=2 可用 `authoring.entry` 声明索引文件；索引、完整指南及制作文件随组件版本保存，引用和指南 SHA-256 在保存时校验；索引与指南的完整结构由 guide component 的 authoringIndexSchema、authoringGuideSchema 返回。本地自编说明可省略上游来源和渲染程序字段，不编造仓库或提交。按索引逐份读取共享规范、所选类型或风格指南、输入 Schema 和例子，避免仅替换模板文字后就宣称完成了新的图形内容。
+组件需要专门的制作流程时，先读 `catalog_describe(view="guide")` 返回的 `authoringReference`。它沿用该组件的 scope、version、integrity，并指向源码包中的制作索引。documentation.version=2 可用 `authoring.entry` 声明索引文件；索引、完整指南及制作文件随组件版本保存，引用和指南 SHA-256 在保存时校验；索引与指南的完整结构见组件制作格式的 authoringIndexSchema、authoringGuideSchema。本地自编说明可省略上游来源和渲染程序字段，不编造仓库或提交。按索引逐份读取共享规范、所选类型或风格指南、输入 Schema 和例子，避免仅替换模板文字后就宣称完成了新的图形内容。
 
 Archify、Diagram Design 和 Fireworks 技术图带有固定上游提交的完整制作指南与原版制作包。读取它们的 `authoring/index.json` 后，按所选流程保存 `authoring/kit.json`、`authoring/run.mjs`、`authoring/diagram-authoring-fonts.mjs` 和 `authoring/font-licenses.json`，使用索引中的实际命令。Archify 3.1 的十类 JSON 输入（architecture、workflow、sequence、dataflow、lifecycle、erd、class、tree、timeline、waterfall）与 Fireworks 的十一种生成风格使用包内原版渲染程序；Diagram Design 和 Fireworks style 8 按原版绘图规范制作 SVG/HTML。将结果的 data 写入组件或导入输出文件；完整原稿保存在 source，presentation 仅控制标题、说明、图例与阅读控件的显示。比较上游结果时使用原版呈现。字体与图标按原规范本地嵌入；字体辅助程序只查询字体家族，内容字形在本地选择。原项目的浏览器检查命令属于参考流程，界面交互仍遵循当前宿主的官方浏览器入口；程序校验与实际视觉检查分别记录。
 
@@ -155,7 +155,7 @@ export default function Related({ goTo }) {
 
 明确操作作用于文字选区、节点、组件数据还是外层容器，检查这个对象已有的选中、右键、悬停菜单及设置面板。新动作优先加入对应入口，沿用其位置和开关逻辑；通用格式设置在前，当前对象的专属动作在后。同一对象在同一触发点保持一个菜单容器。用户明确指定入口位置或交互方式时，按其要求实现并复用动作逻辑。自行新增入口时，根据用户任务说明现有入口缺少什么，并选择合理的位置。
 
-按已经出现的重复提取共享动作、菜单容器、定位函数或局部 hook。可以先完成局部抽象，再随实际需求扩展；具体名称、接口与组合方式按当前组件及宿主能力决定。使用 `guide({topic:"component"})`、组件源码和实际 SDK 导出确认可调用能力；本轮所需的共享实现要位于可用的模块或包内，文档描述的目标行为与当前已公开的接口分别说明。宿主尚无菜单扩展接口时，先评估组件内部已有动作容器能否承载这次功能。
+按已经出现的重复提取共享动作、菜单容器、定位函数或局部 hook。可以先完成局部抽象，再随实际需求扩展；具体名称、接口与组合方式按当前组件及宿主能力决定。使用组件制作格式、组件源码和实际 SDK 导出确认可调用能力；本轮所需的共享实现要位于可用的模块或包内，文档描述的目标行为与当前已公开的接口分别说明。宿主尚无菜单扩展接口时，先评估组件内部已有动作容器能否承载这次功能。
 
 同一动作出现在不同入口时，共享可用条件、状态和执行逻辑。选中菜单与右键菜单切换时保留目标与选区，并让暂时不使用的菜单让位；悬停操作避免同时覆盖它们。菜单根据当前对象和实际尺寸定位，在滚动、缩放、窄视口和嵌套容器中保持可用。阅读、缩放、翻页及计算输入等内容交互按读者任务组织。
 
@@ -175,7 +175,7 @@ export default function Related({ goTo }) {
 
 目录组件声明 manifest.role="page-outline"、pageOutlineProtocol=1、category="outline"，通过 Page 的 attrs.outline.renderer 关联精确版本。React 入口接收 props 和 outline（protocol、pageId、items 树、activeItemId、expandedItemIds、container 的 placement/width/height、theme、locale），以及 navigate(itemId)、setBranchExpanded(itemId,expanded)、collapse()。组件负责呈现、分支和可访问性，Page 宿主负责位置、整体收起和目标校验。只读页面仍提供导航动作。作者 props 遵循包自己的 schema；阅读状态使用上述协议，普通 onChange 不参与。
 
-创建或修改后，在 Page 中实际关联并验证导航、当前章节、窗口宽度变化和收起展开；完整契约见 ShowAI 源码仓库的 docs/page-surface.md，两个独立示例位于仓库的 examples/page-outline-index 和 examples/page-outline-path（不随插件安装；没有仓库时以 guide containers 为准）。
+创建或修改后，在 Page 中实际关联并验证导航、当前章节、窗口宽度变化和收起展开；完整契约见 ShowAI 源码仓库的 docs/page-surface.md，两个独立示例位于仓库的 examples/page-outline-index 和 examples/page-outline-path（不随插件安装；没有仓库时读取[原生容器格式](../../use-showai/references/formats/containers.json)）。
 
 ## 旧组件的事件兼容入口
 
@@ -196,7 +196,7 @@ const open = () => {
 
 ## 统一组件契约
 
-新组件在 manifest.contract 声明 version:1，字段的准确 JSON Schema 见 guide({topic:"component"}) 的 input.runtimeContractSchema。先读 showai_capabilities.componentRuntime 确认当前宿主协议，再读所选精确版本的 catalog_describe view:"contract"；status 为 declared、adapted 或 legacy。需要实例中真正存在的对象时传 instance:{pageId,blockId}，objectOffset/objectLimit 分页，保留回执中的页面 hash 与版本。旧编译包保持原指纹；加入新能力后发布新组件版本并显式升级页面引用。
+新组件在 manifest.contract 声明 version:1，字段的准确 JSON Schema 见组件制作格式的 runtimeContractSchema。先读 showai_capabilities.componentRuntime 确认当前宿主协议，再读所选精确版本的 catalog_describe view:"contract"；status 为 declared、adapted 或 legacy。需要实例中真正存在的对象时传 instance:{pageId,blockId}，objectOffset/objectLimit 分页，保留回执中的页面 hash 与版本。旧编译包保持原指纹；加入新能力后发布新组件版本并显式升级页面引用。
 
 contract 的自定义位置统一如下：
 
@@ -216,6 +216,8 @@ contract 的自定义位置统一如下：
 }
 ```
 
+`runtime.events.emit(name, target = null, payload = null)` 返回 `Promise<ComponentReceipt>`。第三个参数携带事件载荷，须满足该事件声明的 payload Schema；声明 entity 的事件必须传入已发现的对象身份，未声明 entity 的事件使用 null target。
+
 ```jsx
 import { useState } from "react";
 import { useComponentRuntime } from "showai:components";
@@ -230,6 +232,40 @@ export default function Items({ data }) {
   };
   return <section>{data.items.map(item => <button key={item.id} aria-pressed={selected === item.id} onClick={() => open(item)}>{item.title}</button>)}{error && <p role="alert">{error}</p>}</section>;
 }
+```
+
+父组件通过 SDK 的 `ComponentEventBoundary` 接收子组件事件，用 `bindings` 显式列出 `{event,target,handle}`。`target` 是从子组件精确契约和实例查询取得的 `{type,scope,id}`；匹配依据是事件名与这三个字段。`handle(payload)` 接收事件载荷，通过闭包知道绑定目标，返回 `ComponentReceipt` 或 `Promise<ComponentReceipt>`；处理器没有额外的来源 blockId 参数。同一边界中事件名与对象身份的组合必须唯一，多个实例可使用各自的边界或契约中明确区分的 scope。`ComponentContent` 只接收 slot/index，事件绑定放在它外层。
+
+下面假设父组件声明了 `body` 富文本槽，`data.target` 是已经从子组件实例查到的真实对象，子组件声明并发出 `activate` 事件：
+
+```jsx
+import { useMemo, useState } from "react";
+import { ComponentContent, ComponentEventBoundary } from "showai:components";
+export default function Parent({ data }) {
+  const [selected, setSelected] = useState(null);
+  const bindings = useMemo(() => [{
+    event: "activate",
+    target: data.target,
+    handle: async (payload) => {
+      setSelected({ target: data.target, payload });
+      return { status: "handled" };
+    },
+  }], [data.target]);
+  return <ComponentEventBoundary bindings={bindings}>
+    <ComponentContent slot="body" />
+    {selected && <p>{selected.target.id}</p>}
+  </ComponentEventBoundary>;
+}
+```
+
+未命中绑定返回 `unhandled`，子组件按自己的默认行为处理。仅需兼容 `activate` 的旧接口时可使用 `ComponentInteractions` 的 targets/onActivate；需要异步处理和准确回执时使用 ComponentEventBoundary。
+
+回执使用下面的完整类型：
+
+```ts
+type ComponentReceipt<T = unknown> =
+  | { status: "handled"; value?: T }
+  | { status: "unhandled" | "unavailable" | "failed"; reason?: string };
 ```
 
 回执 status 为 handled、unhandled、unavailable 或 failed。handled 表示宿主已处理请求；内容更新的回执不代替正式 Page 保存的 hash/revision。沙箱通过请求与回执转交，inline 直接调用同一协议；旧 onActivate 的布尔值仅为兼容的派发资格，不能当作执行回执。

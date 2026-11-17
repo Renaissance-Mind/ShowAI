@@ -1,6 +1,6 @@
 # 用户引用与组件状态
 
-用户在 ShowAI 中选中内容后「复制引用」，或在对话预览里右键「引用到对话」，会交给你一份引用：一行标题、一条 `showai://` 链接和一行 `"type":"showai.reference"` 的 JSON；对话宿主中它位于模型上下文的 `showai.reference`。它表示用户在某个已保存版本里指向的内容，字段为 kind、projectId、pageId、title、hash、revision、blockIds 或 Board 的 nodeIds 与 surfaceId、至多 20 条文字标签，以及可选的位置参考 position。以 JSON 为准；链接 `showai://project/项目/page/页面?blocks=ID,…` 供人在 ShowAI 中打开并高亮这些内容。同样的规则也在 `guide({topic:"reading"})` 中。
+用户在 ShowAI 中选中内容后「复制引用」，或在对话预览里右键「引用到对话」，会交给你一份引用：一行标题、一条 `showai://` 链接和一行 `"type":"showai.reference"` 的 JSON；对话宿主中它位于模型上下文的 `showai.reference`。它表示用户在某个已保存版本里指向的内容，字段为 kind、projectId、pageId、title、hash、revision、blockIds 或 Board 的 nodeIds 与 surfaceId、至多 20 条文字标签，以及可选的位置参考 position。以 JSON 为准；链接 `showai://project/项目/page/页面?blocks=ID,…` 供人在 ShowAI 中打开并高亮这些内容。读取方法见[页面阅读](page-reading.md)。
 
 | 用户选的范围               | kind      | 定位字段                 |
 | -------------------------- | --------- | ------------------------ |

@@ -18,17 +18,11 @@ The gateway bundle and reader assets do not depend on the CPU, so the Dockerfile
 
 The repository configures `https://agent.showai.renaissancemind.ai/mcp`. User connection steps are in [ChatGPT web setup](chatgpt.md); verify the actual deployment with the checks below. Change both `SHOWAI_MCP_URL` and the custom-domain route together if a different origin is used.
 
-## Shared Skills through remote MCP
+## Installed Skills and remote MCP
 
-The HTTP gateway provides the workflows from `plugins/showai/skills` through its existing `guide` tool. A ChatGPT web user can add the remote MCP connection without installing a Skill package. The gateway's initialization instructions direct the model to `guide()` for the connection entrypoint and the seven workflow routes. This is tool-delivered guidance; it does not register native Skills in the host.
+Install the complete ShowAI plugin with its six Skills and remote MCP connection. The installed `use-showai` Skill routes requests; the other Skills provide their workflows and supporting references. The gateway provides tools, authorization, storage and rendering. `showai_capabilities` reports the current connection's runtime features and limits.
 
-Use `guide({skill:"show-document"})` to read a workflow, and `guide({skill:"use-showai",file:"references/runtime.md",section:"远程"})` to read a referenced file. Relative Markdown links are returned as callable `guide` references. A section hint identifies a heading in the complete file. Each response includes the original source path and SHA256, the delivered text hash, and the available reference files. Pass `knownHash` only for the exact text already held in the current conversation. The existing `topic` and presentation `stage` parameters still read operation and template guidance; do not combine them with `skill`/`file`.
-
-Workflow responses also identify the exact MCP URL and its exposed tool names. A host may initially load only a subset of those tool definitions. If a required tool is listed, use the host's discovery mechanism scoped to that selected connection before treating it as missing. Tool discovery does not grant OAuth scopes or project permissions; report those errors separately. Multiple installed ShowAI connections remain distinct.
-
-`npm run build:cloud-mcp` generates the import index directly from the canonical Skill and reference files, then embeds those files into the gateway bundle. It does not modify or install the local plugin. The Docker build and release integrity inventory include these source files. Remote context rules select the HTTP/OAuth branches of shared instructions: local library configuration, unavailable tools and shell commands do not become remote capabilities. Scripts are available as reference text; a host without script execution uses the documented manual checks.
-
-Refresh the custom MCP connection in ChatGPT after a gateway update, then start a new chat. Verify the plugin contains only the MCP app, inspect actual tool calls for guide loading, and check read-only lookup, page creation and continuation, selected-block display, component/template workflows and unavailable library/history operations. Installation, model guideline selection, saved content, synchronization and visible presentation require separate evidence.
+`npm run package:plugin` copies the shared Skills and generates operation-format resources from the source contracts. `npm run build:cloud-mcp` builds the gateway and reader. Refresh the host's tools after updating the gateway, and separately verify the installed Skill files and workflow selection. Check read-only lookup, page creation and revision, conversation visualization, component/template authoring, restricted project access and retained-history limits. Keep OAuth and project permission errors separate from host tool-discovery failures.
 
 ## Build and verify
 

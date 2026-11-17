@@ -80,7 +80,7 @@ export async function templateContext(
     ref: context.system,
     name: base.name,
     required: true,
-    read: "The show-document Skill already contains this workflow. Hosts without Skills read it once with guide({topic:\"presentation\"}).",
+    read: "Read the installed show-document Skill for the presentation workflow.",
   };
   if (knownHash === hash && componentOffset === undefined)
     return {

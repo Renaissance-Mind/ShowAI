@@ -645,12 +645,9 @@ test("earlier tool shapes are translated; argument errors are structured", async
     unexpected: ["tilePixels"],
   });
   expect(stale.expected.required).toContain("pageId");
-  const guide = await ok(client, "guide", { topic: "migrations" });
-  expect(
-    guide.input.changes.some(
-      (change: any) => change.before === "dataset_create",
-    ),
-  ).toBe(true);
+  expect(listed.structuredContent.migration.reference).toBe(
+    "use-showai/references/formats/migrations.json",
+  );
 });
 
 test("hosted connections reject device paths explicitly", async () => {

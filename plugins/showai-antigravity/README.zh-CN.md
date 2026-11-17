@@ -63,7 +63,7 @@ npm run plugin:dsh
 | [create-template](skills/create-template/SKILL.md)       | 可复用模板文件夹与方法                         |
 | [collaborate-canvas](skills/collaborate-canvas/SKILL.md) | 画布协作、多端配对与保存状态                   |
 
-Agent 文档操作使用 MCP，先读取 guide() 并发现能力与项目。正式成果先保存到项目再 page_present；明确独立交付使用 render_document。详细方法由同源 Skill 维护，本页用于安装与接入。
+Agent 文档操作使用 MCP，先读取已安装的 use-showai Skill，核对项目；连接信息未知或变化时查询一次 showai_capabilities。正式成果先保存到项目再 page_present；明确独立交付使用 render_document。详细方法由同源 Skill 维护，本页用于安装与接入。
 
 ## 运行时与内容库
 
@@ -87,7 +87,7 @@ page_present 返回完整离线 HTML/source 与聊天预览。预览容纳时使
 
 ## 网页 ChatGPT 与远程包
 
-普通 ChatGPT 网页使用托管 MCP 连接并通过 guide 获取工作流，无需本机 Skill 或 ZIP。见 [ChatGPT 接入](https://github.com/Renaissance-Mind/ShowAI/blob/main/docs/i18n/chatgpt.zh-CN.md)。
+ChatGPT 网页安装带完整 Skill 的 ShowAI 插件，并连接其中的托管 MCP App。见 [ChatGPT 接入](https://github.com/Renaissance-Mind/ShowAI/blob/main/docs/i18n/chatgpt.zh-CN.md)。
 
 运营者可以从相同 Skill 生成 HTTP/OAuth 包：
 

@@ -48,7 +48,7 @@ Agents connected to ShowAI follow the same steps; knowing them helps when you re
 
 Exports are snapshots: later edits to the page do not update earlier files. When a preview is too large, the agent presents selected blocks and keeps the full page delivery. `render_document` is only for explicitly standalone work that should not be saved to a project.
 
-Agents that build on ShowAI should call `guide()`, then `showai_capabilities` and `project_context`, to establish the actual connection.
+Agents that build on ShowAI read the installed `use-showai` Skill. Query `showai_capabilities` when the connection is unknown or changes, reuse its capability facts, and resolve the required project identity with `project_context` or `projects_list`.
 
 ## Install from a source checkout
 

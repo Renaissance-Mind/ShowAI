@@ -1,0 +1,30 @@
+{
+  "operations": [
+    {
+      "type": "page.set",
+      "fields": {
+        "title": "Updated finding"
+      }
+    },
+    {
+      "type": "block.text.set",
+      "blockId": "STABLE_BLOCK_ID",
+      "text": "Supported finding."
+    }
+  ],
+  "otherOperations": [
+    "component.insert: kind, data, parentId?, afterId? (adds a catalog component through the editor's insertion path; omitted afterId appends, null inserts first; a stepper's steps[].blocks [{kind,data}] places components inside each step in the same insertion; data may carry $binding to insert a block already bound to a dataset, see the shared-data operation format)",
+    "block.insert: node, parentId?, afterId?",
+    "block.remove: blockId",
+    "block.replace: blockId, node",
+    "block.move: blockId, parentId?, afterId?",
+    "block.attrs.set: blockId, attrs (merges the listed attributes; null removes one; never include id)",
+    "diagram.insert: nodes, edges?, parentId?, direction?, origin?, spacing? (labelled Board shapes and bound arrows in one step; see the whiteboard operation format)",
+    "diagram.arrange: nodeIds, direction? (re-lays out existing connected Board objects along their arrows; see the whiteboard operation format)",
+    "component.props.set: blockId, props (replaces only the listed top-level data keys of an existing component; custom components keep componentId, version and integrity; on a block bound to a dataset it writes the dataset, see the shared-data operation format)",
+    "component.ref.set: blockId, version, integrity, componentId? (points a custom component block at another exact revision; keeps id, props and binding; props must satisfy the new schema)",
+    "component.binding.set: blockId, binding (binds a component block to a project dataset; a props binding drops the block's values outside local; see the shared-data operation format)",
+    "component.binding.remove: blockId, keep? ('snapshot' keeps the shown props in the block, 'local' keeps only its own values)",
+    "comment: text, blockId?, quote? starts a thread on a block, on quoted text (exact text inside one paragraph, heading or code block; blockId narrows the search) or on the page; comment: threadId, text?, resolved? replies and/or resolves (true) or reopens (false). page_read lists open threads in comments.open with threadId, anchor, detached and each comment's author; your comments are signed as the Agent"
+  ]
+}

@@ -23,7 +23,7 @@ A request for a plan or design stops at that record and delivers it. A request f
 
 ## Establish ownership
 
-Begin a ShowAI task with `guide()` for the shared entrypoint, then `showai_capabilities` and `project_context` or `projects_list`. A local library connection can resolve a trusted host directory for new formal work. HTTP clients use authorized project identities. Read-only discovery does not create a project.
+Read the installed `use-showai` Skill for the shared entrypoint. Query `showai_capabilities` when connection information is unknown or changes; reuse its capability facts within that connection. Use `project_context` or `projects_list` for the required project identity. A local library connection can resolve a trusted host directory for new formal work. HTTP clients use authorized project identities. Read-only discovery does not create a project.
 
 Read the current Page before editing; keep its hash, revision and stable IDs. Save formal work before `page_present`. Explicit standalone/file-only requests can use `render_document`. Report connection, save or display failures with their actual retained state.
 
@@ -43,4 +43,4 @@ Source inspection, screenshots, interaction checks and reader trials establish d
 
 `page_present` captures one saved revision and returns full HTML/source. `blockIds` selects the conversation preview while retaining the complete delivery. Use meaningful excerpts if the inline budget is exceeded. See [Conversation display](../plugins/showai/skills/use-showai/references/host-display.md).
 
-Local plugin installation, host capability refresh and current-conversation guidance loading are separate checks. Remote ChatGPT users receive the same workflows through `guide` without installing local Skills. Updating either route does not automatically upgrade the other runtime.
+Plugin installation, host capability refresh and current-conversation guidance loading are separate checks. Local and remote clients read the same installed Skills and bundled operation formats. Updating Skills does not upgrade an already running application or MCP server.

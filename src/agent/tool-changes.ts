@@ -5,6 +5,12 @@ export const TOOL_CHANGES: {
   now: string;
 }[] = [
   {
+    date: "2026-11-17",
+    version: "0.12.0",
+    before: "guide MCP tool and mandatory guide-first discovery",
+    now: "Read the installed ShowAI Skills and their bundled operation formats. The guide MCP tool has been removed; catalog guide views and the operator CLI guide remain available. showai_capabilities reports connection capabilities without workflow instructions.",
+  },
+  {
     date: "2026-11-16",
     version: "0.12.0",
     before: "show_component only returns complete presentations",

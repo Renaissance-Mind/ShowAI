@@ -2,7 +2,7 @@
 
 **语言：** [English](../agent-integration.md) | 简体中文 · [文档目录](index.zh-CN.md)
 
-所有宿主的 Agent 文档操作统一使用 MCP。首先调用 guide() 读取共享入口，再检查 showai_capabilities 和项目上下文。本机插件提供 stdio launcher，远程连接使用 HTTP；CLI 面向服务配置、脚本与运维。
+所有宿主的 Agent 文档操作统一使用 MCP，操作方法从已安装的 use-showai Skill 及其参考文件读取。连接信息未知或变化时查询一次 showai_capabilities，复用当前连接的结果；它提供运行时能力和限制，工作流由 Skill 提供。本机插件提供 stdio launcher，远程连接使用 HTTP；CLI 面向服务配置、脚本与运维。
 
 正式内容先保存到项目再 page_present；明确的独立交付使用 render_document。本机 library 连接每次携带 projectId，只读发现用 projects_list，新正式内容可用 project_resolve 与可信宿主绝对目录定位。绑定项目连接沿用其身份。
 
@@ -46,13 +46,13 @@ showai mcp serve \
 
 ### Cloudflare
 
-配置 deployments/cloudflare/mcp.wrangler.jsonc，用 Worker/Durable Object 转发到 Node Container。构建入口 build:cloud-mcp 包含编译器、阅读器与共享 Skill 源。状态以独立 SHOWAI_MCP_STATE_KEY 加密并在请求确认前检查点到私有 R2；新容器恢复核验后服务。预览的一小时有效期跨重启保留。
+配置 deployments/cloudflare/mcp.wrangler.jsonc，用 Worker/Durable Object 转发到 Node Container。构建入口 build:cloud-mcp 包含编译器与阅读器。状态以独立 SHOWAI_MCP_STATE_KEY 加密并在请求确认前检查点到私有 R2；新容器恢复核验后服务。预览的一小时有效期跨重启保留。
 
 检查点失败不能返回成功。原状态密钥必须备份并在更新时保留；没有自动回收未引用加密块。构建或 dry-run 不证明生产、登录或 ChatGPT 交互通过，见 [部署指南](cloud-mcp-deployment.zh-CN.md)。
 
 ## 工具与授权
 
-公共工具包括 showai_capabilities、guide、public_catalog_list/describe、render_document、presentation_source。presentation_source 分块取回公共渲染输入，不公开私有页面导出。匿名调用不会读取个人内容库。
+公共工具包括 showai_capabilities、public_catalog_list/describe、render_document、show_component、presentation_source。presentation_source 分块取回公共渲染输入，不公开私有页面导出。匿名调用不会读取个人内容库。
 
 HTTP 私有工具沿用项目操作名，显式传 projectId 并检查 OAuth。projects_list 每次读取当前成员权限。项目范围 grant 仅允许原项目；账号范围包含后续项目。project_create 还需 projects.create，创建并同步后返回服务器 ID；同一 operationId UUID 用于同一请求重试。
 
@@ -84,7 +84,7 @@ OAuth 提供发现、DCR、S256 PKCE、resource 绑定、过期访问 token、�
 npm run package:plugin -- --mcp-url https://agent.example.com/mcp --out /absolute/new/showai-plugin
 ```
 
-生成 showai-cloud，复用相同 Skill 与资源，使用 HTTP/OAuth 替代本机 launcher。普通 ChatGPT 网页连接通过 guide 获取流程，不需要 ZIP。本机安装仍使用 plugin:update；公共提交与组织审核是独立流程。
+生成 showai-cloud，复用相同 Skill 与资源，使用 HTTP/OAuth 替代本机 launcher。ChatGPT 网页安装带完整 Skill 的插件并连接其中的 MCP App。本机安装仍使用 plugin:update；公共提交与组织审核是独立流程。
 
 ## 已保存页面的展示约定
 

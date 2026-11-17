@@ -25,7 +25,7 @@ use-showai 是唯一的入口，按用户要的结果分流：创作或修改作
 
 ## 连接与内容归属
 
-首次调用 guide() 读取共享入口，再调用 showai_capabilities，再用 project_context 或 projects_list 核对连接与归属。本机 library 连接中新正式内容可以用 project_resolve 解析可信宿主目录；只读查询不创建项目。远程只使用授权返回的项目身份。页面修改保留当前 hash、revision 与稳定节点 ID，保存冲突明确处理。
+先读取已安装的 use-showai Skill。连接信息未知或变化时查询一次 showai_capabilities，复用当前连接的能力与限制；用 project_context 或 projects_list 核对目标项目。本机 library 连接中新正式内容可以用 project_resolve 解析可信宿主目录；只读查询不创建项目。远程只使用授权返回的项目身份。页面修改保留当前 hash、revision 与稳定节点 ID，保存冲突明确处理。
 
 正式成果先保存到项目，再调用 page_present。独立文件或不入库交付需要用户明确选择。连接、保存或展示失败时保留材料并报告实际限制，不改用另一内容库、创作 CLI 或未保存网页代替。
 

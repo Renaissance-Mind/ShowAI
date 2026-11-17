@@ -91,7 +91,6 @@ const MCP_ONLY = [
   "draft_remove",
   "draft_write:complete",
   "draft_write:save",
-  "guide",
   "library_search",
   "organization_read:deleted",
   "organization_read:folders",

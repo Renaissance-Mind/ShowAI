@@ -1,6 +1,6 @@
 # Page 与 Board 的读取
 
-使用已核实的 MCP 连接与 projectId。先查 `showai_capabilities.boardReading`、`guide({topic:"reading"})` 与实际工具 inputSchema。工具缺失表示运行时或宿主能力尚未更新，安装说明文件不会自动升级 App。
+使用已核实的 MCP 连接与 projectId。复用当前连接的 `showai_capabilities.boardReading`，参数见[页面读取格式](formats/reading.json)与实际工具 inputSchema。工具缺失表示运行时或宿主能力尚未更新，安装说明文件不会自动升级 App。
 
 ## Board 默认看图
 
