@@ -117,6 +117,8 @@ export default function RemoteMcpSettings() {
       setState(value);
     if (current.current && value.config.provider === current.current) {
       const provider = current.current;
+      if (value.phase !== "running" || !value.reachable)
+        setTab((tab) => (tab === "clients" ? "network" : tab));
       const previousConfig = previousConfigs.current[provider];
       previousConfigs.current[provider] = value.config;
       setDrafts((previous) =>

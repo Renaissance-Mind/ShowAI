@@ -21,6 +21,7 @@ const env = {
   SHOWAI_LANGUAGE: "zh-CN",
   SHOWAI_HOME: join(fixtures, "library"),
   SHOWAI_USER_DATA: join(fixtures, "profile"),
+  SHOWAI_AGENT_WORKSPACES: join(fixtures, "agent-workspaces"),
 };
 delete env.ELECTRON_RUN_AS_NODE;
 delete env.SHOWAI_DEV_URL;
@@ -91,7 +92,7 @@ async function verifyDesktopApproval(origin, layout = "light") {
         .getByRole("dialog", { name: "允许这次远程连接？", exact: true })
         .waitFor();
       const number = (
-        await page.locator(".remote-approval-code").innerText()
+        await page.locator(".rm-approval-code").innerText()
       ).trim();
       assert.equal((await browser.locator("code").innerText()).trim(), number);
       await page.screenshot({
@@ -174,90 +175,83 @@ try {
   await page.getByRole("button", { name: "创建项目", exact: true }).click();
   await page.getByRole("button", { name: "设置", exact: true }).click();
   await page.getByRole("button", { name: "远程连接", exact: true }).click();
-  await page.getByRole("button", { name: "同一局域网", exact: true }).waitFor();
-  await snapshot("network-modes");
-  assert.equal(
-    await page
-      .getByRole("button", { name: "Tailscale 私网", exact: true })
-      .count(),
-    1,
-  );
-  assert.equal(
-    await page.getByRole("button", { name: "公网访问", exact: true }).count(),
-    1,
-  );
-  await page.screenshot({
-    animations: "disabled",
-    path: join(output, "network-modes-light.png"),
+  const shot = async (name) => {
+    await page.evaluate(async () => {
+      await document.fonts.ready;
+      await new Promise((resolve) =>
+        requestAnimationFrame(() => requestAnimationFrame(resolve)),
+      );
+    });
+    await page.screenshot({
+      animations: "disabled",
+      path: join(output, name + ".png"),
+    });
+  };
+  await application.evaluate(({ app, BrowserWindow }) => {
+    global.__REMOTE_FOCUS_EVENTS__ = [];
+    const observe = (window) => {
+      for (const event of ["show", "focus"])
+        window.on(event, () => global.__REMOTE_FOCUS_EVENTS__.push(event));
+    };
+    BrowserWindow.getAllWindows().forEach(observe);
+    app.on("browser-window-created", (_event, window) => observe(window));
+    app.on("activate", () => global.__REMOTE_FOCUS_EVENTS__.push("activate"));
   });
+  const status = (provider) =>
+    page.evaluate(
+      (provider) => window.showai.invoke("remoteMcp:status", { provider }),
+      provider,
+    );
+  const button = (name) => page.getByRole("button", { name, exact: true });
+  const tab = (name) => page.getByRole("tab", { name, exact: true });
+  for (const name of [
+    "局域网",
+    "Tailscale 私网",
+    "Tailscale 公网",
+    "Cloudflare 临时域名",
+    "Cloudflare 自有域名",
+  ])
+    await button("配置" + name).waitFor();
+  assert.equal((await status()).connections.length, 5);
+  await shot("network-modes-light");
   result.checks.push(
-    "network-first entry separates LAN, private Tailscale and public access",
+    "all five independent connection profiles are available in the real desktop IPC",
   );
 
-  await page.getByRole("button", { name: "访问规则", exact: true }).click();
-  await page
-    .getByRole("combobox", { name: "项目范围", exact: true })
-    .selectOption("selected");
-  await page
-    .getByRole("combobox", {
-      name: "Remote flow verification 的权限",
-      exact: true,
-    })
-    .selectOption("read");
-  await page.getByRole("button", { name: "保存", exact: true }).click();
-  assert.ok(
-    (await page.locator(".remote-rules").innerText()).includes("指定项目"),
+  await button("配置局域网").click();
+  await tab("内容权限").click();
+  await button("指定项目").click();
+  await button("Remote flow verification：只读").click();
+  await button("保存配置").click();
+  assert.deepEqual(
+    (await status("lan")).config.projects.map((p) => p.write),
+    [false],
   );
-  await page.getByRole("button", { name: "访问规则", exact: true }).click();
-  await page
-    .getByRole("combobox", { name: "项目范围", exact: true })
-    .selectOption("all");
-  await page.getByRole("button", { name: "保存", exact: true }).click();
-
-  await page.getByRole("button", { name: "同一局域网", exact: true }).click();
+  await shot("project-permissions");
+  await button("全部项目").click();
+  await button("保存配置").click();
+  await tab("网络配置").click();
   const addresses = page.getByRole("combobox", {
     name: "本机网络地址",
     exact: true,
   });
   if (await addresses.locator("option:not([disabled])").count()) {
-    await page
-      .getByRole("button", { name: "开启局域网连接", exact: true })
-      .click();
-    await page
-      .getByRole("heading", { name: "在客户端添加服务器", exact: true })
-      .waitFor();
-    assert.equal(
-      await page
-        .getByRole("button", { name: "下载 ChatGPT 插件 ZIP", exact: true })
-        .count(),
-      0,
-    );
+    await button("开启连接").click();
+    await page.locator('.rm-client-area[data-client-view="setup"]').waitFor();
+    assert.equal(await button("ChatGPT").count(), 0);
     await page
       .getByRole("textbox", { name: "客户端名称", exact: true })
       .fill("UI LAN acceptance");
-    await page
-      .getByRole("button", { name: "创建并复制访问密钥", exact: true })
-      .click();
-    await page
-      .getByRole("button", { name: "已填写地址和密钥，验证连接", exact: true })
-      .waitFor();
-    const token = await application.evaluate(({ clipboard }) =>
-      clipboard.readText(),
-    );
-    const status = await page.evaluate(() =>
-      window.showai.invoke("remoteMcp:status"),
-    );
-    assert.equal(status.config.provider, "lan");
-    assert.ok(status.url.startsWith("http://"));
-    assert.ok(!JSON.stringify(status).includes(token));
-    await page.screenshot({
-      animations: "disabled",
-      path: join(output, "lan-client-key.png"),
-    });
-    await page
-      .getByRole("button", { name: "已填写地址和密钥，验证连接", exact: true })
-      .click();
-    const response = await fetch(status.url, {
+    await button("生成密钥").click();
+    const token = await page.locator("#remote-access-key").inputValue();
+    const lan = await status("lan");
+    assert.ok(token.length > 20);
+    assert.ok(lan.url.startsWith("http://"));
+    assert.ok(!JSON.stringify(lan).includes(token));
+    await shot("lan-client-key");
+    await button("去客户端发送消息").click();
+    await shot("lan-client-message");
+    const response = await fetch(lan.url, {
       method: "POST",
       headers: {
         "content-type": "application/json",
@@ -272,13 +266,12 @@ try {
       }),
     }).then((r) => r.json());
     assert.notEqual(response.result?.isError, true);
-    await page
-      .getByRole("heading", { name: "客户端已成功调用", exact: true })
-      .waitFor();
-    await page.getByRole("button", { name: "撤销授权", exact: true }).click();
+    assert.ok(response.result);
+    await page.locator('.rm-client-area[data-client-view="list"]').waitFor();
+    await button("撤销UI LAN acceptance的授权").click();
     assert.equal(
       (
-        await fetch(status.url, {
+        await fetch(lan.url, {
           method: "POST",
           headers: {
             "content-type": "application/json",
@@ -289,153 +282,115 @@ try {
       ).status,
       401,
     );
-    await page.getByRole("button", { name: "断开连接", exact: true }).click();
+    await page.getByRole("switch", { name: "关闭局域网", exact: true }).click();
+    await tab("网络配置").waitFor();
+    await page
+      .locator('[role="tab"][aria-selected="true"]')
+      .filter({ hasText: "网络配置" })
+      .waitFor();
+    assert.equal((await status("lan")).phase, "stopped");
     result.checks.push(
-      "real LAN UI creates and copies a key, records an authenticated MCP call, and revokes it immediately",
+      "real LAN key authenticates an MCP call, reaches the client list, revokes immediately and returns to network controls on shutdown",
     );
-  } else {
+  } else
     result.checks.push("LAN UI reports no available interface on this host");
-    await page.getByRole("button", { name: "返回", exact: true }).click();
-  }
+  await button("返回连接列表").click();
+
+  await button("配置Tailscale 私网").click();
   await page
-    .getByRole("button", { name: "Tailscale 私网", exact: true })
-    .click();
-  assert.ok(
-    (await page.locator(".remote-flow").innerText()).includes("仅限私网访问"),
-  );
-  await page.screenshot({
-    animations: "disabled",
-    path: join(output, "tailscale-private-setup.png"),
-  });
-  await page.getByRole("button", { name: "返回", exact: true }).click();
-  await page.getByRole("button", { name: "公网访问", exact: true }).click();
-  await page
-    .getByRole("button", { name: "Cloudflare 固定域名", exact: false })
-    .click();
-  await page
-    .getByRole("button", { name: "复制本机地址", exact: true })
+    .getByRole("combobox", { name: "HTTPS 端口", exact: true })
     .waitFor();
-  const prepared = await page.evaluate(() =>
-    window.showai.invoke("remoteMcp:status"),
+  await shot("tailscale-private-setup");
+  await button("返回连接列表").click();
+  await button("配置Cloudflare 自有域名").click();
+  await page.waitForFunction(
+    async () =>
+      (
+        await window.showai.invoke("remoteMcp:status", {
+          provider: "cloudflare",
+        })
+      ).config.port > 0,
   );
-  assert.equal(prepared.phase, "prepared");
+  const saved = await status("cloudflare");
+  const prepared = await page.evaluate(
+    (config) => window.showai.invoke("remoteMcp:prepare", { config }),
+    saved.config,
+  );
   await verifyDesktopApproval(prepared.localUrl);
-  await page.getByRole("button", { name: "复制本机地址", exact: true }).click();
-  const reserved = await page.evaluate(() =>
-    window.showai.invoke("remoteMcp:status"),
+  const reserved = await page.evaluate(
+    (config) => window.showai.invoke("remoteMcp:prepare", { config }),
+    prepared.config,
   );
   assert.equal(prepared.localUrl, reserved.localUrl);
-  await page.getByRole("button", { name: "返回", exact: true }).click();
+  assert.equal((await status("lan")).phase, "stopped");
+  await shot("cloudflare-origin");
+  await page.evaluate(() =>
+    window.showai.invoke("remoteMcp:stop", { provider: "cloudflare" }),
+  );
+  await button("返回连接列表").click();
 
-  await page.getByRole("button", { name: "外观", exact: true }).click();
+  await button("外观").click();
   await page.getByRole("radio", { name: "深色", exact: true }).check();
-  await page.getByRole("button", { name: "远程连接", exact: true }).click();
+  await button("远程连接").click();
   const window = await application.browserWindow(page);
-  await window.evaluate((w) => w.setSize(760, 820));
-  await page.getByRole("button", { name: "同一局域网", exact: true }).focus();
+  await window.evaluate((w) => w.setSize(800, 1000));
+  await button("配置局域网").focus();
   await page.keyboard.press("Tab");
   assert.equal(
     await page
-      .getByRole("button", { name: "Tailscale 私网", exact: true })
+      .getByRole("switch", { name: "启用Tailscale 私网", exact: true })
       .evaluate((el) => el === document.activeElement),
     true,
   );
   assert.equal(
     await page
-      .locator(".remote-flow")
+      .locator(".remote-settings")
       .evaluate((el) => el.scrollWidth > el.clientWidth + 1),
     false,
   );
-  await page.screenshot({
-    animations: "disabled",
-    path: join(output, "network-modes-dark-narrow.png"),
-  });
-  const windows = await application.evaluate(({ BrowserWindow }) =>
-    BrowserWindow.getAllWindows().map((w) => ({
-      visible: w.isVisible(),
-      focused: w.isFocused(),
-    })),
-  );
-  assert.ok(windows.every((w) => !w.visible && !w.focused));
+  await shot("network-modes-dark-narrow");
   result.checks.push(
-    "dark/narrow layout and keyboard navigation work in hidden Electron",
+    "dark narrow layout and keyboard order work in hidden Electron",
   );
 
   if (process.env.SHOWAI_TEST_TAILSCALE) {
-    await page.getByRole("button", { name: "公网访问", exact: true }).click();
+    await button("配置Tailscale 公网").click();
+    await button("开启连接").click();
     await page
-      .getByRole("button", { name: "Tailscale 公网（Funnel）", exact: false })
-      .click();
-    await page.getByRole("button", { name: "检查并连接", exact: true }).click();
-    await page
-      .getByRole("heading", { name: "连接哪个客户端？", exact: true })
+      .locator('.rm-client-area[data-client-view="setup"]')
       .waitFor({ timeout: 90000 });
-    await page.getByRole("button", { name: "ChatGPT", exact: false }).click();
-    await page
-      .getByRole("heading", { name: "添加 MCP 服务器", exact: true })
-      .waitFor();
-    assert.equal(
-      await page
-        .locator(".remote-chatgpt-guide > dl .remote-field-guide")
-        .count(),
-      4,
-    );
-    await page.screenshot({
-      animations: "disabled",
-      path: join(output, "chatgpt-server-dark-narrow.png"),
-    });
-    await page.getByRole("button", { name: "下一步", exact: true }).click();
-    assert.equal(
-      await page
-        .getByRole("heading", { name: "设置 OAuth", exact: true })
-        .count(),
-      1,
-    );
-    await page
-      .getByRole("button", { name: "处理自动发现失败", exact: true })
-      .click();
-    await page.getByText("查看 OAuth 端点", { exact: true }).click();
-    const publicStatus = await page.evaluate(() =>
-      window.showai.invoke("remoteMcp:status"),
-    );
+    await button("ChatGPT").click();
+    await button("OAuth 端点").click();
+    const publicStatus = await status("tailscale");
     assert.ok(
-      (await page.getByRole("dialog").innerText()).includes(
+      (await page.locator(".rm-client-recipe").innerText()).includes(
         new URL(publicStatus.url).origin + "/oauth/token",
       ),
     );
-    await page.keyboard.press("Escape");
-    await page.screenshot({
-      animations: "disabled",
-      path: join(output, "chatgpt-oauth-dark-narrow.png"),
-    });
-    await page.getByRole("button", { name: "下一步", exact: true }).click();
-    assert.equal(
-      await page
-        .getByRole("heading", { name: "创建并连接", exact: true })
-        .count(),
-      1,
+    await shot("chatgpt-oauth-dark-narrow");
+    await button("去客户端发送消息").click();
+    await page.locator('.rm-client-area[data-client-view="verify"]').waitFor();
+    await verifyDesktopApproval(
+      new URL(publicStatus.url).origin,
+      "funnel-dark",
     );
-    await page.getByRole("button", { name: "上一步", exact: true }).click();
-    await page.getByRole("button", { name: "下一步", exact: true }).click();
-    await page
-      .getByRole("button", { name: "已打开 ShowAI 授权页，继续", exact: true })
-      .click();
-    await page
-      .getByRole("heading", { name: "验证客户端调用", exact: true })
-      .waitFor();
-    assert.equal(
-      await page
-        .getByRole("button", { name: "生成配对码", exact: true })
-        .count(),
-      0,
+    await page.evaluate(() =>
+      window.showai.invoke("remoteMcp:stop", { provider: "tailscale" }),
     );
-    await page
-      .getByRole("button", { name: "更改连接方式", exact: true })
-      .click();
     result.checks.push(
-      "live Funnel supports client choice and the three-step ChatGPT guide with back navigation and discovery recovery",
+      "live Funnel supports ChatGPT parameters, OAuth endpoints, client messages and real desktop approval",
     );
   }
+  const focus = await application.evaluate(({ BrowserWindow }) => ({
+    windows: BrowserWindow.getAllWindows().map((w) => ({
+      visible: w.isVisible(),
+      focused: w.isFocused(),
+    })),
+    events: global.__REMOTE_FOCUS_EVENTS__,
+  }));
+  assert.ok(focus.windows.every((w) => !w.visible && !w.focused));
+  assert.deepEqual(focus.events, []);
+  result.focus = focus;
   assert.deepEqual(result.rendererErrors, []);
   result.passed = true;
 } catch (error) {
@@ -457,7 +412,16 @@ try {
 } finally {
   if (page)
     await page
-      .evaluate(() => window.showai.invoke("remoteMcp:stop"))
+      .evaluate(async () => {
+        for (const provider of [
+          "lan",
+          "tailscale-private",
+          "tailscale",
+          "cloudflare-quick",
+          "cloudflare",
+        ])
+          await window.showai.invoke("remoteMcp:stop", { provider });
+      })
       .catch(() => {});
   if (application)
     await stopTestProcess(application.process(), () => application.close(), {

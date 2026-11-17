@@ -223,3 +223,29 @@ test("flow branches jump to the message screen and authorization states remain o
   await state("funnel.chatgpt.authorized");
   expect(errors).toEqual([]);
 }, 60000);
+
+test("stopping the selected client connection returns to its network controls", async () => {
+  await page.getByRole("button", { name: "回到起点", exact: true }).click();
+  await state("modes");
+  await frame()
+    .getByRole("button", { name: "配置局域网", exact: true })
+    .click();
+  await state("lan.setup");
+  await page
+    .getByRole("region", { name: "界面状态", exact: true })
+    .getByRole("button", { name: "已开启", exact: true })
+    .click();
+  await state("lan.ready");
+  await frame().getByRole("tab", { name: "客户端", exact: true }).click();
+  await state("lan.client");
+  await frame()
+    .getByRole("switch", { name: "关闭局域网", exact: true })
+    .click();
+  await state("lan.setup");
+  expect(
+    await frame()
+      .getByRole("tab", { name: "网络配置", exact: true })
+      .getAttribute("aria-selected"),
+  ).toBe("true");
+  expect(errors).toEqual([]);
+}, 60000);
