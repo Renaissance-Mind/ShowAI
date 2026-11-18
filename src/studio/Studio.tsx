@@ -1,3 +1,5 @@
+import { browserSearch } from "../browser/codex-workbench";
+import { useCodexReferenceLabel } from "./shell/useCodexReferenceLabel";
 import RemoteMcpApprovalDialog from "./RemoteMcpApprovalDialog";
 import { trackDesktopPreviewActivity } from "./preview-work";
 import { ComponentLibraryContext } from "../components/ComponentLibrary";
@@ -66,6 +68,7 @@ export default function Studio() {
   useEffect(() => {
     trackDesktopPreviewActivity();
   }, []);
+  const codexReference = useCodexReferenceLabel();
   const t = useTranslator(studioMessages);
   const tc = useTranslator(commonMessages);
   useEffect(() => {
@@ -338,7 +341,7 @@ export default function Studio() {
     const launch = workspace.launchState();
     if (!launch) return;
     launchedWelcome.current = true;
-    const params = new URLSearchParams(location.search);
+    const params = browserSearch();
     if (
       launch !== "new" ||
       !welcoming ||
@@ -546,6 +549,7 @@ export default function Studio() {
             pageTitle={page.draft?.title}
             flush={page.flush}
             onLocate={locateAssistantTarget}
+            referenceLabel={codexReference}
             onReference={(target) => {
               const projectId = page.projectId;
               if (projectId)

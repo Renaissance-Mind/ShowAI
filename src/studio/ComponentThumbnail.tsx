@@ -1,3 +1,5 @@
+import ComponentPreviewPage from "./ComponentPreviewPage";
+import { browserUrl, codexWorkbench } from "../browser/codex-workbench";
 import { useEffect, useRef, useState } from "react";
 import { ImageOff, Loader2 } from "../ui/icons";
 import type { CatalogComponent } from "../core/component-categories";
@@ -41,8 +43,12 @@ export default function ComponentThumbnail({
   const [error, setError] = useState("");
   const [scale, setScale] = useState(1);
   const key = JSON.stringify({ ...componentPreviewReference(item), theme });
+  const embedding = codexWorkbench();
+  const previewUrl = new URL(browserUrl("/"));
+  previewUrl.searchParams.set("componentPreview", key);
+  const previewAddress = previewUrl.href;
   useEffect(() => {
-    if (!browser || !visible) return;
+    if (!browser || !visible || embedding) return;
     setFrameState({ key, ready: false, error: "" });
     const receive = (event: MessageEvent) => {
       if (
@@ -59,7 +65,7 @@ export default function ComponentThumbnail({
     };
     window.addEventListener("message", receive);
     return () => window.removeEventListener("message", receive);
-  }, [browser, visible, key]);
+  }, [browser, embedding, visible, key]);
   useEffect(() => {
     if (!container.current) return;
     const observer = new IntersectionObserver(
@@ -100,28 +106,39 @@ export default function ComponentThumbnail({
         );
     };
   }, [key, visible, browser, image.key]);
-  const previewUrl = new URL(location.href);
-  previewUrl.search = "";
-  previewUrl.searchParams.set("componentPreview", key);
   return (
     <div className="component-card-preview" ref={container} aria-hidden="true">
       {image.key === key && image.data ? (
         <img src={image.data} alt="" draggable={false} />
       ) : visible && browser ? (
         <>
-          <iframe
-            ref={frame}
-            title={t("thumbnailTitle", { name: componentDisplayName(item) })}
-            src={previewUrl.href}
-            tabIndex={-1}
-            style={{
-              transform: `translate(-50%, -50%) scale(${scale})`,
-              opacity:
-                frameState.key === key && frameState.ready && !frameState.error
+          {embedding ? (
+            <div
+              style={{
+                position: "absolute",
+                top: "50%",
+                left: "50%",
+                transform: `translate(-50%, -50%) scale(${scale})`,
+                pointerEvents: "none",
+                opacity: frameState.key === key && frameState.ready ? 1 : 0,
+              }}
+            >
+              <ComponentPreviewPage key={key} embeddedKey={key} onPreviewState={setFrameState} />
+            </div>
+          ) : (
+            <iframe
+              ref={frame}
+              title={t("thumbnailTitle", { name: componentDisplayName(item) })}
+              src={previewAddress}
+              tabIndex={-1}
+              style={{
+                transform: `translate(-50%, -50%) scale(${scale})`,
+                opacity: frameState.key === key && frameState.ready && !frameState.error
                   ? 1
                   : 0,
-            }}
-          />
+              }}
+            />
+          )}
           {frameState.key === key && frameState.error ? (
             <span className="component-preview-error" title={frameState.error}>
               <ImageOff size={20} />

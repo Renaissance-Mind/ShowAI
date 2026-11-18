@@ -1,21 +1,35 @@
 import { afterAll, beforeAll, describe, expect, test } from "vitest";
-import { cp, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
-import { join, resolve } from "node:path";
+import {
+  cp,
+  mkdir,
+  mkdtemp,
+  readFile,
+  readdir,
+  rm,
+  writeFile,
+} from "node:fs/promises";
+import { join, resolve, sep } from "node:path";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
+import type { Tool } from "@modelcontextprotocol/sdk/types.js";
 import { spawn } from "node:child_process";
 import { createInterface } from "node:readline";
 import { DesktopPluginInstaller, hostExecutable } from "./desktop-install";
 import { registerRuntime, type RuntimeLaunch } from "../agent/runtime";
 
-async function codexServerTools() {
+async function codexServerTools(root: string, installedPath: string) {
   const codex = await hostExecutable("codex");
   expect(codex).toBeTruthy();
+  const cwd = join(root, "workspace");
+  await mkdir(cwd, { recursive: true });
   const child = spawn(codex!, ["app-server", "--listen", "stdio://"], {
+    cwd,
     stdio: ["pipe", "pipe", "ignore"],
   });
   const send = (message: object) =>
     child.stdin.write(JSON.stringify({ jsonrpc: "2.0", ...message }) + "\n");
+  let tools: Tool[] | undefined;
+  let skills: string[] | undefined;
   try {
     send({
       id: 1,
@@ -26,17 +40,56 @@ async function codexServerTools() {
     });
     for await (const line of createInterface({ input: child.stdout })) {
       const message = JSON.parse(line);
+      if (message.id !== undefined && message.error)
+        throw new Error(JSON.stringify(message.error));
       if (message.id === 1) {
         send({ method: "initialized" });
         send({ id: 2, method: "mcpServerStatus/list", params: {} });
+        send({ id: 3, method: "skills/list", params: { cwds: [cwd] } });
       } else if (message.id === 2) {
-        const showai = message.result.data.find(
-          (item: { name: string }) => item.name === "showai",
-        );
-        return showai ? Object.keys(showai.tools).length : 0;
+        const servers: { name: string; tools: Record<string, Tool> }[] =
+          message.result.data;
+        expect(servers.map(({ name }) => name)).toEqual(["showai"]);
+        tools = Object.values(servers[0].tools);
+      } else if (message.id === 3) {
+        const records: {
+          skills: { path: string; name: string; enabled?: boolean }[];
+        }[] = message.result.data;
+        skills = records
+          .flatMap(({ skills }) => skills)
+          .filter(
+            ({ path, enabled }) =>
+              enabled !== false &&
+              path.startsWith(join(installedPath, "skills") + sep),
+          )
+          .map(({ name }) => name.split(":").at(-1)!)
+          .sort();
       }
+      if (tools && skills) break;
     }
-    throw new Error("Codex app-server exited before listing MCP servers.");
+    if (!tools || !skills)
+      throw new Error("Codex app-server exited before loading ShowAI.");
+    const bundledSkills = (
+      await readdir(join(installedPath, "skills"), { withFileTypes: true })
+    )
+      .filter((entry) => entry.isDirectory())
+      .map((entry) => entry.name)
+      .sort();
+    expect(skills).toEqual(bundledSkills);
+    expect(skills).toContain("use-showai");
+    expect(await readFile(join(root, "codex/config.toml"), "utf8")).not.toMatch(
+      /^\[mcp_servers(?:\.|\])/m,
+    );
+    for (const [name, type] of [
+      ["workbench_open_global", "global"],
+      ["workbench_open_page", "thread"],
+    ]) {
+      expect(tools.find((tool) => tool.name === name)?._meta).toMatchObject({
+        ui: { resourceUri: expect.stringMatching(/^ui:\/\/showai\//) },
+        "openai/ui": { entrypoints: [{ type }] },
+      });
+    }
+    return tools.length;
   } finally {
     child.kill();
   }
@@ -97,6 +150,7 @@ describe.skipIf(!output || !config)(
       async (host) => {
         const first = await installer.install(host);
         expect(first.verifiedFiles).toBeGreaterThan(20);
+        if (host === "codex") await codexServerTools(root, first.installedPath);
         const state = async () =>
           (await installer.status()).find((item) => item.host === host)!;
         expect(await state()).toMatchObject({ enabled: true, current: true });
@@ -296,7 +350,9 @@ describe.skipIf(!output || !config)(
             ).toMatch(/compact fragment|CDN reader/);
           }
           const loaded =
-            host === "codex" ? await codexServerTools() : undefined;
+            host === "codex"
+              ? await codexServerTools(root, changed.installedPath)
+              : undefined;
           if (host === "codex") expect(loaded).toBe(tools.tools.length);
           await writeFile(
             join(output!, `${host}-result.json`),

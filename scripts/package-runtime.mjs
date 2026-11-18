@@ -54,6 +54,9 @@ await copyFile(
   join(root, "dist-agent/cli.mjs"),
   join(runtime, "scripts/cli.mjs"),
 );
+const workbenchAssets = join(runtime, "scripts/codex-workbench-assets");
+await rm(workbenchAssets, { recursive: true, force: true });
+await cp(join(root, "dist-agent/codex-workbench-assets"), workbenchAssets, { recursive: true });
 await copyFile(
   join(root, "dist-agent/index-worker.mjs"),
   join(runtime, "scripts/index-worker.mjs"),

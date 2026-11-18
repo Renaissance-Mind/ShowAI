@@ -1,4 +1,7 @@
+import SourceRuntimeWorker from "../surface/source-runtime-worker.ts?worker&inline";
+import CubicInputWorker from "../surface/portable-cubic-input-worker.ts?worker&inline";
 import { chooseLocalPath, type FileDialogOptions } from "./FileDialog";
+import { browserSearch, browserUrl, codexWorkbench, openCodexWorkbenchLink, reportCodexWorkbenchReady, type CodexWorkbenchConnection } from "./codex-workbench";
 import {
   LOCAL_FILE_TYPES,
   type LocalResourceKind,
@@ -9,6 +12,7 @@ import type {
   DesktopChange,
   DesktopResponse,
 } from "../host/protocol";
+import type { WorkbenchRoute } from "../host/codex-workbench-transport";
 import { closeReporter, type CloseListenerEntry } from "../desktop/close-report";
 import type { LoadedPage } from "../studio/usePage";
 import { translator } from "../i18n";
@@ -44,13 +48,21 @@ const failure = (code: string, message: string) =>
 
 declare global {
   interface Window {
-    __SHOWAI_LOCAL__?: { token: string };
+    __SHOWAI_LOCAL__?: {
+      token: string;
+      codexWorkbench?: CodexWorkbenchConnection;
+      apiOrigin?: string;
+      search?: string;
+    };
   }
 }
 
 export function installBrowserBridge() {
   const config = window.__SHOWAI_LOCAL__;
   if (!config || window.showai) return;
+  if (window.__SHOWAI_CODEX_HOST__)
+    window.__SHOWAI_CODEX_HOST__.createWorker = (kind) =>
+      kind === "source" ? new SourceRuntimeWorker() : new CubicInputWorker();
   const listeners = new Set<(change: DesktopChange) => void>();
   const closeListeners = new Set<CloseListenerEntry>();
   const reloadListeners = new Set<CloseListenerEntry>();
@@ -59,7 +71,8 @@ export function installBrowserBridge() {
   const client = crypto.randomUUID();
   let renewing: Promise<boolean> | undefined;
   function renewToken() {
-    renewing ??= fetch("/", { cache: "no-store" })
+    const path = config!.apiOrigin ? `/${config!.search ?? ""}` : "/";
+    renewing ??= fetch(browserUrl(path), { cache: "no-store" })
       .then(async (response) => {
         const token = response.ok ? pageToken(await response.text()) : undefined;
         if (!token || token === config!.token) return false;
@@ -72,13 +85,19 @@ export function installBrowserBridge() {
     return renewing;
   }
   async function request<T>(
-    route: string,
+    route: WorkbenchRoute,
     args: Record<string, unknown>,
     renewed = false,
   ): Promise<T> {
+    const transport = window.__SHOWAI_CODEX_HOST__?.workbenchRequest;
+    if (transport) {
+      const result = await transport(route, args, client);
+      if (!result.ok) throw result.error;
+      return result.data as T;
+    }
     let response: Response;
     try {
-      response = await fetch(`/api/${route}`, {
+      response = await fetch(browserUrl(`/api/${route}`), {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -116,6 +135,12 @@ export function installBrowserBridge() {
     args: Record<string, unknown>,
     prepare?: () => Promise<boolean>,
   ): Promise<T | null> {
+    if (codexWorkbench()) {
+      if (prepare && !(await prepare())) return null;
+      const result = await request<T>("invoke", { action, args });
+      await openCodexWorkbenchLink((result as { url: string }).url);
+      return result;
+    }
     const opened = window.open(
       "about:blank",
       "_blank",
@@ -257,10 +282,33 @@ export function installBrowserBridge() {
     }
     return request<T>("invoke", { action, args });
   }
-  if (!new URLSearchParams(location.search).has("componentPreview")) {
+  const changes = window.__SHOWAI_CODEX_HOST__?.workbenchChanges;
+  if (changes) {
+    let after = -1;
+    let disposed = false;
+    let scheduled: ReturnType<typeof setTimeout> | undefined;
+    const poll = async () => {
+      try {
+        const result = await changes(after, client);
+        if (disposed) return;
+        after = result.cursor;
+        announce("connected");
+        result.changes.forEach((change) => listeners.forEach((listener) => listener(change)));
+      } catch {
+        if (!disposed) announce("lost");
+      } finally {
+        if (!disposed) scheduled = setTimeout(poll, 1000);
+      }
+    };
+    scheduled = setTimeout(poll, 500);
+    window.addEventListener("pagehide", () => {
+      disposed = true;
+      clearTimeout(scheduled);
+    }, { once: true });
+  } else if (!browserSearch().has("componentPreview")) {
     const connect = () => {
       const events = new EventSource(
-        `/api/events?token=${encodeURIComponent(config.token)}&client=${client}`,
+        browserUrl(`/api/events?token=${encodeURIComponent(config.token)}&client=${client}`),
       );
       events.onmessage = (event) => {
         const change = JSON.parse(event.data) as DesktopChange;
@@ -345,4 +393,5 @@ export function installBrowserBridge() {
         }
       : {}),
   };
+  reportCodexWorkbenchReady();
 }

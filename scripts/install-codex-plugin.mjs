@@ -1,9 +1,14 @@
 #!/usr/bin/env node
 import { createHash } from "node:crypto";
 import { execFile } from "node:child_process";
+import { constants } from "node:fs";
 import {
+  access,
+  cp,
   lstat,
   mkdir,
+  mkdtemp,
+  rename,
   rm,
   readFile,
   readdir,
@@ -21,7 +26,7 @@ const options = new Map();
 const flags = new Set();
 for (let i = 2; i < process.argv.length; i++) {
   const arg = process.argv[i];
-  if (["--remote-url", "--marketplace-root", "--chatgpt-app"].includes(arg)) {
+  if (["--remote-url", "--marketplace-root", "--chatgpt-app", "--workbench-test", "--home"].includes(arg)) {
     if (!process.argv[i + 1]) throw new Error(`${arg} requires a value.`);
     options.set(arg, process.argv[++i]);
   } else flags.add(arg);
@@ -93,27 +98,144 @@ async function fingerprint(directory) {
   };
 }
 
+const workbenchTestName = "showai-workbench-test";
+const workbenchTestServer = "showai_workbench_test";
+
+async function stageWorkbenchTest(marketplaceRoot, pluginRoot, home) {
+  const compiled = join(root, "dist-runtime");
+  const runtimeDigest = createHash("sha256")
+    .update(await readFile(join(compiled, "scripts/cli.mjs")))
+    .update(await readFile(join(compiled, "web/index.html")))
+    .update(await readFile(join(compiled, "scripts/codex-workbench-assets/index.json")))
+    .digest("hex")
+    .slice(0, 16);
+  const runtimeRoot = join(marketplaceRoot, "runtime", runtimeDigest);
+  const cli = join(runtimeRoot, "scripts/cli.mjs");
+  const library = await realpath(home);
+  if (!(await lstat(library)).isDirectory())
+    throw new Error("The selected ShowAI content library is not a directory.");
+
+  const marketplace = join(marketplaceRoot, ".agents/plugins/marketplace.json");
+  const current = await readFile(marketplace, "utf8").then(JSON.parse, (error) => {
+    if (error.code !== "ENOENT") throw error;
+  });
+  if (current && current.name !== workbenchTestName)
+    throw new Error("Choose a separate directory for the workbench test marketplace.");
+  const previous = await readFile(join(pluginRoot, "plugin.json"), "utf8").then(JSON.parse, (error) => {
+    if (error.code !== "ENOENT") throw error;
+  });
+  if (previous && previous.name !== workbenchTestName)
+    throw new Error("The test package directory belongs to another plugin.");
+  await access(cli).catch(async (error) => {
+    if (error.code !== "ENOENT") throw error;
+    await mkdir(dirname(runtimeRoot), { recursive: true });
+    const temporary = await mkdtemp(join(dirname(runtimeRoot), ".staging-"));
+    try {
+      await cp(compiled, temporary, {
+        recursive: true, mode: constants.COPYFILE_FICLONE, verbatimSymlinks: true,
+      });
+      await rename(temporary, runtimeRoot);
+    } finally {
+      await rm(temporary, { recursive: true, force: true });
+    }
+  });
+  if (previous) await rm(pluginRoot, { recursive: true });
+  await cp(join(root, "plugins/showai-codex"), pluginRoot, { recursive: true });
+
+  const binding = join(marketplaceRoot, "agent-runtime.json");
+  const env = {
+    SHOWAI_HOME: library,
+    SHOWAI_CODEX_WORKBENCH_PROFILE: join(marketplaceRoot, "profile"),
+  };
+  const launch = { command: process.execPath, args: [cli], env };
+  const runtime = JSON.parse(await readFile(join(runtimeRoot, "assets/build.json"), "utf8"));
+  await writeFile(binding, JSON.stringify({
+    format: "showai-agent-runtime", protocol: 1, channel: "development",
+    version: runtime.version, home: library, launch, registeredAt: new Date().toISOString(),
+  }, null, 2) + "\n", { mode: 0o600 });
+
+  const mcpPath = join(pluginRoot, "mcp.json");
+  const mcp = JSON.parse(await readFile(mcpPath, "utf8"));
+  const server = mcp.mcpServers.showai;
+  server.command = process.execPath;
+  Object.assign(server.env, env, { SHOWAI_RUNTIME_CONFIG: binding });
+  mcp.mcpServers = { [workbenchTestServer]: server };
+  await writeFile(mcpPath, JSON.stringify(mcp, null, 2) + "\n");
+
+  const manifestPath = join(pluginRoot, "plugin.json");
+  const manifest = JSON.parse(await readFile(manifestPath, "utf8"));
+  const runtimeHash = createHash("sha256")
+    .update(await readFile(cli))
+    .update((await fingerprint(pluginRoot)).treeSha256)
+    .digest("hex")
+    .slice(0, 12);
+  manifest.name = workbenchTestName;
+  manifest.version = `${manifest.version.split("+")[0]}+workbench.${runtimeHash}`;
+  manifest.extensions["com.openai"].interface.displayName = "ShowAI Workbench Test";
+  await writeFile(manifestPath, JSON.stringify(manifest, null, 2) + "\n");
+
+  await mkdir(dirname(marketplace), { recursive: true });
+  await writeFile(marketplace, JSON.stringify({
+    name: workbenchTestName,
+    interface: { displayName: "ShowAI Workbench Test" },
+    plugins: [{
+      name: workbenchTestName,
+      source: { source: "local", path: "./plugins/showai-workbench-test" },
+      policy: { installation: "AVAILABLE", authentication: "ON_USE" },
+      category: "Productivity",
+    }],
+  }, null, 2) + "\n");
+  return { runtime: cli, home: library };
+}
+
+async function registerWorkbenchTestServer(installedPath) {
+  const configured = JSON.parse((await command("codex", ["mcp", "list", "--json"])).stdout);
+  const manifest = JSON.parse(await readFile(join(installedPath, "mcp.json"), "utf8"));
+  const server = manifest.mcpServers[workbenchTestServer];
+  const existing = configured.find((item) => item.name === workbenchTestServer);
+  if (existing && existing.transport?.env?.SHOWAI_RUNTIME_CONFIG !== server.env.SHOWAI_RUNTIME_CONFIG)
+    throw new Error(`MCP server ${workbenchTestServer} belongs to another installation.`);
+  await command("codex", [
+    "mcp", "add", workbenchTestServer,
+    ...Object.entries(server.env).flatMap(([key, value]) => ["--env", `${key}=${value}`]),
+    "--", server.command, join(installedPath, "mcp/launch.mjs"),
+  ]);
+  const verification = JSON.parse((await command(
+    "codex", ["mcp", "get", workbenchTestServer, "--json"],
+  )).stdout);
+  if (!verification.enabled ||
+      verification.transport?.args?.[0] !== join(installedPath, "mcp/launch.mjs") ||
+      verification.transport?.env?.SHOWAI_HOME !== server.env.SHOWAI_HOME)
+    throw new Error("Codex did not load the test workbench MCP connection.");
+  return workbenchTestServer;
+}
+
 async function install() {
   for (const flag of flags)
     if (!["--update", "--json", "--help"].includes(flag))
       throw new Error(`Unknown option ${flag}.`);
   if (flags.has("--help")) {
     log(
-      "Usage: node scripts/install-codex-plugin.mjs [--update] [--json]\n       node scripts/install-codex-plugin.mjs --remote-url HTTPS_MCP_URL --marketplace-root DIRECTORY [--chatgpt-app asdk_app_ID] [--update] [--json]\nValidates the MCP plugin, then uses official Codex commands to install or refresh it. The remote form generates showai-cloud from the same skills in its own marketplace beside the local plugin. The ShowAI software runtime is installed separately. Verifies installed bytes and enabled status.",
+      "Usage: node scripts/install-codex-plugin.mjs [--update] [--json]\n       node scripts/install-codex-plugin.mjs --remote-url HTTPS_MCP_URL --marketplace-root DIRECTORY [--chatgpt-app asdk_app_ID] [--update] [--json]\nValidates the MCP plugin, then uses official Codex commands to install or refresh it. The remote form generates showai-cloud in its own marketplace. Use --workbench-test DIRECTORY --home LIBRARY with a built checkout to install the separately named interactive workbench test. The ShowAI software runtime is installed separately. Verifies installed bytes and enabled status.",
     );
     return;
   }
   const remoteUrl = options.get("--remote-url");
+  const workbenchTest = options.get("--workbench-test");
+  const testHome = options.get("--home");
+  if ((!workbenchTest !== !testHome) || (workbenchTest && remoteUrl))
+    throw new Error("--workbench-test and --home are used together for a local test package.");
+  if (testHome && !isAbsolute(testHome))
+    throw new Error("--home must be an absolute content library path.");
   if (!remoteUrl !== !options.get("--marketplace-root"))
     throw new Error("--remote-url and --marketplace-root are used together.");
   if (options.get("--chatgpt-app") && !remoteUrl)
     throw new Error("--chatgpt-app applies to the remote plugin.");
-  const marketplaceRoot = remoteUrl
-    ? resolve(options.get("--marketplace-root"))
-    : root;
-  const pluginRoot = remoteUrl
-    ? join(marketplaceRoot, "plugins/showai-cloud")
-    : join(root, "plugins/showai-codex");
+  const marketplaceRoot = workbenchTest
+    ? resolve(workbenchTest)
+    : remoteUrl ? resolve(options.get("--marketplace-root")) : root;
+  const pluginName = workbenchTest ? workbenchTestName : remoteUrl ? "showai-cloud" : "showai";
+  const pluginRoot = join(marketplaceRoot, "plugins", remoteUrl || workbenchTest ? pluginName : "showai-codex");
   if (remoteUrl) {
     const previous = await readFile(
       join(pluginRoot, "plugin.json"),
@@ -153,13 +275,17 @@ async function install() {
     );
   }
 
+  let workbenchBinding;
+  if (workbenchTest) {
+    await command(process.execPath, [join(root, "scripts/package-plugin.mjs")]);
+    workbenchBinding = await stageWorkbenchTest(marketplaceRoot, pluginRoot, testHome);
+  }
   const marketplace = JSON.parse(
     await readFile(
       join(marketplaceRoot, ".agents/plugins/marketplace.json"),
       "utf8",
     ),
   );
-  const pluginName = remoteUrl ? "showai-cloud" : "showai";
   if (!/^[a-z0-9][a-z0-9_-]*$/.test(marketplace.name))
     throw new Error("Invalid local marketplace name.");
   const entry = marketplace.plugins?.find((item) => item.name === pluginName);
@@ -267,7 +393,8 @@ async function install() {
     throw new Error(
       `Installed version ${installed.version} differs from the bundle version ${manifest.version}.`,
     );
-  const receiptPath = remoteUrl
+  const registeredMcp = workbenchTest ? await registerWorkbenchTestServer(installedPath) : undefined;
+  const receiptPath = remoteUrl || workbenchTest
     ? join(marketplaceRoot, "codex-plugin-install.json")
     : join(root, "artifacts/codex-plugin-install.json");
   const receipt = {
@@ -277,6 +404,7 @@ async function install() {
     version: manifest.version,
     enabled: true,
     marketplaceRoot,
+    ...(workbenchBinding ? { ...workbenchBinding, registeredMcp } : {}),
     ...(remoteUrl
       ? { mcpUrl: remoteUrl, chatgptApp: options.get("--chatgpt-app") ?? null }
       : {}),

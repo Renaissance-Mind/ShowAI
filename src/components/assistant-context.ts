@@ -20,6 +20,7 @@ export interface ComponentContextItem extends ComponentContextSnapshot {
   name: string;
 }
 export interface AssistantBridge {
+  referenceLabel?: string;
   open(target: AssistantTarget): void;
   reference(target: AssistantTarget): void;
   componentContext(item: ComponentContextItem): void;

@@ -360,7 +360,7 @@ export function createSourceTransport(invoke:<T>(action:string,args?:Record<stri
  let worker:Worker|undefined,owner:SourceRuntimeOwner|undefined,sequence=0;
  const pending=new Map<string,{resolve:(value:SourceRuntimeResponse)=>void;reject:(error:unknown)=>void}>();
  const start=()=>{
-  worker=new Worker(new URL("./source-runtime-worker.ts",import.meta.url),{type:"module"});
+  worker=window.__SHOWAI_CODEX_HOST__?.createWorker?.("source") ?? new Worker(new URL("./source-runtime-worker.ts",import.meta.url),{type:"module"});
   worker.onmessage=({data})=>{const task=pending.get(data.id);if(!task)return;pending.delete(data.id);if(data.ok)task.resolve(data.data);else task.reject(Object.assign(new Error(data.error.message),data.error));};
   worker.onerror=event=>{worker?.terminate();worker=undefined;for(const task of pending.values())task.reject(new Error(event.message));pending.clear()};
  };

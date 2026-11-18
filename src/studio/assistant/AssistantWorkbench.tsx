@@ -527,6 +527,7 @@ export default function AssistantWorkbench({
   flush,
   onLocate,
   onReference,
+  referenceLabel,
   onOpenSettings,
   prefill,
   onPrefillUsed,
@@ -542,6 +543,7 @@ export default function AssistantWorkbench({
   flush: () => Promise<boolean>;
   onLocate: (pageId: string, ids: string[]) => void;
   onReference: (target: AgentTarget) => void;
+  referenceLabel?: string;
   onOpenSettings: () => void;
   prefill?: { key: string; pageId: string; text: string } | null;
   onPrefillUsed?: () => void;
@@ -1064,6 +1066,7 @@ export default function AssistantWorkbench({
               setError("");
               setComposer(target);
             },
+            referenceLabel,
             reference: (target) =>
               live.current.onReference(
                 agentTarget(live.current.pageId, target),
@@ -1071,6 +1074,14 @@ export default function AssistantWorkbench({
             componentContext: (item) => {
               const current = live.current;
               if (!current.pageId) return;
+              if (referenceLabel) {
+                const { blockId, componentId, name, label, model } = item;
+                current.onReference({
+                  pageId: current.pageId, kind: "blocks", blockIds: [blockId],
+                  components: [{ blockId, componentId, name, label, model }],
+                });
+                return;
+              }
               const fresh = !current.components.some(
                 (entry) => entry.blockId === item.blockId,
               );
@@ -1103,7 +1114,7 @@ export default function AssistantWorkbench({
             },
           }
         : null,
-    [enabled, projectId],
+    [enabled, projectId, referenceLabel],
   );
   const closeComposer = useCallback(() => setComposer(null), []);
 

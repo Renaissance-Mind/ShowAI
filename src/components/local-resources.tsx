@@ -114,16 +114,22 @@ export async function grantLocalResource(
 ): Promise<Outcome> {
   const name = localRefName(ref);
   const bridge = typeof window === "undefined" ? undefined : window.showai;
-  if (bridge)
-    return bridge.invoke<Grant>("media:resolve", { ref, kind }).then(
-      (grant) => ({
+  if (bridge) {
+    try {
+      const grant = await bridge.invoke<Grant>("media:resolve", { ref, kind });
+      const readMedia = window.__SHOWAI_CODEX_HOST__?.readMedia;
+      return {
         status: "ready",
-        url: new URL(localMediaUrl(grant.token), location.href).href,
+        url: readMedia
+          ? URL.createObjectURL(await readMedia(grant.token))
+          : new URL(localMediaUrl(grant.token), window.__SHOWAI_LOCAL__?.apiOrigin ?? location.href).href,
         name: grant.name,
         expiresAt: grant.expiresAt,
-      }),
-      (error: unknown) => ({ status: "missing", name, message: errorText(error) }),
-    );
+      };
+    } catch (error) {
+      return { status: "missing", name, message: errorText(error) };
+    }
+  }
   const channel = frameChannel();
   if (channel) return requestFromHost(channel, ref, kind);
   return { status: "unavailable", name };
@@ -153,6 +159,7 @@ export async function frameResource(
       transfer: [],
     };
   const response = await fetch(outcome.url);
+  if (outcome.url.startsWith("blob:")) URL.revokeObjectURL(outcome.url);
   const size = Number(response.headers.get("content-length") ?? 0);
   if (!response.ok || size > CAPACITY.resourceBytes) {
     await response.body?.cancel();
@@ -199,7 +206,13 @@ function resolveCached(ref: string, kind: LocalResourceKind) {
 
 function invalidate(ref: string, kind: LocalResourceKind) {
   const key = cacheKey(ref, kind);
+  const previous = cache.get(key);
   cache.delete(key);
+  void previous?.then((outcome) => {
+    if (outcome.status === "ready" && outcome.url.startsWith("blob:") &&
+        window.__SHOWAI_CODEX_HOST__?.readMedia)
+      URL.revokeObjectURL(outcome.url);
+  });
   for (const listener of listeners.get(key) ?? []) listener();
 }
 

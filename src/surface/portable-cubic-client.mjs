@@ -137,7 +137,7 @@ export function createPortableCubicClient() {
         "Cubic worker belongs to a retired editor",
       );
     if (worker) return worker;
-    const current = new Worker(
+    const current = globalThis.window?.__SHOWAI_CODEX_HOST__?.createWorker?.("cubic") ?? new Worker(
       new URL("./portable-cubic-input-worker.ts", import.meta.url),
       { type: "module" },
     );

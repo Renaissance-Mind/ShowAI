@@ -1,3 +1,4 @@
+import { browserSearch } from "./browser/codex-workbench";
 import { installIconTooltips } from "./ui/icon-tooltip.mjs";
 import { installKeyboardFocus } from "./ui/keyboard-focus";
 import { installWorkbenchMotion } from "./ui/workbench-motion";
@@ -17,7 +18,7 @@ const ComponentPreviewPage = lazy(
 );
 const PagePreviewPage = lazy(() => import("./studio/PagePreviewPage"));
 export default function App() {
-  const params = new URLSearchParams(location.search);
+  const params = browserSearch();
   const capture = params.has("componentPreview") || params.has("pagePreview");
   const theme = useAppearanceTheme();
   const locale = useLocale();
@@ -42,8 +43,8 @@ export default function App() {
       console.error("Couldn't update the desktop language", error);
     });
   }, [locale, capture]);
-  const preview = new URLSearchParams(location.search).has("componentPreview");
-  const pagePreview = new URLSearchParams(location.search).has("pagePreview");
+  const preview = browserSearch().has("componentPreview");
+  const pagePreview = browserSearch().has("pagePreview");
   return (
     <Suspense
       fallback={

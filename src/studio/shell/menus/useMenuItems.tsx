@@ -1,3 +1,4 @@
+import { useCodexReferenceLabel } from "../useCodexReferenceLabel";
 import {
   ArrowDown,
   ArrowUp,
@@ -101,6 +102,7 @@ export function useMenuItems({
 }) {
   const t = useTranslator(studioMessages);
   const tc = useTranslator(commonMessages);
+  const codexReference = useCodexReferenceLabel();
   const tn = useTranslator(navigationMessages);
   function creationMenuItems(
     target: LibraryTarget | null,
@@ -241,9 +243,9 @@ export function useMenuItems({
         ? [
             {
               group: agents,
-              label: tc("copyReference"),
+              label: codexReference ?? tc("copyReference"),
               command: "page.copyReference",
-              description: t("copyPageReferenceDetail"),
+              description: codexReference ? undefined : t("copyPageReferenceDetail"),
               icon: <AtSign size={15} />,
               onSelect: action(() =>
                 copyPageReference(target.projectId, {

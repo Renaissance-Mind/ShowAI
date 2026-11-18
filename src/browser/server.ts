@@ -49,7 +49,8 @@ import {
   required,
   text,
 } from "../workbench/actions";
-import type { DesktopChange, DesktopInfo } from "../host/protocol";
+import type { DesktopChange, DesktopInfo, DesktopResponse } from "../host/protocol";
+import { workbenchChunkBytes, type WorkbenchRoute } from "../host/codex-workbench-transport";
 import { openLocalPath, systemVersion } from "./system";
 import { localMediaResponse } from "../workbench/local-media";
 import { windowQuery } from "../workbench/window-target";
@@ -61,6 +62,7 @@ export interface BrowserServerOptions {
   cliEntry: string;
   settingsPath: string;
   registerAgentRuntime?: boolean;
+  codexWorkbench?: { key: string };
   additionalActions?: ReadonlySet<string>;
   agentWorkspaceRoot?: string;
   interceptInvoke?: (
@@ -69,6 +71,26 @@ export interface BrowserServerOptions {
     next: () => Promise<unknown>,
   ) => Promise<unknown>;
   development?: { origin: string; token: string; sourceCommit?: string };
+}
+
+const codexSandboxDomains = [
+  "web-sandbox.oaiusercontent.com",
+  "staging-web-sandbox.oaiusercontent.com",
+];
+
+function allowsCodexOrigin(value: string): boolean {
+  if (value === "app://-") return true;
+  const url = URL.parse(value);
+  if (url?.protocol === "codex-sandbox:") {
+    return value === `codex-sandbox://${url.hostname}` &&
+      codexSandboxDomains.some((domain) =>
+        url.hostname === domain || url.hostname.endsWith(`.${domain}`),
+      );
+  }
+  return url?.origin === value && url.protocol === "https:" &&
+    (url.hostname === "chatgpt.com" ||
+      url.hostname.endsWith(".chatgpt.com") ||
+      url.hostname.endsWith(".oaiusercontent.com"));
 }
 
 export async function startBrowserServer(options: BrowserServerOptions) {
@@ -85,6 +107,9 @@ export async function startBrowserServer(options: BrowserServerOptions) {
       );
   }
   const fixedHome = options.home ?? process.env.SHOWAI_HOME;
+  const embedding = options.codexWorkbench;
+  if (embedding && (!fixedHome || options.development || !/^[0-9a-f]{64}$/.test(embedding.key)))
+    throw new Error("The embedded workbench requires a fixed library and a private key.");
   let savedHome: string | undefined;
   if (!fixedHome) {
     const source = await readFile(options.settingsPath, "utf8").catch(
@@ -145,11 +170,23 @@ export async function startBrowserServer(options: BrowserServerOptions) {
       env: { SHOWAI_HOME: store.root },
     },
   });
+  type ChangeForClient = (id: string) => DesktopChange | undefined;
+  const workbenchChanges: ChangeForClient[] = [];
+  let workbenchCursor = 0;
+  function dispatchChanges(changeForClient: ChangeForClient) {
+    for (const [client, id] of clients) {
+      const update = changeForClient(id);
+      if (update) client.write(`data: ${JSON.stringify(update)}\n\n`);
+    }
+    if (embedding) {
+      workbenchChanges.push(changeForClient);
+      if (workbenchChanges.length > 160) workbenchChanges.shift();
+      workbenchCursor++;
+    }
+  }
   const notify = (type: "home" | "files", change?: DesktopChange) => {
-    for (const client of clients.keys())
-      client.write(
-        `data: ${JSON.stringify({ type, home: store.root, ...change })}\n\n`,
-      );
+    const update = { type, home: store.root, ...change } as DesktopChange;
+    dispatchChanges(() => update);
   };
   async function deliverFiles(root: string, batch: string[]) {
     if (closed) return;
@@ -159,27 +196,21 @@ export async function startBrowserServer(options: BrowserServerOptions) {
     const dependents = change.datasets?.length
       ? await datasetDependents(store, change.datasets)
       : [];
-    for (const [client, id] of clients) {
+    dispatchChanges((id) => {
       const own = id ? echoes.get(id) : undefined;
       const visible = own ? batch.filter((path) => !own.has(path)) : batch;
-      if (!visible.length && !dependents.length) continue;
+      if (!visible.length && !dependents.length) return undefined;
       const resources = changedResources(root, visible);
-      client.write(
-        `data: ${JSON.stringify({
-          ...resources,
-          ...(dependents.length
-            ? {
-                datasets: [
-                  ...new Set([...(resources.datasets ?? []), ...dependents]),
-                ],
-              }
-            : {}),
-          type: "files",
-          home: root,
-        })}\n\n`,
-      );
-    }
-    if (!closed && (change.projectIds?.length || change.catalog || change.all))
+      return {
+        ...resources,
+        ...(dependents.length
+          ? { datasets: [...new Set([...(resources.datasets ?? []), ...dependents])] }
+          : {}),
+        type: "files",
+        home: root,
+      };
+    });
+    if (!embedding && !closed && (change.projectIds?.length || change.catalog || change.all))
       syncManager(root).wake(
         change.catalog || change.all ? undefined : change.projectIds,
         !!(change.catalog || change.all),
@@ -201,7 +232,7 @@ export async function startBrowserServer(options: BrowserServerOptions) {
     });
   }
   async function useHome(home: string) {
-    await syncManager(store.root).stop();
+    if (!embedding) await syncManager(store.root).stop();
     await maintenance?.stop();
     store = new FileStore(home);
     ownWrites.clear();
@@ -218,15 +249,17 @@ export async function startBrowserServer(options: BrowserServerOptions) {
       }),
     );
     service = new AgentService({ root: store.root });
-    if (options.registerAgentRuntime !== false)
+    if (!embedding && options.registerAgentRuntime !== false)
       await registerRuntimeOnStartup(
         store.root,
         info().cli,
         options.development ? "development" : "packaged",
       );
-    await announce();
-    maintenance = new MaintenanceScheduler(store.root).start();
-    syncManager(store.root).start();
+    if (!embedding) {
+      await announce();
+      maintenance = new MaintenanceScheduler(store.root).start();
+      syncManager(store.root).start();
+    }
     watcher = watchLibrary(store.root, (path) =>
       path
         .slice(store.root.length)
@@ -297,9 +330,9 @@ export async function startBrowserServer(options: BrowserServerOptions) {
     runtime: () => info(),
     channel: options.development ? "development" : "packaged",
   });
-  const remoteConnector = new RemoteMacConnector(agentHost, () => store.root);
+  const remoteConnector = embedding ? undefined : new RemoteMacConnector(agentHost, () => store.root);
   void remoteConnector
-    .start()
+    ?.start()
     .catch((error) => console.error("Remote Agent connector:", error.message));
   async function selectedPath(
     args: Record<string, unknown>,
@@ -318,16 +351,21 @@ export async function startBrowserServer(options: BrowserServerOptions) {
     return resolved;
   }
   async function invoke(action: string, args: Record<string, unknown>) {
+    if (embedding) {
+      if (action === "sync:wake") return { scheduled: false };
+      if (desktopPluginActions.has(action) || remoteDeviceActions.has(action))
+        throw new CoreError("INVALID_DATA", "Manage plugins and remote devices in the ShowAI app.");
+    }
     if (desktopPluginActions.has(action))
       return pluginInstallerAction(pluginInstaller, action, args);
-    if (action === "agent:remoteDevice") return remoteConnector.status();
+    if (action === "agent:remoteDevice") return remoteConnector?.status();
     if (action === "agent:approveRemoteClient")
-      return remoteConnector.approveClient(
+      return remoteConnector?.approveClient(
         String(args.id),
         args.approve === true,
       );
     if (action === "agent:shareDevice")
-      return remoteConnector.save(
+      return remoteConnector?.save(
         args.settings as Parameters<RemoteMacConnector["save"]>[0],
       );
     if (agentActions.has(action)) return agentHost.action(action, args);
@@ -421,7 +459,7 @@ export async function startBrowserServer(options: BrowserServerOptions) {
           case "app:openPageWindow":
           case "app:openWindow": {
             return {
-              url: `${origin}/?${new URLSearchParams(windowQuery(args))}`,
+              url: `${origin}/?${workbenchParams(args)}`,
             };
           }
           default:
@@ -433,6 +471,12 @@ export async function startBrowserServer(options: BrowserServerOptions) {
       },
     })(action, args);
   }
+  function workbenchParams(target: Parameters<typeof windowQuery>[0]) {
+    const params = new URLSearchParams(windowQuery(target));
+    if (embedding) params.set("codexWorkbench", embedding.key);
+    return params;
+  }
+
   async function dialogList(args: Record<string, unknown>) {
     const path = await realpath(text(args, "path", true) ?? homedir());
     const entries = await readdir(path, { withFileTypes: true });
@@ -515,13 +559,28 @@ export async function startBrowserServer(options: BrowserServerOptions) {
       response.setHeader("X-Content-Type-Options", "nosniff");
       response.setHeader("X-Frame-Options", "DENY");
       response.setHeader("Referrer-Policy", "no-referrer");
+      const requestOrigin = request.headers.origin;
+      const codexOrigin = requestOrigin && embedding && allowsCodexOrigin(requestOrigin);
       if (
         request.headers.host !== new URL(origin).host ||
-        (request.headers.origin && request.headers.origin !== origin)
+        (requestOrigin && requestOrigin !== origin && !codexOrigin)
       ) {
         response.writeHead(403);
         response.end("Forbidden origin");
         return;
+      }
+      if (codexOrigin) {
+        response.setHeader("Access-Control-Allow-Origin", requestOrigin);
+        response.setHeader("Vary", "Origin");
+        if (request.method === "OPTIONS") {
+          response.setHeader("Access-Control-Allow-Methods", "GET, HEAD, POST");
+          response.setHeader("Access-Control-Allow-Headers", "Authorization, Content-Type, X-ShowAI-Client");
+          if (request.headers["access-control-request-private-network"] === "true")
+            response.setHeader("Access-Control-Allow-Private-Network", "true");
+          response.writeHead(204);
+          response.end();
+          return;
+        }
       }
       const url = new URL(request.url ?? "/", origin);
       const printable = /^\/api\/print\/([0-9a-f-]{36})$/.exec(url.pathname);
@@ -621,7 +680,7 @@ export async function startBrowserServer(options: BrowserServerOptions) {
             throw new CoreError("INVALID_DATA", "Unknown language.");
           setLocale(input.locale);
           workbenchLocale = input.locale;
-          await recordAppLanguage(store.root, input.locale);
+          if (!embedding) await recordAppLanguage(store.root, input.locale);
           data = null;
         } else if (url.pathname === "/api/shutdown") {
           data = null;
@@ -672,17 +731,45 @@ export async function startBrowserServer(options: BrowserServerOptions) {
       }
       if (url.pathname === "/") {
         const preview = url.searchParams.has("componentPreview");
-        if (preview) response.setHeader("X-Frame-Options", "SAMEORIGIN");
-        const config = JSON.stringify({ token }).replace(/</g, "\\u003c");
-        const html = (
-          await readFile(join(webRoot, "index.html"), "utf8")
-        ).replace(
+        const embedded = embedding &&
+          (url.searchParams.get("codexWorkbench") === embedding.key ||
+            (preview && request.headers["sec-fetch-site"] === "same-origin"));
+        if (embedding && !embedded) {
+          response.writeHead(403);
+          response.end("Forbidden workbench request");
+          return;
+        }
+        if (embedded) response.removeHeader("X-Frame-Options");
+        else if (preview) response.setHeader("X-Frame-Options", "SAMEORIGIN");
+        const ancestors = embedded
+          ? "'self' app: https://chatgpt.com https://*.chatgpt.com https://*.oaiusercontent.com"
+          : preview ? "'self'" : "'none'";
+        const config = JSON.stringify({
+          token,
+          ...(codexOrigin && embedded ? { apiOrigin: origin, search: url.search } : {}),
+          ...(embedded && !preview
+            ? {
+                codexWorkbench: {
+                  key: embedding.key,
+                  instance: /^[0-9a-f]{32}$/.test(url.searchParams.get("codexInstance") ?? "")
+                    ? url.searchParams.get("codexInstance")
+                    : randomBytes(16).toString("hex"),
+                  mode: url.searchParams.get("codexMode") === "thread" ? "thread" : "global",
+                },
+              }
+            : {}),
+        }).replace(/</g, "\\u003c");
+        const index = await readFile(join(webRoot, "index.html"), "utf8");
+        const document = codexOrigin && embedded
+          ? index.replaceAll('"./assets/', `"${origin}/assets/`)
+          : index;
+        const html = document.replace(
           "<head>",
           `<head><script>window.__SHOWAI_LOCAL__=${config}</script>`,
         );
         response.setHeader(
           "Content-Security-Policy",
-          `default-src 'self'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https: http:; media-src 'self' data: https: http:; font-src 'self' data:; connect-src 'self'; frame-src 'self' about: data: blob:; frame-ancestors ${preview ? "'self'" : "'none'"}; object-src 'none'; base-uri 'none'; form-action 'none'; worker-src 'self'`,
+          `default-src 'self'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https: http:; media-src 'self' data: https: http:; font-src 'self' data:; connect-src 'self'; frame-src 'self' about: data: blob:; frame-ancestors ${ancestors}; object-src 'none'; base-uri 'none'; form-action 'none'; worker-src 'self'`,
         );
         response.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
         response.end(request.method === "HEAD" ? undefined : html);
@@ -751,9 +838,9 @@ export async function startBrowserServer(options: BrowserServerOptions) {
       await watcher.close();
       await sources?.close();
       await Promise.all(pendingChanges);
-      await remoteConnector.close();
+      await remoteConnector?.close();
       agentHost.close();
-      await syncManager(store.root).stop();
+      if (!embedding) await syncManager(store.root).stop();
       await maintenance?.stop();
       await presence?.remove();
       for (const client of clients.keys()) client.end();
@@ -768,7 +855,7 @@ export async function startBrowserServer(options: BrowserServerOptions) {
     throw new Error("Missing local server address.");
   if (!origin) {
     origin = `http://127.0.0.1:${address.port}`;
-    await announce();
+    if (!embedding) await announce();
   }
   return {
     url: origin + "/",
@@ -776,5 +863,45 @@ export async function startBrowserServer(options: BrowserServerOptions) {
     home: store.root,
     close,
     connectedClients: () => clients.size,
+    workbench: {
+      async request(route: WorkbenchRoute, args: Record<string, unknown>, client: string) {
+        const response = await fetch(`${origin}/api/${route}`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+            "X-ShowAI-Client": client,
+          },
+          body: JSON.stringify(args),
+        });
+        if (!response.headers.get("content-type")?.includes("application/json"))
+          throw new CoreError("INVALID_DATA", `ShowAI workbench returned HTTP ${response.status}.`);
+        return await response.json() as DesktopResponse<unknown>;
+      },
+      changes(after: number, client: string) {
+        const oldest = workbenchCursor - workbenchChanges.length;
+        const changes: DesktopChange[] = after < oldest || after > workbenchCursor
+          ? [{ type: "files", home: store.root, all: true }]
+          : workbenchChanges.slice(after - oldest).flatMap((changeForClient) =>
+              changeForClient(client) ?? [],
+            );
+        return { cursor: workbenchCursor, changes };
+      },
+      async media(grant: string, offset: number) {
+        const response = await fetch(`${origin}/api/media/${grant}`, {
+          headers: { Range: `bytes=${offset}-${offset + workbenchChunkBytes - 1}` },
+        });
+        const range = /^bytes \d+-\d+\/(\d+)$/.exec(response.headers.get("content-range") ?? "");
+        if (response.status !== 206 || !range) {
+          await response.body?.cancel();
+          throw new CoreError("NOT_FOUND", "The local media chunk is unavailable.");
+        }
+        return {
+          base64: Buffer.from(await response.arrayBuffer()).toString("base64"),
+          mime: response.headers.get("content-type") ?? "application/octet-stream",
+          size: Number(range[1]),
+        };
+      },
+    },
   };
 }

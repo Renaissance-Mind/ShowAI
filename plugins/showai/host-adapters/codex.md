@@ -2,6 +2,10 @@
 
 此插件默认使用 Codex 的 MCP Apps 原生视图，声明 `SHOWAI_HOST_DISPLAY=mcp-app`。show_component 使用 `delivery:"auto"`；工具调用后由宿主直接展示组件，无需等待最终回复，也无需追加 visualize 文件引用。page_present 和 render_document 同样使用附带的阅读器；正式页面仍先保存再展示。
 
+## 工作台与对话选区
+
+支持 Plugin Extensions 的 Codex 桌面端可以从主侧栏打开 ShowAI 工作台，也可以在当前聊天右侧打开 ShowAI 页面编辑器。用户在编辑器选择「引用到 Codex 对话」后，下一条消息可携带项目、页面、版本及内容对象的 `showai.reference`。根据该引用读取和修改原页。引用缺少页面或选区时，请用户在右侧定位对象并引用，或使用 ShowAI 的「复制引用」。用户可以在主侧栏的工作台中搜索并打开已保存的 Page，也可以从选区发起 Codex 草稿。然后在新对话右侧打开 ShowAI，按页面选择器定位同一页。消息中的阅读预览继续按展示工具交付。
+
 ## 分批生成
 
 用户要求边生成边看，或任务中的内容会分批到达时，按 show-visual 的持续更新流程调用 `show_component({kind,data,live:true})`。第一批内容须完整合法并有实际信息，后续使用同一个 viewId 和块 ID 调用 show_component_update，最后 complete:true。读取器自动读取新版本，不启动模型回合。内容已齐或小任务可直接一次展示，不为了流式效果拆成逐字调用。
