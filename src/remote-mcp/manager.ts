@@ -17,6 +17,7 @@ import {
 } from "./types";
 import { installCloudflared } from "./install";
 import { localLibraryPolicy } from "./local-library";
+import { tailnetDeviceTransport } from "./tailnet-device";
 import { PairingCodes } from "./pairing";
 import { isTailscaleProvider } from "./client-setup";
 import { isLanAddress, lanAddresses, tailscalePort } from "./network";
@@ -48,6 +49,9 @@ export function validateRemoteMcpConfig(value: unknown): RemoteMcpConfig {
     (c.bindAddress !== undefined &&
       (typeof c.bindAddress !== "string" ||
         (c.bindAddress !== "" && !isLanAddress(c.bindAddress)))) ||
+    (c.privateAuth !== undefined &&
+      (c.provider !== "tailscale-private" ||
+        !["device", "oauth"].includes(c.privateAuth))) ||
     (c.httpsPort !== undefined && ![443, 8443, 10000].includes(c.httpsPort)) ||
     (c.executable && !isAbsolute(c.executable)) ||
     (c.access !== undefined && !["all", "selected"].includes(c.access)) ||
@@ -83,6 +87,7 @@ export function validateRemoteMcpConfig(value: unknown): RemoteMcpConfig {
   }
   return {
     provider: c.provider,
+    ...(c.privateAuth ? { privateAuth: c.privateAuth } : {}),
     ...(c.chatgptAppId
       ? { chatgptAppId: c.chatgptAppId, chatgptEndpoint: c.chatgptEndpoint }
       : {}),
@@ -134,6 +139,7 @@ export class RemoteMcpManager {
       decrypt: (value: string) => string;
       provider?: RemoteMcpProvider;
       toolsDirectory?: string;
+      onApprovalRequest?(name: string): void;
       reserveHttpsPort?: (
         config: Parameters<typeof tailscalePort>[0],
         preferred?: number,
@@ -336,9 +342,14 @@ export class RemoteMcpManager {
       root: home,
       desktopApproval: c.provider !== "lan",
       accessKeyOnly: c.provider === "lan",
-      requireOAuth: c.provider === "tailscale-private",
+      requireOAuth:
+        c.provider === "tailscale-private" && c.privateAuth !== "device",
+      deviceApproval:
+        c.provider === "tailscale-private" && c.privateAuth === "device",
+      onApprovalRequest: this.options.onApprovalRequest,
       ...localLibraryPolicy(home, c),
-      consumePairingCode: (code: string) => this.pairing.consume(code),
+      consumePairingCode: (code: string, binding?: string) =>
+        this.pairing.consume(code, Date.now(), binding),
       onCall: (_name: string, clientId: string) => {
         this.lastCallClientId = clientId;
         this.lastCallAt = new Date().toISOString();
@@ -354,6 +365,7 @@ export class RemoteMcpManager {
         createHash("sha256")
           .update(
             this.options.home() +
+              (c.privateAuth === "device" ? "\0tailscale-device\0" : "") +
               (origin ??
                 (c.provider === "lan"
                   ? `lan:${c.bindAddress}`
@@ -519,11 +531,45 @@ export class RemoteMcpManager {
             "Cannot inspect existing Tailscale Serve configuration.",
         );
       const existing = JSON.parse(serving.stdout || "{}");
-      httpsPort = this.options.reserveHttpsPort
-        ? this.options.reserveHttpsPort(existing, c.httpsPort)
-        : tailscalePort(existing, c.httpsPort);
-      this.config = { ...c, httpsPort };
-      origin = `https://${String(state.Self.DNSName).replace(/\.$/, "")}${httpsPort === 443 ? "" : `:${httpsPort}`}`;
+      const device =
+        c.provider === "tailscale-private" && c.privateAuth === "device"
+          ? await tailnetDeviceTransport(executable, state.Self)
+          : undefined;
+      for (;;) {
+        httpsPort = this.options.reserveHttpsPort
+          ? this.options.reserveHttpsPort(existing, c.httpsPort)
+          : tailscalePort(existing, c.httpsPort);
+        origin = `https://${String(state.Self.DNSName).replace(/\.$/, "")}${httpsPort === 443 ? "" : `:${httpsPort}`}`;
+        this.config = { ...c, httpsPort };
+        if (!device) break;
+        signal.throwIfAborted();
+        try {
+          this.http = await startMcpHttpServer({
+            ...this.serverOptions(c, origin),
+            tailnet: device,
+            publicUrl: origin,
+            port: httpsPort,
+          });
+          break;
+        } catch (error) {
+          if ((error as NodeJS.ErrnoException).code !== "EADDRINUSE")
+            throw error;
+          existing.TCP = { ...existing.TCP, [httpsPort]: {} };
+        }
+      }
+      if (device) {
+        this.restrictGrants();
+        await this.persist();
+        await this.check();
+        signal.throwIfAborted();
+        if (!this.reachable)
+          throw new Error(
+            this.error ||
+              "The private Tailscale HTTPS listener is unreachable.",
+          );
+        this.phase = "running";
+        return;
+      }
     }
     if (this.http)
       await this.http.configure({

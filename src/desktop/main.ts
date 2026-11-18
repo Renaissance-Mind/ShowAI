@@ -20,6 +20,7 @@ import {
   Menu,
   nativeImage,
   nativeTheme,
+  Notification,
   protocol,
   shell,
   safeStorage,
@@ -29,6 +30,7 @@ import {
   chatgptAppId,
 } from "../remote-mcp/plugin-package";
 import { RemoteMcpConnections } from "../remote-mcp/connections";
+import remoteConnectionMessages from "../i18n/messages/remoteConnections";
 import { remoteMcpActions } from "../remote-mcp/types";
 import type { IpcMainEvent, IpcMainInvokeEvent, NativeImage } from "electron";
 import { watchLibrary, type LibraryWatcher } from "../core/library-watcher";
@@ -2001,6 +2003,18 @@ else {
       remoteConnector = new RemoteMacConnector(agentHost, () => store.root);
       remoteMcp = new RemoteMcpConnections({
         directory: join(app.getPath("userData"), "remote-mcp"),
+        onApprovalRequest(name) {
+          if (presentation.background || BrowserWindow.getFocusedWindow() || !Notification.isSupported())
+            return;
+          const notification = new Notification({
+            title: "ShowAI",
+            body: translator(remoteConnectionMessages)("approvalNotification", { name }),
+          });
+          notification.once("click", () => {
+            void menuWindow().then(revealWindow);
+          });
+          notification.show();
+        },
         home: () => store.root,
         encrypt: (value) => {
           if (

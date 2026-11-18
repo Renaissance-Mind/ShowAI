@@ -5,7 +5,15 @@ import {
   readCapacityText,
   formatBytes,
 } from "../portable/capacity.mjs";
-import { createServer, type Server } from "node:http";
+import { createServer, type Server, type RequestListener } from "node:http";
+import {
+  createServer as createHttpsServer,
+  type Server as HttpsServer,
+} from "node:https";
+import type {
+  TailnetDeviceTransport,
+  TailnetPeer,
+} from "../remote-mcp/tailnet-device";
 import { mkdir, readFile, readdir, writeFile, rm } from "node:fs/promises";
 import { isAbsolute, join, resolve } from "node:path";
 import { randomBytes, randomUUID } from "node:crypto";
@@ -77,6 +85,8 @@ const oauth = (write: boolean) => [
   },
 ];
 type StoredArtifact = {
+  grantId?: string;
+  projectId?: string;
   html: string;
   inline?: string;
   online?: string;
@@ -178,6 +188,7 @@ export async function createMcpHttpApp(options: McpHttpOptions) {
   const storePresentation = async (
     value: Presentation,
     publicSource = false,
+    owner?: { grantId: string; projectId?: string },
   ) => {
     for (const [key, item] of artifacts)
       if (item.expires <= Date.now()) {
@@ -191,6 +202,7 @@ export async function createMcpHttpApp(options: McpHttpOptions) {
     const key = randomBytes(32).toString("base64url"),
       expires = Date.now() + 3600_000;
     artifacts.set(key, {
+      ...owner,
       html: value.html,
       inline: value.inline,
       online: value.online,
@@ -236,12 +248,20 @@ export async function createMcpHttpApp(options: McpHttpOptions) {
     context?: RemoteWorkspaceContext,
     grant?: ProjectGrant,
   ) {
+    const storeForClient = (value: Presentation, publicSource = false) =>
+      storePresentation(
+        value,
+        publicSource,
+        options.local?.deviceApproval && grant
+          ? { grantId: grant.id, projectId: context?.projectId }
+          : undefined,
+      );
     const server = createMcpServer({
       root: context?.root ?? join(state, "public"),
       projectId: context?.projectId ?? "unselected",
       projectAccess: "library",
       workspaceProjectIds: context?.projectIds ?? [],
-      storeProjectPresentation: (value) => storePresentation(value, false),
+      storeProjectPresentation: (value) => storeForClient(value, false),
       sourceContext: {
         actor: { kind: "external", label: "MCP client" },
         channel: "mcp",
@@ -250,7 +270,7 @@ export async function createMcpHttpApp(options: McpHttpOptions) {
       instructions: "Read use-showai Skill. HTTP; authorized projects.",
       presentation: {
         transport: "http",
-        storePresentation: (value) => storePresentation(value, true),
+        storePresentation: (value) => storeForClient(value, true),
         widgetDomain: options.widgetDomain,
         privateProjects: !!options.local || servers.length > 0,
         hostDisplay: "mcp-app",
@@ -478,7 +498,7 @@ export async function createMcpHttpApp(options: McpHttpOptions) {
                     args.format === "inline"
                       ? { inline: output }
                       : await inlinePresentation(output);
-                  const delivery = await storePresentation({
+                  const delivery = await storeForClient({
                     title: String(data.title ?? "ShowAI"),
                     document: {} as Presentation["document"],
                     html:
@@ -602,6 +622,7 @@ export async function createMcpHttpApp(options: McpHttpOptions) {
         if (
           !artifact ||
           !artifact.publicSource ||
+          (options.local?.deviceApproval && artifact.grantId !== grant?.id) ||
           artifact.expires <= Date.now()
         )
           return mcpFailure(
@@ -658,9 +679,12 @@ export async function createMcpHttpApp(options: McpHttpOptions) {
                     )
                     .map((p) => ({
                       ...p,
-                      role: grant.scopes.includes("projects.write")
-                        ? p.role
-                        : "viewer",
+                      role:
+                        grant.scopes.includes("projects.write") &&
+                        (!grant.writeProjectIds ||
+                          grant.writeProjectIds.includes(p.id))
+                          ? p.role
+                          : "viewer",
                     }))
                 : await workspaces.projects(grant, includeArchived),
             )
@@ -767,8 +791,10 @@ export async function createMcpHttpApp(options: McpHttpOptions) {
             tool._meta = { ...tool._meta, securitySchemes: oauth(false) };
           if (tool._meta?.securitySchemes)
             tool.securitySchemes = tool._meta.securitySchemes;
-          if (options.local?.accessKeyOnly) {
-            tool.securitySchemes = [{ type: "http", scheme: "bearer" }];
+          if (options.local?.accessKeyOnly || options.local?.deviceApproval) {
+            tool.securitySchemes = options.local.deviceApproval
+              ? [{ type: "noauth" }]
+              : [{ type: "http", scheme: "bearer" }];
             tool._meta = {
               ...tool._meta,
               securitySchemes: tool.securitySchemes,
@@ -782,7 +808,7 @@ export async function createMcpHttpApp(options: McpHttpOptions) {
   }
   return {
     authorization,
-    async fetch(request: Request): Promise<Response> {
+    async fetch(request: Request, peer?: TailnetPeer): Promise<Response> {
       const target = new URL(request.url);
       const allowedHosts = [url.host, ...(options.allowedHosts ?? [])];
       if (!allowedHosts.includes(target.host))
@@ -791,7 +817,11 @@ export async function createMcpHttpApp(options: McpHttpOptions) {
       const artifactRead =
         target.pathname.startsWith("/artifacts/") &&
         ["GET", "HEAD"].includes(request.method);
-      if (requestOrigin && requestOrigin !== origin && !artifactRead)
+      if (
+        requestOrigin &&
+        requestOrigin !== origin &&
+        (!artifactRead || options.local?.deviceApproval)
+      )
         return json({ error: "Origin not allowed." }, 403);
       if (target.pathname === "/health")
         return json({
@@ -804,21 +834,68 @@ export async function createMcpHttpApp(options: McpHttpOptions) {
             ? { browserRendering: options.browserRendering }
             : {}),
         });
+      const device = options.local?.deviceApproval === true;
+      if (device && !peer)
+        return json({ error: "Tailscale device identity unavailable." }, 403);
       if (
         options.local?.accessKeyOnly &&
-        (target.pathname.startsWith("/oauth/") ||
-          target.pathname.startsWith("/.well-known/"))
-      )
-        return json({ error: "This LAN connection uses access keys." }, 404);
-      const auth = options.local?.accessKeyOnly
-        ? undefined
-        : await authorization.fetch(request);
+        target.pathname === "/connect/request" &&
+        request.method === "POST"
+      ) {
+        try {
+          if (
+            request.headers.get("content-type")?.split(";")[0] !==
+            "application/json"
+          )
+            return json({ error: "Use JSON." }, 415);
+          const input = JSON.parse(
+            await readCapacityText(request, 4096, "LAN enrollment"),
+          );
+          if (
+            ![input?.invite, input?.keyHash, input?.name].every(
+              (v) => typeof v === "string",
+            )
+          )
+            return json({ error: "Invalid enrollment." }, 400);
+          const status = await authorization.enrollLan(
+            input.invite,
+            input.keyHash,
+            input.name,
+          );
+          return json(
+            { status, retryAfterSeconds: 2 },
+            status === "approved" ? 200 : 202,
+          );
+        } catch (error) {
+          if (error instanceof AuthorizationError)
+            return json({ error: error.message }, error.status);
+          if (error instanceof SyntaxError || error instanceof CapacityError)
+            return json({ error: "Invalid enrollment." }, 400);
+          throw error;
+        }
+      }
+      const auth =
+        options.local?.accessKeyOnly || device
+          ? undefined
+          : await authorization.fetch(request);
       if (auth) return auth;
       const asset = target.pathname.match(
         /^\/artifacts\/([A-Za-z0-9_-]{43})\/(page\.html|inline\.html|online\.html|compact\.html|page\.showai\.json)$/,
       );
       if (asset && ["GET", "HEAD"].includes(request.method)) {
         const value = artifacts.get(asset[1]);
+        if (device) {
+          const grant = authorization.deviceGrant(peer!.binding);
+          if (
+            !grant ||
+            value?.grantId !== grant.id ||
+            (value.projectId &&
+              !(await options.local!.projects()).some(
+                (p) => p.id === value.projectId,
+              ))
+          )
+            return json({ error: "Private preview unavailable." }, 403);
+        }
         if (!value || value.expires <= Date.now())
           return json(
             { error: "Preview expired. Render the page again." },
@@ -849,7 +926,9 @@ export async function createMcpHttpApp(options: McpHttpOptions) {
               : "text/html; charset=utf-8",
             "content-disposition": `attachment; filename="${asset[2]}"`,
             "cache-control": "private, no-store",
-            "access-control-allow-origin": "*",
+            ...(!options.local?.deviceApproval
+              ? { "access-control-allow-origin": "*" }
+              : {}),
             "referrer-policy": "no-referrer",
             "x-content-type-options": "nosniff",
             "content-security-policy": "sandbox allow-scripts allow-downloads",
@@ -921,7 +1000,8 @@ export async function createMcpHttpApp(options: McpHttpOptions) {
           id: body.id ?? null,
           result: {
             ...mcpFailure(error),
-            ...(error instanceof AuthorizationError &&
+            ...(!device &&
+            error instanceof AuthorizationError &&
             ["invalid_token", "insufficient_scope"].includes(error.code)
               ? {
                   _meta: {
@@ -944,6 +1024,25 @@ export async function createMcpHttpApp(options: McpHttpOptions) {
         async (loggedCall) => {
           const dispatch = async () => {
             try {
+              let deviceGrant: ProjectGrant | undefined;
+              if (device) {
+                const method = body.method;
+                if (method === "initialize")
+                  await authorization.requestDevice(peer!, false);
+                else if (
+                  !["notifications/initialized", "ping", "tools/list"].includes(
+                    String(method),
+                  )
+                ) {
+                  deviceGrant = await authorization.requestDevice(peer!, true);
+                  if (!deviceGrant)
+                    throw new AuthorizationError(
+                      "Waiting for the device owner to click Allow in ShowAI. Retry this call shortly.",
+                      "approval_pending",
+                      403,
+                    );
+                }
+              }
               if (
                 name &&
                 (!publicTools.has(name) ||
@@ -957,14 +1056,20 @@ export async function createMcpHttpApp(options: McpHttpOptions) {
                 const bearer = request.headers
                   .get("authorization")
                   ?.match(/^Bearer ([A-Za-z0-9_-]+)$/)?.[1];
-                const grant = authorization.verify(
-                  bearer,
+                const needed =
                   name === "project_create"
                     ? "projects.create"
                     : writeTools.has(name)
                       ? "projects.write"
-                      : "projects.read",
-                );
+                      : "projects.read";
+                const grant =
+                  deviceGrant ?? authorization.verify(bearer, needed);
+                if (!grant.scopes.includes(needed))
+                  throw new AuthorizationError(
+                    "This operation is outside the approved project permissions.",
+                    "insufficient_scope",
+                    403,
+                  );
                 callLog.authorize(loggedCall, grant.id);
                 if (options.local && publicTools.has(name))
                   return execute(request, body, undefined, grant);
@@ -1031,7 +1136,9 @@ export async function createMcpHttpApp(options: McpHttpOptions) {
                       !selected ||
                       (writeTools.has(name) &&
                         writers.has(id) &&
-                        selected.role === "viewer")
+                        (selected.role === "viewer" ||
+                          (grant.writeProjectIds &&
+                            !grant.writeProjectIds.includes(id))))
                     )
                       throw new AuthorizationError(
                         "This project or operation is not allowed by the device owner.",
@@ -1056,6 +1163,8 @@ export async function createMcpHttpApp(options: McpHttpOptions) {
                           .filter(
                             (p) =>
                               p.role !== "viewer" &&
+                              (!grant.writeProjectIds ||
+                                grant.writeProjectIds.includes(p.id)) &&
                               grant.scopes.includes("projects.write"),
                           )
                           .map((p) => p.id),
@@ -1204,12 +1313,12 @@ export async function createMcpHttpApp(options: McpHttpOptions) {
                   );
                 renderCount++;
                 try {
-                  return await execute(request, body);
+                  return await execute(request, body, undefined, deviceGrant);
                 } finally {
                   renderCount--;
                 }
               }
-              return execute(request, body);
+              return execute(request, body, undefined, deviceGrant);
             } catch (error) {
               if (loggedCall && error instanceof AuthorizationError)
                 loggedCall.errorCode = error.code;
@@ -1245,6 +1354,7 @@ export async function startMcpHttpServer(
     publicUrl?: string;
     host?: string;
     port?: number;
+    tailnet?: TailnetDeviceTransport;
   },
 ): Promise<{
   server: Server;
@@ -1257,7 +1367,15 @@ export async function startMcpHttpServer(
   close(): Promise<void>;
 }> {
   let app: Awaited<ReturnType<typeof createMcpHttpApp>> | undefined;
-  const server = createServer(async (incoming, outgoing) => {
+  const tailnet = options.tailnet;
+  if (
+    !!tailnet !== !!options.local?.deviceApproval ||
+    (tailnet && !options.publicUrl?.startsWith("https://"))
+  )
+    throw new Error(
+      "Device approval requires a direct private Tailscale HTTPS listener.",
+    );
+  const handle: RequestListener = async (incoming, outgoing) => {
     try {
       if (!app) {
         outgoing.writeHead(503);
@@ -1283,7 +1401,7 @@ export async function startMcpHttpServer(
           headers.set(name, Array.isArray(value) ? value.join(",") : value);
       const method = incoming.method ?? "GET";
       const request = new Request(
-        `http://${incoming.headers.host ?? "localhost"}${incoming.url ?? "/"}`,
+        `${tailnet ? "https" : "http"}://${incoming.headers.host ?? "localhost"}${incoming.url ?? "/"}`,
         {
           method,
           headers,
@@ -1292,14 +1410,18 @@ export async function startMcpHttpServer(
             : {}),
         },
       );
+      const peer =
+        tailnet && new URL(request.url).pathname !== "/health"
+          ? await tailnet.identify(incoming.socket.remoteAddress)
+          : undefined;
       const response =
         options.durableState &&
         !["/health", "/mcp"].includes(new URL(request.url).pathname)
           ? await options.durableState.run(
-              () => app!.fetch(request),
+              () => app!.fetch(request, peer),
               () => app!.authorization.checkpoint(),
             )
-          : await app.fetch(request);
+          : await app.fetch(request, peer);
       outgoing.writeHead(response.status, Object.fromEntries(response.headers));
       outgoing.end(Buffer.from(await response.arrayBuffer()));
     } catch (error) {
@@ -1310,36 +1432,62 @@ export async function startMcpHttpServer(
       if (!outgoing.headersSent) outgoing.writeHead(500);
       outgoing.end("MCP request failed.");
     }
-  });
-  await new Promise<void>((done, reject) => {
-    server.once("error", reject);
-    server.listen(options.port ?? 8789, options.host ?? "127.0.0.1", done);
-  });
-  const address = server.address();
-  if (!address || typeof address === "string")
-    throw new Error("MCP server has no TCP address.");
-  const host =
-    options.host && !["0.0.0.0", "::"].includes(options.host)
-      ? options.host
-      : "127.0.0.1";
-  const localUrl = `http://${host.includes(":") ? `[${host}]` : host}:${address.port}`;
+  };
+  const hosts = tailnet?.addresses ?? [options.host ?? "127.0.0.1"];
+  const servers: Server[] = [];
+  let stopRenewal: (() => void) | undefined;
+  const closeListeners = async () => {
+    stopRenewal?.();
+    await Promise.all(
+      servers.map((server) => {
+        server.closeAllConnections();
+        return new Promise<void>((resolve) => server.close(() => resolve()));
+      }),
+    );
+  };
+  let port = options.port ?? 8789;
+  let localUrl: string;
   try {
+    for (const host of hosts) {
+      const listener = tailnet
+        ? createHttpsServer(tailnet.tls, handle)
+        : createServer(handle);
+      await new Promise<void>((resolve, reject) => {
+        listener.once("error", reject);
+        listener.listen(port, host, () => {
+          listener.off("error", reject);
+          resolve();
+        });
+      });
+      servers.push(listener);
+      const address = listener.address();
+      if (!address || typeof address === "string")
+        throw new Error("MCP server has no TCP address.");
+      port = address.port;
+    }
+    const host = ["0.0.0.0", "::"].includes(hosts[0]) ? "127.0.0.1" : hosts[0];
+    localUrl = tailnet
+      ? options.publicUrl!
+      : `http://${host.includes(":") ? `[${host}]` : host}:${port}`;
     await options.durableState?.restore();
     app = await createMcpHttpApp({
       ...options,
       publicUrl: options.publicUrl ?? localUrl,
-      allowedHosts: [
-        ...(options.allowedHosts ?? []),
-        `127.0.0.1:${address.port}`,
-        `localhost:${address.port}`,
-      ],
+      allowedHosts: tailnet
+        ? []
+        : [
+            ...(options.allowedHosts ?? []),
+            `127.0.0.1:${port}`,
+            `localhost:${port}`,
+          ],
     });
+    if (tailnet) stopRenewal = tailnet.renew(servers as HttpsServer[]);
   } catch (error) {
-    server.close();
+    await closeListeners();
     throw error;
   }
   return {
-    server,
+    server: servers[0],
     get url() {
       return app!.authorization.url;
     },
@@ -1348,21 +1496,22 @@ export async function startMcpHttpServer(
       return app!.authorization;
     },
     async configure(input) {
+      if (tailnet || input.local?.deviceApproval)
+        throw new Error(
+          "Restart the private HTTPS listener to reconfigure device approval.",
+        );
       const next = await createMcpHttpApp({
         ...options,
         ...input,
-        allowedHosts: [new URL(localUrl).host, `localhost:${address.port}`],
+        allowedHosts: [new URL(localUrl).host, `localhost:${port}`],
       });
       const previous = app;
       app = next;
       previous?.close();
     },
     async close() {
-      server.closeAllConnections();
-      await new Promise<void>((done, reject) =>
-        server.close((error) => (error ? reject(error) : done())),
-      );
       app?.close();
+      await closeListeners();
     },
   };
 }

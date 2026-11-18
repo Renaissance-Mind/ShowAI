@@ -28,6 +28,8 @@ export default function RemoteMcpClientSetup({
   addRequest,
   busy,
   onCopy,
+  onCopyPrompt,
+  promptCopied,
   onExport,
   onRefresh,
 }: {
@@ -35,6 +37,8 @@ export default function RemoteMcpClientSetup({
   addRequest: number;
   busy: boolean;
   onCopy(value: string): Promise<void>;
+  onCopyPrompt(): Promise<void>;
+  promptCopied: boolean;
   onExport(): void;
   onRefresh(): Promise<void>;
 }) {
@@ -293,6 +297,17 @@ export default function RemoteMcpClientSetup({
                   </>
                 ) : (
                   <div className="rm-client-recipe">
+                    <button
+                      type="button"
+                      className="rm-button primary"
+                      disabled={pending}
+                      onClick={() => void run(onCopyPrompt)}
+                    >
+                      {promptCopied ? <Check size={15} /> : <Copy size={15} />}
+                      <span aria-live="polite">
+                        {t(promptCopied ? "copied" : "setupPrompt")}
+                      </span>
+                    </button>
                     <RemoteCopyField
                       label={t("endpoint")}
                       value={state.url!}
@@ -302,7 +317,11 @@ export default function RemoteMcpClientSetup({
                       <span>{t("authentication")}</span>
                       <span className="rm-capability">
                         <KeyRound size={14} />
-                        {lan ? "Bearer" : "OAuth"}
+                        {lan
+                          ? "Bearer"
+                          : state.config.privateAuth === "device"
+                            ? t("sharedDevice")
+                            : "OAuth"}
                       </span>
                     </div>
                     {lan &&

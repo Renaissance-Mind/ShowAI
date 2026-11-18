@@ -9,7 +9,7 @@ Open **Settings → Remote connection** in the desktop App. Choose the network, 
 | Mode | Who can connect | Connection |
 | --- | --- | --- |
 | Local network | Devices on the same Wi-Fi or Ethernet | Direct HTTP with an access key |
-| Tailscale private network | Devices on the same tailnet, subject to its access rules | Private HTTPS through Tailscale Serve and OAuth |
+| Tailscale private network | Devices on the same tailnet, subject to its access rules | Private HTTPS with device approval or OAuth |
 | Public access → Cloudflare temporary | Internet clients, including ChatGPT web | Temporary HTTPS tunnel and OAuth |
 | Public access → Cloudflare fixed domain | Internet clients using your own hostname | Your Cloudflare tunnel and OAuth |
 | Public access → Tailscale Funnel | Internet clients outside the tailnet | Public HTTPS through Funnel and OAuth |
@@ -22,7 +22,9 @@ New connections default to full access to all current and future projects, inclu
 
 For **Local network**, select the computer's network address and choose **Start local network connection**. Only that interface is bound. Copy the MCP URL into your client, choose Streamable HTTP, name the client in ShowAI, and create its access key. Paste the key into the client's Bearer Token field or `Authorization: Bearer <key>` header. Keys are shown once, stored as hashes, expire after 90 days, and can be revoked separately. HTTP is intended for a trusted local network; choose Tailscale private network for HTTPS. Clients that require HTTPS/OAuth cannot use this HTTP mode. The computer's service check does not establish reachability from another device; complete a real client call.
 
-For **Tailscale private network**, join both devices to the same tailnet and enable MagicDNS and HTTPS. ShowAI starts Serve in the foreground and keeps the endpoint private to the tailnet. Funnel permission is unnecessary. Connect an HTTP/OAuth client using the generated URL. An unauthenticated request to `/mcp` returns HTTP 401 and a link to the OAuth discovery metadata. A client that requests only `projects.read` can read the projects allowed by the access rules.
+For **Tailscale private network**, join both devices to the same tailnet and enable MagicDNS and HTTPS. New connections use **Device approval**. Start the connection, select **Copy setup prompt**, and send the prompt to an agent that can configure MCP. ShowAI displays the device and owner verified by Tailscale. Select **Allow connection**. Agents on that device share the grant. You can revoke it under **Clients**. MCP requests and approval stay inside the private network.
+
+Existing private OAuth connections keep their previous settings. Select **Device approval** under **Network → Authentication** and save to switch. Private OAuth uses Tailscale Serve and advertises its discovery URL with HTTP 401. On a trusted LAN, the setup prompt includes a single-use invitation valid for ten minutes. An agent with local credential storage and configurable request headers can enroll itself and request approval in ShowAI.
 
 For **Public access**, choose a tunnel. **Cloudflare temporary connection** downloads and verifies the official connector if needed, reserves a local port and starts the tunnel. Its URL changes on reconnect. Quick Tunnel has no availability guarantee; MCP uses JSON responses without depending on SSE.
 
@@ -32,7 +34,7 @@ For your own Cloudflare domain, choose **Cloudflare fixed domain**:
 2. **Open Cloudflare dashboard**. Create a Cloudflared Tunnel and a Published application route pointing to that HTTP service address. Return and choose **Route configured — continue**.
 3. Enter the HTTPS hostname and that tunnel's token, then connect. Tokens are encrypted with the operating system's credential storage. No account API key is needed.
 
-The setup reuses the saved fixed-route port when available. If it is occupied, ShowAI reserves a different free port and takes you through updating the Cloudflare route. It never terminates the other program. Temporary Cloudflare and Tailscale connections always forward the actual automatically assigned local port. The listener stays bound while its public URL is configured.
+The setup reuses the saved fixed-route port when available. If it is occupied, ShowAI reserves a different free port and takes you through updating the Cloudflare route. It never terminates the other program. Temporary Cloudflare and Tailscale Serve or Funnel connections forward the actual automatically assigned local port. The listener stays bound while its public URL is configured.
 
 For **Tailscale public access (Funnel)**, sign in to Tailscale and enable MagicDNS, HTTPS and Funnel permission. Serve and Funnel reserve an unused HTTPS port from 443, 8443 and 10000. Existing routes are preserved; stopping ShowAI stops only its own foreground connector. If all ports are occupied, the actual error is shown instead of replacing another service.
 
@@ -40,7 +42,7 @@ A failure stays at the connection step with retry and diagnostics. The address m
 
 ## Connect another MCP client
 
-Copy the URL, select Streamable HTTP, and use the authentication method shown by ShowAI: an access key for local network mode, or OAuth for HTTPS connections. For OAuth, initiate the connection in your client, then match the connection number in the desktop ShowAI dialog and select **Allow connection**. Return to your client and send the verification prompt or call `projects_list`. Client names, callback origin and access scope are shown for approval. Requests expire after ten minutes; restarting cancels pending requests and preserves valid grants.
+Select **Copy setup prompt** and send it to your agent. For a manual connection, use the displayed MCP URL and Streamable HTTP. Leave the authentication fields empty for Tailscale device approval, enter the access key for LAN mode, or select OAuth for an OAuth connection. For OAuth, initiate the connection in your client, then match the connection number in the desktop ShowAI dialog and select **Allow connection**. Return to your client and send the verification prompt or call `projects_list`. Client names, callback origin and access scope are shown for approval. Requests expire after ten minutes; restarting cancels pending requests and preserves valid grants.
 
 ## Connect ChatGPT
 

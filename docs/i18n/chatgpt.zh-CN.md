@@ -9,7 +9,7 @@
 | 模式 | 适用设备或客户端 | 连接方式 |
 | --- | --- | --- |
 | 同一局域网 | 同一 Wi-Fi 或以太网内的设备 | HTTP 直连与访问密钥 |
-| Tailscale 私网 | 同一 tailnet 内、访问规则允许的设备 | Tailscale Serve 提供私网 HTTPS 与 OAuth |
+| Tailscale 私网 | 同一 tailnet 内、访问规则允许的设备 | 私网 HTTPS，按设备批准或使用 OAuth |
 | 公网访问 → Cloudflare 临时连接 | ChatGPT 网页等云端客户端、网络外的设备 | 临时 HTTPS 隧道与 OAuth |
 | 公网访问 → Cloudflare 固定域名 | 通过自有域名连接的公网客户端 | 自有 Cloudflare 隧道与 OAuth |
 | 公网访问 → Tailscale 公网（Funnel） | 未加入 tailnet 的公网客户端 | Funnel 提供公网 HTTPS 与 OAuth |
@@ -22,7 +22,9 @@ ChatGPT 网页从云端发起请求，需要公网地址。其他设备上运行
 
 「同一局域网」中选择本机网络地址，点击「开启局域网连接」。服务只监听所选网卡。将 MCP 地址填入客户端，选择 Streamable HTTP；在 ShowAI 填写客户端名称并创建访问密钥，将密钥粘贴到客户端的 Bearer Token 字段或 `Authorization: Bearer <密钥>` 请求头。密钥只显示一次，仅保存摘要，90 天后到期，可单独撤销。HTTP 用于可信局域网；需要 HTTPS 时选择 Tailscale 私网。要求 HTTPS/OAuth 的客户端不能使用此 HTTP 模式。本机检查不证明其他设备可达，最后要完成真实客户端调用。
 
-「Tailscale 私网」要求两端加入同一 tailnet，启用 MagicDNS 和 HTTPS。ShowAI 启动前台 Serve，仅向私网提供地址，不需要 Funnel 权限。客户端使用生成的地址与 OAuth 连接。访问 `/mcp` 时如果缺少有效凭据，服务会返回 HTTP 401 和 OAuth 发现地址。只申请 `projects.read` 的客户端可以读取访问规则允许的项目。
+在「Tailscale 私网」中，两端加入同一 tailnet，开启 MagicDNS 和 HTTPS。新连接默认使用「设备授权」。打开连接后点击「复制接入提示词」，将整段发给能配置 MCP 的 Agent。Agent 用私网 HTTPS 连接，ShowAI 显示 Tailscale 核实的设备和所属账号。点击「允许连接」，Agent 就能调用获准的工具。同一设备上的 Agent 共用授权，可在「客户端」里撤销。MCP 和批准都在私网内完成。
+
+已有的 OAuth 连接保留原方式。可以在「网络 → 身份验证」选择设备授权并保存，也可以保留 OAuth。OAuth 模式使用 Tailscale Serve，客户端根据 HTTP 401 返回的地址发现授权服务。对于可信局域网，复制接入提示词会生成十分钟内有效的一次性邀请，支持设置请求头和本地凭据的 Agent 可自行配置，再由用户在 ShowAI 允许。
 
 「公网访问」中先选择隧道。「Cloudflare 临时连接」会按需下载并校验官方连接工具，绑定可用端口并创建隧道。地址重新连接后变化，没有可用性保证；MCP 使用 JSON 响应，不依赖 SSE。
 
@@ -32,7 +34,7 @@ ChatGPT 网页从云端发起请求，需要公网地址。其他设备上运行
 2. 点击「打开 Cloudflare 控制台」，创建 Cloudflared Tunnel 和发布应用路由，把 HTTP 服务指向上述地址。回到 ShowAI，点击「路由已配置，继续」。
 3. 填入 HTTPS 域名和该隧道的令牌，建立连接。令牌由操作系统凭据存储加密保存，不需要账号 API Key。
 
-固定域名优先复用上次保存的端口；端口被占用时，ShowAI 会保留另一个可用端口，并引导更新 Cloudflare 路由，不会结束占用端口的程序。临时 Cloudflare 和 Tailscale 始终转发程序自动分配的实际端口。配置公网地址期间，本机监听保持绑定。
+固定域名优先复用上次保存的端口；端口被占用时，ShowAI 会保留另一个可用端口，并引导更新 Cloudflare 路由，不会结束占用端口的程序。临时 Cloudflare、Tailscale Serve 和 Funnel 转发程序自动分配的实际端口。配置公网地址期间，本机监听保持绑定。
 
 「Tailscale 公网（Funnel）」要求登录 Tailscale，启用 MagicDNS、HTTPS 和 Funnel 权限。Serve 与 Funnel 从 443、8443、10000 中选择未占用的 HTTPS 端口，保留已有路由；断开时只停止本次启动的前台连接器。三个端口全部占用时显示实际错误，不覆盖其他服务。
 
@@ -40,7 +42,7 @@ ChatGPT 网页从云端发起请求，需要公网地址。其他设备上运行
 
 ## 连接其他 MCP 客户端
 
-复制地址，在客户端选择 Streamable HTTP，使用界面显示的认证方式：局域网为访问密钥，HTTPS 连接为 OAuth。OAuth 连接由客户端发起，在 ShowAI 桌面弹窗核对连接编号并点击「允许连接」，再回客户端发送验证指令或调用 `projects_list`。确认弹窗包含客户端名称、回调地址与访问范围。请求十分钟有效；重启会取消待确认请求，保留已有有效授权。
+点击「复制接入提示词」，把整段发给 Agent。手动连接时使用界面显示的 MCP 地址和 Streamable HTTP。Tailscale 设备授权模式下认证字段留空，局域网使用访问密钥，OAuth 连接选择 OAuth。OAuth 连接由客户端发起，在 ShowAI 桌面弹窗核对连接编号并点击「允许连接」，再回客户端发送验证指令或调用 `projects_list`。确认弹窗包含客户端名称、回调地址与访问范围。请求十分钟有效；重启会取消待确认请求，保留已有有效授权。
 
 ## 连接 ChatGPT
 

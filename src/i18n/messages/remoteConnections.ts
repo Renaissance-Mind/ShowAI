@@ -1,6 +1,11 @@
 import { defineMessages } from "../index";
 export default defineMessages("remoteConnections", {
   "zh-CN": {
+    setupPrompt: "复制接入提示词",
+    sharedDevice: "设备授权",
+    invitedLanClient: "一次性局域网邀请",
+    sharedDeviceOwner: "同一设备上的 Agent 共用这次授权",
+    approvalNotification: "{name} 请求连接 ShowAI",
     "copyingValue": "正在复制…",
     "viewConfiguration": "查看配置",
     "clientsUnavailable": "开启连接后可管理客户端。",
@@ -145,6 +150,11 @@ export default defineMessages("remoteConnections", {
     oauthEndpoints: "OAuth 端点",
   },
   en: {
+    setupPrompt: "Copy setup prompt",
+    sharedDevice: "Device approval",
+    invitedLanClient: "Single-use LAN invitation",
+    sharedDeviceOwner: "Agents on this device share this approval",
+    approvalNotification: "{name} wants to connect to ShowAI",
     "copyingValue": "Copying…",
     "viewConfiguration": "View configuration",
     "clientsUnavailable": "Start the connection to manage clients.",

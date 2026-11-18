@@ -1,5 +1,6 @@
 export interface RemoteApprovalRequest {
   provider?: RemoteMcpProvider;
+  method?: "device" | "invitation";
   id: string;
   code: string;
   clientName: string;
@@ -23,6 +24,7 @@ export interface RemoteMcpConfig {
   executable: string;
   bindAddress?: string;
   httpsPort?: number;
+  privateAuth?: "device" | "oauth";
   access?: "all" | "selected";
   chatgptAppId?: string;
   chatgptEndpoint?: string;
@@ -87,7 +89,7 @@ export function defaultRemoteMcpConfig(
     executable: "",
     projects: [],
     ...(provider === "tailscale-private"
-      ? { httpsPort: 8443 }
+      ? { httpsPort: 8443, privateAuth: "device" as const }
       : provider === "tailscale"
         ? { httpsPort: 443 }
         : {}),

@@ -7,6 +7,9 @@ import { join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { syncProtocol, type SyncProject } from "../sync/protocol";
 
+import type { TailnetPeer } from "../remote-mcp/tailnet-device";
+import type { RemoteApprovalRequest } from "../remote-mcp/types";
+
 export interface ProjectGrant {
   id: string;
   clientId: string;
@@ -16,6 +19,8 @@ export interface ProjectGrant {
   upstreamToken: string;
   projectIds: string[];
   projectAccess?: "selected" | "account";
+  writeProjectIds?: string[];
+  deviceBinding?: string;
   scopes: string[];
   lastCallAt?: string;
 }
@@ -60,10 +65,12 @@ export interface LocalMcpAuthorization {
       archived?: boolean;
     }>
   >;
-  consumePairingCode(code: string): boolean;
+  consumePairingCode(code: string, binding?: string): boolean;
   desktopApproval?: boolean;
   accessKeyOnly?: boolean;
   requireOAuth?: boolean;
+  deviceApproval?: boolean;
+  onApprovalRequest?(name: string): void;
 }
 const token = () => randomBytes(32).toString("base64url");
 const hash = (value: string) =>
@@ -169,6 +176,17 @@ export async function upstream<T>(
 
 export class McpAuthorization {
   readonly resource: string;
+  private pending = new Map<
+    string,
+    {
+      request: RemoteApprovalRequest;
+      grant: ProjectGrant;
+      binding: string;
+      decided: Promise<void>;
+      finish(): void;
+    }
+  >();
+  private closed = false;
   private constructor(
     readonly url: string,
     readonly servers: string[],
@@ -220,32 +238,53 @@ export class McpAuthorization {
       };
     });
   }
-  pendingApprovals() {
-    if (!this.local?.desktopApproval) return [];
+  pendingApprovals(): RemoteApprovalRequest[] {
+    const pending = [...this.pending.values()].map((item) => item.request);
+    if (!this.local?.desktopApproval) return pending;
     const rows = this.db
       .prepare("SELECT key,value FROM records WHERE kind='flow' AND expires>?")
       .all(Date.now()) as { key: string; value: string }[];
-    return rows.flatMap((row) => {
-      const flow = JSON.parse(row.value) as Flow;
-      if (!flow.desktopApproval || flow.desktopApproval.decision) return [];
-      const client = this.get<Client>("client", flow.clientId);
-      if (!client) return [];
-      return [
-        {
-          id: row.key,
-          code: row.key.slice(-6).toUpperCase(),
-          clientName: client.client_name || "MCP client",
-          callbackOrigin: new URL(flow.redirect).origin,
-          scopes: flow.scopes,
-          access: this.local!.access ?? "selected",
-          createdAt: flow.desktopApproval.createdAt,
-          expiresAt: flow.desktopApproval.expiresAt,
-        },
-      ];
-    });
+    return pending.concat(
+      rows.flatMap((row) => {
+        const flow = JSON.parse(row.value) as Flow;
+        if (!flow.desktopApproval || flow.desktopApproval.decision) return [];
+        const client = this.get<Client>("client", flow.clientId);
+        if (!client) return [];
+        return [
+          {
+            id: row.key,
+            code: row.key.slice(-6).toUpperCase(),
+            clientName: client.client_name || "MCP client",
+            callbackOrigin: new URL(flow.redirect).origin,
+            scopes: flow.scopes,
+            access: this.local!.access ?? "selected",
+            createdAt: flow.desktopApproval.createdAt,
+            expiresAt: flow.desktopApproval.expiresAt,
+          },
+        ];
+      }),
+    );
   }
   decideApproval(id: string, decision: "allow" | "deny") {
-    if (!this.local?.desktopApproval || !["allow", "deny"].includes(decision))
+    if (!["allow", "deny"].includes(decision))
+      throw new Error("Invalid approval decision.");
+    const pending = this.pending.get(id);
+    if (pending) {
+      if (Date.parse(pending.request.expiresAt) <= Date.now())
+        throw new Error("This connection request expired.");
+      if (decision === "allow")
+        this.saveLocalGrant(
+          pending.grant,
+          pending.request.clientName,
+          pending.binding,
+        );
+      else if (pending.grant.deviceBinding)
+        this.put("deviceDenied", pending.binding, true, 60_000);
+      else this.put("invitationDenied", pending.binding, true, 600_000);
+      pending.finish();
+      return;
+    }
+    if (!this.local?.desktopApproval)
       throw new Error("Invalid local approval.");
     const flow = this.get<Flow>("flow", id);
     if (!flow?.desktopApproval || flow.desktopApproval.decision)
@@ -276,6 +315,11 @@ export class McpAuthorization {
     );
   }
   revoke(id: string) {
+    const grant = this.get<ProjectGrant>("grant", id);
+    if (grant?.deviceBinding) {
+      this.put("deviceDenied", grant.deviceBinding, true, 60_000);
+      this.remove("device", grant.deviceBinding);
+    }
     this.remove("grant", id);
   }
   async createAccessKey(name: string) {
@@ -285,57 +329,207 @@ export class McpAuthorization {
       );
     if (!name.trim() || name.length > 100)
       throw new Error("Enter a client name of 1 to 100 characters.");
+    const grant = await this.localGrant();
+    const credential = token();
+    const expiresAt = this.saveLocalGrant(grant, name.trim(), hash(credential));
+    return { id: grant.id, token: credential, expiresAt };
+  }
+  private async localGrant(): Promise<ProjectGrant> {
+    if (!this.local) throw new Error("A local library is required.");
     const projects = (await this.local.projects()).filter((p) => !p.archived);
-    const grantedScopes = ["projects.read"];
-    if (
-      projects.some((p) => p.role !== "viewer") ||
-      this.local.access === "all"
-    )
-      grantedScopes.push("projects.write");
-    if (this.local.access === "all") grantedScopes.push("projects.create");
-    const clientId = token(),
-      credential = token();
-    const grant: ProjectGrant = {
+    const all = this.local.access === "all";
+    const writeProjectIds = projects
+      .filter((p) => p.role !== "viewer")
+      .map((p) => p.id);
+    return {
       id: token(),
-      clientId,
+      clientId: token(),
       serverUrl: this.url,
       serverId: "local",
       user: { id: "local", name: "Local ShowAI" },
       upstreamToken: "",
-      projectAccess: this.local.access === "all" ? "account" : "selected",
-      projectIds: this.local.access === "all" ? [] : projects.map((p) => p.id),
-      scopes: grantedScopes,
-    };
-    const ttl = 90 * 86400_000;
-    this.put(
-      "client",
-      clientId,
-      {
-        client_id: clientId,
-        client_name: name.trim(),
-        redirect_uris: [],
-        token_endpoint_auth_method: "none",
-      },
-      ttl,
-    );
-    this.put("grant", grant.id, grant, ttl);
-    this.put(
-      "access",
-      hash(credential),
-      {
-        grantId: grant.id,
-        clientId,
-        scopes: grantedScopes,
-      },
-      ttl,
-    );
-    return {
-      id: grant.id,
-      token: credential,
-      expiresAt: new Date(Date.now() + ttl).toISOString(),
+      projectAccess: all ? "account" : "selected",
+      projectIds: all ? [] : projects.map((p) => p.id),
+      ...(all ? {} : { writeProjectIds }),
+      scopes: [
+        "projects.read",
+        ...(all || writeProjectIds.length ? ["projects.write"] : []),
+        ...(all ? ["projects.create"] : []),
+      ],
     };
   }
+  private saveLocalGrant(grant: ProjectGrant, name: string, binding: string) {
+    const ttl = 90 * 86400_000;
+    this.db.exec("BEGIN IMMEDIATE");
+    try {
+      this.put(
+        "client",
+        grant.clientId,
+        {
+          client_id: grant.clientId,
+          client_name: name,
+          redirect_uris: [],
+          token_endpoint_auth_method: "none",
+        },
+        ttl,
+      );
+      this.put("grant", grant.id, grant, ttl);
+      if (grant.deviceBinding) this.put("device", binding, grant.id, ttl);
+      else
+        this.put(
+          "access",
+          binding,
+          { grantId: grant.id, clientId: grant.clientId, scopes: grant.scopes },
+          ttl,
+        );
+      this.db.exec("COMMIT");
+    } catch (error) {
+      this.db.exec("ROLLBACK");
+      throw error;
+    }
+    return new Date(Date.now() + ttl).toISOString();
+  }
+  deviceGrant(binding: string) {
+    if (!this.local?.deviceApproval) return;
+    const id = this.get<string>("device", binding);
+    const grant = id && this.get<ProjectGrant>("grant", id);
+    if (
+      grant &&
+      grant.deviceBinding === binding &&
+      grant.serverUrl === this.url
+    )
+      return grant;
+  }
+  private async requestLocalApproval(
+    method: "device" | "invitation",
+    binding: string,
+    name: string,
+    source: string,
+  ) {
+    const existing = () =>
+      [...this.pending.values()].find(
+        (p) => p.binding === binding && p.request.method === method,
+      );
+    const pending = existing();
+    if (pending) return pending;
+    const grant = await this.localGrant();
+    if (this.closed) throw new Error("ShowAI has stopped this connection.");
+    const concurrent = existing();
+    if (concurrent) return concurrent;
+    if (method === "device") {
+      grant.deviceBinding = binding;
+      if (this.deviceGrant(binding)) return;
+      if (this.get<boolean>("deviceDenied", binding))
+        throw new AuthorizationError(
+          "ShowAI access was declined or revoked. Retry after one minute.",
+          "access_denied",
+          403,
+        );
+    }
+    if (this.pendingApprovals().length >= 8)
+      throw new AuthorizationError(
+        "Too many pending requests. Retry shortly.",
+        "temporarily_unavailable",
+        429,
+      );
+    const id = token(),
+      created = Date.now(),
+      lifetime = 600_000;
+    let settle!: () => void;
+    const decided = new Promise<void>((resolve) => {
+      settle = resolve;
+    });
+    const request: RemoteApprovalRequest = {
+      method,
+      id,
+      code: "",
+      clientName: name,
+      callbackOrigin: source,
+      scopes: grant.scopes,
+      access: grant.projectAccess === "account" ? "all" : "selected",
+      createdAt: new Date(created).toISOString(),
+      expiresAt: new Date(created + lifetime).toISOString(),
+    };
+    const finish = () => {
+      clearTimeout(timer);
+      this.pending.delete(id);
+      settle();
+    };
+    const timer = setTimeout(finish, lifetime);
+    timer.unref();
+    const entry = { request, grant, binding, decided, finish };
+    this.pending.set(id, entry);
+    this.local?.onApprovalRequest?.(name);
+    return entry;
+  }
+  async requestDevice(peer: TailnetPeer, wait: boolean) {
+    if (!this.local?.deviceApproval)
+      throw new Error("Device approvals are disabled.");
+    const grant = this.deviceGrant(peer.binding);
+    if (grant) return grant;
+    const entry = await this.requestLocalApproval(
+      "device",
+      peer.binding,
+      peer.name,
+      peer.owner,
+    );
+    if (entry && wait) {
+      let timer: ReturnType<typeof setTimeout> | undefined;
+      await Promise.race([
+        entry.decided,
+        new Promise<void>((resolve) => {
+          timer = setTimeout(resolve, 20_000);
+        }),
+      ]);
+      clearTimeout(timer);
+    }
+    if (this.closed) throw new Error("ShowAI has stopped this connection.");
+    if (this.get<boolean>("deviceDenied", peer.binding))
+      throw new AuthorizationError(
+        "ShowAI declined this device.",
+        "access_denied",
+        403,
+      );
+    return this.deviceGrant(peer.binding);
+  }
+  async enrollLan(code: string, digest: string, name: string) {
+    if (
+      !this.local?.accessKeyOnly ||
+      !/^[a-f0-9]{64}$/.test(digest) ||
+      !name.trim() ||
+      name.length > 100
+    )
+      throw new AuthorizationError(
+        "Invalid LAN enrollment.",
+        "invalid_request",
+        400,
+      );
+    if (!this.local.consumePairingCode(code, digest))
+      throw new AuthorizationError(
+        "The invitation expired or has been used.",
+        "access_denied",
+        403,
+      );
+    const access = this.get<{ grantId: string }>("access", digest);
+    if (access && this.get<ProjectGrant>("grant", access.grantId))
+      return "approved";
+    if (access || this.get<boolean>("invitationDenied", digest))
+      throw new AuthorizationError(
+        "This client was declined or revoked in ShowAI.",
+        "access_denied",
+        403,
+      );
+    await this.requestLocalApproval(
+      "invitation",
+      digest,
+      name.trim(),
+      this.url,
+    );
+    return "pending";
+  }
   close() {
+    this.closed = true;
+    for (const item of this.pending.values()) item.finish();
     this.db.close();
   }
   checkpoint() {

@@ -82,7 +82,14 @@ export default function RemoteMcpApprovalDialog() {
             <Laptop size={24} />
             <span>
               <strong>{request.clientName}</strong>
-              <small>{request.callbackOrigin}</small>
+              <small>
+                {request.method === "invitation"
+                  ? c("invitedLanClient")
+                  : request.callbackOrigin}
+              </small>
+              {request.method === "device" && (
+                <small>{c("sharedDeviceOwner")}</small>
+              )}
             </span>
           </div>
           {request.provider && (
@@ -95,13 +102,15 @@ export default function RemoteMcpApprovalDialog() {
             </>
           )}
         </div>
-        <div className="rm-field">
-          <label>
-            <ShieldCheck size={15} />
-            {c("code")}
-          </label>
-          <code className="rm-approval-code">{request.code}</code>
-        </div>
+        {request.code && (
+          <div className="rm-field">
+            <label>
+              <ShieldCheck size={15} />
+              {c("code")}
+            </label>
+            <code className="rm-approval-code">{request.code}</code>
+          </div>
+        )}
         <dl className="rm-approval-permissions">
           <div>
             <dt>{c("requestScope")}</dt>

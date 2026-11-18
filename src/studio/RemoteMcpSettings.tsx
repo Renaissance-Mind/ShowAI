@@ -6,6 +6,7 @@ import {
   ChevronRight,
   CircleAlert,
   Check,
+  Copy,
   ExternalLink,
   Folder,
   FolderOpen,
@@ -30,7 +31,10 @@ import {
   type RemoteMcpStatus,
   type RemoteMcpConnectionSummary,
 } from "../remote-mcp/types";
-import { isTailscaleProvider } from "../remote-mcp/client-setup";
+import {
+  agentSetupPrompt,
+  isTailscaleProvider,
+} from "../remote-mcp/client-setup";
 import { desktop, errorMessage } from "../host/bridge";
 import Dialog from "../ui/Dialog";
 import RemoteMcpClientSetup from "./RemoteMcpClientSetup";
@@ -48,6 +52,12 @@ export default function RemoteMcpSettings({ home }: { home?: string }) {
   const locale = useLocale();
   const tabId = useId();
   const [addingClient, setAddingClient] = useState(0);
+  const [copiedPrompt, setCopiedPrompt] = useState("");
+  useEffect(() => {
+    if (!copiedPrompt) return;
+    const timer = setTimeout(() => setCopiedPrompt(""), 2200);
+    return () => clearTimeout(timer);
+  }, [copiedPrompt]);
   const [selected, setSelected] = useState<RemoteMcpProvider>(),
     [tab, setTab] = useState<Tab>("network"),
     [state, setState] = useState<RemoteMcpStatus>(),
@@ -87,7 +97,14 @@ export default function RemoteMcpSettings({ home }: { home?: string }) {
     (!!config &&
       !!state &&
       (
-        ["port", "httpsPort", "bindAddress", "publicUrl", "executable"] as const
+        [
+          "port",
+          "httpsPort",
+          "bindAddress",
+          "publicUrl",
+          "executable",
+          "privateAuth",
+        ] as const
       ).some((key) => config[key] !== state.config[key]));
   const invalidPort =
     !!config?.port &&
@@ -257,6 +274,19 @@ export default function RemoteMcpSettings({ home }: { home?: string }) {
   }
   const copy = (text: string) =>
     desktop.invoke<void>("clipboard:write", { text });
+  async function copyPrompt() {
+    if (!ready || !state?.url) return;
+    const invitation =
+      state.config.provider === "lan"
+        ? await desktop.invoke<{ code: string }>("remoteMcp:pair", {
+            provider: "lan",
+          })
+        : undefined;
+    await copy(
+      agentSetupPrompt(state.url, state.config, locale, invitation?.code),
+    );
+    setCopiedPrompt(state.url);
+  }
   async function start() {
     if (!selected || !config) return;
     const provider = selected;
@@ -793,6 +823,25 @@ export default function RemoteMcpSettings({ home }: { home?: string }) {
                         )}
                       </>
                     )}
+                    {selected === "tailscale-private" && (
+                      <div className="rm-field rm-short-field">
+                        <label htmlFor="remote-private-auth">
+                          {t("authentication")}
+                        </label>
+                        <RemoteSelect
+                          id="remote-private-auth"
+                          value={config.privateAuth ?? "oauth"}
+                          onChange={(e) =>
+                            change({
+                              privateAuth: e.target.value as "device" | "oauth",
+                            })
+                          }
+                        >
+                          <option value="device">{t("sharedDevice")}</option>
+                          <option value="oauth">OAuth</option>
+                        </RemoteSelect>
+                      </div>
+                    )}
                     {ready && state.url && (
                       <RemoteCopyField
                         label={t("endpoint")}
@@ -906,18 +955,39 @@ export default function RemoteMcpSettings({ home }: { home?: string }) {
                         {t(active ? "saveReconnect" : "save")}
                       </button>
                       {ready ? (
-                        <button
-                          className="rm-button primary"
-                          type="button"
-                          onClick={() => {
-                            setAddingClient((id) => id + 1);
-                            setTab("clients");
-                          }}
-                        >
-                          <Laptop size={15} />
-                          {t("addClient")}
-                          <ChevronRight size={15} />
-                        </button>
+                        <>
+                          <button
+                            type="button"
+                            className="rm-button primary"
+                            disabled={busy}
+                            onClick={() => void run(copyPrompt)}
+                          >
+                            {copiedPrompt === state.url ? (
+                              <Check size={15} />
+                            ) : (
+                              <Copy size={15} />
+                            )}
+                            <span aria-live="polite">
+                              {t(
+                                copiedPrompt === state.url
+                                  ? "copied"
+                                  : "setupPrompt",
+                              )}
+                            </span>
+                          </button>
+                          <button
+                            className="rm-button"
+                            type="button"
+                            onClick={() => {
+                              setAddingClient((id) => id + 1);
+                              setTab("clients");
+                            }}
+                          >
+                            <Laptop size={15} />
+                            {t("addClient")}
+                            <ChevronRight size={15} />
+                          </button>
+                        </>
                       ) : (
                         <button
                           className="rm-button primary"
@@ -1064,6 +1134,8 @@ export default function RemoteMcpSettings({ home }: { home?: string }) {
                     addRequest={addingClient}
                     busy={busy}
                     onCopy={copy}
+                    onCopyPrompt={copyPrompt}
+                    promptCopied={copiedPrompt === state.url}
                     onRefresh={() => refresh()}
                     onExport={() => {
                       setPluginLink("");

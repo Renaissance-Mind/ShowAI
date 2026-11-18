@@ -13,6 +13,7 @@ export class PairingCodes {
     hash: Buffer;
     expires: number;
     used: boolean;
+    binding?: string;
   };
   issue(now = Date.now()) {
     const code = randomBytes(18).toString("base64url");
@@ -28,9 +29,8 @@ export class PairingCodes {
       expiresAt: new Date(this.current.expires).toISOString(),
     };
   }
-  consume(code: string, now = Date.now()) {
-    if (!this.current || this.current.used || now >= this.current.expires)
-      return false;
+  consume(code: string, now = Date.now(), binding?: string) {
+    if (!this.current || now >= this.current.expires) return false;
     if (
       !timingSafeEqual(
         createHash("sha256").update(code.trim()).digest(),
@@ -38,7 +38,9 @@ export class PairingCodes {
       )
     )
       return false;
+    if (this.current.used) return !!binding && this.current.binding === binding;
     this.current.used = true;
+    this.current.binding = binding;
     return true;
   }
   status(now = Date.now()): PairingStatus | undefined {

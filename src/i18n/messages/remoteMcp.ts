@@ -11,7 +11,7 @@ export default defineMessages("remoteMcp", {
     tailscalePublic: "Tailscale 公网（Funnel）",
     tailscalePublicHint: "允许网络外的客户端通过 HTTPS 访问",
     tailscalePrivateSetup:
-      "两端加入同一网络，启用 MagicDNS 和 HTTPS。使用 Serve，仅限私网访问。",
+      "两端加入同一 Tailscale 私网，启用 MagicDNS 和 HTTPS。",
     networkAddress: "本机网络地址",
     selectAddress: "选择网络地址",
     refreshAddresses: "刷新地址",
@@ -249,7 +249,7 @@ export default defineMessages("remoteMcp", {
     tailscalePublic: "Tailscale public access (Funnel)",
     tailscalePublicHint: "Let clients outside your network connect over HTTPS",
     tailscalePrivateSetup:
-      "Join both devices to the same tailnet and enable MagicDNS and HTTPS. Serve stays private to your network.",
+      "Join both devices to the same tailnet and enable MagicDNS and HTTPS.",
     networkAddress: "Local network address",
     selectAddress: "Select an address",
     refreshAddresses: "Refresh addresses",
