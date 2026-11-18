@@ -1,4 +1,14 @@
 import type { Locale, Message, Namespace } from "../i18n";
+import motionMessages from "../i18n/messages/uiMotion";
+import type { MotionObservation } from "./types";
+
+export function motionSummary(observation: MotionObservation, locale: Locale) {
+  const t = messages(motionMessages, locale);
+  const events = observation.events.join(" · ") || t("noEvents");
+  return observation.widthChanges === undefined
+    ? events
+    : events + " · " + t("widthChanges", { count: observation.widthChanges });
+}
 
 export function messages<N extends Record<string, Message>>(
   namespace: Namespace<N>,

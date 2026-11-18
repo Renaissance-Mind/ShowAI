@@ -1,4 +1,6 @@
-import { useEffect, useRef, useState } from "react";
+import { useSessionDraft } from "./session-draft";
+import { settingsTabKeyDown } from "./settings-tab-keys";
+import { useEffect, useId, useRef, useState } from "react";
 import {
   ChevronLeft,
   ChevronRight,
@@ -19,7 +21,7 @@ import {
   ShieldCheck,
   X,
 } from "../ui/icons";
-import { useTranslator } from "../i18n/react";
+import { useLocale, useTranslator } from "../i18n/react";
 import messages from "../i18n/messages/remoteConnections";
 import {
   remoteMcpProviders,
@@ -35,25 +37,27 @@ import RemoteMcpClientSetup from "./RemoteMcpClientSetup";
 import {
   RemoteBrand,
   RemoteCopyField,
-  RemoteIconButton,
   RemoteSelect,
   remoteProviderKeys,
 } from "./RemoteConnectionControls";
 import "./remote-mcp-settings.css";
 
 type Tab = "network" | "permissions" | "clients";
-export default function RemoteMcpSettings() {
+export default function RemoteMcpSettings({ home }: { home?: string }) {
   const t = useTranslator(messages);
+  const locale = useLocale();
+  const tabId = useId();
+  const [addingClient, setAddingClient] = useState(0);
   const [selected, setSelected] = useState<RemoteMcpProvider>(),
     [tab, setTab] = useState<Tab>("network"),
     [state, setState] = useState<RemoteMcpStatus>(),
     [connections, setConnections] = useState<RemoteMcpConnectionSummary[]>([]),
-    [drafts, setDrafts] = useState<
+    [drafts, setDrafts] = useSessionDraft<
       Partial<Record<RemoteMcpProvider, RemoteMcpConfig>>
-    >({}),
-    [tokens, setTokens] = useState<Partial<Record<RemoteMcpProvider, string>>>(
-      {},
-    ),
+    >(`remote-connections.drafts:${home ?? ""}`, {}),
+    [tokens, setTokens] = useSessionDraft<
+      Partial<Record<RemoteMcpProvider, string>>
+    >(`remote-connections.tokens:${home ?? ""}`, {}),
     [busy, setBusy] = useState(false),
     [error, setError] = useState(""),
     [saved, setSaved] = useState(false),
@@ -71,12 +75,28 @@ export default function RemoteMcpSettings() {
     ready = state?.phase === "running" && state.reachable === true;
   const config = selected ? drafts[selected] : undefined,
     token = selected ? (tokens[selected] ?? "") : "";
-  const dirty =
+  const permissionDirty =
     !!config &&
     !!state &&
-    (JSON.stringify(config) !== JSON.stringify(state.config) || !!token);
+    (config.access !== state.config.access ||
+      JSON.stringify(config.projects) !==
+        JSON.stringify(state.config.projects));
+  const dirty =
+    permissionDirty ||
+    !!token ||
+    (!!config &&
+      !!state &&
+      (
+        ["port", "httpsPort", "bindAddress", "publicUrl", "executable"] as const
+      ).some((key) => config[key] !== state.config[key]));
+  const invalidPort =
+    !!config?.port &&
+    (!Number.isInteger(config.port) ||
+      config.port < 1024 ||
+      config.port > 65535);
   const valid =
     !!config &&
+    !invalidPort &&
     (config.provider !== "lan" ||
       !!state?.addresses.some((item) => item.address === config.bindAddress)) &&
     (config.provider !== "cloudflare" ||
@@ -110,6 +130,8 @@ export default function RemoteMcpSettings() {
           url: value.url,
           clients: value.clients.length,
           reachable: value.reachable,
+          checkedAt: value.checkedAt,
+          tokenSaved: value.tokenSaved,
         },
       ],
     );
@@ -128,12 +150,12 @@ export default function RemoteMcpSettings() {
               [provider]: {
                 ...previous[provider]!,
                 port:
-                  !previousConfig ||
+                  previousConfig &&
                   previous[provider]!.port === previousConfig.port
                     ? value.config.port
                     : previous[provider]!.port,
                 httpsPort:
-                  !previousConfig ||
+                  previousConfig &&
                   previous[provider]!.httpsPort === previousConfig.httpsPort
                     ? value.config.httpsPort
                     : previous[provider]!.httpsPort,
@@ -176,22 +198,13 @@ export default function RemoteMcpSettings() {
       if (reading) return;
       reading = true;
       try {
-        let value = await desktop.invoke<RemoteMcpStatus>("remoteMcp:status", {
-          provider: selected,
-          refresh,
-        });
-        if (
-          mounted &&
-          refresh &&
-          selected === "cloudflare" &&
-          value.phase === "stopped" &&
-          !value.config.port
-        ) {
-          await desktop.invoke("remoteMcp:prepare", { config: value.config });
-          value = await desktop.invoke<RemoteMcpStatus>("remoteMcp:stop", {
+        const value = await desktop.invoke<RemoteMcpStatus>(
+          "remoteMcp:status",
+          {
             provider: selected,
-          });
-        }
+            refresh,
+          },
+        );
         if (mounted) apply(value);
       } catch (error) {
         if (mounted) setError(errorMessage(error));
@@ -230,6 +243,7 @@ export default function RemoteMcpSettings() {
     opening.current = undefined;
     setSelected(provider);
     setTab("network");
+    setAddingClient(0);
     setState(undefined);
     setError("");
     setSaved(false);
@@ -247,7 +261,6 @@ export default function RemoteMcpSettings() {
     if (!selected || !config) return;
     const provider = selected;
     await run(async () => {
-      if (active) await desktop.invoke("remoteMcp:stop", { provider });
       let next = { ...config };
       if (
         provider !== "lan" &&
@@ -267,6 +280,7 @@ export default function RemoteMcpSettings() {
       const value = await desktop.invoke<RemoteMcpStatus>("remoteMcp:start", {
         config: next,
         token,
+        replace: active,
       });
       setDrafts((previous) => ({ ...previous, [provider]: value.config }));
       setTokens((previous) => ({ ...previous, [provider]: "" }));
@@ -281,23 +295,33 @@ export default function RemoteMcpSettings() {
       );
     });
   }
-  async function save() {
-    if (!selected || !config) return;
-    const provider = selected,
-      enabled = !!state?.resumeOnLaunch;
+  async function save(permissionsOnly = false) {
+    if (!selected || !config || !state) return;
+    const provider = selected;
+    const submitted = permissionsOnly
+      ? { ...state.config, access: config.access, projects: config.projects }
+      : config;
     await run(async () => {
-      if (active || enabled)
-        await desktop.invoke("remoteMcp:stop", { provider });
-      let value = await desktop.invoke<RemoteMcpStatus>("remoteMcp:configure", {
-        config,
-        token,
-      });
-      if (enabled)
-        value = await desktop.invoke<RemoteMcpStatus>("remoteMcp:start", {
-          config: value.config,
-        });
-      setDrafts((previous) => ({ ...previous, [provider]: value.config }));
-      setTokens((previous) => ({ ...previous, [provider]: "" }));
+      const value = await desktop.invoke<RemoteMcpStatus>(
+        "remoteMcp:configure",
+        {
+          config: submitted,
+          ...(permissionsOnly ? {} : { token }),
+          restart: true,
+        },
+      );
+      setDrafts((previous) => ({
+        ...previous,
+        [provider]: permissionsOnly
+          ? {
+              ...config,
+              access: value.config.access,
+              projects: value.config.projects,
+            }
+          : value.config,
+      }));
+      if (!permissionsOnly)
+        setTokens((previous) => ({ ...previous, [provider]: "" }));
       apply(value);
       setSaved(true);
     });
@@ -386,9 +410,6 @@ export default function RemoteMcpSettings() {
     >
       {!selected ? (
         <>
-          <header className="settings-heading">
-            <h2>{t("title")}</h2>
-          </header>
           {[remoteMcpProviders.slice(0, 2), remoteMcpProviders.slice(2)].map(
             (providers, index) => (
               <section className="rm-route-group" key={index}>
@@ -410,21 +431,49 @@ export default function RemoteMcpSettings() {
                         <RemoteBrand provider={provider} />
                         <div className="rm-route-open">
                           <span className="rm-route-name">
-                            {name(provider)}
+                            <span>{name(provider)}</span>
                             <span className={`rm-status ${label}`}>
                               <span />
                               {t(label)}
                             </span>
                           </span>
                           {value?.url && <code>{value.url}</code>}
+                          {value?.checkedAt && (
+                            <small>
+                              {t("checkedAt", {
+                                time: new Date(value.checkedAt).toLocaleString(
+                                  locale,
+                                ),
+                              })}
+                            </small>
+                          )}
                         </div>
-                        {toggle(provider, !!value?.enabled)}
-                        <RemoteIconButton
-                          label={t("configure", { name: name(provider) })}
-                          onClick={() => choose(provider)}
-                        >
-                          <ChevronRight size={16} />
-                        </RemoteIconButton>
+                        <div className="rm-route-actions">
+                          <button
+                            type="button"
+                            className="rm-button"
+                            aria-label={t("configure", {
+                              name: name(provider),
+                            })}
+                            onClick={() => choose(provider)}
+                          >
+                            {t(
+                              value?.configured
+                                ? "viewConfiguration"
+                                : "configureAction",
+                            )}
+                            <ChevronRight size={14} aria-hidden="true" />
+                          </button>
+                          {value &&
+                            (value.enabled ||
+                              (value.configured &&
+                                (provider !== "lan" ||
+                                  !!value.config.bindAddress) &&
+                                (provider !== "cloudflare" ||
+                                  (!!value.config.publicUrl &&
+                                    value.tokenSaved)))) &&
+                            toggle(provider, value.enabled)}
+                        </div>
                       </div>
                     );
                   })}
@@ -435,10 +484,11 @@ export default function RemoteMcpSettings() {
         </>
       ) : (
         <>
+          <button type="button" className="rm-button rm-return" onClick={back}>
+            <ChevronLeft size={16} aria-hidden="true" />
+            {t("back")}
+          </button>
           <header className="rm-page-header">
-            <RemoteIconButton label={t("back")} onClick={back}>
-              <ChevronLeft size={19} />
-            </RemoteIconButton>
             <h2>{name(selected)}</h2>
             <span
               className={`rm-status ${statusKey(state ?? { phase: "stopped" })}`}
@@ -446,14 +496,38 @@ export default function RemoteMcpSettings() {
               <span />
               {t(statusKey(state ?? { phase: "stopped" }))}
             </span>
-            {toggle(
-              selected,
-              !!state?.resumeOnLaunch ||
-                state?.phase === "starting" ||
-                state?.phase === "running",
-            )}
+            {(state?.resumeOnLaunch || active) && toggle(selected, true)}
           </header>
-          <nav className="rm-tabs" role="tablist" aria-label={name(selected)}>
+          {(state?.error || error) && (
+            <div className="rm-error" role="alert">
+              <CircleAlert size={17} />
+              <span>{error || state?.error}</span>
+              {state?.error && valid && (
+                <button
+                  className="rm-button"
+                  type="button"
+                  disabled={busy}
+                  onClick={() => void start()}
+                >
+                  {t("retryConnection")}
+                </button>
+              )}
+              <button
+                type="button"
+                className="rm-button"
+                onClick={() => setModal("diagnostics")}
+              >
+                <Settings2 size={16} aria-hidden="true" />
+                {t("diagnostics")}
+              </button>
+            </div>
+          )}
+          <nav
+            className="rm-tabs"
+            role="tablist"
+            aria-label={name(selected)}
+            onKeyDown={settingsTabKeyDown}
+          >
             {(
               [
                 ["network", Network],
@@ -463,9 +537,22 @@ export default function RemoteMcpSettings() {
             ).map(([value, Icon]) => (
               <button
                 key={value}
+                id={`${tabId}-tab-${value}`}
                 role="tab"
+                aria-controls={`${tabId}-panel-${value}`}
+                tabIndex={tab === value ? 0 : -1}
                 aria-selected={tab === value}
                 disabled={value === "clients" && !ready}
+                title={
+                  value === "clients" && !ready
+                    ? t("clientsUnavailable")
+                    : undefined
+                }
+                aria-description={
+                  value === "clients" && !ready
+                    ? t("clientsUnavailable")
+                    : undefined
+                }
                 onClick={() => setTab(value)}
               >
                 <Icon size={16} />
@@ -473,11 +560,40 @@ export default function RemoteMcpSettings() {
               </button>
             ))}
           </nav>
+          {saved && !error && !state?.error && (
+            <p className="settings-help" role="status">
+              {t(state?.phase === "starting" ? "savingReconnect" : "saved")}
+            </p>
+          )}
+          {dirty && (
+            <div className="rm-draft-actions">
+              <span className="settings-help" role="status">
+                {t("unsaved")}
+              </span>
+              <button
+                type="button"
+                className="rm-button"
+                disabled={busy}
+                onClick={() => {
+                  if (!state || !selected) return;
+                  setDrafts((previous) => ({
+                    ...previous,
+                    [selected]: state.config,
+                  }));
+                  setTokens((previous) => ({ ...previous, [selected]: "" }));
+                  setError("");
+                }}
+              >
+                {t("discardConfiguration")}
+              </button>
+            </div>
+          )}
           {config && state ? (
             <div className="rm-detail-body">
               <div
                 role="tabpanel"
-                aria-label={t("network")}
+                id={`${tabId}-panel-network`}
+                aria-labelledby={`${tabId}-tab-network`}
                 className="rm-tab-panel"
                 hidden={tab !== "network"}
               >
@@ -485,32 +601,22 @@ export default function RemoteMcpSettings() {
                   <div className="rm-starting" role="status">
                     <RefreshCw className="rm-spin" size={22} />
                     <span>{t("starting")}</span>
-                    <RemoteIconButton
-                      label={t("cancel")}
+                    <button
+                      type="button"
+                      className="rm-button"
                       onClick={() => void stop(selected)}
                     >
-                      <X size={16} />
-                    </RemoteIconButton>
+                      <X size={16} aria-hidden="true" />
+                      {t("cancel")}
+                    </button>
                   </div>
                 ) : (
                   <form
                     onSubmit={(event) => {
                       event.preventDefault();
-                      void start();
+                      if (!ready && valid && !busy) void start();
                     }}
                   >
-                    {(state.error || error) && (
-                      <div className="rm-error" role="alert">
-                        <CircleAlert size={17} />
-                        <span>{state.error || error}</span>
-                        <RemoteIconButton
-                          label={t("diagnostics")}
-                          onClick={() => setModal("diagnostics")}
-                        >
-                          <Settings2 size={16} />
-                        </RemoteIconButton>
-                      </div>
-                    )}
                     {selected === "lan" ? (
                       <div className="rm-field">
                         <label htmlFor="remote-bind-address">
@@ -547,19 +653,28 @@ export default function RemoteMcpSettings() {
                               </option>
                             ))}
                           </RemoteSelect>
-                          <RemoteIconButton
-                            label={t("refresh")}
+                          <button
+                            className="rm-button"
+                            type="button"
+                            aria-label={t("refresh")}
                             disabled={busy}
                             onClick={() => void run(() => refresh(true))}
                           >
                             <RefreshCw size={16} />
-                          </RemoteIconButton>
+                            {t("refresh")}
+                          </button>
                         </div>
+                        {!state.addresses.length && (
+                          <p className="settings-help">{t("recoverAddress")}</p>
+                        )}
                       </div>
                     ) : (
                       <>
                         {selected === "cloudflare" && (
                           <div className="rm-route-config">
+                            <p className="settings-help">
+                              {t("fixedDomainSteps")}
+                            </p>
                             <div className="rm-field">
                               <label htmlFor="remote-hostname">
                                 {t("hostname")}
@@ -584,15 +699,17 @@ export default function RemoteMcpSettings() {
                                 autoComplete="off"
                                 value={token}
                                 placeholder={state.tokenSaved ? t("saved") : ""}
-                                onChange={(event) =>
+                                onChange={(event) => {
+                                  setSaved(false);
                                   setTokens((previous) => ({
                                     ...previous,
                                     [selected]: event.target.value,
-                                  }))
-                                }
+                                  }));
+                                }}
                               />
                             </div>
-                            {state.localUrl || config.port ? (
+                            {state.localUrl ||
+                            (state.configured && state.config.port) ? (
                               <RemoteCopyField
                                 label={t("localRoute")}
                                 value={
@@ -609,7 +726,7 @@ export default function RemoteMcpSettings() {
                                 onClick={() => void prepareRoute()}
                               >
                                 <Network size={16} />
-                                {t("localRoute")}
+                                {t("generateRoute")}
                               </button>
                             )}
                             <a
@@ -683,71 +800,101 @@ export default function RemoteMcpSettings() {
                         onCopy={copy}
                       />
                     )}
-                    <details className="rm-advanced">
-                      <summary>
-                        <Settings2 size={14} />
-                        {t("advanced")}
-                      </summary>
-                      <div className="rm-inset">
-                        {(selected === "lan" || selected === "cloudflare") && (
-                          <div className="rm-field rm-short-field">
-                            <label htmlFor="remote-local-port">
-                              {t("port")}
-                            </label>
+                    <div className="rm-network-fields">
+                      {(selected === "lan" || selected === "cloudflare") && (
+                        <div className="rm-field rm-short-field">
+                          <label htmlFor="remote-local-port">{t("port")}</label>
+                          <input
+                            id="remote-local-port"
+                            type="number"
+                            min={1024}
+                            max={65535}
+                            value={config.port || ""}
+                            placeholder={t("auto")}
+                            aria-invalid={invalidPort}
+                            aria-describedby={
+                              invalidPort ? `${tabId}-port-error` : undefined
+                            }
+                            onChange={(event) =>
+                              change({
+                                port: Number(event.target.value) || 0,
+                              })
+                            }
+                          />
+                          {invalidPort && (
+                            <p
+                              id={`${tabId}-port-error`}
+                              className="studio-form-error"
+                            >
+                              {t("invalidPort")}
+                            </p>
+                          )}
+                        </div>
+                      )}
+                      {selected !== "lan" && (
+                        <div className="rm-field">
+                          <label htmlFor="remote-tool-path">{t("tool")}</label>
+                          <div className="rm-input-action">
                             <input
-                              id="remote-local-port"
-                              type="number"
-                              min={1024}
-                              max={65535}
-                              value={config.port || ""}
-                              placeholder={t("auto")}
+                              id="remote-tool-path"
+                              value={config.executable}
+                              placeholder={
+                                (isTailscaleProvider(selected)
+                                  ? state.executables.tailscale
+                                  : state.executables.cloudflare) ||
+                                t("notFound")
+                              }
                               onChange={(event) =>
-                                change({
-                                  port: Number(event.target.value) || 0,
-                                })
+                                change({ executable: event.target.value })
                               }
                             />
+                            <button
+                              type="button"
+                              className="rm-button"
+                              disabled={busy}
+                              onClick={() =>
+                                void run(async () => {
+                                  const path = await desktop.invoke<
+                                    string | null
+                                  >("remoteMcp:chooseExecutable", {
+                                    provider: selected,
+                                  });
+                                  if (path) change({ executable: path });
+                                })
+                              }
+                            >
+                              <FolderOpen size={16} aria-hidden="true" />
+                              {t("chooseTool")}
+                            </button>
                           </div>
-                        )}
-                        {selected !== "lan" && (
-                          <div className="rm-field">
-                            <label htmlFor="remote-tool-path">
-                              {t("tool")}
-                            </label>
-                            <div className="rm-input-action">
-                              <input
-                                id="remote-tool-path"
-                                value={config.executable}
-                                placeholder={
-                                  (isTailscaleProvider(selected)
-                                    ? state.executables.tailscale
-                                    : state.executables.cloudflare) ||
-                                  t("notFound")
-                                }
-                                onChange={(event) =>
-                                  change({ executable: event.target.value })
-                                }
-                              />
-                              <RemoteIconButton
-                                label={t("chooseTool")}
-                                onClick={() =>
-                                  void run(async () => {
-                                    const path = await desktop.invoke<
-                                      string | null
-                                    >("remoteMcp:chooseExecutable", {
-                                      provider: selected,
-                                    });
-                                    if (path) change({ executable: path });
-                                  })
-                                }
-                              >
-                                <FolderOpen size={16} />
-                              </RemoteIconButton>
-                            </div>
-                          </div>
-                        )}
+                        </div>
+                      )}
+                    </div>
+                    {!ready && (
+                      <div className="rm-start-scope">
+                        <span>
+                          {t(
+                            config.access === "selected"
+                              ? "selectedScope"
+                              : "allScope",
+                            { count: config.projects.length },
+                          )}
+                        </span>
+                        <button
+                          className="rm-button"
+                          type="button"
+                          onClick={() => {
+                            setTab("permissions");
+                            document
+                              .getElementById(`${tabId}-tab-permissions`)
+                              ?.focus();
+                          }}
+                        >
+                          <ShieldCheck size={15} aria-hidden="true" />
+                          {t("changePermissions")}
+                        </button>
                       </div>
-                    </details>
+                    )}
                     <footer className="rm-form-actions">
                       <button
                         className="rm-button"
@@ -762,7 +909,10 @@ export default function RemoteMcpSettings() {
                         <button
                           className="rm-button primary"
                           type="button"
-                          onClick={() => setTab("clients")}
+                          onClick={() => {
+                            setAddingClient((id) => id + 1);
+                            setTab("clients");
+                          }}
                         >
                           <Laptop size={15} />
                           {t("addClient")}
@@ -797,7 +947,8 @@ export default function RemoteMcpSettings() {
               </div>
               <div
                 role="tabpanel"
-                aria-label={t("permissions")}
+                id={`${tabId}-panel-permissions`}
+                aria-labelledby={`${tabId}-tab-permissions`}
                 className="rm-tab-panel"
                 hidden={tab !== "permissions"}
               >
@@ -875,6 +1026,7 @@ export default function RemoteMcpSettings() {
                                 onClick={() => access(project.id, option)}
                               >
                                 <Icon size={15} />
+                                <span>{t(label)}</span>
                               </button>
                             ))}
                           </div>
@@ -888,10 +1040,10 @@ export default function RemoteMcpSettings() {
                     className="rm-button primary"
                     disabled={
                       busy ||
-                      !dirty ||
+                      !permissionDirty ||
                       (config.access === "selected" && !config.projects.length)
                     }
-                    onClick={() => void save()}
+                    onClick={() => void save(true)}
                   >
                     <Save size={15} />
                     {t(active ? "saveReconnect" : "save")}
@@ -900,7 +1052,8 @@ export default function RemoteMcpSettings() {
               </div>
               <div
                 role="tabpanel"
-                aria-label={t("clients")}
+                id={`${tabId}-panel-clients`}
+                aria-labelledby={`${tabId}-tab-clients`}
                 className="rm-tab-panel"
                 hidden={tab !== "clients"}
               >
@@ -908,6 +1061,7 @@ export default function RemoteMcpSettings() {
                   <RemoteMcpClientSetup
                     key={selected}
                     state={state}
+                    addRequest={addingClient}
                     busy={busy}
                     onCopy={copy}
                     onRefresh={() => refresh()}

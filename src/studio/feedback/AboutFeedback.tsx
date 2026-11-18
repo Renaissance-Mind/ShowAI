@@ -134,8 +134,13 @@ function UpdateRows() {
               : state.phase === "failed"
                 ? t("update.failed", { message: state.error! })
                 : t("update.idle");
-  const button =
-    state.phase === "available"
+  const retry = state.phase === "failed" && state.retryDownload;
+  const button = retry
+    ? {
+        label: t("update.retryDownload"),
+        action: "appUpdate:download" as const,
+      }
+    : state.phase === "available"
       ? { label: t("update.download"), action: "appUpdate:download" as const }
       : state.phase === "ready"
         ? { label: t("update.restart"), action: "appUpdate:install" as const }
@@ -150,6 +155,7 @@ function UpdateRows() {
             role={state.phase === "failed" ? "alert" : "status"}
           >
             {failure ? t("update.failed", { message: failure }) : text}
+            {retry && state.version && ` · ${state.version}`}
           </span>
           {!busy ? (
             <button
@@ -161,6 +167,15 @@ function UpdateRows() {
             </button>
           ) : (
             <Loader2 size={14} className="studio-spin" aria-hidden="true" />
+          )}
+          {retry && (
+            <button
+              className="settings-button"
+              type="button"
+              onClick={() => act("appUpdate:check")}
+            >
+              {t("update.check")}
+            </button>
           )}
         </dd>
       </div>
@@ -260,10 +275,10 @@ export function AboutFeedback({
 }) {
   const t = useTranslator(messages);
   const appIcon = appIconForTheme(useAppearanceTheme());
-  const [shownView, setView] = useSessionDraft<"about" | "report">(
-    "feedback.view",
-    "about",
-  );
+  const [shownView, setView] = useState<"about" | "report">("about");
+  const hasDraft =
+    !!readSessionDraft("feedback.report.summary", "").trim() ||
+    !!readSessionDraft("feedback.report.steps", "").trim();
   const [shownContext, setContext] = useSessionDraft<
     ReportProblemDetail | undefined
   >("feedback.context", undefined);
@@ -337,35 +352,9 @@ export function AboutFeedback({
         />
         <div>
           <h2>ShowAI</h2>
+          <p>{versionLine(info)}</p>
         </div>
       </div>
-      <section
-        className="settings-group settings-about"
-        aria-labelledby="feedback-info-title"
-      >
-        <h2 id="feedback-info-title">{t("info.title")}</h2>
-        <dl>
-          <InfoRow label={t("info.version")} value={versionLine(info)} />
-          {info?.mode !== "browser" && <UpdateRows />}
-          <InfoRow label={t("info.platform")} value={platformLine(info)} />
-          <InfoRow label={t("info.runtime")} value={runtimeLine(info)} />
-          <InfoRow
-            label={t("info.mode")}
-            value={
-              info
-                ? `${
-                    info.mode === "browser"
-                      ? t("mode.browser")
-                      : info.packaged
-                        ? t("mode.packaged")
-                        : t("mode.development")
-                  } (${modeLine(info)})`
-                : "—"
-            }
-          />
-          {info && localPlugins && <PluginRows home={info.home} />}
-        </dl>
-      </section>
       <section className="settings-group" aria-labelledby="feedback-help-title">
         <h2 id="feedback-help-title">{t("help.title")}</h2>
         <div className="feedback-cards">
@@ -378,12 +367,12 @@ export function AboutFeedback({
             type="button"
             className="feedback-card"
             onClick={() => {
-              setContext(undefined);
+              if (!hasDraft) setContext(undefined);
               setView("report");
             }}
           >
             <Flag size={16} aria-hidden="true" />
-            <strong>{t("help.report")}</strong>
+            <strong>{t(hasDraft ? "resumeReport" : "help.report")}</strong>
             <span>{t("help.reportDetail")}</span>
           </button>
           {onOpenDocs && (
@@ -417,6 +406,35 @@ export function AboutFeedback({
             </a>
           )}
         </div>
+      </section>
+      {info?.mode !== "browser" && (
+        <dl className="feedback-update">{<UpdateRows />}</dl>
+      )}
+      <section
+        className="settings-group settings-about"
+        aria-labelledby="feedback-technical-title"
+      >
+        <h2 id="feedback-technical-title">{t("technicalInfo")}</h2>
+        <dl>
+          <InfoRow label={t("info.version")} value={versionLine(info)} />
+          <InfoRow label={t("info.platform")} value={platformLine(info)} />
+          <InfoRow label={t("info.runtime")} value={runtimeLine(info)} />
+          <InfoRow
+            label={t("info.mode")}
+            value={
+              info
+                ? `${
+                    info.mode === "browser"
+                      ? t("mode.browser")
+                      : info.packaged
+                        ? t("mode.packaged")
+                        : t("mode.development")
+                  } (${modeLine(info)})`
+                : "—"
+            }
+          />
+          {info && localPlugins && <PluginRows home={info.home} />}
+        </dl>
       </section>
       <section
         className="settings-group"

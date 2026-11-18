@@ -1,4 +1,4 @@
-import { useState, type ReactNode, type SelectHTMLAttributes } from "react";
+import { useEffect, useState, type SelectHTMLAttributes } from "react";
 import { Check, ChevronDown, Copy, Network } from "../ui/icons";
 import { useTranslator } from "../i18n/react";
 import messages from "../i18n/messages/remoteConnections";
@@ -30,32 +30,6 @@ export function RemoteBrand({ provider }: { provider: RemoteMcpProvider }) {
     </span>
   );
 }
-export function RemoteIconButton({
-  label,
-  children,
-  onClick,
-  disabled,
-  danger = false,
-}: {
-  label: string;
-  children: ReactNode;
-  onClick(): void;
-  disabled?: boolean;
-  danger?: boolean;
-}) {
-  return (
-    <button
-      type="button"
-      className={`rm-icon-button${danger ? " danger" : ""}`}
-      aria-label={label}
-      title={label}
-      onClick={onClick}
-      disabled={disabled}
-    >
-      {children}
-    </button>
-  );
-}
 export function RemoteSelect(props: SelectHTMLAttributes<HTMLSelectElement>) {
   return (
     <span className="rm-select">
@@ -73,33 +47,57 @@ export function RemoteCopyField({
   value: string;
   onCopy(value: string): Promise<void>;
 }) {
-  const t = useTranslator(messages),
-    [copied, setCopied] = useState(false),
-    [error, setError] = useState("");
+  const t = useTranslator(messages);
+  const [receipt, setReceipt] = useState<{ value: string; error?: string }>();
+  const [pending, setPending] = useState(false);
+  const copied = receipt?.value === value && !receipt.error;
+  const error = receipt?.value === value ? receipt.error : undefined;
+  useEffect(() => {
+    if (!copied) return;
+    const reset = setTimeout(() => setReceipt(undefined), 1800);
+    return () => clearTimeout(reset);
+  }, [copied, receipt]);
   return (
     <div className="rm-field" data-copy-field={label}>
-      <label>{label}</label>
+      <span className="rm-copy-label">{label}</span>
       <div className="rm-copy-field">
         <code>{value}</code>
-        <RemoteIconButton
-          label={copied ? t("copied") : t("copy", { name: label })}
-          onClick={() =>
-            void onCopy(value).then(
-              () => {
-                setError("");
-                setCopied(true);
-                setTimeout(() => setCopied(false), 1800);
-              },
-              (error) =>
-                setError(
-                  error instanceof Error ? error.message : String(error),
-                ),
-            )
-          }
+        <button
+          type="button"
+          className="rm-button"
+          aria-disabled={pending}
+          aria-busy={pending}
+          aria-label={t("copy", { name: label })}
+          onClick={() => {
+            if (pending) return;
+            setPending(true);
+            setReceipt(undefined);
+            void onCopy(value)
+              .then(
+                () => setReceipt({ value }),
+                (reason) =>
+                  setReceipt({
+                    value,
+                    error:
+                      reason instanceof Error ? reason.message : String(reason),
+                  }),
+              )
+              .finally(() => setPending(false));
+          }}
         >
-          {copied ? <Check size={16} /> : <Copy size={16} />}
-        </RemoteIconButton>
+          {copied ? (
+            <Check size={15} aria-hidden="true" />
+          ) : (
+            <Copy size={15} aria-hidden="true" />
+          )}
+          <span>
+            {t(pending ? "copyingValue" : copied ? "copied" : "copyValue")}
+          </span>
+        </button>
       </div>
+      <span className="settings-sr-only" role="status">
+        {copied ? t("copied") : ""}
+      </span>
       {error && (
         <span className="rm-error" role="alert">
           {error}

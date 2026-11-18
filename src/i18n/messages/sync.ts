@@ -2,6 +2,8 @@ import { defineMessages } from "../index";
 
 export default defineMessages("sync", {
   "zh-CN": {
+    "newConflictVersion": "同步状态有变化，请加载最新版本后重新确认。",
+    "reloadConflict": "加载最新版本",
     "role.admin": "管理员",
     "role.editor": "编辑者",
     "role.viewer": "查看者",
@@ -123,7 +125,6 @@ export default defineMessages("sync", {
     joinWithAccount: "用于加入的账号",
     joinAs: "以 {name} 加入",
     signInToJoin: "登录或注册此服务器",
-    closeJoin: "关闭加入共享项目",
     inviteRegistration: "通过邀请注册不需要注册密钥。",
     connectForInvite: "登录后加入“{name}”",
     serverAccounts: "服务器账号",
@@ -145,7 +146,7 @@ export default defineMessages("sync", {
     "account.methods": "登录与安全",
     "account.sessions": "已登录的设备",
     "account.danger": "退出与移除",
-    accountPanelFor: "{name} 的账号与设备",
+    accountPanelFor: "{name}的账号与设备",
     "session.signedIn": "登录于 {date}",
     signOutDevice: "退出该设备",
     signOutAllQuestion: "确认退出此账号在所有设备上的登录（包括本设备）？绑定服务器上的会话也会退出，项目与本地内容保留。",
@@ -310,6 +311,8 @@ export default defineMessages("sync", {
     "methods.remove": "移除",
   },
   en: {
+    "newConflictVersion": "Sync state changed. Load the latest versions and review your choices.",
+    "reloadConflict": "Load latest versions",
     "role.admin": "Admin",
     "role.editor": "Editor",
     "role.viewer": "Viewer",
@@ -435,7 +438,6 @@ export default defineMessages("sync", {
     joinWithAccount: "Account to join with",
     joinAs: "Join as {name}",
     signInToJoin: "Sign in to this server",
-    closeJoin: "Close join a shared project",
     inviteRegistration: "Registering through an invite doesn't need a registration key.",
     connectForInvite: "Sign in to join “{name}”",
     serverAccounts: "Server accounts",

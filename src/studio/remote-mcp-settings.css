@@ -330,15 +330,6 @@
     monospace;
   color: var(--text);
 }
-.rm-copy-field .rm-icon-button {
-  border-color: transparent;
-  background: transparent;
-  width: 28px;
-  height: 28px;
-}
-.rm-copy-field .rm-icon-button:hover {
-  background: var(--hover);
-}
 .rm-route-config,
 .rm-client-recipe,
 .rm-client-area,
@@ -379,36 +370,15 @@
 .rm-tag.success {
   color: var(--brand-accent);
 }
-.rm-advanced {
-  padding-top: 6px;
-  font-size: 12px;
-  color: var(--muted);
-}
-.rm-advanced > summary {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  width: fit-content;
-  cursor: pointer;
-}
-.rm-inset {
+.rm-network-fields,
+.rm-oauth-fields {
   display: grid;
-  gap: 20px;
-  margin-top: 18px;
-  padding: 20px;
-  border: 1px solid var(--line);
-  border-radius: 7px;
-  background: var(--surface);
+  gap: 16px;
+  min-width: 0;
 }
-.rm-disclosure {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0;
-  width: fit-content;
-  gap: 8px;
-  font-size: 12px;
-  color: var(--muted);
+.rm-oauth-fields {
+  padding-top: 16px;
+  border-top: 1px solid var(--line);
 }
 .rm-external-links {
   display: flex;
@@ -419,21 +389,15 @@
   width: fit-content;
 }
 .rm-permission-capabilities {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  border: 1px solid var(--line);
-  border-radius: 7px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 20px;
 }
 .rm-permission-capabilities > span {
-  display: flex;
+  display: inline-flex;
   align-items: center;
-  justify-content: center;
-  gap: 8px;
-  min-height: 54px;
+  gap: 6px;
   font-size: 12px;
-}
-.rm-permission-capabilities > span + span {
-  border-left: 1px solid var(--line);
 }
 .rm-permission-capabilities > span > svg:last-child {
   color: var(--brand-accent);
@@ -789,4 +753,122 @@
   display: flex;
   gap: 5px;
   align-items: center;
+}
+
+.rm-route-open small,
+.rm-tag time {
+  color: var(--muted);
+}
+.rm-permission-picker {
+  flex-wrap: wrap;
+}
+.rm-permission-picker button:has(span) {
+  width: auto;
+  gap: 4px;
+  padding-inline: 7px;
+}
+.rm-error .rm-button {
+  flex: none;
+}
+
+.rm-draft-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-block: 10px;
+}
+.rm-draft-actions .settings-help {
+  margin: 0;
+}
+
+.rm-input-action > .rm-button {
+  min-height: 38px;
+}
+
+.rm-route-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.rm-route-actions .rm-button {
+  padding-inline: 9px;
+}
+.rm-return {
+  width: fit-content;
+  margin-bottom: 12px;
+}
+.rm-tabs,
+.rm-detail-body {
+  margin-left: 0;
+}
+.rm-start-scope {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px 14px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--surface);
+}
+.rm-copy-label {
+  color: var(--text);
+  font-weight: 500;
+}
+.rm-copy-field .rm-button,
+.rm-secret-field .rm-button {
+  min-height: 29px;
+  padding-block: 3px;
+}
+.rm-secret-field {
+  flex-wrap: wrap;
+  padding: 5px;
+}
+.rm-secret-field > input {
+  flex: 1 1 130px;
+  min-width: 0;
+}
+.rm-copy-field .rm-button span,
+.rm-secret-field .rm-button span {
+  min-width: 3ch;
+}
+.rm-danger-action:hover:not(:disabled) {
+  border-color: var(--danger);
+  color: var(--danger);
+}
+.rm-client-table-head,
+.rm-client-record {
+  grid-template-columns: minmax(0, 1fr) minmax(96px, 0.7fr) max-content;
+}
+.rm-client-record .rm-tag {
+  flex-wrap: wrap;
+  width: fit-content;
+}
+.rm-error {
+  flex-wrap: wrap;
+}
+.rm-error > span {
+  min-width: min(200px, 80%);
+}
+@media (max-width: 680px) {
+  .rm-route-row {
+    flex-wrap: wrap;
+    padding-block: 8px;
+  }
+  .rm-route-open {
+    flex-basis: calc(100% - 44px);
+    padding-bottom: 4px;
+  }
+  .rm-route-actions {
+    justify-content: flex-start;
+    padding-inline-start: 44px;
+  }
+}
+
+.rm-button[aria-disabled="true"] {
+  cursor: wait;
+  opacity: 0.55;
 }

@@ -478,8 +478,8 @@ export function LaunchConfigCopy({ info }: { info: DesktopInfo | null }) {
               <span>{t(`launch.${kind}Hint`)}</span>
               <button
                 className="settings-button"
-                onClick={(event) => {
-                  event.preventDefault();
+                type="button"
+                onClick={() => {
                   setError("");
                   void desktop
                     .invoke("clipboard:write", { text })
@@ -576,6 +576,8 @@ export default function PluginInstallSettings({ home }: { home: string }) {
     receipt,
     runtime,
     refresh,
+    refreshHost,
+    installedAt,
     install,
     updateAll,
     repairRuntime,
@@ -644,6 +646,12 @@ export default function PluginInstallSettings({ home }: { home: string }) {
         const state = verify.states.get(host.host);
         const status = hostStatus(t, host, home, state, reason);
         const failed = state?.kind === "failed" ? state : undefined;
+        const updateFailure = batch?.failed.find(
+          (item) => item.host === host.host,
+        );
+        const confirmed =
+          (state?.kind === "connected" || state?.kind === "called") &&
+          Date.parse(state.at) >= (installedAt[host.host] ?? 0);
         const dsh =
           receipt?.host === host.host && receipt.dsh
             ? receipt.dsh
@@ -669,7 +677,7 @@ export default function PluginInstallSettings({ home }: { home: string }) {
               <p className="plugin-host-state" data-tone={status.tone}>
                 {status.text}
               </p>
-              {restart.has(host.host) && (
+              {restart.has(host.host) && !confirmed && (
                 <p className="plugin-host-next" role="status">
                   {t(`next.${host.host}`)}
                 </p>
@@ -688,6 +696,12 @@ export default function PluginInstallSettings({ home }: { home: string }) {
                 <p className="plugin-install-note">
                   {t("manualCurrent", { path: host.manualPath })}
                 </p>
+              )}
+              {updateFailure && (
+                <PluginError
+                  message={updateFailure.message}
+                  details={updateFailure.details}
+                />
               )}
               {host.error && (
                 <PluginError
@@ -712,7 +726,40 @@ export default function PluginInstallSettings({ home }: { home: string }) {
               )}
               {dsh && <DshSteps steps={dsh} />}
             </div>
-            {failed ? (
+            {updateFailure ? (
+              <button
+                className="settings-button"
+                disabled={!!busy}
+                onClick={() =>
+                  void updateAll([host.host]).then((result) =>
+                    setBatch((previous) => ({
+                      updated: [
+                        ...(previous?.updated ?? []).filter(
+                          (item) => item !== host.host,
+                        ),
+                        ...result.updated,
+                      ],
+                      failed: [
+                        ...(previous?.failed ?? []).filter(
+                          (item) => item.host !== host.host,
+                        ),
+                        ...result.failed,
+                      ],
+                    })),
+                  )
+                }
+              >
+                {t("retryHost")}
+              </button>
+            ) : host.error ? (
+              <button
+                className="settings-button"
+                disabled={!!busy}
+                onClick={() => void refreshHost(host.host)}
+              >
+                {t("rescanHost", { host: pluginHostNames[host.host] })}
+              </button>
+            ) : failed ? (
               <button
                 className="settings-button"
                 disabled={!!busy}
@@ -753,14 +800,6 @@ export default function PluginInstallSettings({ home }: { home: string }) {
           {verify.error}
         </p>
       )}
-      {batch?.failed.map((item) => (
-        <p key={item.host} role="alert" className="plugin-install-error">
-          {t("batchFailed", {
-            host: pluginHostNames[item.host],
-            message: item.message,
-          })}
-        </p>
-      ))}
     </section>
   );
 }

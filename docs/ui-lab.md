@@ -24,6 +24,10 @@ The service boundary is explicit: remote MCP responses, tunnel startup, OAuth re
 
 The browser host exposes the desktop renderer capabilities needed by remote settings. Host installation, external Agent scanning, file reveal and new application windows are disabled in scenes. Clipboard writes are recorded without changing the system clipboard; plugin export uses a simulated result. Hidden Electron checks this renderer in a native window; desktop IPC and OS integrations retain their own acceptance tests.
 
+Choose **Workbench motion** in the feature selector, or open `/__ui-lab/?feature=workbench-motion`. The state buttons open directory arrows, tab selection, sidebar pinning and the Agent panel. The selection bar and toolbar search each have a current and a proposed scene. Both use real controls and the same sample data. Proposed styles apply only inside the selected Lab scene. To see the navigation sidebar hide, unpin it and move the pointer into the page.
+
+**UI checks** operates each motion scene with standard and reduced motion. It records CSS animation and transition events during the action, before taking the settled screenshot. Sidebar and Agent panel checks also count changes in the editor width. The results drawer shows the observations for each action.
+
 ## Capture and verify
 
 ```sh
@@ -31,6 +35,7 @@ npm run test:ui -- --flow --feature remote-connection --out /absolute/path/ui-la
 npm run test:ui -- --flow --feature remote-connection --node lan.error --node funnel.chatgpt.verify --out /absolute/path/ui-lab/results
 npm run test:ui -- --url http://127.0.0.1:5859 --feature remote-connection --scene chatgpt --scene permissions --theme dark --width 800 --height 1000 --scale 2 --out /absolute/path/ui-lab/results
 npm run test:ui -- --url http://127.0.0.1:5859 --feature workbench --out /absolute/path/ui-lab/results
+npm run test:ui -- --flow --feature workbench-motion --out /absolute/path/ui-lab/results
 npm run test:ui -- --renderer electron --feature remote-connection --scene lan --out /absolute/path/ui-lab/results
 ```
 

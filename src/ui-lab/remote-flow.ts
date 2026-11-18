@@ -88,7 +88,7 @@ export function remoteConnectionFlow(locale: Locale = "zh-CN"): UiFlow {
       root = `.remote-settings[data-remote-provider="${p.provider}"]`,
       panel = (tab: string) =>
         selector(
-          `${root} [role="tabpanel"]:not([hidden])[aria-label="${t(tab as "network" | "permissions" | "clients")}"]`,
+          `${root}[data-remote-tab="${tab}"] .rm-detail-body > .rm-tab-panel:not([hidden])`,
         );
     const open = async (ctx: SceneContext) => {
       await home(ctx);
@@ -137,7 +137,7 @@ export function remoteConnectionFlow(locale: Locale = "zh-CN"): UiFlow {
                 role: "textbox" as const,
                 name: t("tunnelToken"),
               }),
-              b("route", t("localRoute")),
+              b("route", t("generateRoute")),
             ]
           : p.id === "tailnet" || p.id === "funnel"
             ? [
@@ -423,11 +423,16 @@ export function remoteConnectionFlow(locale: Locale = "zh-CN"): UiFlow {
               ),
             },
           ],
-          enter: (ctx) => clientSetup(ctx, true),
+          enter: async (ctx) => {
+            await clientSetup(ctx, true);
+            await ctx.ui.expect(
+              button(t("copy", { name: r("oauthAuthorization") })),
+            );
+          },
           actions: [
             b("next", t("nextMessage"), id("chatgpt.verify")),
-            b("advanced", t("oauthEndpoints")),
-            b("export", t("export"), id("plugin")),
+            b("copy-oauth", t("copy", { name: r("oauthAuthorization") })),
+            b("export", t("exportChatgptPlugin"), id("plugin")),
           ],
         });
       const verify = async (ctx: SceneContext) => {
@@ -601,7 +606,7 @@ export function remoteConnectionFlow(locale: Locale = "zh-CN"): UiFlow {
         ],
         enter: async (ctx) => {
           await clientSetup(ctx, true);
-          await ctx.ui.click(button(t("export")));
+          await ctx.ui.click(button(t("exportChatgptPlugin")));
         },
         actions: [
           action("link", t("binding"), { role: "textbox", name: t("binding") }),

@@ -1,7 +1,11 @@
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { app, autoUpdater as nativeUpdater } from "electron";
-import { autoUpdater, type ProgressInfo, type UpdateInfo } from "electron-updater";
+import {
+  autoUpdater,
+  type ProgressInfo,
+  type UpdateInfo,
+} from "electron-updater";
 import type { AppUpdateState } from "../host/protocol";
 import type { LogLevel } from "./main-log";
 
@@ -57,7 +61,9 @@ export class AppUpdates {
     };
     autoUpdater.autoDownload = options.automatic;
     autoUpdater.autoInstallOnAppQuit = true;
-    autoUpdater.on("checking-for-update", () => this.set({ phase: "checking" }));
+    autoUpdater.on("checking-for-update", () =>
+      this.set({ phase: "checking", retryDownload: false, error: undefined }),
+    );
     autoUpdater.on("update-not-available", () =>
       this.set({
         phase: "current",
@@ -89,7 +95,12 @@ export class AppUpdates {
       );
     autoUpdater.on("error", (error: Error) => {
       if (this.state.phase === "ready") return;
-      this.set({ phase: "failed", error: shortError(error) });
+      this.set({
+        phase: "failed",
+        retryDownload:
+          this.state.phase === "downloading" || this.state.retryDownload,
+        error: shortError(error),
+      });
     });
   }
 
@@ -109,7 +120,8 @@ export class AppUpdates {
   }
 
   async check(): Promise<AppUpdateState> {
-    if (!this.state.supported || this.state.phase === "ready") return this.state;
+    if (!this.state.supported || this.state.phase === "ready")
+      return this.state;
     if (this.state.phase === "downloading") return this.state;
     this.checking ??= autoUpdater
       .checkForUpdates()
@@ -126,10 +138,18 @@ export class AppUpdates {
   }
 
   async download(): Promise<AppUpdateState> {
-    if (this.state.phase !== "available") return this.state;
-    this.set({ phase: "downloading", percent: 0 });
+    if (
+      this.state.phase !== "available" &&
+      !(this.state.phase === "failed" && this.state.retryDownload)
+    )
+      return this.state;
+    this.set({ phase: "downloading", percent: 0, error: undefined });
     await autoUpdater.downloadUpdate().catch((error: unknown) => {
-      this.set({ phase: "failed", error: shortError(error) });
+      this.set({
+        phase: "failed",
+        retryDownload: true,
+        error: shortError(error),
+      });
     });
     return this.state;
   }
@@ -160,7 +180,10 @@ export class AppUpdates {
     const exit = () => {
       quit();
       setTimeout(() => {
-        log("warn", "ShowAI did not quit after the update was installed; exiting.");
+        log(
+          "warn",
+          "ShowAI did not quit after the update was installed; exiting.",
+        );
         app.exit(0);
       }, EXIT_FALLBACK_MS);
     };
@@ -194,7 +217,9 @@ export class AppUpdates {
         return this.download();
       case "appUpdate:setAutomatic":
         if (typeof args.automatic !== "boolean")
-          throw new TypeError("appUpdate:setAutomatic needs a boolean `automatic`.");
+          throw new TypeError(
+            "appUpdate:setAutomatic needs a boolean `automatic`.",
+          );
         return this.setAutomatic(args.automatic);
       case "appUpdate:install":
         this.requestInstall(quit);
@@ -211,7 +236,10 @@ export class AppUpdates {
   private set(change: Partial<AppUpdateState>): void {
     this.state = { ...this.state, ...change };
     if (change.phase && change.phase !== "downloading")
-      this.options.log("info", `Update ${change.phase}${this.state.version ? ` ${this.state.version}` : ""}${change.error ? `: ${change.error}` : ""}`);
+      this.options.log(
+        "info",
+        `Update ${change.phase}${this.state.version ? ` ${this.state.version}` : ""}${change.error ? `: ${change.error}` : ""}`,
+      );
     this.options.publish(this.state);
   }
 }

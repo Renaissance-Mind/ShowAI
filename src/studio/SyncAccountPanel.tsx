@@ -72,14 +72,6 @@ export default function SyncAccountPanel({
       aria-label={t("accountPanelFor", { name: connection.user.name })}
     >
       <section className="sync-account-block">
-        <p className="settings-help">{f("signOutHelp")}</p>
-        <button className="settings-button" disabled={busy} onClick={() => void run(async () => {
-          await desktop.invoke("sync:signOut", { connectionId: connection.id });
-          onRemoved();
-          notify(f("signedOut"));
-        })}>{f("signOut")}</button>
-      </section>
-      <section className="sync-account-block">
         <h4>{t("account.methods")}</h4>
         <LoginMethods connectionId={connection.id} revision={methodsRevision} />
         <ServiceLogin
@@ -247,6 +239,25 @@ export default function SyncAccountPanel({
       </section>
       <section className="sync-account-block sync-account-danger">
         <h4>{t("account.danger")}</h4>
+        <div className="sync-danger-row">
+          <p className="settings-help">{f("signOutHelp")}</p>
+          <button
+            type="button"
+            className="settings-button"
+            disabled={busy}
+            onClick={() =>
+              void run(async () => {
+                await desktop.invoke("sync:signOut", {
+                  connectionId: connection.id,
+                });
+                onRemoved();
+                notify(f("signedOut"));
+              })
+            }
+          >
+            {f("signOut")}
+          </button>
+        </div>
         {secure && (
           <div className="sync-danger-row">
             <div>

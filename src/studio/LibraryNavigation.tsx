@@ -1,7 +1,6 @@
 import { clientIsMac, isDeleteShortcut } from "./keyboard-shortcuts";
 import { memo, useRef, type KeyboardEvent, type MouseEvent } from "react";
 import {
-  ChevronDown,
   ChevronRight,
   FileText,
   Folder,
@@ -127,7 +126,7 @@ function LibraryRowView({
             onToggle();
           }}
         >
-          {expanded ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
+          <ChevronRight size={13} aria-hidden="true" />
         </button>
       ) : (
         <span className="studio-tree-chevron" aria-hidden="true" />

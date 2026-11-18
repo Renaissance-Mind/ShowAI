@@ -33,6 +33,7 @@ export default function ServiceLogin({
 }) {
   const t = useTranslator(messages);
   const epoch = useRef(0);
+  const codeRef = useRef<HTMLInputElement>(null);
   useEffect(() => {
     epoch.current++;
     return () => {
@@ -85,6 +86,10 @@ export default function ServiceLogin({
       cancelled = true;
     };
   }, [url, invite, connectionId, availableMethods]);
+  useEffect(() => {
+    if (flow && (confirming || flow.provider === "email") && !busy)
+      codeRef.current?.focus();
+  }, [confirming, error, busy, flow]);
   async function finish(
     current: Flow,
     entered?: { code?: string; completionCode?: string },
@@ -175,6 +180,18 @@ export default function ServiceLogin({
         {error}
       </p>
     ) : null;
+  const codeEntry = !!flow && (confirming || flow.provider === "email");
+  const errorMessageNode = error && (
+    <p role="alert" className="sync-error">
+      {error}
+      {remaining !== null &&
+        flow &&
+        ` ${t("login.attemptsLeft", {
+          count: remaining,
+          time: countdown(flow.expiresAt - now),
+        })}`}
+    </p>
+  );
   return (
     <div className="sync-oauth">
       {!provider &&
@@ -183,21 +200,8 @@ export default function ServiceLogin({
         ) : (
           <p className="sync-divider">{t("login.otherMethods")}</p>
         ))}
-      {error && (
-        <p role="alert" className="sync-error">
-          {error}
-          {remaining !== null && flow && (
-            <>
-              {" "}
-              {t("login.attemptsLeft", {
-                count: remaining,
-                time: countdown(flow.expiresAt - now),
-              })}
-            </>
-          )}
-        </p>
-      )}
-      {!["email"].includes(flow?.provider ?? "") && (
+      {!codeEntry && errorMessageNode}
+      {!flow && (
         <div className="sync-actions">
           {methods.includes("github") &&
             (!provider || provider === "github") && (
@@ -239,6 +243,8 @@ export default function ServiceLogin({
           <label className="sync-field">
             <span>{t("login.completionCode")}</span>
             <input
+              ref={codeRef}
+              aria-invalid={!!error}
               autoComplete="one-time-code"
               maxLength={9}
               value={code}
@@ -294,6 +300,8 @@ export default function ServiceLogin({
             <span>{t("login.code")}</span>
             <input
               inputMode="numeric"
+              ref={codeRef}
+              aria-invalid={!!error}
               autoComplete="one-time-code"
               maxLength={8}
               value={code}
@@ -316,6 +324,7 @@ export default function ServiceLogin({
           </button>
         </div>
       )}
+      {codeEntry && errorMessageNode}
       {flow && (
         <button
           type="button"

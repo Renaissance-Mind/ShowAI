@@ -148,7 +148,11 @@ export function AgentExecutionPicker({
     </div>
   );
 }
-export function RemoteDeviceSettings() {
+export function RemoteDeviceSettings({
+  onAccounts,
+}: {
+  onAccounts?: () => void;
+}) {
   const [state, setState] = useState<{
     settings: ConnectorSettings;
     online: boolean;
@@ -164,11 +168,24 @@ export function RemoteDeviceSettings() {
   } | null>(null);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
-  const refresh = () =>
+  const refresh = (preserveDraft = false) =>
     desktop
       .invoke<NonNullable<typeof state>>("agent:remoteDevice")
-      .then(setState)
-      .catch((reason) => setError(reason.message));
+      .then((next) => {
+        setState((current) =>
+          preserveDraft && current
+            ? {
+                ...next,
+                settings: {
+                  ...current.settings,
+                  trustedClients: next.settings.trustedClients,
+                },
+              }
+            : next,
+        );
+        setError("");
+      })
+      .catch((reason) => setError(errorMessage(reason)));
   useEffect(() => {
     if (remoteExecution()) return;
     void refresh();
@@ -195,7 +212,10 @@ export function RemoteDeviceSettings() {
   if (remoteExecution()) return null;
   if (!state)
     return (
-      <section className="settings-group agent-device-settings">
+      <section
+        id="agent-device-settings"
+        className="settings-group agent-device-settings"
+      >
         <h2>{t("useThisComputerFromIPad")}</h2>
         {error ? (
           <p role="alert" className="agent-error">
@@ -224,7 +244,10 @@ export function RemoteDeviceSettings() {
     }
   };
   return (
-    <section className="settings-group agent-device-settings">
+    <section
+      id="agent-device-settings"
+      className="settings-group agent-device-settings"
+    >
       <h2>{t("useThisComputerFromIPad")}</h2>
       <p className="settings-help">{t("nearbyHelp")}</p>
       <p className="settings-help" role="status">
@@ -260,6 +283,15 @@ export function RemoteDeviceSettings() {
             ))}
           </select>
         </label>
+        {onAccounts && !state.connections.length && (
+          <button
+            type="button"
+            className="settings-button agent-account-link"
+            onClick={onAccounts}
+          >
+            {t("openAccounts")}
+          </button>
+        )}
         <fieldset>
           <legend>{t("allowedProjects")}</legend>
           {!state.projects.some(
@@ -322,10 +354,33 @@ export function RemoteDeviceSettings() {
           </select>
         </fieldset>
         <div className="settings-row">
-          <span role="status">
-            {state.online ? t("connected") : t("disconnected")}
-          </span>
+          <div>
+            <span role="status">
+              {t(
+                state.online
+                  ? "connected"
+                  : state.settings.enabled
+                    ? "reconnecting"
+                    : "notConfigured",
+              )}
+            </span>
+            {(error || state.error) && (
+              <p role="alert" className="agent-error">
+                {error || state.error}
+              </p>
+            )}
+          </div>
           <div className="agent-device-actions">
+            {state.settings.enabled && !state.online && (
+              <button
+                type="button"
+                className="settings-button"
+                disabled={busy}
+                onClick={() => void refresh(true)}
+              >
+                {t("refreshConnectionStatus")}
+              </button>
+            )}
             {state.settings.enabled && (
               <button
                 type="button"
@@ -333,7 +388,7 @@ export function RemoteDeviceSettings() {
                 disabled={busy}
                 onClick={() => void save({ ...state.settings, enabled: false })}
               >
-                {t("disconnect")}
+                {t("disableCrossNetwork")}
               </button>
             )}
             <button
@@ -346,48 +401,60 @@ export function RemoteDeviceSettings() {
               }
               onClick={() => void save({ ...state.settings, enabled: true })}
             >
-              {t(state.settings.enabled ? "save" : "connect")}
+              {t(
+                state.settings.enabled
+                  ? "saveCrossNetwork"
+                  : "enableCrossNetwork",
+              )}
             </button>
           </div>
         </div>
       </section>
-      {state.pendingClients
-        .filter((client) => !client.id.startsWith("lan:"))
-        .map((client) => (
-          <div className="settings-row" key={client.id}>
-            <span>
-              {client.name} · {client.code ?? client.id.slice(-6)}
-            </span>
-            <button
-              className="settings-button"
-              onClick={() =>
-                void desktop
-                  .invoke("agent:approveRemoteClient", {
-                    id: client.id,
-                    approve: true,
-                  })
-                  .then(refresh)
-                  .catch((reason) => setError(reason.message))
-              }
-            >
-              {t("allowDevice")}
-            </button>
-            <button
-              className="settings-button"
-              onClick={() =>
-                void desktop
-                  .invoke("agent:approveRemoteClient", {
-                    id: client.id,
-                    approve: false,
-                  })
-                  .then(refresh)
-                  .catch((reason) => setError(reason.message))
-              }
-            >
-              {t("reject")}
-            </button>
-          </div>
-        ))}
+      {state.pendingClients.some((client) => !client.id.startsWith("lan:")) && (
+        <section
+          className="agent-remote-advanced"
+          aria-label={t("pendingDevices")}
+        >
+          <h3 className="settings-section-heading">{t("pendingDevices")}</h3>
+          {state.pendingClients
+            .filter((client) => !client.id.startsWith("lan:"))
+            .map((client) => (
+              <div className="settings-row" key={client.id}>
+                <span>
+                  {client.name} · {client.code ?? client.id.slice(-6)}
+                </span>
+                <button
+                  className="settings-button"
+                  onClick={() =>
+                    void desktop
+                      .invoke("agent:approveRemoteClient", {
+                        id: client.id,
+                        approve: true,
+                      })
+                      .then(() => refresh(true))
+                      .catch((reason) => setError(reason.message))
+                  }
+                >
+                  {t("allowDevice")}
+                </button>
+                <button
+                  className="settings-button"
+                  onClick={() =>
+                    void desktop
+                      .invoke("agent:approveRemoteClient", {
+                        id: client.id,
+                        approve: false,
+                      })
+                      .then(() => refresh(true))
+                      .catch((reason) => setError(reason.message))
+                  }
+                >
+                  {t("reject")}
+                </button>
+              </div>
+            ))}
+        </section>
+      )}
       {[
         ...(state.settings.trustedClients ?? []),
         ...(state.lan?.trusted ?? []),
@@ -404,7 +471,7 @@ export function RemoteDeviceSettings() {
                   id: client.id,
                   approve: false,
                 })
-                .then(refresh)
+                .then(() => refresh(true))
                 .catch((reason) => setError(reason.message))
             }
           >
@@ -412,9 +479,9 @@ export function RemoteDeviceSettings() {
           </button>
         </div>
       ))}
-      {(error || state.error || state.lan?.error) && (
+      {state.lan?.error && (
         <p role="alert" className="agent-error">
-          {error || state.error || state.lan?.error}
+          {state.lan.error}
         </p>
       )}
     </section>

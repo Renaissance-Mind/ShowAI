@@ -51,6 +51,22 @@
   color: var(--text);
   box-shadow: 0 1px var(--paper);
 }
+.studio-tab[data-active]:not(:only-child)::after {
+  content: "";
+  position: absolute;
+  inset: auto 10px 3px;
+  height: 2px;
+  border-radius: 2px;
+  background: var(--accent);
+  pointer-events: none;
+  animation: studio-tab-select var(--duration-fast) var(--ease-out);
+}
+@keyframes studio-tab-select {
+  from {
+    opacity: 0.5;
+    transform: scaleX(0.7);
+  }
+}
 .studio-tab > [role="tab"] {
   display: flex;
   align-items: center;

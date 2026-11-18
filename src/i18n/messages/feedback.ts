@@ -2,6 +2,9 @@ import { defineMessages } from "../index";
 
 export default defineMessages("feedback", {
   "zh-CN": {
+    "technicalInfo": "技术信息",
+    "resumeReport": "继续编辑反馈",
+    "update.retryDownload": "重试下载",
     helpAndFeedback: "帮助与反馈",
     "info.title": "应用信息",
     "info.version": "版本",
@@ -24,8 +27,8 @@ export default defineMessages("feedback", {
     "update.ready": "{version} 已下载，重启后完成更新",
     "update.failed": "更新没有完成：{message}",
     "update.check": "检查更新",
-    "update.download": "下载并安装",
-    "update.restart": "重启并更新",
+    "update.download": "下载更新",
+    "update.restart": "重启安装",
     "update.later": "稍后",
     "plugins.unavailable": "无法读取插件状态：{message}",
     "host.notFound": "未找到",
@@ -76,7 +79,7 @@ export default defineMessages("feedback", {
     "report.stepsHint": "1. 打开…\n2. 点击…\n3. 出现…",
     "report.context": "来自：{source} · {code} · {time}",
     "report.removeContext": "移除来源信息",
-    "report.github": "在 GitHub 提交",
+    "report.github": "打开 GitHub 反馈草稿",
     "report.copyAll": "复制全文",
     "report.githubNote":
       "在 GitHub 提交需要 GitHub 账号。没有账号时，可以复制全文，发到团队公布的任意渠道。",
@@ -99,6 +102,9 @@ export default defineMessages("feedback", {
     "agent.report": "报告问题",
   },
   en: {
+    "technicalInfo": "Technical information",
+    "resumeReport": "Continue editing feedback",
+    "update.retryDownload": "Retry download",
     helpAndFeedback: "Help & feedback",
     "info.title": "App information",
     "info.version": "Version",
@@ -121,8 +127,8 @@ export default defineMessages("feedback", {
     "update.ready": "{version} is downloaded and installs when ShowAI restarts",
     "update.failed": "Update did not finish: {message}",
     "update.check": "Check for updates",
-    "update.download": "Download and install",
-    "update.restart": "Restart to update",
+    "update.download": "Download update",
+    "update.restart": "Restart to install",
     "update.later": "Later",
     "plugins.unavailable": "Can't read plugin status: {message}",
     "host.notFound": "Not found",
@@ -173,7 +179,7 @@ export default defineMessages("feedback", {
     "report.stepsHint": "1. Open …\n2. Click …\n3. See …",
     "report.context": "From: {source} · {code} · {time}",
     "report.removeContext": "Remove source information",
-    "report.github": "Submit on GitHub",
+    "report.github": "Open GitHub draft",
     "report.copyAll": "Copy Full Report",
     "report.githubNote":
       "Submitting on GitHub needs a GitHub account. Without one, copy the full report and send it through any channel the team announces.",

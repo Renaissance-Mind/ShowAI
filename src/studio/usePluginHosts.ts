@@ -38,10 +38,7 @@ export function pluginActionLabel(
       : ("install" as const);
 }
 
-export function pluginUpToDate(
-  host: PluginInstallation,
-  home?: string | null,
-) {
+export function pluginUpToDate(host: PluginInstallation, home?: string | null) {
   return (
     host.installed &&
     host.enabled &&
@@ -111,22 +108,52 @@ export function pluginErrorText(
   const key = `error.${code}` as Parameters<typeof t>[0];
   const name = pluginHostNames[(data?.host as PluginHost) ?? host ?? "codex"];
   const localized =
-    code?.startsWith("PLUGIN_") && t(key, {
+    code?.startsWith("PLUGIN_") &&
+    t(key, {
       host: name,
       version: String(data?.minimumVersion ?? ""),
     });
-  if (!localized || localized.startsWith("pluginInstall.")) return { message: raw };
+  if (!localized || localized.startsWith("pluginInstall."))
+    return { message: raw };
   const output = typeof data?.output === "string" ? data.output : "";
-  return { message: localized, details: [raw, output].filter(Boolean).join("\n\n") };
+  return {
+    message: localized,
+    details: [raw, output].filter(Boolean).join("\n\n"),
+  };
 }
 
 export interface PluginBatchResult {
   updated: PluginHost[];
-  failed: { host: PluginHost; message: string }[];
+  failed: { host: PluginHost; message: string; details?: string }[];
 }
 
 export function usePluginHosts(home: string | null) {
   const [hosts, setHosts] = useState<PluginInstallation[]>([]);
+  const publishHosts = useCallback(
+    (next: PluginInstallation[]) => {
+      setHosts(next);
+      if (home)
+        window.dispatchEvent(
+          new CustomEvent("showai:plugin-hosts", {
+            detail: { home, hosts: next },
+          }),
+        );
+    },
+    [home],
+  );
+  useEffect(() => {
+    if (!home) return;
+    const changed = (event: Event) => {
+      const detail = (
+        event as CustomEvent<{ home: string; hosts: PluginInstallation[] }>
+      ).detail;
+      if (detail.home === home) setHosts(detail.hosts);
+    };
+    window.addEventListener("showai:plugin-hosts", changed);
+    return () => window.removeEventListener("showai:plugin-hosts", changed);
+  }, [home]);
+  const currentHosts = useRef(hosts);
+  currentHosts.current = hosts;
   const [scanned, setScanned] = useState(false);
   const [busy, setBusy] = useState<
     PluginHost | "scan" | "all" | "runtime" | null
@@ -141,6 +168,9 @@ export function usePluginHosts(home: string | null) {
     setError(text.message);
     setErrorDetails(text.details ?? "");
   }, []);
+  const [installedAt, setInstalledAt] = useState<
+    Partial<Record<PluginHost, number>>
+  >({});
   const [receipt, setReceipt] = useState<PluginInstallReceipt | null>(null);
   const mounted = useRef(true);
   useEffect(
@@ -158,7 +188,7 @@ export function usePluginHosts(home: string | null) {
         desktop.invoke<RuntimeRegistrationStatus>("plugins:runtime"),
       ]);
       if (mounted.current) {
-        setHosts(next);
+        publishHosts(next);
         setRuntime(registration);
       }
     } catch (reason) {
@@ -169,13 +199,37 @@ export function usePluginHosts(home: string | null) {
         setScanned(true);
       }
     }
-  }, []);
+  }, [fail, publishHosts]);
   useEffect(() => {
     mounted.current = true;
     setReceipt(null);
     setScanned(false);
     if (home) void refresh();
   }, [home, refresh]);
+  const refreshHost = useCallback(
+    async (host: PluginHost) => {
+      setBusy(host);
+      setError("");
+      try {
+        const hosts = await desktop.invoke<PluginInstallation[]>(
+          "plugins:status",
+          { host },
+        );
+        const next = hosts.find((item) => item.host === host);
+        if (mounted.current && next)
+          publishHosts(
+            currentHosts.current.map((item) =>
+              item.host === host ? next : item,
+            ),
+          );
+      } catch (reason) {
+        if (mounted.current) fail(reason, host);
+      } finally {
+        if (mounted.current) setBusy(null);
+      }
+    },
+    [fail, publishHosts],
+  );
   const install = useCallback(
     async (host: PluginHost, options: { repairRuntime?: boolean } = {}) => {
       setBusy(host);
@@ -194,7 +248,10 @@ export function usePluginHosts(home: string | null) {
         );
         if (!mounted.current) return false;
         setReceipt(result);
-        setHosts(await desktop.invoke<PluginInstallation[]>("plugins:status"));
+        setInstalledAt((previous) => ({ ...previous, [host]: Date.now() }));
+        publishHosts(
+          await desktop.invoke<PluginInstallation[]>("plugins:status"),
+        );
         return true;
       } catch (reason) {
         if (mounted.current) fail(reason, host);
@@ -203,7 +260,7 @@ export function usePluginHosts(home: string | null) {
         if (mounted.current) setBusy(null);
       }
     },
-    [fail],
+    [fail, publishHosts],
   );
   const repairRuntime = useCallback(async () => {
     setBusy("runtime");
@@ -228,43 +285,52 @@ export function usePluginHosts(home: string | null) {
           "plugins:setPath",
           { host, path },
         );
-        if (mounted.current) setHosts(next);
+        if (mounted.current) publishHosts(next);
       } catch (reason) {
         if (mounted.current) fail(reason, host);
       } finally {
         if (mounted.current) setBusy(null);
       }
     },
-    [fail],
+    [fail, publishHosts],
   );
-  const updateAll = useCallback(async (targets: PluginHost[]) => {
-    setBusy("all");
-    setError("");
-    setReceipt(null);
-    const result: PluginBatchResult = { updated: [], failed: [] };
-    try {
-      for (const host of targets) {
-        try {
-          await desktop.invoke<PluginInstallReceipt>("plugins:install", {
-            host,
-          });
-          result.updated.push(host);
-        } catch (reason) {
-          result.failed.push({
-            host,
-            message: pluginErrorText(reason, host).message,
-          });
+  const updateAll = useCallback(
+    async (targets: PluginHost[]) => {
+      setBusy("all");
+      setError("");
+      setReceipt(null);
+      const result: PluginBatchResult = { updated: [], failed: [] };
+      try {
+        for (const host of targets) {
+          try {
+            await desktop.invoke<PluginInstallReceipt>("plugins:install", {
+              host,
+            });
+            result.updated.push(host);
+            if (mounted.current)
+              setInstalledAt((previous) => ({
+                ...previous,
+                [host]: Date.now(),
+              }));
+          } catch (reason) {
+            result.failed.push({
+              host,
+              ...pluginErrorText(reason, host),
+            });
+          }
         }
+        const next =
+          await desktop.invoke<PluginInstallation[]>("plugins:status");
+        if (mounted.current) publishHosts(next);
+      } catch (reason) {
+        if (mounted.current) fail(reason);
+      } finally {
+        if (mounted.current) setBusy(null);
       }
-      const next = await desktop.invoke<PluginInstallation[]>("plugins:status");
-      if (mounted.current) setHosts(next);
-    } catch (reason) {
-      if (mounted.current) fail(reason);
-    } finally {
-      if (mounted.current) setBusy(null);
-    }
-    return result;
-  }, [fail]);
+      return result;
+    },
+    [fail, publishHosts],
+  );
   return {
     hosts,
     scanned,
@@ -274,6 +340,8 @@ export function usePluginHosts(home: string | null) {
     receipt,
     runtime,
     refresh,
+    refreshHost,
+    installedAt,
     install,
     updateAll,
     repairRuntime,

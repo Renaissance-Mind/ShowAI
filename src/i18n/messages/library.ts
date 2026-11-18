@@ -2,6 +2,11 @@ import { defineMessages } from "../index";
 
 export default defineMessages("library", {
   "zh-CN": {
+    "storageRefreshed": "空间统计已刷新",
+    "refreshingStats": "正在刷新统计…",
+    "archiving": "正在备份…",
+    "maintenanceEffects": "压缩保留正式内容；重建索引仅更新搜索数据。",
+    "advancedMaintenance": "高级维护",
     "category.repository": "正式内容",
     "category.workspace": "可读文件",
     "category.indexes": "搜索与操作索引",
@@ -92,6 +97,11 @@ export default defineMessages("library", {
     "upgrade.issuesNote": "原始字节已保留；以下旧快照无法直接预览或恢复。",
   },
   en: {
+    "storageRefreshed": "Storage statistics refreshed",
+    "refreshingStats": "Refreshing statistics…",
+    "archiving": "Backing up…",
+    "maintenanceEffects": "Compression preserves library content. Rebuilding updates only the search index.",
+    "advancedMaintenance": "Advanced maintenance",
     "category.repository": "Saved content",
     "category.workspace": "Readable files",
     "category.indexes": "Search and operation indexes",

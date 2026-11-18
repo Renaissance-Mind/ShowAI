@@ -297,6 +297,7 @@ export const workbenchActions = new Set([
   "datasets:chooseFile",
   "fs:reveal",
   "settings:chooseHome",
+  "settings:chooseFolder",
   "clipboard:write",
   "media:open",
   "media:resolve",
@@ -2006,6 +2007,7 @@ export function createWorkbench(
       }
       case "fs:reveal":
       case "settings:chooseHome":
+      case "settings:chooseFolder":
       case "clipboard:write":
         return host.invoke(action, args);
       case "media:open":

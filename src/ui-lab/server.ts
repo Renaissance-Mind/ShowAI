@@ -19,6 +19,7 @@ import { randomBytes, randomUUID } from "node:crypto";
 import { execFileSync } from "node:child_process";
 import { startBrowserServer } from "../browser/server";
 import { AgentService } from "../agent/service";
+import motionMessages from "../i18n/messages/uiMotion";
 import { uiFeatures, uiScene } from "./registry";
 import { remoteConnectionFixture } from "./fixtures/remote-connection";
 import labMessages from "../i18n/messages/uiLab";
@@ -105,7 +106,14 @@ export async function startUiLab(options: UiLabOptions) {
             locale,
           )
         : undefined,
-      sceneId = selectedNode?.scene ?? String(input.scene ?? "overview"),
+      sceneId =
+        selectedNode?.scene ??
+        String(
+          input.scene ??
+            uiFeatures(locale).find((item) => item.id === feature)?.scenes[0]
+              ?.id ??
+            "overview",
+        ),
       scene = uiScene(feature, sceneId, locale);
     const id = randomUUID(),
       token = randomBytes(32).toString("hex"),
@@ -124,6 +132,30 @@ export async function startUiLab(options: UiLabOptions) {
       projects[1].id,
       "before",
     );
+    if (feature === "workbench-motion") {
+      const m = messages(motionMessages, locale);
+      for (const title of [m("interview"), m("plan")])
+        await service.createPage(projects[0].id, {
+          title,
+          blocks: [
+            { kind: "text", data: { format: "markdown", content: m("note") } },
+          ],
+        });
+      if (sceneId === "directory") {
+        const folder = await service.store.createFolder(projects[0].id, {
+          name: m("materials"),
+        });
+        await service.store.createPage(projects[0].id, {
+          title: m("fieldNote"),
+          parentId: folder.id,
+        });
+        const sidebar = await service.store.createProjectGroup(m("team"));
+        await service.store.moveProjectToGroup(
+          projects[1].id,
+          sidebar.groups.at(-1)!.id,
+        );
+      }
+    }
     const fixture =
       scene.fixture === "remote-connection"
         ? remoteConnectionFixture(

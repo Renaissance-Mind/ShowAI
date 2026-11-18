@@ -14,11 +14,7 @@ export function resolveAppearance(
   preference: AppearancePreference,
   systemDark: boolean,
 ): AppearanceTheme {
-  return preference === "system"
-    ? systemDark
-      ? "dark"
-      : "light"
-    : preference;
+  return preference === "system" ? (systemDark ? "dark" : "light") : preference;
 }
 
 export function useAppearancePreference() {
@@ -39,5 +35,10 @@ export function useAppearancePreference() {
     document.documentElement.dataset.theme = theme;
     localStorage.setItem(APPEARANCE_KEY, preference);
   }, [theme, preference]);
-  return { preference, setPreference, theme };
+  return {
+    preference,
+    setPreference,
+    theme,
+    systemTheme: resolveAppearance("system", systemDark),
+  };
 }

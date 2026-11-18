@@ -495,8 +495,7 @@
   color: var(--muted);
 }
 @media (max-width: 640px) {
-  .agent-device-settings
-    label.settings-row {
+  .agent-device-settings label.settings-row {
     grid-template-columns: 1fr;
     gap: 8px;
   }
@@ -676,4 +675,31 @@
 .agent-device-settings fieldset .settings-row > span {
   min-width: 0;
   overflow-wrap: anywhere;
+}
+
+.agent-settings-overview {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-block: 12px 0;
+  color: var(--muted);
+}
+.agent-settings-overview a {
+  color: var(--accent);
+}
+.agent-source-form,
+#agent-device-settings {
+  scroll-margin-block-start: 16px;
+}
+.agent-test-error {
+  flex-basis: 100%;
+  color: var(--danger);
+}
+
+.agent-account-link {
+  margin-top: 6px;
+}
+.agent-device-actions {
+  flex-wrap: wrap;
 }

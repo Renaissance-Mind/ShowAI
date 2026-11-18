@@ -788,6 +788,15 @@ async function nativeAction(
       }
       return null;
     }
+    case "settings:chooseFolder": {
+      const selection = await dialog.showOpenDialog(window, {
+        title: t("chooseDataDirectory"),
+        defaultPath: typeof args.path === "string" ? args.path : store.root,
+        properties: ["openDirectory", "createDirectory"],
+      });
+      if (selection.canceled || !selection.filePaths[0]) return null;
+      return realpath(selection.filePaths[0]);
+    }
     case "settings:chooseHome": {
       if (process.env.SHOWAI_HOME)
         throw new CoreError(
@@ -847,13 +856,17 @@ async function handle(
       case "remoteMcp:installCloudflare":
         return remoteMcp.installCloudflare(args.provider);
       case "remoteMcp:configure":
-        return remoteMcp.configure(args.config, args.token);
+        return remoteMcp.configure(
+          args.config,
+          args.token,
+          args.restart === true,
+        );
       case "remoteMcp:prepare":
         return remoteMcp.prepare(args.config);
       case "remoteMcp:status":
         return remoteMcp.status(args.refresh === true, args.provider);
       case "remoteMcp:start":
-        return remoteMcp.start(args.config, args.token);
+        return remoteMcp.start(args.config, args.token, args.replace === true);
       case "remoteMcp:stop":
         return remoteMcp.stop(args.provider);
       case "remoteMcp:check":

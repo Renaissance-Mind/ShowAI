@@ -119,7 +119,11 @@ function TaskResult({
   );
 }
 
-export default function AgentSettings() {
+export default function AgentSettings({
+  onAccounts,
+}: {
+  onAccounts?: () => void;
+}) {
   const t = useTranslator(strings);
   const tc = useTranslator(common);
   const presetName = (provider: string, fallback: string) =>
@@ -143,6 +147,14 @@ export default function AgentSettings() {
     [],
   );
   const [taskId, setTaskId] = useState("");
+  const sourceForm = useRef<HTMLFormElement>(null);
+  const editingId = editing?.id;
+  useEffect(() => {
+    if (!editingId) return;
+    const form = sourceForm.current;
+    form?.scrollIntoView({ block: "start" });
+    form?.querySelector("input")?.focus({ preventScroll: true });
+  }, [editingId]);
   const mounted = useRef(true),
     settingsRef = useRef<Configuration | null>(null);
   const taskRef = useRef("");
@@ -337,13 +349,22 @@ export default function AgentSettings() {
     return (
       <div className="agent-settings">
         <AgentExecutionPicker onChange={executionChanged} disabled={busy} />
-        <PendingNotice label={t("reading")} lines={4} minHeight={320} />
-        {error && (
-          <p role="alert" className="agent-error">
-            {error}
-          </p>
+        {error ? (
+          <div role="alert" className="agent-error">
+            <p>{error}</p>
+            <button
+              type="button"
+              className="settings-button"
+              disabled={busy}
+              onClick={action(() => refresh().catch(statusError))}
+            >
+              {tc("retry")}
+            </button>
+          </div>
+        ) : (
+          <PendingNotice label={t("reading")} lines={4} minHeight={320} />
         )}
-        <RemoteDeviceSettings />
+        <RemoteDeviceSettings onAccounts={onAccounts} />
       </div>
     );
   const deviceExecution =
@@ -431,6 +452,18 @@ export default function AgentSettings() {
               </button>
             ))}
           </div>
+          <div className="agent-settings-overview">
+            <span>
+              {status.settings.mode === "local"
+                ? (status.agents.find(
+                    (agent) => agent.id === status.settings.localAgent,
+                  )?.name ?? t("mode.local.title"))
+                : selected
+                  ? `${selected.name} · ${selected.model || t("noModel")}`
+                  : t("chooseSource")}
+            </span>
+            <a href="#agent-device-settings">{t("deviceSettings")}</a>
+          </div>
         </section>
       )}
       {status.settings.mode === "local" ? (
@@ -516,6 +549,98 @@ export default function AgentSettings() {
         </section>
       ) : (
         <>
+          {!remoteExecution() && (
+            <section
+              className="settings-group"
+              aria-labelledby="agent-runtime-title"
+            >
+              <h2 id="agent-runtime-title">{t("runtime")}</h2>
+              <div className="settings-row">
+                <div className="settings-row-text">
+                  <h3>
+                    {t("runtimeName")}{" "}
+                    {status.runtime.version && (
+                      <span className="agent-version">
+                        {status.runtime.version}
+                      </span>
+                    )}
+                  </h3>
+                  <p>
+                    {status.runtime.stage
+                      ? t(`runtime.stage.${status.runtime.stage}`)
+                      : status.runtime.progress}
+                    {status.runtime.state === "installing" &&
+                      !!status.runtime.received &&
+                      ` · ${
+                        status.runtime.total
+                          ? t("runtime.bytes", {
+                              received: formatBytes(status.runtime.received),
+                              total: formatBytes(status.runtime.total),
+                            })
+                          : t("runtime.bytesUnknown", {
+                              received: formatBytes(status.runtime.received),
+                            })
+                      }`}
+                  </p>
+                  {status.runtime.state === "installing" && (
+                    <progress
+                      className="agent-runtime-progress"
+                      aria-label={t("runtime.installing")}
+                      {...(status.runtime.total && status.runtime.received
+                        ? {
+                            max: status.runtime.total,
+                            value: status.runtime.received,
+                          }
+                        : {})}
+                    />
+                  )}
+                </div>
+                <button
+                  className="settings-button"
+                  disabled={
+                    busy || status.runtime.state === "installing" || hasRunning
+                  }
+                  onClick={action(async () => {
+                    update(await desktop.invoke("agent:install"));
+                  })}
+                >
+                  {status.runtime.state === "installing" ? (
+                    <Loader2 size={13} className="studio-spin" />
+                  ) : (
+                    <Download size={13} />
+                  )}
+                  {status.runtime.state === "ready"
+                    ? t("runtime.update")
+                    : status.runtime.state === "installing"
+                      ? t("runtime.installing")
+                      : status.runtime.state === "failed"
+                        ? t("runtime.retry")
+                        : t("runtime.install")}
+                </button>
+              </div>
+              <p className="settings-help">
+                {t("runtimeHelp")}
+                {status.runtime.state !== "ready" && ` ${t("runtime.size")}`}
+              </p>
+              {status.runtime.state === "failed" && (
+                <div className="agent-error" role="alert">
+                  <p>
+                    {t(
+                      `runtime.failure.${status.runtime.failure ?? "unknown"}`,
+                    )}
+                  </p>
+                  {status.runtime.error && (
+                    <section className="agent-events">
+                      <h3 className="settings-section-heading">
+                        {t("runtime.failureDetail")}
+                      </h3>
+                      <pre>{status.runtime.error}</pre>
+                    </section>
+                  )}
+                </div>
+              )}
+            </section>
+          )}
           <section
             className="settings-group"
             aria-labelledby="agent-sources-title"
@@ -698,15 +823,9 @@ export default function AgentSettings() {
             {cloudExecution && (
               <p className="settings-help">{t("cloudChatgptHelp")}</p>
             )}
-            {!deviceExecution && (
-              <ServerResources
-                selected={selected}
-                disabled={busy || !!hasRunning}
-                update={update}
-              />
-            )}
             {editing && (
               <form
+                ref={sourceForm}
                 className="agent-source-form"
                 onSubmit={(event) => {
                   event.preventDefault();
@@ -936,6 +1055,15 @@ export default function AgentSettings() {
                 >
                   {t("testModel")}
                 </button>
+                {activeTask?.state === "failed" &&
+                  activeTask.sourceId === managed.id && (
+                    <p className="agent-test-error" role="status">
+                      {activeTask.problem?.code === "rate_limited" ||
+                      /\b429\b/.test(activeTask.error ?? "")
+                        ? t("modelRetryAfterLimit")
+                        : t("modelTestFailed")}
+                    </p>
+                  )}
                 <button
                   className="settings-button agent-remove"
                   disabled={
@@ -969,6 +1097,13 @@ export default function AgentSettings() {
                 </button>
               </p>
             )}
+            {!deviceExecution && (
+              <ServerResources
+                selected={selected}
+                disabled={busy || !!hasRunning}
+                update={update}
+              />
+            )}
             {status.authorization.error && (
               <div className="agent-error" role="alert">
                 <p>{t("authorizationIncomplete")}</p>
@@ -981,98 +1116,6 @@ export default function AgentSettings() {
               </div>
             )}
           </section>
-          {!remoteExecution() && (
-            <section
-              className="settings-group"
-              aria-labelledby="agent-runtime-title"
-            >
-              <h2 id="agent-runtime-title">{t("runtime")}</h2>
-              <div className="settings-row">
-                <div className="settings-row-text">
-                  <h3>
-                    {t("runtimeName")}{" "}
-                    {status.runtime.version && (
-                      <span className="agent-version">
-                        {status.runtime.version}
-                      </span>
-                    )}
-                  </h3>
-                  <p>
-                    {status.runtime.stage
-                      ? t(`runtime.stage.${status.runtime.stage}`)
-                      : status.runtime.progress}
-                    {status.runtime.state === "installing" &&
-                      !!status.runtime.received &&
-                      ` · ${
-                        status.runtime.total
-                          ? t("runtime.bytes", {
-                              received: formatBytes(status.runtime.received),
-                              total: formatBytes(status.runtime.total),
-                            })
-                          : t("runtime.bytesUnknown", {
-                              received: formatBytes(status.runtime.received),
-                            })
-                      }`}
-                  </p>
-                  {status.runtime.state === "installing" && (
-                    <progress
-                      className="agent-runtime-progress"
-                      aria-label={t("runtime.installing")}
-                      {...(status.runtime.total && status.runtime.received
-                        ? {
-                            max: status.runtime.total,
-                            value: status.runtime.received,
-                          }
-                        : {})}
-                    />
-                  )}
-                </div>
-                <button
-                  className="settings-button"
-                  disabled={
-                    busy || status.runtime.state === "installing" || hasRunning
-                  }
-                  onClick={action(async () => {
-                    update(await desktop.invoke("agent:install"));
-                  })}
-                >
-                  {status.runtime.state === "installing" ? (
-                    <Loader2 size={13} className="studio-spin" />
-                  ) : (
-                    <Download size={13} />
-                  )}
-                  {status.runtime.state === "ready"
-                    ? t("runtime.update")
-                    : status.runtime.state === "installing"
-                      ? t("runtime.installing")
-                      : status.runtime.state === "failed"
-                        ? t("runtime.retry")
-                        : t("runtime.install")}
-                </button>
-              </div>
-              <p className="settings-help">
-                {t("runtimeHelp")}
-                {status.runtime.state !== "ready" && ` ${t("runtime.size")}`}
-              </p>
-              {status.runtime.state === "failed" && (
-                <div className="agent-error" role="alert">
-                  <p>
-                    {t(
-                      `runtime.failure.${status.runtime.failure ?? "unknown"}`,
-                    )}
-                  </p>
-                  {status.runtime.error && (
-                    <section className="agent-events">
-                      <h3 className="settings-section-heading">
-                        {t("runtime.failureDetail")}
-                      </h3>
-                      <pre>{status.runtime.error}</pre>
-                    </section>
-                  )}
-                </div>
-              )}
-            </section>
-          )}
         </>
       )}
       {taskId && activeTask && (
@@ -1105,7 +1148,7 @@ export default function AgentSettings() {
           )}
         </section>
       )}
-      <RemoteDeviceSettings />
+      <RemoteDeviceSettings onAccounts={onAccounts} />
       {!remoteExecution() && (
         <section className="agent-storage">
           <h3 className="settings-section-heading">{t("storage")}</h3>

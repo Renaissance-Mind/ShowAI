@@ -273,6 +273,7 @@ export function StudioSidebar({
     projects,
     organization,
     contents,
+    capabilities,
     unreadableProjects,
     setDismissedUnreadable,
     syncOverview,
@@ -375,6 +376,11 @@ export function StudioSidebar({
           section={settingsSection}
           onSelect={setSettingsSection}
           platform={info?.platform}
+          pluginHome={
+            info?.mode !== "browser" && capabilities.localPlugins
+              ? info?.home
+              : undefined
+          }
         />
       ) : view === "templates" ? (
         <TemplateNavigation

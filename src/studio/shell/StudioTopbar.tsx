@@ -1,3 +1,4 @@
+import { SettingsSearch } from "../Settings";
 import type { MouseEvent as ReactMouseEvent } from "react";
 import {
   ArrowUpRight,
@@ -144,6 +145,7 @@ export function StudioTopbar({
   } = library;
   const {
     view,
+    setSettingsSection,
     docPage,
     selectedProject,
     setSelectedProject,
@@ -515,9 +517,17 @@ export function StudioTopbar({
             </span>
           </button>
         )}
+        {view === "settings" && (
+          <SettingsSearch
+            platform={info?.platform}
+            onSelect={setSettingsSection}
+            onShortcuts={() => setDialog({ type: "shortcuts" })}
+          />
+        )}
         {(view === "projects" ||
           view === "project" ||
           info?.libraryVersion === 2) &&
+          view !== "settings" &&
           view !== "components" &&
           view !== "templates" && (
             <ExpandableSearch

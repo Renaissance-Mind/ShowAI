@@ -213,3 +213,7 @@
 .feedback-update-row dd .settings-button {
   flex-shrink: 0;
 }
+
+.feedback-update {
+  margin: 0 0 12px;
+}

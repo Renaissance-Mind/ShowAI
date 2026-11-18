@@ -771,7 +771,11 @@
   border-radius: 6px;
   background: var(--paper);
   color: var(--text);
-  font: 12px ui-monospace, "SFMono-Regular", Consolas, monospace;
+  font:
+    12px ui-monospace,
+    "SFMono-Regular",
+    Consolas,
+    monospace;
 }
 .plugin-launch-config .settings-config {
   margin-top: 12px;
@@ -837,4 +841,102 @@
   color: var(--text);
   font-family: ui-monospace, "SFMono-Regular", Consolas, monospace;
   font-size: 12px;
+}
+
+.settings-nav-updates {
+  margin-inline-start: auto;
+  color: var(--text);
+  font-size: 11px;
+  padding: 1px 7px;
+  border-radius: 99px;
+  background: var(--accent-soft);
+}
+.settings-search {
+  width: min(220px, 42vw);
+  -webkit-app-region: no-drag;
+}
+.settings-search-field {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 0 8px;
+  height: 32px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--muted);
+}
+.settings-search-field > svg {
+  flex-shrink: 0;
+}
+.settings-search-field > input {
+  min-width: 0;
+  flex: 1;
+  padding: 0;
+  border: 0;
+  outline: none;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: 13px;
+}
+.settings-search-field:focus-within {
+  border-color: var(--accent);
+}
+.settings-search-results {
+  position: absolute;
+  z-index: 70;
+  right: 12px;
+  top: calc(100% + 6px);
+  width: min(540px, calc(100% - 24px));
+  max-height: calc(100vh - 72px);
+  overflow: auto;
+  display: grid;
+  padding: 5px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--paper);
+  box-shadow: 0 12px 36px #0002;
+}
+.settings-search-results button {
+  text-align: start;
+  padding: 8px;
+  border-radius: 5px;
+}
+.settings-search-results button:hover,
+.settings-search-results button:focus-visible {
+  background: var(--accent-soft);
+}
+.settings-theme-effective {
+  display: block;
+  color: var(--muted);
+  font-weight: 400;
+}
+@media (max-width: 830px) {
+  .settings-theme-options {
+    grid-template-columns: 1fr;
+  }
+  .settings-theme-preview {
+    max-height: 88px;
+  }
+}
+
+.work-records-form,
+.library-space-archive {
+  flex-wrap: wrap;
+}
+
+.settings-location-heading {
+  padding-bottom: 10px;
+}
+.settings-path {
+  flex-wrap: wrap;
+}
+.settings-primary-button:not(:disabled) {
+  background: var(--text);
+  color: var(--paper);
+}
+.settings-primary-button:hover:not(:disabled) {
+  background: var(--text);
+  opacity: 0.88;
 }

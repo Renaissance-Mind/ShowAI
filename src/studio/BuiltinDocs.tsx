@@ -13,13 +13,7 @@ import SurfaceEditor from "../surface/SurfaceEditor";
 import type { ShowDocument } from "../types";
 import { useLocale, useTranslator } from "../i18n/react";
 import sidebarMessages from "../i18n/messages/sidebar";
-import {
-  ChevronDown,
-  ChevronRight,
-  Folder,
-  FolderOpen,
-  Loader2,
-} from "../ui/icons";
+import { ChevronRight, Folder, FolderOpen, Loader2 } from "../ui/icons";
 import { errorMessage } from "../host/bridge";
 import {
   NAVIGATE_EVENT,
@@ -112,7 +106,7 @@ export function DocsNavigation({
       aria-expanded={!!expanded[id]}
       onClick={() => toggle(id)}
     >
-      {expanded[id] ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
+      <ChevronRight size={13} aria-hidden="true" />
     </button>
   );
   const page = (id: string) => {

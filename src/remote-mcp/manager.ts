@@ -1,3 +1,6 @@
+import { translator } from "../i18n";
+import messages from "../i18n/messages/remoteConnections";
+const t = translator(messages);
 import { spawn, type ChildProcess } from "node:child_process";
 import { createHash, randomBytes } from "node:crypto";
 import { access, mkdir, readFile, rename, writeFile } from "node:fs/promises";
@@ -273,12 +276,14 @@ export class RemoteMcpManager {
     );
     return next;
   }
-  start(value: unknown, token?: unknown) {
-    return this.command(() => this.startImpl(value, token));
+  start(value: unknown, token?: unknown, replace = false) {
+    return this.command(() => this.startImpl(value, token, replace));
   }
-  configure(value: unknown, token?: unknown) {
+  configure(value: unknown, token?: unknown, restart = false) {
     return this.command(async () => {
       await this.initialize();
+      if (restart && (this.resumeOnLaunch || this.phase === "running"))
+        return this.startImpl(value, token, true);
       if (this.phase === "starting" || this.phase === "running")
         throw new Error(
           "Stop this connection before changing its configuration.",
@@ -289,11 +294,14 @@ export class RemoteMcpManager {
       const store = new FileStore(this.options.home());
       for (const project of config.projects)
         await store.readProject(project.id);
+      const encryptedToken =
+        typeof token === "string" && token.trim()
+          ? this.options.encrypt(token.trim())
+          : this.encryptedToken;
+      await this.persist(config, this.resumeOnLaunch, encryptedToken);
       if (this.phase === "prepared") await this.stopImpl();
-      if (typeof token === "string" && token.trim())
-        this.encryptedToken = this.options.encrypt(token.trim());
+      this.encryptedToken = encryptedToken;
       this.config = config;
-      await this.persist();
       return this.status();
     });
   }
@@ -328,6 +336,7 @@ export class RemoteMcpManager {
       root: home,
       desktopApproval: c.provider !== "lan",
       accessKeyOnly: c.provider === "lan",
+      requireOAuth: c.provider === "tailscale-private",
       ...localLibraryPolicy(home, c),
       consumePairingCode: (code: string) => this.pairing.consume(code),
       onCall: (_name: string, clientId: string) => {
@@ -373,14 +382,16 @@ export class RemoteMcpManager {
       });
     }
   }
-  private async startImpl(value: unknown, token?: unknown) {
+  private async startImpl(value: unknown, token?: unknown, replace = false) {
     await this.initialize();
-    if (this.phase === "starting" || this.phase === "running")
+    const running = this.phase === "starting" || this.phase === "running";
+    if (running && !replace)
       throw new Error(
         "Stop the current connection before changing its configuration.",
       );
-    if (this.phase !== "prepared") await this.stopImpl();
     const config = validateRemoteMcpConfig(value);
+    if (this.options.provider && config.provider !== this.options.provider)
+      throw new Error("The connection provider cannot be changed.");
     if (config.provider === "cloudflare" && !config.publicUrl)
       throw new Error("Enter the public HTTPS domain before connecting.");
     if (config.access === "selected" && !config.projects.length)
@@ -394,30 +405,26 @@ export class RemoteMcpManager {
       );
     const store = new FileStore(this.options.home());
     for (const p of config.projects) await store.readProject(p.id);
-    if (
+    const encryptedToken =
       config.provider === "cloudflare" &&
       typeof token === "string" &&
       token.trim()
-    )
-      this.encryptedToken = this.options.encrypt(token.trim());
-    if (config.provider === "cloudflare" && !this.encryptedToken)
+        ? this.options.encrypt(token.trim())
+        : this.encryptedToken;
+    if (config.provider === "cloudflare" && !encryptedToken)
       throw new Error("Enter your Cloudflare tunnel token.");
+    if (running && config.executable)
+      await access(config.executable, constants.X_OK);
+    const fallback =
+      this.phase === "running" && this.reachable === true
+        ? { config: this.config, encryptedToken: this.encryptedToken }
+        : undefined;
+    await this.persist(config, true, encryptedToken);
+    if (this.phase !== "prepared") await this.stopImpl();
+    this.encryptedToken = encryptedToken;
     this.config = config;
     this.resumeOnLaunch = true;
     this.suspended = false;
-    const path = join(this.options.directory, "config.json");
-    await writeFile(
-      path + ".tmp",
-      JSON.stringify({
-        config,
-        resumeOnLaunch: this.resumeOnLaunch,
-        encryptedToken: this.encryptedToken,
-        managedCloudflared: this.managedCloudflared,
-      }),
-      { mode: 0o600 },
-    );
-    await rename(path + ".tmp", path);
-    this.configured = true;
     this.phase = "starting";
     this.error = undefined;
     this.diagnostics = undefined;
@@ -430,11 +437,33 @@ export class RemoteMcpManager {
     const signal = this.abort.signal;
     this.task = this.launch(signal)
       .catch(async (error: Error) => {
-        if (!signal.aborted) {
-          this.phase = "error";
-          this.error = error.message;
-        }
         await this.cleanup();
+        if (signal.aborted) return;
+        if (fallback) {
+          this.config = fallback.config;
+          this.encryptedToken = fallback.encryptedToken;
+          this.phase = "starting";
+          try {
+            await this.persist();
+            await this.launch(signal);
+            this.error = t("configurationRestored", { message: error.message });
+            return;
+          } catch (recoveryError) {
+            await this.cleanup();
+            if (signal.aborted) return;
+            this.phase = "error";
+            this.error = t("configurationRecoveryFailed", {
+              message: error.message,
+              recovery:
+                recoveryError instanceof Error
+                  ? recoveryError.message
+                  : String(recoveryError),
+            });
+            return;
+          }
+        }
+        this.phase = "error";
+        this.error = error.message;
       })
       .finally(() => this.scheduleRecovery());
     return this.status();
@@ -658,15 +687,19 @@ export class RemoteMcpManager {
         if (client.projectAccess !== "account")
           this.http!.authorization.revoke(client.id);
   }
-  private async persist() {
+  private async persist(
+    config = this.config,
+    resumeOnLaunch = this.resumeOnLaunch,
+    encryptedToken = this.encryptedToken,
+  ) {
     const path = join(this.options.directory, "config.json");
     await writeFile(
       path + ".tmp",
       JSON.stringify({
-        config: this.config,
-        encryptedToken: this.encryptedToken,
+        config,
+        encryptedToken,
         managedCloudflared: this.managedCloudflared,
-        resumeOnLaunch: this.resumeOnLaunch,
+        resumeOnLaunch,
       }),
       { mode: 0o600 },
     );

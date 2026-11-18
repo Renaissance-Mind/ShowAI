@@ -50,6 +50,46 @@ afterAll(async () => {
   if (root) await rm(root, { recursive: true, force: true });
 });
 const frame = () => page.frameLocator("iframe");
+test("the feature selector and its direct link open the interactive workbench motion checks", async () => {
+  const review = await context.newPage();
+  try {
+    await review.goto(server.url + "?feature=workbench-motion");
+    const picker = review.getByRole("combobox", { name: "测试功能" });
+    await expect.poll(() => picker.inputValue()).toBe("workbench-motion");
+    const app = review.frameLocator("iframe");
+    const state = (id: string) =>
+      expect
+        .poll(() => app.locator("html").getAttribute("data-ui-lab-node"), {
+          timeout: 20000,
+        })
+        .toBe(id);
+    await state("directory");
+    await review.getByRole("button", { name: "标签切换", exact: true }).click();
+    await state("tabs");
+    await app.getByRole("tab", { name: "访谈提纲", exact: true }).click();
+    await app
+      .getByRole("tabpanel", { name: "访谈提纲", exact: true })
+      .waitFor();
+    await review
+      .getByRole("button", { name: "多选栏 · 候选", exact: true })
+      .click();
+    await state("selection-proposal");
+    await review
+      .getByRole("button", { name: "操作 1：选择「访谈提纲」", exact: true })
+      .click();
+    await app.getByText("已选 1 项", { exact: true }).waitFor();
+    await picker.selectOption("workbench");
+    await state("project");
+    await picker.selectOption("workbench-motion");
+    await state("directory");
+    expect(new URL(review.url()).searchParams.get("feature")).toBe(
+      "workbench-motion",
+    );
+  } finally {
+    await review.close();
+  }
+}, 90000);
+
 async function state(id: string) {
   await expect
     .poll(() => frame().locator("html").getAttribute("data-ui-lab-node"), {
@@ -210,8 +250,10 @@ test("flow branches jump to the message screen and authorization states remain o
       .count(),
   ).toBe(1);
   expect(
-    await frame().locator(".rm-message-task [role=status]").textContent(),
-  ).toBe("尚未收到客户端请求");
+    await frame()
+      .locator(".rm-message-task .rm-client-status[role=status]")
+      .textContent(),
+  ).toBe("等待客户端发起授权");
   await shot("client-message");
   await page
     .getByRole("region", { name: "界面状态", exact: true })
