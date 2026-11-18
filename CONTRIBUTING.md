@@ -49,6 +49,8 @@ Every interface string goes into a message namespace in `src/i18n/messages/` wit
 
 Saved pages, content libraries and exported pages outlive the code that wrote them. A change to a data format, a CLI command or an MCP tool must keep reading what earlier versions wrote; check the existing callers and describe the compatibility in the pull request. Handle errors where they enter the program (I/O, processes, user input) and surface the cause; do not swallow a failure and report success.
 
+The [independent UI acceptance template](examples/ui-acceptance/README.md) helps a task deliver its own preview and checks. For reusable ShowAI workbench scenarios, see [UI Lab](docs/ui-lab.md).
+
 Run the tests of the area you changed:
 
 | Area                                | Command                                                      |

@@ -44,6 +44,8 @@ Guides describe the current source. The released app, the plugin and hosted serv
 
 [UI scenarios](ui-lab.md) provides an interactive real-app Demo, shared interaction steps, background screenshots and visual comparison.
 
+Use the [independent UI acceptance template](../examples/ui-acceptance/README.md) for a preview and checks owned by one task.
+
 | Guide                                                           | Contents                                               |
 | --------------------------------------------------------------- | ------------------------------------------------------ |
 | [Agent integration](agent-integration.md)                       | stdio/HTTP, OAuth, tools and presentation              |
