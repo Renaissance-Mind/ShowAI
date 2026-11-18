@@ -3,7 +3,7 @@ import type {
   McpServer,
   ToolCallback,
 } from "@modelcontextprotocol/sdk/server/mcp.js";
-import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
+import type { CallToolResult, Implementation } from "@modelcontextprotocol/sdk/types.js";
 import type { ChangeContext } from "../../core/history-model";
 import type {
   Presentation,
@@ -22,6 +22,7 @@ export interface McpServerOptions {
   root?: string;
   projectId: string;
   instructions?: string;
+  icons?: Implementation["icons"];
   decorateTool?: (
     name: string,
     tool: import("@modelcontextprotocol/sdk/server/mcp.js").RegisteredTool,

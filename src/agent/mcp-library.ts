@@ -19,11 +19,12 @@ import { openLibrary } from "../core/open-library";
 import { recordConnections } from "./mcp-connections";
 import { recordMcpCalls } from "./mcp-call-log";
 import { mcpChangeContext } from "./mcp-actor";
-import { registerCodexWorkbench, type OpenCodexWorkbench } from "./codex-workbench";
+import { codexWorkbenchIcons, registerCodexWorkbench, type OpenCodexWorkbench } from "./codex-workbench";
 
 export function createLibraryMcpServer(options: {
   root: string;
   presentationDirectory?: string;
+  icons?: typeof codexWorkbenchIcons;
 }) {
   const service = new AgentService({ root: options.root });
   const inherited = { ...changeContext(), readerId: randomUUID() };
@@ -168,7 +169,10 @@ export async function startLibraryMcp(
   });
   recordConnections(transport, options.root);
   recordMcpCalls(transport, options.root);
-  const server = createLibraryMcpServer(options);
+  const server = createLibraryMcpServer({
+    ...options,
+    icons: options.openWorkbench ? codexWorkbenchIcons : options.icons,
+  });
   if (options.openWorkbench) {
     registerCodexWorkbench(server, options.openWorkbench);
     process.stdin.once("end", () =>

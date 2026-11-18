@@ -1,6 +1,8 @@
 import { randomBytes } from "node:crypto";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
+import lightLogo from "../../plugins/showai/assets/logo.svg?raw";
+import darkLogo from "../../plugins/showai/assets/logo-dark.svg?raw";
 import { workbenchRoutes, type CodexWorkbenchTransport } from "../host/codex-workbench-transport";
 import { mcpFailure } from "./presentation-tools";
 import {
@@ -18,6 +20,15 @@ export type OpenCodexWorkbench = (key: string) => Promise<{
 }>;
 
 const legacyWorkbenchUri = "ui://showai/workbench.html";
+export const codexWorkbenchIcons = ([
+  ["light", lightLogo],
+  ["dark", darkLogo],
+] as const).map(([theme, svg]) => ({
+  src: `data:image/svg+xml;base64,${Buffer.from(svg).toString("base64")}`,
+  mimeType: "image/svg+xml",
+  sizes: ["any"],
+  theme,
+}));
 const readOnly = { readOnlyHint: true, destructiveHint: false, openWorldHint: false };
 const appOnly = { ui: { visibility: ["app"] } };
 const clientId = z.string().regex(/^[\w-]{1,100}$/);

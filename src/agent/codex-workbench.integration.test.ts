@@ -31,6 +31,14 @@ it("opens both Codex workbench entries and saves into the MCP library", async ()
   });
   try {
     await client.connect(transport);
+    expect(client.getServerVersion()?.icons).toEqual(
+      ["light", "dark"].map((theme) => ({
+        src: expect.stringMatching(/^data:image\/svg\+xml;base64,/),
+        mimeType: "image/svg+xml",
+        sizes: ["any"],
+        theme,
+      })),
+    );
     const { tools } = await client.listTools();
     expect(tools.find((tool) => tool.name === "workbench_open_global")?._meta).toMatchObject({
       ui: { resourceUri: codexWorkbenchUri, visibility: ["app"] },

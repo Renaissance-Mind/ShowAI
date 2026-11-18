@@ -43,7 +43,7 @@ export function createMcpServer(options: McpServerOptions): McpServer {
   const projectId = service.requireProject(options.projectId);
   const server = strictToolInputs(
     new McpServer(
-      { name: "showai", version: packageMetadata.version },
+      { name: "showai", version: packageMetadata.version, icons: options.icons },
       {
         instructions:
           options.instructions ??
