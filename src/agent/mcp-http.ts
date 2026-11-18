@@ -857,11 +857,10 @@ export async function createMcpHttpApp(options: McpHttpOptions) {
         });
       }
       if (target.pathname !== "/mcp") return json({ error: "Not found." }, 404);
-      if (request.method !== "POST")
-        return json({ error: "Use Streamable HTTP POST." }, 405, {
-          allow: "POST",
-        });
-      if (options.local?.accessKeyOnly) {
+      if (
+        options.local?.requireOAuth ||
+        (options.local?.accessKeyOnly && request.method === "POST")
+      ) {
         try {
           authorization.verify(
             request.headers
@@ -870,15 +869,15 @@ export async function createMcpHttpApp(options: McpHttpOptions) {
           );
         } catch (error) {
           if (!(error instanceof AuthorizationError)) throw error;
-          return new Response(JSON.stringify({ error: error.code }), {
-            status: 401,
-            headers: {
-              "content-type": "application/json",
-              "www-authenticate": authorization.challenge(),
-            },
+          return json({ error: error.code }, 401, {
+            "www-authenticate": authorization.challenge(),
           });
         }
       }
+      if (request.method !== "POST")
+        return json({ error: "Use Streamable HTTP POST." }, 405, {
+          allow: "POST",
+        });
       let raw: string;
       try {
         raw = await readCapacityText(

@@ -63,6 +63,7 @@ export interface LocalMcpAuthorization {
   consumePairingCode(code: string): boolean;
   desktopApproval?: boolean;
   accessKeyOnly?: boolean;
+  requireOAuth?: boolean;
 }
 const token = () => randomBytes(32).toString("base64url");
 const hash = (value: string) =>
@@ -622,7 +623,11 @@ export class McpAuthorization {
             csrf: token(),
             attempts: 0,
           };
-        if (this.local?.access === "all") flow.scopes = [...scopeNames];
+        if (
+          this.local?.access === "all" &&
+          (!this.local.requireOAuth || !q.get("scope")?.trim())
+        )
+          flow.scopes = [...scopeNames];
         if (
           this.local &&
           this.local.access !== "all" &&

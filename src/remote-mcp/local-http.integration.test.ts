@@ -137,6 +137,7 @@ async function authorize(scope = "projects.read projects.write") {
   return tokenResponse.json() as Promise<{
     access_token: string;
     refresh_token: string;
+    scope: string;
   }>;
 }
 beforeAll(async () => {
@@ -294,6 +295,50 @@ test("read-only OAuth scope cannot write and persisted authorization survives a 
     (await reconnected.callTool({ name: "projects_list", arguments: {} }))
       .isError,
   ).not.toBe(true);
+});
+
+test("private HTTP clients discover OAuth and keep their requested read-only scope across the library", async () => {
+  for (const c of clients.splice(0)) await c.close();
+  await http.configure({
+    publicUrl: http.url,
+    stateDirectory: join(directory, "private-oauth"),
+    local: {
+      ...authorizationOptions(),
+      ...localLibraryPolicy(service.store.root, { projects: [] }),
+      requireOAuth: true,
+    },
+  });
+  const url = http.url + "/mcp";
+  for (const method of ["GET", "POST"]) {
+    const probe = await fetch(url, { method });
+    expect(probe.status).toBe(401);
+    expect(probe.headers.get("www-authenticate")).toContain(
+      `resource_metadata="${http.url}/.well-known/oauth-protected-resource"`,
+    );
+  }
+  const metadata = await fetch(
+    http.url + "/.well-known/oauth-protected-resource/mcp",
+  );
+  expect((await metadata.json()).resource).toBe(url);
+  const token = await authorize("projects.read");
+  expect(token.scope).toBe("projects.read");
+  const c = await client(token.access_token);
+  const listed = await c.callTool({ name: "projects_list", arguments: {} });
+  expect(JSON.stringify(listed.structuredContent)).toContain(hidden);
+  expect(
+    (
+      await c.callTool({
+        name: "project_create",
+        arguments: { name: "Read-only denial" },
+      })
+    ).isError,
+  ).toBe(true);
+  http.authorization.revoke(http.authorization.verify(token.access_token).id);
+  const revoked = await fetch(url, {
+    method: "POST",
+    headers: { authorization: `Bearer ${token.access_token}` },
+  });
+  expect(revoked.status).toBe(401);
 });
 
 test("full-library consent includes future projects and idempotent project creation", async () => {

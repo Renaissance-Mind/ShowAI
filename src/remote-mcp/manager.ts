@@ -336,6 +336,7 @@ export class RemoteMcpManager {
       root: home,
       desktopApproval: c.provider !== "lan",
       accessKeyOnly: c.provider === "lan",
+      requireOAuth: c.provider === "tailscale-private",
       ...localLibraryPolicy(home, c),
       consumePairingCode: (code: string) => this.pairing.consume(code),
       onCall: (_name: string, clientId: string) => {

@@ -110,6 +110,13 @@ test.skipIf(!executable).each(["tailscale-private", "tailscale"])(
         origin + "/.well-known/oauth-authorization-server",
       ).then((r) => r.json());
       expect(metadata.issuer).toBe(origin);
+      if (provider === "tailscale-private") {
+        const probe = await request(state.url!);
+        expect(probe.status).toBe(401);
+        expect(probe.headers.get("www-authenticate")).toContain(
+          `resource_metadata="${origin}/.well-known/oauth-protected-resource"`,
+        );
+      }
       const redirect = "http://127.0.0.1:12345/callback";
       const registration = await request(origin + "/oauth/register", {
         method: "POST",

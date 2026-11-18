@@ -22,7 +22,7 @@ ChatGPT 网页从云端发起请求，需要公网地址。其他设备上运行
 
 「同一局域网」中选择本机网络地址，点击「开启局域网连接」。服务只监听所选网卡。将 MCP 地址填入客户端，选择 Streamable HTTP；在 ShowAI 填写客户端名称并创建访问密钥，将密钥粘贴到客户端的 Bearer Token 字段或 `Authorization: Bearer <密钥>` 请求头。密钥只显示一次，仅保存摘要，90 天后到期，可单独撤销。HTTP 用于可信局域网；需要 HTTPS 时选择 Tailscale 私网。要求 HTTPS/OAuth 的客户端不能使用此 HTTP 模式。本机检查不证明其他设备可达，最后要完成真实客户端调用。
 
-「Tailscale 私网」要求两端加入同一 tailnet，启用 MagicDNS 和 HTTPS。ShowAI 启动前台 Serve，仅向私网提供地址，不需要 Funnel 权限。客户端使用生成的地址与 OAuth 连接。
+「Tailscale 私网」要求两端加入同一 tailnet，启用 MagicDNS 和 HTTPS。ShowAI 启动前台 Serve，仅向私网提供地址，不需要 Funnel 权限。客户端使用生成的地址与 OAuth 连接。访问 `/mcp` 时如果缺少有效凭据，服务会返回 HTTP 401 和 OAuth 发现地址。只申请 `projects.read` 的客户端可以读取访问规则允许的项目。
 
 「公网访问」中先选择隧道。「Cloudflare 临时连接」会按需下载并校验官方连接工具，绑定可用端口并创建隧道。地址重新连接后变化，没有可用性保证；MCP 使用 JSON 响应，不依赖 SSE。
 
