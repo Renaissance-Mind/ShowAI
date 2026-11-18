@@ -226,6 +226,8 @@ try {
   );
 
   await button("配置局域网").click();
+  await page.getByRole("spinbutton", { name: "本机端口", exact: true }).waitFor();
+  assert.equal(await page.locator(".studio-settings details").count(), 0);
   await tab("内容权限").click();
   await button("指定项目").click();
   await button("Remote flow verification：只读").click();
@@ -389,7 +391,9 @@ try {
       .locator('.rm-client-area[data-client-view="setup"]')
       .waitFor({ timeout: 90000 });
     await button("ChatGPT").click();
-    await button("OAuth 端点").click();
+    await page
+      .getByRole("heading", { name: "OAuth 端点", exact: true })
+      .waitFor();
     const publicStatus = await status("tailscale");
     assert.ok(
       (await page.locator(".rm-client-recipe").innerText()).includes(

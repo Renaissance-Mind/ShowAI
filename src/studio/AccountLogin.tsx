@@ -29,9 +29,6 @@ export default function AccountLogin({
     t = useTranslator(syncMessages);
   const id = useId();
   const credential = useRef<HTMLInputElement>(null);
-  const [advanced, setAdvanced] = useState(
-    initial.url !== "https://showai.renaissancemind.ai/cloud",
-  );
   const [changedServer, setChangedServer] = useState(false);
   const [url, setUrl] = useState(initial.url),
     [probe, setProbe] = useState(initial.url),
@@ -79,15 +76,8 @@ export default function AccountLogin({
       generation.current++;
     };
   }, [probe, retry]);
-  const allMethods = info
-    ? loginMethods(info.auth)
-    : (["password", "token", "github", "google"] as Method[]);
-  const methods = allMethods.filter(
-    (value) =>
-      value !== "token" ||
-      advanced ||
-      method === "token" ||
-      allMethods.length === 1,
+  const methods = loginMethods(
+    info?.auth ?? ["password", "token", "github", "google"],
   );
   useEffect(() => {
     if (error && !busy) credential.current?.focus();
@@ -125,12 +115,7 @@ export default function AccountLogin({
   }
   return (
     <div className="sync-login">
-      <details
-        className="sync-login-advanced"
-        open={advanced}
-        onToggle={(event) => setAdvanced(event.currentTarget.open)}
-      >
-        <summary>{f("auth.otherConnection")}</summary>
+      <div className="sync-login-server">
         <label className="sync-field sync-server-field">
           <span>
             {t("serverUrl")}
@@ -166,7 +151,7 @@ export default function AccountLogin({
             {f("auth.serverChanged")}
           </p>
         )}
-      </details>
+      </div>
       {serverError && (
         <div className="sync-error" role="alert">
           {serverError}

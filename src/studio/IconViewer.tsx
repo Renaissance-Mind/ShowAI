@@ -1,7 +1,7 @@
-import ExpandableSearch from "../components/ExpandableSearch";
-import { useId, useMemo, useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import * as icons from "../ui/icons";
 import {
+  ChevronLeft,
   Copy,
   Download,
   Moon,
@@ -69,13 +69,13 @@ const defaults = {
 
 export default function IconViewer() {
   const t = useTranslator(messages);
-  const detailId = useId();
   const [query, setQuery] = useState("");
   const [group, setGroup] = useState<Group>("all");
   const [selected, setSelected] = useState(catalog[0].name);
   const [preview, setPreview] = useState(defaults);
-  const [previewOpen, setPreviewOpen] = useState(false);
-  const detail = useRef<HTMLElement>(null);
+  const [narrowView, setNarrowView] = useState<"catalog" | "detail">("catalog");
+  const selectedTile = useRef<HTMLButtonElement>(null);
+  const backButton = useRef<HTMLButtonElement>(null);
   const [notice, setNotice] = useState("");
   const [error, setError] = useState("");
   const specimen = useRef<HTMLDivElement>(null);
@@ -130,14 +130,22 @@ export default function IconViewer() {
     setTimeout(() => URL.revokeObjectURL(url), 1000);
   };
   return (
-    <section className="icon-viewer" aria-label={t("browser")}>
+    <section
+      className="icon-viewer"
+      data-narrow-view={visible.length ? narrowView : "catalog"}
+      aria-label={t("browser")}
+    >
       <div className="icon-viewer-tools">
-        <ExpandableSearch
-          label={t("search")}
-          placeholder={t("searchPlaceholder")}
-          value={query}
-          onChange={setQuery}
-        />
+        <label className="icon-viewer-search">
+          <Search size={15} aria-hidden="true" />
+          <input
+            type="search"
+            aria-label={t("search")}
+            placeholder={t("searchPlaceholder")}
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+          />
+        </label>
         <span className="icon-viewer-count" aria-live="polite">
           {t("count", { visible: visible.length, count: catalog.length })}
         </span>
@@ -161,18 +169,7 @@ export default function IconViewer() {
           );
         })}
       </div>
-      <div className="icon-viewer-layout" data-preview-open={previewOpen}>
-        {!!visible.length && (
-          <button
-            type="button"
-            className="settings-button icon-viewer-preview-toggle"
-            aria-expanded={previewOpen}
-            aria-controls={detailId}
-            onClick={() => setPreviewOpen(!previewOpen)}
-          >
-            {t(previewOpen ? "hidePreview" : "showPreview")}
-          </button>
-        )}
+      <div className="icon-viewer-layout">
         <div className="icon-viewer-grid" role="group" aria-label={t("list")}>
           {visible.map(({ name, Icon }) => (
             <button
@@ -181,13 +178,13 @@ export default function IconViewer() {
               aria-label={name}
               aria-pressed={current.name === name}
               title={name}
-              onClick={() => {
+              onClick={(event) => {
                 setSelected(name);
-                setPreviewOpen(true);
-                if (window.matchMedia("(max-width: 800px)").matches)
-                  requestAnimationFrame(() =>
-                    detail.current?.scrollIntoView({ block: "nearest" }),
-                  );
+                if (window.matchMedia("(max-width: 800px)").matches) {
+                  selectedTile.current = event.currentTarget;
+                  setNarrowView("detail");
+                  requestAnimationFrame(() => backButton.current?.focus());
+                }
                 setNotice("");
                 setError("");
               }}
@@ -221,12 +218,19 @@ export default function IconViewer() {
           )}
         </div>
         {!!visible.length && (
-          <aside
-            id={detailId}
-            ref={detail}
-            className="icon-viewer-detail"
-            aria-label={t("detail")}
-          >
+          <aside className="icon-viewer-detail" aria-label={t("detail")}>
+            <button
+              type="button"
+              className="settings-button icon-viewer-back"
+              ref={backButton}
+              onClick={() => {
+                setNarrowView("catalog");
+                requestAnimationFrame(() => selectedTile.current?.focus());
+              }}
+            >
+              <ChevronLeft size={14} aria-hidden="true" />
+              {t("backToIcons")}
+            </button>
             <div
               className={`icon-viewer-specimen preview-${preview.background}`}
               ref={specimen}

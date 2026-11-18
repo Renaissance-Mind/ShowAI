@@ -800,91 +800,76 @@ export default function RemoteMcpSettings({ home }: { home?: string }) {
                         onCopy={copy}
                       />
                     )}
-                    <details className="rm-advanced">
-                      <summary>
-                        <Settings2 size={14} aria-hidden="true" />
-                        {t("advanced")}
-                        <ChevronRight
-                          size={14}
-                          className="rm-advanced-indicator"
-                          aria-hidden="true"
-                        />
-                      </summary>
-                      <div className="rm-inset">
-                        {(selected === "lan" || selected === "cloudflare") && (
-                          <div className="rm-field rm-short-field">
-                            <label htmlFor="remote-local-port">
-                              {t("port")}
-                            </label>
+                    <div className="rm-network-fields">
+                      {(selected === "lan" || selected === "cloudflare") && (
+                        <div className="rm-field rm-short-field">
+                          <label htmlFor="remote-local-port">{t("port")}</label>
+                          <input
+                            id="remote-local-port"
+                            type="number"
+                            min={1024}
+                            max={65535}
+                            value={config.port || ""}
+                            placeholder={t("auto")}
+                            aria-invalid={invalidPort}
+                            aria-describedby={
+                              invalidPort ? `${tabId}-port-error` : undefined
+                            }
+                            onChange={(event) =>
+                              change({
+                                port: Number(event.target.value) || 0,
+                              })
+                            }
+                          />
+                          {invalidPort && (
+                            <p
+                              id={`${tabId}-port-error`}
+                              className="studio-form-error"
+                            >
+                              {t("invalidPort")}
+                            </p>
+                          )}
+                        </div>
+                      )}
+                      {selected !== "lan" && (
+                        <div className="rm-field">
+                          <label htmlFor="remote-tool-path">{t("tool")}</label>
+                          <div className="rm-input-action">
                             <input
-                              id="remote-local-port"
-                              type="number"
-                              min={1024}
-                              max={65535}
-                              value={config.port || ""}
-                              placeholder={t("auto")}
-                              aria-invalid={invalidPort}
-                              aria-describedby={
-                                invalidPort ? `${tabId}-port-error` : undefined
+                              id="remote-tool-path"
+                              value={config.executable}
+                              placeholder={
+                                (isTailscaleProvider(selected)
+                                  ? state.executables.tailscale
+                                  : state.executables.cloudflare) ||
+                                t("notFound")
                               }
                               onChange={(event) =>
-                                change({
-                                  port: Number(event.target.value) || 0,
-                                })
+                                change({ executable: event.target.value })
                               }
                             />
-                            {invalidPort && (
-                              <p
-                                id={`${tabId}-port-error`}
-                                className="studio-form-error"
-                              >
-                                {t("invalidPort")}
-                              </p>
-                            )}
+                            <button
+                              type="button"
+                              className="rm-button"
+                              disabled={busy}
+                              onClick={() =>
+                                void run(async () => {
+                                  const path = await desktop.invoke<
+                                    string | null
+                                  >("remoteMcp:chooseExecutable", {
+                                    provider: selected,
+                                  });
+                                  if (path) change({ executable: path });
+                                })
+                              }
+                            >
+                              <FolderOpen size={16} aria-hidden="true" />
+                              {t("chooseTool")}
+                            </button>
                           </div>
-                        )}
-                        {selected !== "lan" && (
-                          <div className="rm-field">
-                            <label htmlFor="remote-tool-path">
-                              {t("tool")}
-                            </label>
-                            <div className="rm-input-action">
-                              <input
-                                id="remote-tool-path"
-                                value={config.executable}
-                                placeholder={
-                                  (isTailscaleProvider(selected)
-                                    ? state.executables.tailscale
-                                    : state.executables.cloudflare) ||
-                                  t("notFound")
-                                }
-                                onChange={(event) =>
-                                  change({ executable: event.target.value })
-                                }
-                              />
-                              <button
-                                type="button"
-                                className="rm-button"
-                                disabled={busy}
-                                onClick={() =>
-                                  void run(async () => {
-                                    const path = await desktop.invoke<
-                                      string | null
-                                    >("remoteMcp:chooseExecutable", {
-                                      provider: selected,
-                                    });
-                                    if (path) change({ executable: path });
-                                  })
-                                }
-                              >
-                                <FolderOpen size={16} aria-hidden="true" />
-                                {t("chooseTool")}
-                              </button>
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    </details>
+                        </div>
+                      )}
+                    </div>
                     {!ready && (
                       <div className="rm-start-scope">
                         <span>

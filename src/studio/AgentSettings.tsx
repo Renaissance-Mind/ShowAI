@@ -880,25 +880,22 @@ export default function AgentSettings({
                       />
                     </label>
                     {!deviceExecution && (
-                      <details className="settings-disclosure">
-                        <summary>{t("protocol")}</summary>
-                        <label>
-                          <span className="sr-only">{t("protocol")}</span>
-                          <select
-                            value={editing.protocol}
-                            onChange={(event) =>
-                              setEditing({
-                                ...editing,
-                                protocol: event.target
-                                  .value as ModelSource["protocol"],
-                              })
-                            }
-                          >
-                            <option value="responses">Responses API</option>
-                            <option value="chat">Chat Completions</option>
-                          </select>
-                        </label>
-                      </details>
+                      <label>
+                        {t("protocol")}
+                        <select
+                          value={editing.protocol}
+                          onChange={(event) =>
+                            setEditing({
+                              ...editing,
+                              protocol: event.target
+                                .value as ModelSource["protocol"],
+                            })
+                          }
+                        >
+                          <option value="responses">Responses API</option>
+                          <option value="chat">Chat Completions</option>
+                        </select>
+                      </label>
                     )}
                     <label>
                       {t("apiKey")}
@@ -1101,14 +1098,11 @@ export default function AgentSettings({
               </p>
             )}
             {!deviceExecution && (
-              <details className="settings-disclosure">
-                <summary>{t("serverModelOptions")}</summary>
-                <ServerResources
-                  selected={selected}
-                  disabled={busy || !!hasRunning}
-                  update={update}
-                />
-              </details>
+              <ServerResources
+                selected={selected}
+                disabled={busy || !!hasRunning}
+                update={update}
+              />
             )}
             {status.authorization.error && (
               <div className="agent-error" role="alert">

@@ -2,7 +2,6 @@ import { defineMessages } from "../index";
 
 export default defineMessages("agentSettings", {
   "zh-CN": {
-    "serverModelOptions": "服务器模型资源",
     "modelTestFailed": "模型调用失败。可以查看下方执行记录并重新测试。",
     "modelRetryAfterLimit": "模型调用限流。请稍后重新测试。",
     "deviceSettings": "连接 iPad",
@@ -139,7 +138,6 @@ export default defineMessages("agentSettings", {
     "resources.saved": "已保存到来源服务器，其他绑定设备现在可以检索使用。",
   },
   en: {
-    "serverModelOptions": "Server model resources",
     "modelTestFailed": "The model test failed. Review the execution record below and try again.",
     "modelRetryAfterLimit": "Model rate limit reached. Try the test again later.",
     "deviceSettings": "Connect iPad",

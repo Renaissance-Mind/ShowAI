@@ -423,10 +423,15 @@ export function remoteConnectionFlow(locale: Locale = "zh-CN"): UiFlow {
               ),
             },
           ],
-          enter: (ctx) => clientSetup(ctx, true),
+          enter: async (ctx) => {
+            await clientSetup(ctx, true);
+            await ctx.ui.expect(
+              button(t("copy", { name: r("oauthAuthorization") })),
+            );
+          },
           actions: [
             b("next", t("nextMessage"), id("chatgpt.verify")),
-            b("advanced", t("oauthEndpoints")),
+            b("copy-oauth", t("copy", { name: r("oauthAuthorization") })),
             b("export", t("exportChatgptPlugin"), id("plugin")),
           ],
         });

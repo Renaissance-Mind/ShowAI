@@ -851,9 +851,52 @@
   border-radius: 99px;
   background: var(--accent-soft);
 }
+.settings-search {
+  width: min(220px, 42vw);
+  -webkit-app-region: no-drag;
+}
+.settings-search-field {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 0 8px;
+  height: 32px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--muted);
+}
+.settings-search-field > svg {
+  flex-shrink: 0;
+}
+.settings-search-field > input {
+  min-width: 0;
+  flex: 1;
+  padding: 0;
+  border: 0;
+  outline: none;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: 13px;
+}
+.settings-search-field:focus-within {
+  border-color: var(--accent);
+}
 .settings-search-results {
+  position: absolute;
+  z-index: 70;
+  right: 12px;
+  top: calc(100% + 6px);
+  width: min(540px, calc(100% - 24px));
+  max-height: calc(100vh - 72px);
+  overflow: auto;
   display: grid;
   padding: 5px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--paper);
+  box-shadow: 0 12px 36px #0002;
 }
 .settings-search-results button {
   text-align: start;
@@ -878,14 +921,6 @@
   }
 }
 
-.settings-disclosure {
-  margin-block: 8px;
-}
-.settings-disclosure > summary {
-  cursor: pointer;
-  color: var(--muted);
-  width: fit-content;
-}
 .work-records-form,
 .library-space-archive {
   flex-wrap: wrap;
@@ -896,32 +931,6 @@
 }
 .settings-path {
   flex-wrap: wrap;
-}
-.settings-path > details {
-  flex: 1;
-  min-width: min(150px, 100%);
-}
-.settings-location-details > summary {
-  cursor: pointer;
-  color: var(--text);
-  padding: 4px 2px;
-}
-.settings-disclosure > summary {
-  min-height: 32px;
-  padding: 6px 10px;
-  border: 1px solid var(--line);
-  border-radius: 6px;
-  background: var(--surface);
-  color: var(--text);
-}
-.settings-disclosure > summary:hover,
-.settings-disclosure > summary:focus-visible,
-.settings-disclosure[open] > summary {
-  border-color: var(--muted);
-  background: var(--hover);
-}
-.settings-disclosure[open] > summary {
-  margin-bottom: 10px;
 }
 .settings-primary-button:not(:disabled) {
   background: var(--text);

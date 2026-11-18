@@ -106,17 +106,21 @@ export default function LibraryMigrationDialog({
             </dl>
             <p>{t("upgrade.snapshotNote")}</p>
             {!!report.issues.length && (
-              <details open>
-                <summary>
+              <section
+                aria-label={t("upgrade.issues", {
+                  count: report.issues.length,
+                })}
+              >
+                <h3 className="settings-section-heading">
                   {t("upgrade.issues", { count: report.issues.length })}
-                </summary>
+                </h3>
                 <p>{t("upgrade.issuesNote")}</p>
                 {report.issues.map((issue) => (
                   <p key={issue} className="history-import-issue">
                     {issue}
                   </p>
                 ))}
-              </details>
+              </section>
             )}
           </>
         )}

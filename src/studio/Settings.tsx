@@ -1,6 +1,5 @@
 import { writeSessionDraft } from "./session-draft";
 import { useState } from "react";
-import ExpandableSearch from "../components/ExpandableSearch";
 import { pluginNeedsUpdate, usePluginHosts } from "./usePluginHosts";
 import {
   Bot,
@@ -14,6 +13,7 @@ import {
   Shapes,
   Monitor,
   Moon,
+  Search,
   Settings2,
   Sun,
   Globe,
@@ -156,6 +156,7 @@ export function SettingsSearch({
 }) {
   const t = useTranslator(messages);
   const [query, setQuery] = useState("");
+  const [searching, setSearching] = useState(false);
   const options = sections
     .filter(({ id }) => availableSettingsSection(id, platform) === id)
     .map(({ id, label }) => ({ id, name: t(label), target: "" }));
@@ -193,6 +194,7 @@ export function SettingsSearch({
   );
   function select(option: (typeof options)[number]) {
     setQuery("");
+    setSearching(false);
     onSelect(option.id);
     if (option.target === "shortcuts") {
       onShortcuts();
@@ -203,25 +205,30 @@ export function SettingsSearch({
         (option.target ? document.getElementById(option.target) : null) ??
         document.querySelector<HTMLElement>(".studio-settings h2");
       if (!target) return;
-      for (
-        let parent = target.parentElement;
-        parent;
-        parent = parent.parentElement
-      )
-        if (parent instanceof HTMLDetailsElement) parent.open = true;
       if (target.tabIndex < 0) target.tabIndex = -1;
       target.scrollIntoView({ block: "nearest" });
       target.focus({ preventScroll: true });
     });
   }
   return (
-    <ExpandableSearch
-      label={t("searchSettings")}
-      value={query}
-      onChange={setQuery}
+    <div
+      className="settings-search"
+      onBlur={(event) => {
+        if (!event.currentTarget.contains(event.relatedTarget))
+          setSearching(false);
+      }}
       onKeyDown={(event) => {
+        if (event.nativeEvent.isComposing) return;
+        if (event.key === "Escape" && searching) {
+          event.preventDefault();
+          event.stopPropagation();
+          event.nativeEvent.stopImmediatePropagation();
+          setQuery("");
+          setSearching(false);
+        }
         if (
           event.key === "Enter" &&
+          searching &&
           event.target instanceof HTMLInputElement &&
           matches[0]
         ) {
@@ -230,19 +237,35 @@ export function SettingsSearch({
         }
       }}
     >
-      <div className="settings-search-results">
-        {matches.map((option) => (
-          <button
-            key={option.target || option.id}
-            type="button"
-            onClick={() => select(option)}
-          >
-            {option.name}
-          </button>
-        ))}
-        {!matches.length && <p>{t("noSettingsResults")}</p>}
-      </div>
-    </ExpandableSearch>
+      <label className="settings-search-field">
+        <Search size={15} aria-hidden="true" />
+        <input
+          type="search"
+          aria-label={t("searchSettings")}
+          placeholder={t("searchSettings")}
+          value={query}
+          onFocus={() => setSearching(true)}
+          onChange={(event) => {
+            setQuery(event.target.value);
+            setSearching(true);
+          }}
+        />
+      </label>
+      {searching && (
+        <div className="settings-search-results">
+          {matches.map((option) => (
+            <button
+              key={option.target || option.id}
+              type="button"
+              onClick={() => select(option)}
+            >
+              {option.name}
+            </button>
+          ))}
+          {!matches.length && <p>{t("noSettingsResults")}</p>}
+        </div>
+      )}
+    </div>
   );
 }
 

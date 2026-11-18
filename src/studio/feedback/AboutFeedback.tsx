@@ -410,8 +410,11 @@ export function AboutFeedback({
       {info?.mode !== "browser" && (
         <dl className="feedback-update">{<UpdateRows />}</dl>
       )}
-      <details className="settings-group settings-about settings-disclosure">
-        <summary>{t("technicalInfo")}</summary>
+      <section
+        className="settings-group settings-about"
+        aria-labelledby="feedback-technical-title"
+      >
+        <h2 id="feedback-technical-title">{t("technicalInfo")}</h2>
         <dl>
           <InfoRow label={t("info.version")} value={versionLine(info)} />
           <InfoRow label={t("info.platform")} value={platformLine(info)} />
@@ -432,9 +435,12 @@ export function AboutFeedback({
           />
           {info && localPlugins && <PluginRows home={info.home} />}
         </dl>
-      </details>
-      <details className="settings-group settings-disclosure">
-        <summary id="feedback-diagnostics-title">{t("diag.title")}</summary>
+      </section>
+      <section
+        className="settings-group"
+        aria-labelledby="feedback-diagnostics-title"
+      >
+        <h2 id="feedback-diagnostics-title">{t("diag.title")}</h2>
         <p className="feedback-muted">{t("diag.privacy")}</p>
         <DiagnosticsPreview text={diagnostics.text} error={diagnostics.error} />
         <div className="feedback-actions">
@@ -482,7 +488,7 @@ export function AboutFeedback({
             {status.text}
           </p>
         )}
-      </details>
+      </section>
     </div>
   );
 }

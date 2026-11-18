@@ -214,14 +214,6 @@
   flex-shrink: 0;
 }
 
-.feedback-about .settings-disclosure {
-  padding-block: 10px;
-  border-block-end: 1px solid var(--line);
-}
-.feedback-about .settings-disclosure > summary {
-  font-weight: 600;
-  color: var(--text);
-}
 .feedback-update {
   margin: 0 0 12px;
 }

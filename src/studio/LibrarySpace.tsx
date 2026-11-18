@@ -111,15 +111,9 @@ export default function LibrarySpace({ home }: { home: string }) {
           </div>
         </div>
         <div className="library-space-section-content">
-          <p className="library-space-summary">
-            {storage
-              ? t("diskUsed", { size: bytes(storage.allocatedBytes) })
-              : t("checkingFiles")}
-          </p>
-          {storage && (
-            <details className="settings-disclosure">
-              <summary>{t("storageDetails")}</summary>
-              <p>
+          {storage ? (
+            <>
+              <p className="library-space-summary">
                 {t("summary", {
                   size: bytes(storage.totalBytes),
                   allocated: bytes(storage.allocatedBytes),
@@ -143,7 +137,9 @@ export default function LibrarySpace({ home }: { home: string }) {
                   })}
                 </p>
               </div>
-            </details>
+            </>
+          ) : (
+            <p className="library-space-summary">{t("checkingFiles")}</p>
           )}
         </div>
       </section>
@@ -218,9 +214,19 @@ export default function LibrarySpace({ home }: { home: string }) {
               </div>
             </div>
           )}
-          <details className="settings-disclosure">
-            <summary>{t("advancedMaintenance")}</summary>
-            <p className="settings-help">{t("maintenanceEffects")}</p>
+          <section
+            className="library-space-section"
+            aria-labelledby="library-maintenance-tools"
+          >
+            <div>
+              <h4
+                id="library-maintenance-tools"
+                className="settings-section-heading"
+              >
+                {t("advancedMaintenance")}
+              </h4>
+              <p className="settings-help">{t("maintenanceEffects")}</p>
+            </div>
             <div className="library-space-actions">
               <button
                 className="settings-button"
@@ -255,7 +261,7 @@ export default function LibrarySpace({ home }: { home: string }) {
                 {t("rebuildIndex")}
               </button>
             </div>
-          </details>
+          </section>
           {plan && (
             <div className="library-space-plan">
               <p>

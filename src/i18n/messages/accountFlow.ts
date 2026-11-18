@@ -3,6 +3,8 @@ export default defineMessages("accountFlow", {
   "zh-CN": {
     "auth.cancelSignIn": "取消登录",
     "manageAccount": "管理账号",
+    backToAccounts: "返回账号列表",
+    backToProjects: "返回项目列表",
     "clearSourceFilter": "清除来源筛选",
     "moreActions": "更多",
     "clearProjectFilters": "清除筛选",
@@ -10,7 +12,6 @@ export default defineMessages("accountFlow", {
     "projects.onDevice": "已在本机",
     "projects.unpublished": "服务器尚无同步版本",
     "auth.serverChanged": "服务器已切换，请选择登录方式。",
-    "auth.otherConnection": "其他连接方式",
     "projects.downloadFirst": "请先下载到本机",
     "projects.signInToSave": "登录账号以保存到服务器",
     "projects.backToCreate": "返回新建项目",
@@ -136,6 +137,8 @@ export default defineMessages("accountFlow", {
   en: {
     "auth.cancelSignIn": "Cancel sign-in",
     "manageAccount": "Manage account",
+    backToAccounts: "Back to accounts",
+    backToProjects: "Back to projects",
     "clearSourceFilter": "Clear source filter",
     "moreActions": "More",
     "clearProjectFilters": "Clear filters",
@@ -143,7 +146,6 @@ export default defineMessages("accountFlow", {
     "projects.onDevice": "On this device",
     "projects.unpublished": "No version on the server yet",
     "auth.serverChanged": "Server changed. Choose a sign-in method.",
-    "auth.otherConnection": "Other connection options",
     "projects.downloadFirst": "Download to this device first",
     "projects.signInToSave": "Sign in to save to a server",
     "projects.backToCreate": "Back to new project",

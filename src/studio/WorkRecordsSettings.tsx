@@ -54,21 +54,20 @@ export default function WorkRecordsSettings() {
       <h2 id="settings-work-records-title">{t("workRecords")}</h2>
       <div className="settings-row settings-location-heading">
         <div className="settings-row-text">
-          <h3>{t("workRecordsLocation")}</h3>
+          <h3>
+            {t(
+              location?.source === "default"
+                ? "temporaryRecords"
+                : "workRecordsLocation",
+            )}
+          </h3>
           <p>{t("workRecordsDetail")}</p>
         </div>
       </div>
       {draft === null ? (
         <div className="settings-path">
           <Folder size={17} aria-hidden="true" />
-          {location?.source === "default" ? (
-            <details className="settings-location-details">
-              <summary>{t("temporaryRecords")}</summary>
-              <code>{location.directory}</code>
-            </details>
-          ) : (
-            <code>{location?.directory ?? t("readingLibrary")}</code>
-          )}
+          <code>{location?.directory ?? t("readingLibrary")}</code>
           {location && (
             <button
               className="settings-button"

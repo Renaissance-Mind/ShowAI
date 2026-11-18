@@ -107,10 +107,10 @@ export function PluginError({
     <div role="alert" className="plugin-install-error">
       <p>{message}</p>
       {details && (
-        <details className="settings-disclosure">
-          <summary>{t("technicalDetails")}</summary>
+        <section>
+          <h3 className="settings-section-heading">{t("technicalDetails")}</h3>
           <pre className="plugin-install-details">{details}</pre>
-        </details>
+        </section>
       )}
     </div>
   );
@@ -465,11 +465,11 @@ export function LaunchConfigCopy({ info }: { info: DesktopInfo | null }) {
   const server = launcher ?? runtimeMcpLaunch(info.cli);
   const kinds: LaunchSnippetKind[] = ["claude", "codex", "json"];
   return (
-    <details
-      className="settings-group plugin-launch-config settings-disclosure"
+    <section
+      className="settings-group plugin-launch-config"
       aria-labelledby="settings-launch-title"
     >
-      <summary id="settings-launch-title">{t("launch.title")}</summary>
+      <h2 id="settings-launch-title">{t("launch.title")}</h2>
       {kinds.map((kind) => {
         const text = launchSnippet(kind, server, info.platform);
         return (
@@ -478,8 +478,8 @@ export function LaunchConfigCopy({ info }: { info: DesktopInfo | null }) {
               <span>{t(`launch.${kind}Hint`)}</span>
               <button
                 className="settings-button"
-                onClick={(event) => {
-                  event.preventDefault();
+                type="button"
+                onClick={() => {
                   setError("");
                   void desktop
                     .invoke("clipboard:write", { text })
@@ -502,7 +502,7 @@ export function LaunchConfigCopy({ info }: { info: DesktopInfo | null }) {
           {error}
         </p>
       )}
-    </details>
+    </section>
   );
 }
 
