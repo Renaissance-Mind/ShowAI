@@ -366,7 +366,8 @@ try {
       .evaluate(
         (el) =>
           el.contains(document.activeElement) &&
-          document.activeElement !== el.querySelector(".rm-route-name-button"),
+          document.activeElement !==
+            el.querySelector(".rm-route-actions > button"),
       ),
     true,
   );

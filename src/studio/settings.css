@@ -890,3 +890,44 @@
 .library-space-archive {
   flex-wrap: wrap;
 }
+
+.settings-location-heading {
+  padding-bottom: 10px;
+}
+.settings-path {
+  flex-wrap: wrap;
+}
+.settings-path > details {
+  flex: 1;
+  min-width: min(150px, 100%);
+}
+.settings-location-details > summary {
+  cursor: pointer;
+  color: var(--text);
+  padding: 4px 2px;
+}
+.settings-disclosure > summary {
+  min-height: 32px;
+  padding: 6px 10px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--text);
+}
+.settings-disclosure > summary:hover,
+.settings-disclosure > summary:focus-visible,
+.settings-disclosure[open] > summary {
+  border-color: var(--muted);
+  background: var(--hover);
+}
+.settings-disclosure[open] > summary {
+  margin-bottom: 10px;
+}
+.settings-primary-button:not(:disabled) {
+  background: var(--text);
+  color: var(--paper);
+}
+.settings-primary-button:hover:not(:disabled) {
+  background: var(--text);
+  opacity: 0.88;
+}

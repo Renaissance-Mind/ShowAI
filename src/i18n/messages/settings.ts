@@ -2,6 +2,9 @@ import { defineMessages } from "../index";
 
 export default defineMessages("settings", {
   "zh-CN": {
+    "switchLibrary": "更换内容库",
+    "recordsLocationSaved": "已保存制作记录位置",
+    "savingRecordsLocation": "正在保存…",
     "searchBackup": "完整备份",
     "searchModel": "模型来源",
     "directoryCopied": "路径已复制",
@@ -35,7 +38,7 @@ export default defineMessages("settings", {
     workRecordsLocation: "存放位置",
     workRecordsDetail:
       "Agent 制作页面时，读者简报、材料、规划与评审记录保存在这里，只留在这台设备上。默认位置是系统临时目录，系统可能定期清理。",
-    changeWorkRecords: "更改",
+    changeWorkRecords: "更改记录位置",
     resetWorkRecords: "恢复默认",
     saveWorkRecords: "保存",
     cancelWorkRecords: "取消",
@@ -61,6 +64,9 @@ export default defineMessages("settings", {
     environmentDevelopment: "开发环境",
   },
   en: {
+    "switchLibrary": "Switch library",
+    "recordsLocationSaved": "Work records location saved",
+    "savingRecordsLocation": "Saving…",
     "searchBackup": "Full backup",
     "searchModel": "Model sources",
     "directoryCopied": "Path copied",
@@ -95,7 +101,7 @@ export default defineMessages("settings", {
     workRecordsLocation: "Location",
     workRecordsDetail:
       "When an Agent makes a page, its reader brief, material, plan and review records are kept here, on this device only. By default this is the system temporary directory, which the system may clean up.",
-    changeWorkRecords: "Change",
+    changeWorkRecords: "Change records location",
     resetWorkRecords: "Use default",
     saveWorkRecords: "Save",
     cancelWorkRecords: "Cancel",

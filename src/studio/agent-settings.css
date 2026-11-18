@@ -696,3 +696,10 @@
   flex-basis: 100%;
   color: var(--danger);
 }
+
+.agent-account-link {
+  margin-top: 6px;
+}
+.agent-device-actions {
+  flex-wrap: wrap;
+}

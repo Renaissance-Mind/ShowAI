@@ -21,6 +21,8 @@ function bytes(value: number) {
 export default function LibrarySpace({ home }: { home: string }) {
   const t = useTranslator(messages);
   const ts = useTranslator(settingsMessages);
+  const [refreshing, setRefreshing] = useState(false);
+  const [archivePending, setArchivePending] = useState(false);
   const [archiveError, setArchiveError] = useState("");
   const [storage, setStorage] = useState<LibraryStorage | null>(null);
   const [plan, setPlan] = useState<CleanupPlan | null>(null),
@@ -87,13 +89,24 @@ export default function LibrarySpace({ home }: { home: string }) {
               {analyzing ? t("analyzingProjects") : t("analyzeProjects")}
             </button>
             <button
-              className="settings-button settings-button-icon"
+              type="button"
+              className="settings-button"
               disabled={busy}
               aria-label={t("refreshStats")}
-              title={t("refreshStats")}
-              onClick={() => void run(async () => {})}
+              onClick={() => {
+                setRefreshing(true);
+                void run(async () => {
+                  await refresh(!!storage?.projects);
+                  setNotice(t("storageRefreshed"));
+                }, false).finally(() => setRefreshing(false));
+              }}
             >
-              <RefreshCw size={14} />
+              <RefreshCw
+                size={14}
+                className={refreshing ? "studio-spin" : undefined}
+                aria-hidden="true"
+              />
+              {t(refreshing ? "refreshingStats" : "refreshStats")}
             </button>
           </div>
         </div>
@@ -329,6 +342,7 @@ export default function LibrarySpace({ home }: { home: string }) {
               disabled={busy || !archivePath.trim()}
               onClick={() => {
                 setArchiveError("");
+                setArchivePending(true);
                 void run(async () => {
                   const result = await desktop
                     .invoke<{ path: string }>("library:archive", {
@@ -340,10 +354,13 @@ export default function LibrarySpace({ home }: { home: string }) {
                     });
                   if (result)
                     setNotice(t("toast.archived", { path: result.path }));
-                }, false);
+                }, false).finally(() => setArchivePending(false));
               }}
             >
-              {t("saveArchive")}
+              {archivePending && (
+                <Loader2 size={14} className="studio-spin" aria-hidden="true" />
+              )}
+              {t(archivePending ? "archiving" : "saveArchive")}
             </button>
           </div>
           {archiveError && (

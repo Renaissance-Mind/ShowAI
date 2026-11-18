@@ -1,5 +1,11 @@
 import { useState } from "react";
-import { ArrowRight, ExternalLink, KeyRound, ChevronDown } from "../ui/icons";
+import {
+  ArrowRight,
+  ExternalLink,
+  KeyRound,
+  ChevronDown,
+  FileDown,
+} from "../ui/icons";
 import { useTranslator } from "../i18n/react";
 import messages from "../i18n/messages/remoteConnections";
 import originalMessages from "../i18n/messages/remoteMcp";
@@ -10,11 +16,13 @@ export default function ChatgptConnectionGuide({
   endpoint,
   onCopy,
   onReady,
+  onExport,
   busy,
 }: {
   endpoint: string;
   onCopy(value: string): Promise<void>;
   onReady(): void;
+  onExport(): void;
   busy: boolean;
 }) {
   const t = useTranslator(messages),
@@ -38,7 +46,7 @@ export default function ChatgptConnectionGuide({
       </div>
       <button
         type="button"
-        className="rm-disclosure"
+        className="rm-button rm-disclosure"
         aria-expanded={advanced}
         onClick={() => setAdvanced((value) => !value)}
       >
@@ -72,9 +80,18 @@ export default function ChatgptConnectionGuide({
           target="_blank"
           rel="noreferrer"
         >
-          {t("openChatgpt")}
-          <ExternalLink size={14} />
+          {t("openChatgptSettings")}
+          <ExternalLink size={14} aria-hidden="true" />
         </a>
+        <button
+          type="button"
+          className="rm-button"
+          disabled={busy}
+          onClick={onExport}
+        >
+          <FileDown size={14} aria-hidden="true" />
+          {t("exportChatgptPlugin")}
+        </button>
         <button className="rm-button primary" disabled={busy} onClick={onReady}>
           {t("nextMessage")}
           <ArrowRight size={15} />

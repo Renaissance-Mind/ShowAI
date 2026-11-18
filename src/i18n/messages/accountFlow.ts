@@ -1,6 +1,10 @@
 import { defineMessages } from "../index";
 export default defineMessages("accountFlow", {
   "zh-CN": {
+    "auth.cancelSignIn": "取消登录",
+    "manageAccount": "管理账号",
+    "clearSourceFilter": "清除来源筛选",
+    "moreActions": "更多",
     "clearProjectFilters": "清除筛选",
     "downloadCompact": "下载",
     "projects.onDevice": "已在本机",
@@ -130,6 +134,10 @@ export default defineMessages("accountFlow", {
     accountAdvanced: "账号绑定与高级设置",
   },
   en: {
+    "auth.cancelSignIn": "Cancel sign-in",
+    "manageAccount": "Manage account",
+    "clearSourceFilter": "Clear source filter",
+    "moreActions": "More",
     "clearProjectFilters": "Clear filters",
     "downloadCompact": "Download",
     "projects.onDevice": "On this device",

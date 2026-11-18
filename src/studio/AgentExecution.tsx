@@ -168,11 +168,24 @@ export function RemoteDeviceSettings({
   } | null>(null);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
-  const refresh = () =>
+  const refresh = (preserveDraft = false) =>
     desktop
       .invoke<NonNullable<typeof state>>("agent:remoteDevice")
-      .then(setState)
-      .catch((reason) => setError(reason.message));
+      .then((next) => {
+        setState((current) =>
+          preserveDraft && current
+            ? {
+                ...next,
+                settings: {
+                  ...current.settings,
+                  trustedClients: next.settings.trustedClients,
+                },
+              }
+            : next,
+        );
+        setError("");
+      })
+      .catch((reason) => setError(errorMessage(reason)));
   useEffect(() => {
     if (remoteExecution()) return;
     void refresh();
@@ -270,6 +283,15 @@ export function RemoteDeviceSettings({
             ))}
           </select>
         </label>
+        {onAccounts && !state.connections.length && (
+          <button
+            type="button"
+            className="settings-button agent-account-link"
+            onClick={onAccounts}
+          >
+            {t("openAccounts")}
+          </button>
+        )}
         <fieldset>
           <legend>{t("allowedProjects")}</legend>
           {!state.projects.some(
@@ -349,23 +371,14 @@ export function RemoteDeviceSettings({
             )}
           </div>
           <div className="agent-device-actions">
-            {onAccounts && !state.connections.length && (
-              <button
-                type="button"
-                className="settings-button"
-                onClick={onAccounts}
-              >
-                {t("openAccounts")}
-              </button>
-            )}
             {state.settings.enabled && !state.online && (
               <button
                 type="button"
                 className="settings-button"
                 disabled={busy}
-                onClick={() => void refresh()}
+                onClick={() => void refresh(true)}
               >
-                {t("refreshDevices")}
+                {t("refreshConnectionStatus")}
               </button>
             )}
             {state.settings.enabled && (
@@ -375,7 +388,7 @@ export function RemoteDeviceSettings({
                 disabled={busy}
                 onClick={() => void save({ ...state.settings, enabled: false })}
               >
-                {t("disconnect")}
+                {t("disableCrossNetwork")}
               </button>
             )}
             <button
@@ -388,7 +401,11 @@ export function RemoteDeviceSettings({
               }
               onClick={() => void save({ ...state.settings, enabled: true })}
             >
-              {t(state.settings.enabled ? "save" : "connect")}
+              {t(
+                state.settings.enabled
+                  ? "saveCrossNetwork"
+                  : "enableCrossNetwork",
+              )}
             </button>
           </div>
         </div>
@@ -414,7 +431,7 @@ export function RemoteDeviceSettings({
                         id: client.id,
                         approve: true,
                       })
-                      .then(refresh)
+                      .then(() => refresh(true))
                       .catch((reason) => setError(reason.message))
                   }
                 >
@@ -428,7 +445,7 @@ export function RemoteDeviceSettings({
                         id: client.id,
                         approve: false,
                       })
-                      .then(refresh)
+                      .then(() => refresh(true))
                       .catch((reason) => setError(reason.message))
                   }
                 >
@@ -454,7 +471,7 @@ export function RemoteDeviceSettings({
                   id: client.id,
                   approve: false,
                 })
-                .then(refresh)
+                .then(() => refresh(true))
                 .catch((reason) => setError(reason.message))
             }
           >

@@ -9,6 +9,7 @@ export default function WorkRecordsSettings() {
   const t = useTranslator(messages);
   const errorId = useId();
   const [notice, setNotice] = useState("");
+  const [busy, setBusy] = useState(false);
   const [invalid, setInvalid] = useState(false);
   const [location, setLocation] = useState<WorkRecordsLocation | null>(null);
   const [draft, setDraft] = useState<string | null>(null);
@@ -19,7 +20,9 @@ export default function WorkRecordsSettings() {
       .then(setLocation, (reason) => setError(errorMessage(reason)));
   }, []);
   async function save(directory: string | null) {
+    if (busy) return;
     setError("");
+    setNotice("");
     setInvalid(
       directory !== null && !/^(?:[/\\]|[A-Za-z]:[/\\])/.test(directory),
     );
@@ -27,6 +30,7 @@ export default function WorkRecordsSettings() {
       setError(t("completePath"));
       return;
     }
+    setBusy(true);
     try {
       setLocation(
         await desktop.invoke<WorkRecordsLocation>("library:setWorkRecords", {
@@ -34,8 +38,11 @@ export default function WorkRecordsSettings() {
         }),
       );
       setDraft(null);
+      setNotice(t("recordsLocationSaved"));
     } catch (reason) {
       setError(errorMessage(reason));
+    } finally {
+      setBusy(false);
     }
   }
   const pinned = location?.source === "environment";
@@ -45,26 +52,17 @@ export default function WorkRecordsSettings() {
       aria-labelledby="settings-work-records-title"
     >
       <h2 id="settings-work-records-title">{t("workRecords")}</h2>
-      <div className="settings-row">
+      <div className="settings-row settings-location-heading">
         <div className="settings-row-text">
           <h3>{t("workRecordsLocation")}</h3>
           <p>{t("workRecordsDetail")}</p>
         </div>
-        {draft === null && (
-          <button
-            className="settings-button"
-            disabled={!location || pinned}
-            onClick={() => setDraft(location?.directory ?? "")}
-          >
-            {t("changeWorkRecords")}
-          </button>
-        )}
       </div>
       {draft === null ? (
         <div className="settings-path">
           <Folder size={17} aria-hidden="true" />
           {location?.source === "default" ? (
-            <details>
+            <details className="settings-location-details">
               <summary>{t("temporaryRecords")}</summary>
               <code>{location.directory}</code>
             </details>
@@ -73,8 +71,10 @@ export default function WorkRecordsSettings() {
           )}
           {location && (
             <button
-              className="settings-icon-button"
+              className="settings-button"
+              type="button"
               aria-label={t("copyDirectory")}
+              disabled={busy}
               onClick={() =>
                 void desktop
                   .invoke("clipboard:write", { text: location.directory })
@@ -84,14 +84,31 @@ export default function WorkRecordsSettings() {
                   )
               }
             >
-              <Copy size={15} />
+              <Copy size={15} aria-hidden="true" />
+              {t("copyDirectory")}
             </button>
           )}
           {location?.source === "setting" && (
-            <button className="settings-button" onClick={() => save(null)}>
+            <button
+              className="settings-button"
+              disabled={busy}
+              onClick={() => void save(null)}
+            >
               {t("resetWorkRecords")}
             </button>
           )}
+          <button
+            type="button"
+            className="settings-button"
+            disabled={!location || pinned || busy}
+            onClick={() => {
+              setDraft(location?.directory ?? "");
+              setNotice("");
+              setError("");
+            }}
+          >
+            {t("changeWorkRecords")}
+          </button>
         </div>
       ) : (
         <form
@@ -105,6 +122,7 @@ export default function WorkRecordsSettings() {
             aria-label={t("workRecordsLocation")}
             value={draft}
             autoFocus
+            disabled={busy}
             aria-invalid={invalid}
             aria-describedby={error ? errorId : undefined}
             spellCheck={false}
@@ -114,12 +132,16 @@ export default function WorkRecordsSettings() {
               setError("");
             }}
             onKeyDown={(event) => {
-              if (event.key === "Escape") setDraft(null);
+              if (event.key === "Escape" && !busy) {
+                setDraft(null);
+                setError("");
+              }
             }}
           />
           <button
             className="settings-button"
             type="button"
+            disabled={busy}
             onClick={() =>
               void desktop.invoke<string | null>("settings:chooseFolder").then(
                 (path) => {
@@ -131,13 +153,21 @@ export default function WorkRecordsSettings() {
           >
             {t("chooseFolder")}
           </button>
-          <button className="settings-button" type="submit">
-            {t("saveWorkRecords")}
+          <button
+            className="settings-button settings-primary-button"
+            type="submit"
+            disabled={busy}
+          >
+            {t(busy ? "savingRecordsLocation" : "saveWorkRecords")}
           </button>
           <button
             className="settings-button"
             type="button"
-            onClick={() => setDraft(null)}
+            disabled={busy}
+            onClick={() => {
+              setDraft(null);
+              setError("");
+            }}
           >
             {t("cancelWorkRecords")}
           </button>

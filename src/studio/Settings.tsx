@@ -335,30 +335,32 @@ export function SettingsPanel({
           aria-labelledby="settings-library-title"
         >
           <h2 id="settings-library-title">{t("library")}</h2>
-          <div className="settings-row">
+          <div className="settings-row settings-location-heading">
             <div className="settings-row-text">
               <h3>{t("storageLocation")}</h3>
             </div>
-            <button
-              className="settings-button"
-              disabled={!info}
-              onClick={onChooseHome}
-            >
-              {t("chooseLibrary")}
-              <ChevronRight size={14} aria-hidden="true" />
-            </button>
           </div>
           <div className="settings-path">
             <Folder size={17} aria-hidden="true" />
             <code>{info?.home ?? t("readingLibrary")}</code>
             <button
-              className="settings-icon-button"
+              type="button"
+              className="settings-button"
               aria-label={t("copyLibraryPath")}
-              title={t("copyLibraryPath")}
               disabled={!info}
               onClick={onCopyHome}
             >
               <Copy size={15} aria-hidden="true" />
+              {t("copyDirectory")}
+            </button>
+            <button
+              type="button"
+              className="settings-button"
+              disabled={!info}
+              onClick={onChooseHome}
+            >
+              {t("switchLibrary")}
+              <ChevronRight size={14} aria-hidden="true" />
             </button>
           </div>
 
@@ -438,7 +440,6 @@ export function SettingsPanel({
           <div className="settings-row">
             <div className="settings-row-text">
               <label htmlFor="settings-language">{t("language")}</label>
-              <p>{t("languageDetail")}</p>
             </div>
             <div className="settings-select">
               <select

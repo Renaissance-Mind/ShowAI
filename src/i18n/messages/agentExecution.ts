@@ -1,6 +1,10 @@
 import { defineMessages } from "../index";
 export default defineMessages("agentExecution", {
   "zh-CN": {
+    "refreshConnectionStatus": "刷新连接状态",
+    "disableCrossNetwork": "关闭跨网络连接",
+    "enableCrossNetwork": "开启跨网络连接",
+    "saveCrossNetwork": "保存跨网络配置",
     "pendingDevices": "待确认设备",
     "openAccounts": "打开账号设置",
     "notConfigured": "未配置跨网络连接",
@@ -39,6 +43,10 @@ export default defineMessages("agentExecution", {
     removeProject: "移除",
   },
   en: {
+    "refreshConnectionStatus": "Refresh connection status",
+    "disableCrossNetwork": "Disable cross-network connection",
+    "enableCrossNetwork": "Enable cross-network connection",
+    "saveCrossNetwork": "Save cross-network settings",
     "pendingDevices": "Devices awaiting approval",
     "openAccounts": "Open account settings",
     "notConfigured": "Cross-network connection not configured",

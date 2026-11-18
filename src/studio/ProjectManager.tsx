@@ -345,6 +345,9 @@ export default function ProjectManager({
               void onRefresh();
             },
             loading,
+            "",
+            undefined,
+            f("projects.refresh"),
           )}
           {iconButton(
             f("invitationTitle"),
@@ -392,26 +395,29 @@ export default function ProjectManager({
             {t("archived")}
           </button>
         </div>
-        <select
-          aria-label={f("projects.location")}
-          value={filter}
-          onChange={(e) => onFilter(e.target.value)}
-        >
-          <option value="all">{f("projects.allLocations")}</option>
-          <option value="local">{f("localLocation")}</option>
-          {status.connections.map((account) => (
-            <option key={account.id} value={account.id}>
-              {account.name} · {account.user.name}
-            </option>
-          ))}
-        </select>
+        <label className="sync-source-filter">
+          <span>{f("projects.source")}</span>
+          <select
+            aria-label={f("projects.location")}
+            value={filter}
+            onChange={(e) => onFilter(e.target.value)}
+          >
+            <option value="all">{f("projects.allLocations")}</option>
+            <option value="local">{f("localLocation")}</option>
+            {status.connections.map((account) => (
+              <option key={account.id} value={account.id}>
+                {account.name} · {account.user.name}
+              </option>
+            ))}
+          </select>
+        </label>
         {filter !== "all" && (
           <button
             type="button"
             className="settings-button"
             onClick={() => onFilter("all")}
           >
-            {f("projects.allLocations")}
+            {f("clearSourceFilter")}
           </button>
         )}
         <label className="sync-manager-search">
@@ -545,13 +551,15 @@ export default function ProjectManager({
                           : null}
                     <button
                       type="button"
-                      className="studio-icon sync-action"
+                      className="settings-button sync-action"
                       aria-label={f("projects.more", { name: row.name })}
                       title={f("projects.more", { name: row.name })}
                       aria-haspopup="menu"
+                      aria-expanded={menu?.row.key === row.key}
                       onClick={(e) => setMenu({ row, anchor: e.currentTarget })}
                     >
-                      <MoreHorizontal size={19} />
+                      {f("moreActions")}
+                      <MoreHorizontal size={15} aria-hidden="true" />
                     </button>
                   </div>
                 </td>

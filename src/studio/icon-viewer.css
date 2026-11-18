@@ -266,3 +266,27 @@
     display: none;
   }
 }
+
+.icon-viewer-settings-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-block: 14px 8px;
+}
+.icon-viewer-settings-heading h3 {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 500;
+}
+.icon-viewer-background-field {
+  display: grid;
+  gap: 6px;
+  font-size: 12px;
+}
+.icon-viewer-copy-error {
+  margin-block: 8px;
+  color: var(--danger);
+  font-size: 12px;
+}

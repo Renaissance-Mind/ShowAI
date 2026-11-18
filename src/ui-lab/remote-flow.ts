@@ -427,7 +427,7 @@ export function remoteConnectionFlow(locale: Locale = "zh-CN"): UiFlow {
           actions: [
             b("next", t("nextMessage"), id("chatgpt.verify")),
             b("advanced", t("oauthEndpoints")),
-            b("export", t("export"), id("plugin")),
+            b("export", t("exportChatgptPlugin"), id("plugin")),
           ],
         });
       const verify = async (ctx: SceneContext) => {
@@ -601,7 +601,7 @@ export function remoteConnectionFlow(locale: Locale = "zh-CN"): UiFlow {
         ],
         enter: async (ctx) => {
           await clientSetup(ctx, true);
-          await ctx.ui.click(button(t("export")));
+          await ctx.ui.click(button(t("exportChatgptPlugin")));
         },
         actions: [
           action("link", t("binding"), { role: "textbox", name: t("binding") }),

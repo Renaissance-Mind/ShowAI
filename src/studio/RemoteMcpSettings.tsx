@@ -37,7 +37,6 @@ import RemoteMcpClientSetup from "./RemoteMcpClientSetup";
 import {
   RemoteBrand,
   RemoteCopyField,
-  RemoteIconButton,
   RemoteSelect,
   remoteProviderKeys,
 } from "./RemoteConnectionControls";
@@ -432,16 +431,7 @@ export default function RemoteMcpSettings({ home }: { home?: string }) {
                         <RemoteBrand provider={provider} />
                         <div className="rm-route-open">
                           <span className="rm-route-name">
-                            <button
-                              type="button"
-                              className="rm-route-name-button"
-                              aria-label={t("configure", {
-                                name: name(provider),
-                              })}
-                              onClick={() => choose(provider)}
-                            >
-                              {name(provider)}
-                            </button>
+                            <span>{name(provider)}</span>
                             <span className={`rm-status ${label}`}>
                               <span />
                               {t(label)}
@@ -458,29 +448,32 @@ export default function RemoteMcpSettings({ home }: { home?: string }) {
                             </small>
                           )}
                         </div>
-                        {value &&
-                        (value.enabled ||
-                          (value.configured &&
-                            (provider !== "lan" ||
-                              !!value.config.bindAddress) &&
-                            (provider !== "cloudflare" ||
-                              (!!value.config.publicUrl &&
-                                value.tokenSaved)))) ? (
-                          toggle(provider, value.enabled)
-                        ) : (
+                        <div className="rm-route-actions">
                           <button
                             type="button"
                             className="rm-button"
-                            aria-label={
-                              t("configure", { name: name(provider) }) +
-                              " · " +
-                              t("configureAction")
-                            }
+                            aria-label={t("configure", {
+                              name: name(provider),
+                            })}
                             onClick={() => choose(provider)}
                           >
-                            {t("configureAction")}
+                            {t(
+                              value?.configured
+                                ? "viewConfiguration"
+                                : "configureAction",
+                            )}
+                            <ChevronRight size={14} aria-hidden="true" />
                           </button>
-                        )}
+                          {value &&
+                            (value.enabled ||
+                              (value.configured &&
+                                (provider !== "lan" ||
+                                  !!value.config.bindAddress) &&
+                                (provider !== "cloudflare" ||
+                                  (!!value.config.publicUrl &&
+                                    value.tokenSaved)))) &&
+                            toggle(provider, value.enabled)}
+                        </div>
                       </div>
                     );
                   })}
@@ -491,10 +484,11 @@ export default function RemoteMcpSettings({ home }: { home?: string }) {
         </>
       ) : (
         <>
+          <button type="button" className="rm-button rm-return" onClick={back}>
+            <ChevronLeft size={16} aria-hidden="true" />
+            {t("back")}
+          </button>
           <header className="rm-page-header">
-            <RemoteIconButton label={t("back")} onClick={back}>
-              <ChevronLeft size={19} />
-            </RemoteIconButton>
             <h2>{name(selected)}</h2>
             <span
               className={`rm-status ${statusKey(state ?? { phase: "stopped" })}`}
@@ -518,12 +512,14 @@ export default function RemoteMcpSettings({ home }: { home?: string }) {
                   {t("retryConnection")}
                 </button>
               )}
-              <RemoteIconButton
-                label={t("diagnostics")}
+              <button
+                type="button"
+                className="rm-button"
                 onClick={() => setModal("diagnostics")}
               >
-                <Settings2 size={16} />
-              </RemoteIconButton>
+                <Settings2 size={16} aria-hidden="true" />
+                {t("diagnostics")}
+              </button>
             </div>
           )}
           <nav
@@ -547,6 +543,16 @@ export default function RemoteMcpSettings({ home }: { home?: string }) {
                 tabIndex={tab === value ? 0 : -1}
                 aria-selected={tab === value}
                 disabled={value === "clients" && !ready}
+                title={
+                  value === "clients" && !ready
+                    ? t("clientsUnavailable")
+                    : undefined
+                }
+                aria-description={
+                  value === "clients" && !ready
+                    ? t("clientsUnavailable")
+                    : undefined
+                }
                 onClick={() => setTab(value)}
               >
                 <Icon size={16} />
@@ -595,12 +601,14 @@ export default function RemoteMcpSettings({ home }: { home?: string }) {
                   <div className="rm-starting" role="status">
                     <RefreshCw className="rm-spin" size={22} />
                     <span>{t("starting")}</span>
-                    <RemoteIconButton
-                      label={t("cancel")}
+                    <button
+                      type="button"
+                      className="rm-button"
                       onClick={() => void stop(selected)}
                     >
-                      <X size={16} />
-                    </RemoteIconButton>
+                      <X size={16} aria-hidden="true" />
+                      {t("cancel")}
+                    </button>
                   </div>
                 ) : (
                   <form
@@ -794,8 +802,13 @@ export default function RemoteMcpSettings({ home }: { home?: string }) {
                     )}
                     <details className="rm-advanced">
                       <summary>
-                        <Settings2 size={14} />
+                        <Settings2 size={14} aria-hidden="true" />
                         {t("advanced")}
+                        <ChevronRight
+                          size={14}
+                          className="rm-advanced-indicator"
+                          aria-hidden="true"
+                        />
                       </summary>
                       <div className="rm-inset">
                         {(selected === "lan" || selected === "cloudflare") && (
@@ -849,8 +862,10 @@ export default function RemoteMcpSettings({ home }: { home?: string }) {
                                   change({ executable: event.target.value })
                                 }
                               />
-                              <RemoteIconButton
-                                label={t("chooseTool")}
+                              <button
+                                type="button"
+                                className="rm-button"
+                                disabled={busy}
                                 onClick={() =>
                                   void run(async () => {
                                     const path = await desktop.invoke<
@@ -862,28 +877,40 @@ export default function RemoteMcpSettings({ home }: { home?: string }) {
                                   })
                                 }
                               >
-                                <FolderOpen size={16} />
-                              </RemoteIconButton>
+                                <FolderOpen size={16} aria-hidden="true" />
+                                {t("chooseTool")}
+                              </button>
                             </div>
                           </div>
                         )}
                       </div>
                     </details>
-                    <footer className="rm-form-actions">
-                      {!ready && (
-                        <button
-                          type="button"
-                          className="rm-button"
-                          onClick={() => setTab("permissions")}
-                        >
+                    {!ready && (
+                      <div className="rm-start-scope">
+                        <span>
                           {t(
                             config.access === "selected"
                               ? "selectedScope"
                               : "allScope",
                             { count: config.projects.length },
                           )}
+                        </span>
+                        <button
+                          className="rm-button"
+                          type="button"
+                          onClick={() => {
+                            setTab("permissions");
+                            document
+                              .getElementById(`${tabId}-tab-permissions`)
+                              ?.focus();
+                          }}
+                        >
+                          <ShieldCheck size={15} aria-hidden="true" />
+                          {t("changePermissions")}
                         </button>
-                      )}
+                      </div>
+                    )}
+                    <footer className="rm-form-actions">
                       <button
                         className="rm-button"
                         type="button"

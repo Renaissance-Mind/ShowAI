@@ -210,7 +210,9 @@ test("flow branches jump to the message screen and authorization states remain o
       .count(),
   ).toBe(1);
   expect(
-    await frame().locator(".rm-message-task [role=status]").textContent(),
+    await frame()
+      .locator(".rm-message-task .rm-client-status[role=status]")
+      .textContent(),
   ).toBe("等待客户端发起授权");
   await shot("client-message");
   await page

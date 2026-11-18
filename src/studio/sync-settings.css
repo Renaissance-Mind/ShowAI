@@ -1748,9 +1748,8 @@
   width: 100%;
 }
 .sync-dialog
-  :is(.sync-management, .sync-account-panel)
-  .settings-button:not(.sync-primary, .sync-danger-fill),
-.sync-account-panel .settings-button:not(.sync-primary, .sync-danger-fill) {
+  .sync-management
+  .settings-button:not(.sync-primary, .sync-danger-fill) {
   border-color: transparent;
   background: none;
   box-shadow: none;
@@ -1864,5 +1863,30 @@
   overflow-wrap: anywhere;
 }
 .sync-manager-actions {
+  flex-wrap: wrap;
+}
+
+.sync-source-filter {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  color: var(--muted);
+  font-size: 12px;
+}
+.sync-source-filter select {
+  min-width: 0;
+  max-width: 100%;
+}
+.sync-account-settings {
+  grid-column: 1 / -1;
+}
+.sync-account-settings > summary {
+  margin-inline-start: 34px;
+}
+.sync-manager-row-actions {
+  flex-wrap: wrap;
+}
+.sync-manager-filters {
   flex-wrap: wrap;
 }

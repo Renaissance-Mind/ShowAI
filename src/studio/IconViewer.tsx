@@ -1,5 +1,5 @@
 import ExpandableSearch from "../components/ExpandableSearch";
-import { useMemo, useRef, useState } from "react";
+import { useId, useMemo, useRef, useState } from "react";
 import * as icons from "../ui/icons";
 import {
   Copy,
@@ -69,6 +69,7 @@ const defaults = {
 
 export default function IconViewer() {
   const t = useTranslator(messages);
+  const detailId = useId();
   const [query, setQuery] = useState("");
   const [group, setGroup] = useState<Group>("all");
   const [selected, setSelected] = useState(catalog[0].name);
@@ -166,9 +167,10 @@ export default function IconViewer() {
             type="button"
             className="settings-button icon-viewer-preview-toggle"
             aria-expanded={previewOpen}
+            aria-controls={detailId}
             onClick={() => setPreviewOpen(!previewOpen)}
           >
-            {t("detail")}
+            {t(previewOpen ? "hidePreview" : "showPreview")}
           </button>
         )}
         <div className="icon-viewer-grid" role="group" aria-label={t("list")}>
@@ -220,6 +222,7 @@ export default function IconViewer() {
         </div>
         {!!visible.length && (
           <aside
+            id={detailId}
             ref={detail}
             className="icon-viewer-detail"
             aria-label={t("detail")}
@@ -237,6 +240,21 @@ export default function IconViewer() {
             </div>
             <h2>{current.name}</h2>
             <p>{t(`category.${current.category}`)} · Lucide</p>
+            <div className="icon-viewer-settings-heading">
+              <h3>{t("previewOptions")}</h3>
+              <button
+                type="button"
+                className="settings-button"
+                onClick={() => {
+                  setPreview(defaults);
+                  setNotice(t("previewReset"));
+                  setError("");
+                }}
+              >
+                <RotateCcw size={14} aria-hidden="true" />
+                {t("resetPreview")}
+              </button>
+            </div>
             <div className="icon-viewer-controls">
               <label>
                 {t("size")} <output>{preview.size} px</output>
@@ -281,44 +299,45 @@ export default function IconViewer() {
                 />
                 <code>{preview.color}</code>
               </label>
-              <div
-                className="icon-viewer-background"
-                role="group"
-                aria-label={t("background")}
-              >
-                <button
-                  aria-pressed={preview.background === "light"}
-                  onClick={() =>
-                    setPreview({
-                      ...preview,
-                      background: "light",
-                    })
-                  }
+              <div className="icon-viewer-background-field">
+                <span>{t("previewBackground")}</span>
+                <div
+                  className="icon-viewer-background"
+                  role="group"
+                  aria-label={t("background")}
                 >
-                  <Sun size={14} />
-                  {t("light")}
-                </button>
-                <button
-                  aria-pressed={preview.background === "dark"}
-                  onClick={() =>
-                    setPreview({
-                      ...preview,
-                      background: "dark",
-                    })
-                  }
-                >
-                  <Moon size={14} />
-                  {t("dark")}
-                </button>
-                <button
-                  aria-label={t("reset")}
-                  title={t("reset")}
-                  onClick={() => setPreview(defaults)}
-                >
-                  <RotateCcw size={14} />
-                </button>
+                  <button
+                    aria-pressed={preview.background === "light"}
+                    onClick={() =>
+                      setPreview({
+                        ...preview,
+                        background: "light",
+                      })
+                    }
+                  >
+                    <Sun size={14} />
+                    {t("light")}
+                  </button>
+                  <button
+                    aria-pressed={preview.background === "dark"}
+                    onClick={() =>
+                      setPreview({
+                        ...preview,
+                        background: "dark",
+                      })
+                    }
+                  >
+                    <Moon size={14} />
+                    {t("dark")}
+                  </button>
+                </div>
               </div>
             </div>
+            {error && (
+              <div className="icon-viewer-copy-error" role="alert">
+                {error} {t("downloadInstead")}
+              </div>
+            )}
             <div className="icon-viewer-actions">
               <button onClick={() => void copy(current.name, t("copiedName"))}>
                 <Copy size={14} />
@@ -336,16 +355,6 @@ export default function IconViewer() {
             <div role="status" className="icon-viewer-status">
               {notice}
             </div>
-            {error && (
-              <div className="icon-viewer-actions">
-                <p role="alert">{error}</p>
-                <button onClick={download}>
-                  <Download size={14} />
-                  {t("downloadSvg")}
-                </button>
-              </div>
-            )}
-
             <code className="icon-viewer-source">src/ui/icons.ts</code>
           </aside>
         )}

@@ -2,6 +2,13 @@ import { defineMessages } from "../index";
 
 export default defineMessages("icons", {
   "zh-CN": {
+    "previewOptions": "预览设置",
+    "previewBackground": "预览背景",
+    "resetPreview": "恢复预览默认值",
+    "previewReset": "已恢复预览默认值",
+    "showPreview": "展开图标预览",
+    "hidePreview": "收起图标预览",
+    "downloadInstead": "仍可使用下方的「下载 SVG」。",
     "downloadedSvg": "已请求下载 SVG",
     "category.all": "全部",
     "category.text": "文字与排版",
@@ -36,6 +43,13 @@ export default defineMessages("icons", {
     copyFailed: "复制失败：{error}",
   },
   en: {
+    "previewOptions": "Preview settings",
+    "previewBackground": "Preview background",
+    "resetPreview": "Reset preview settings",
+    "previewReset": "Preview settings reset",
+    "showPreview": "Show icon preview",
+    "hidePreview": "Hide icon preview",
+    "downloadInstead": "You can still use Download SVG below.",
     "downloadedSvg": "SVG download requested",
     "category.all": "All",
     "category.text": "Text & typography",

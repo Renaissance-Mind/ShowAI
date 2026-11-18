@@ -1,15 +1,7 @@
 import { useSessionDraft } from "./session-draft";
 import { settingsTabKeyDown } from "./settings-tab-keys";
 import { useEffect, useMemo, useId, useRef, useState } from "react";
-import {
-  Database,
-  FolderOpen,
-  LogOut,
-  Folder,
-  Plus,
-  RefreshCw,
-  X,
-} from "../ui/icons";
+import { Database, FolderOpen, Folder, Plus, RefreshCw, X } from "../ui/icons";
 import { desktop, errorMessage } from "../host/bridge";
 import { coalescedTask } from "../lib/coalesced-task";
 import { retainEqual } from "./navigation-refresh";
@@ -65,6 +57,9 @@ export default function SyncSettings({
 }) {
   const f = useTranslator(flowMessages);
   const viewId = useId();
+  const [openAccountDetails, setOpenAccountDetails] = useState<
+    Record<string, boolean>
+  >({});
   const handledRequest = useRef<number | undefined>(undefined);
   const [uploadProject, setUploadProject] = useState<ProjectSyncRequest | null>(
     null,
@@ -489,22 +484,20 @@ export default function SyncSettings({
               {showConnect ? (
                 <button
                   type="button"
-                  className="studio-icon"
-                  aria-label={tc("cancel")}
-                  title={tc("cancel")}
+                  className="settings-button"
                   onClick={() => setShowConnect(false)}
                 >
-                  <X size={18} />
+                  <X size={16} aria-hidden="true" />
+                  {f("auth.cancelSignIn")}
                 </button>
               ) : (
                 <button
                   type="button"
-                  className="studio-icon"
-                  aria-label={f("addAccount")}
-                  title={f("addAccount")}
+                  className="settings-button sync-primary"
                   onClick={() => openConnect()}
                 >
-                  <Plus size={19} />
+                  <Plus size={16} aria-hidden="true" />
+                  {f("addAccount")}
                 </button>
               )}
             </div>
@@ -544,9 +537,7 @@ export default function SyncSettings({
                   {connection.signedOut ? (
                     <button
                       type="button"
-                      className="studio-icon"
-                      aria-label={f("signIn")}
-                      title={f("signIn")}
+                      className="settings-button"
                       onClick={() =>
                         openConnect({
                           url: connection.url,
@@ -554,70 +545,59 @@ export default function SyncSettings({
                         })
                       }
                     >
-                      <RefreshCw size={18} />
+                      <RefreshCw size={16} aria-hidden="true" />
+                      {f("signIn")}
                     </button>
                   ) : (
-                    <>
-                      <button
-                        type="button"
-                        className="studio-icon"
-                        aria-label={f("viewProjects")}
-                        title={f("viewProjects")}
-                        onClick={() => {
-                          setProjectFilter(connection.id);
-                          setActiveView("projects");
-                        }}
-                      >
-                        <FolderOpen size={18} />
-                      </button>
-                      <button
-                        type="button"
-                        className="studio-icon"
-                        aria-label={f("signOut")}
-                        title={f("signOut")}
-                        disabled={busy}
-                        onClick={() =>
-                          void run(async () => {
-                            await desktop.invoke("sync:signOut", {
-                              connectionId: connection.id,
-                            });
-                            setMessage(f("signedOut"));
-                          })
-                        }
-                      >
-                        <LogOut size={18} />
-                      </button>
-                    </>
+                    <button
+                      type="button"
+                      className="settings-button"
+                      onClick={() => {
+                        setProjectFilter(connection.id);
+                        setActiveView("projects");
+                      }}
+                    >
+                      <FolderOpen size={16} aria-hidden="true" />
+                      {f("viewProjects")}
+                    </button>
                   )}
                 </div>
                 {!connection.signedOut && (
-                  <SyncAccountPanel
-                    connection={connection}
-                    busy={busy}
-                    syncedProjects={projectsOn(connection.id)}
-                    run={run}
-                    notify={setMessage}
-                    onSignedOut={() =>
-                      openConnect({
-                        url: connection.url,
-                        account: connection.user.name,
-                      })
-                    }
-                    onRemoved={() => {
-                      void refresh();
+                  <details
+                    className="settings-disclosure sync-account-settings"
+                    open={openAccountDetails[connection.id] ?? false}
+                    onToggle={(event) => {
+                      const open = event.currentTarget.open;
+                      setOpenAccountDetails((previous) =>
+                        !!previous[connection.id] === open
+                          ? previous
+                          : { ...previous, [connection.id]: open },
+                      );
                     }}
-                  />
+                  >
+                    <summary>{f("manageAccount")}</summary>
+                    {openAccountDetails[connection.id] && (
+                      <SyncAccountPanel
+                        connection={connection}
+                        busy={busy}
+                        syncedProjects={projectsOn(connection.id)}
+                        run={run}
+                        notify={setMessage}
+                        onSignedOut={() =>
+                          openConnect({
+                            url: connection.url,
+                            account: connection.user.name,
+                          })
+                        }
+                        onRemoved={() => {
+                          void refresh();
+                        }}
+                      />
+                    )}
+                  </details>
                 )}
               </article>
             ))
-          )}
-          {!showConnect && !status.connections.length && (
-            <button
-              className="settings-button sync-primary"
-              onClick={() => openConnect()}
-            >
-              {f("auth.title")}
-            </button>
           )}
           {!!status.connections.some((item) => !item.signedOut) &&
             !showConnect && (
