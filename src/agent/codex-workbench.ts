@@ -17,6 +17,7 @@ import {
   codexWorkbenchHtml,
   codexWorkbenchUri,
   codexWorkbenchFileUri,
+  codexWorkbenchCardUri,
   codexWorkbenchThreadUri,
   type CodexWorkbenchMode,
 } from "./codex-workbench-ui";
@@ -68,19 +69,22 @@ export function registerCodexWorkbench(
   ] as const;
   const resources = [
     ...views,
-    { mode: "thread", name: "workbench_file", uri: codexWorkbenchFileUri },
+    { mode: "thread", name: "workbench_file", uri: codexWorkbenchFileUri, entrypoint: "file" },
+    { mode: "thread", name: "workbench_page_card", uri: codexWorkbenchCardUri, entrypoint: "card" },
     { mode: undefined, name: "workbench_legacy", uri: legacyWorkbenchUri },
     { mode: "global", name: "workbench_global_v2", uri: "ui://showai/workbench-v2.html" },
     { mode: "thread", name: "workbench_thread_v2", uri: "ui://showai/workbench-thread-v2.html" },
   ] as const;
   const mimeType = "text/html;profile=mcp-app";
-  for (const { mode, name, uri } of resources) {
+  for (const resource of resources) {
+    const { mode, name, uri } = resource;
+    const entrypoint = "entrypoint" in resource ? resource.entrypoint : undefined;
     server.registerResource(name, uri, { mimeType }, async () => {
       return {
         contents: [{
           uri,
           mimeType,
-          text: codexWorkbenchHtml(mode, uri === codexWorkbenchFileUri),
+          text: codexWorkbenchHtml(mode, entrypoint, codexWorkbenchIcons[0].src),
           _meta: {
             ui: {
               csp: {
@@ -90,6 +94,9 @@ export function registerCodexWorkbench(
               prefersBorder: false,
               permissions: { clipboardWrite: {} },
             },
+            ...(entrypoint === "card" ? {
+              "openai/ui": { availableDisplayModes: ["inline", "fullscreen"] },
+            } : {}),
           },
         }],
       };
@@ -146,13 +153,20 @@ export function registerCodexWorkbench(
     description: "Create a local reference file that opens the saved ShowAI Page when clicked in Codex. Link the returned absolute path in the reply.",
     inputSchema: codexPageIdentity,
     annotations: readOnly,
+    _meta: {
+      ui: { resourceUri: codexWorkbenchCardUri, visibility: ["model", "app"] },
+    },
   }, async ({ projectId, pageId }) => {
     try {
       const { file, ...reference } = await writeCodexPageReference(
         service, presentationDirectory, projectId, pageId,
       );
       const result = mcpSuccess(reference);
-      return { ...result, content: [...result.content, file] };
+      return {
+        ...result,
+        content: [...result.content, file],
+        _meta: { showaiPageCard: { projectId, pageId, title: reference.title } },
+      };
     } catch (error) {
       return mcpFailure(error);
     }

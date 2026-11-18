@@ -7,7 +7,7 @@ import { join } from "node:path";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
 import { expect, it } from "vitest";
-import { codexWorkbenchUri, codexWorkbenchThreadUri, codexWorkbenchFileUri } from "./codex-workbench-ui";
+import { codexWorkbenchUri, codexWorkbenchThreadUri, codexWorkbenchFileUri, codexWorkbenchCardUri } from "./codex-workbench-ui";
 import { codexPageReferenceExtension } from "./codex-page-reference";
 import type { ShowDocument } from "../types";
 
@@ -56,6 +56,17 @@ it("opens both Codex workbench entries and saves into the MCP library", async ()
       ui: { resourceUri: codexWorkbenchFileUri, visibility: ["app"] },
       "openai/ui": { entrypoints: [{ type: "file", extensions: [codexPageReferenceExtension] }] },
     });
+    expect(tools.find((tool) => tool.name === "workbench_page_reference")?._meta?.ui)
+      .toEqual({ resourceUri: codexWorkbenchCardUri, visibility: ["model", "app"] });
+    const cardResource = await client.readResource({ uri: codexWorkbenchCardUri });
+    expect(cardResource.contents[0]).toMatchObject({
+      mimeType: "text/html;profile=mcp-app",
+      text: expect.stringContaining('id="showai-page-card"'),
+      _meta: { "openai/ui": { availableDisplayModes: ["inline", "fullscreen"] } },
+    });
+    expect(cardResource.contents[0]).toHaveProperty(
+      "text", expect.stringContaining('"ui/request-display-mode"'),
+    );
     const fileResource = await client.readResource({ uri: codexWorkbenchFileUri });
     expect(fileResource.contents[0]).toMatchObject({
       mimeType: "text/html;profile=mcp-app",
@@ -194,6 +205,8 @@ it("opens both Codex workbench entries and saves into the MCP library", async ()
       data: { path: string; title: string; projectId: string; pageId: string };
     }).data;
     expect(data).toMatchObject({ title: "Edited in workbench", projectId, pageId });
+    expect(referenceFile._meta?.showaiPageCard)
+      .toEqual({ title: "Edited in workbench", projectId, pageId });
     expect(data.path.endsWith(codexPageReferenceExtension)).toBe(true);
     expect(referenceFile.content).toEqual(expect.arrayContaining([
       expect.objectContaining({ type: "resource_link", uri: pathToFileURL(data.path).href }),

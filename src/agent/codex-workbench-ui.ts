@@ -7,22 +7,54 @@ export const codexWorkbenchUri = "ui://showai/workbench-v3.html";
 export const codexWorkbenchThreadUri = "ui://showai/workbench-thread-v3.html";
 export const codexWorkbenchFileUri = "ui://showai/workbench-file-v1.html";
 
-export function codexWorkbenchHtml(mode?: CodexWorkbenchMode, fileEntry = false) {
+export const codexWorkbenchCardUri = "ui://showai/workbench-card-v1.html";
+
+export function codexWorkbenchHtml(
+  mode?: CodexWorkbenchMode,
+  entrypoint?: "file" | "card",
+  icon?: string,
+) {
+  const card = entrypoint === "card"
+    ? `<article id="showai-page-card" aria-label="ShowAI" hidden>
+        <img src="${icon ?? ""}" alt="" width="34" height="34">
+        <div class="showai-card-content">
+          <strong id="showai-card-title"></strong>
+          <div id="showai-card-kind"></div>
+        </div>
+        <button type="button" id="showai-card-open" disabled></button>
+      </article>`
+    : "";
   return `<!doctype html>
 <html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <style>
 :root { color-scheme: light dark; font: 14px system-ui }
 body { margin: 0 }
+#showai-page-card {
+  display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center;
+  gap: 14px; margin: 8px 0; padding: 14px 16px;
+  border: 1px solid color-mix(in srgb, CanvasText 16%, Canvas);
+  border-left: 3px solid color-mix(in srgb, CanvasText 58%, Canvas); border-radius: 10px;
+}
+#showai-page-card[hidden] { display: none }
+#showai-page-card img { background: white; padding: 3px; border-radius: 6px; box-sizing: border-box }
+.showai-card-content { min-width: 0; overflow-wrap: anywhere }
+#showai-card-kind { margin-top: 3px; opacity: 0.7 }
+#showai-card-open { padding: 7px 12px; border: 1px solid color-mix(in srgb, CanvasText 20%, Canvas);
+  border-radius: 6px; background: Canvas; color: CanvasText; font: inherit; cursor: pointer }
+#showai-card-open:disabled { opacity: 0.6; cursor: default }
+#showai-card-open:focus-visible { outline: 2px solid Highlight; outline-offset: 2px }
 #showai-launch { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 16px }
 #showai-launch[hidden], #showai-launch button[hidden] { display: none }
 </style></head><body>
+${card}
 <div id="showai-launch" role="status"><span id="showai-message"></span><button id="showai-retry" hidden></button><button id="showai-external" hidden></button></div>
 <div id="root" hidden></div>
 <script>
 (() => {
   const translations = ${JSON.stringify(messages.catalogs)};
   const chunkBytes = ${workbenchChunkBytes};
-  const useFileEntrypoint = ${fileEntry};
+  const useFileEntrypoint = ${entrypoint === "file"};
+  const usePageCard = ${entrypoint === "card"};
   const referenceLimit = ${codexPageReferenceMaxLength};
   let mode = ${JSON.stringify(mode) ?? "null"};
   const status = document.getElementById("showai-launch");
@@ -30,13 +62,16 @@ body { margin: 0 }
   const retry = document.getElementById("showai-retry");
   const external = document.getElementById("showai-external");
   const root = document.getElementById("root");
+  const card = document.getElementById("showai-page-card");
+  const openCardButton = document.getElementById("showai-card-open");
+  let pageCard, openingCard = false;
   const pending = new Map();
   let locale = navigator.language.startsWith("zh") ? "zh-CN" : "en";
   let context = {};
   let capabilities = {};
   let launch, launchUrl, bundle, launchTimer, initialized = false;
   let ready = false, refreshing = false, sequence = 0;
-  let fileInput, filePage, readingFile = false;
+  let fileInput, referencePage, readingFile = false;
   const urls = new Map();
   const assetDownloads = new Map();
   const waitingDownloads = [];
@@ -47,7 +82,7 @@ body { margin: 0 }
   function show(key, details) {
     message.textContent = details ? t(key) + " · " + details : t(key);
     retry.textContent = t("retry");
-    retry.hidden = key !== "failed" || !!window.showai ||
+    retry.hidden = key !== "failed" || usePageCard || !!window.showai ||
       (useFileEntrypoint && !fileInput) || (!launch && !capabilities.serverTools);
     external.textContent = t("openInBrowser");
     external.hidden = key !== "failed" || !launchUrl;
@@ -78,9 +113,9 @@ body { margin: 0 }
   function currentUrl() {
     const url = new URL(launch);
     const path = context["openai/deepLink"]?.url;
-    if (filePage) {
-      url.searchParams.set("project", filePage.projectId);
-      url.searchParams.set("page", filePage.pageId);
+    if (referencePage) {
+      url.searchParams.set("project", referencePage.projectId);
+      url.searchParams.set("page", referencePage.pageId);
     } else if (typeof path === "string" && path.startsWith("/")) {
       const target = new URL(path, url.origin);
       if (target.origin === url.origin) {
@@ -246,8 +281,55 @@ body { margin: 0 }
     return { url, bundle: descriptor.bundle };
   }
 
+  function showPageCard() {
+    if (!pageCard || ready || openingCard || refreshing) return;
+    document.getElementById("showai-card-title").textContent = pageCard.title;
+    document.getElementById("showai-card-kind").textContent = t("pageCardKind");
+    openCardButton.textContent = t("openOriginalPage");
+    openCardButton.disabled = !initialized;
+    card.hidden = false;
+  }
+
+  function presentPageCard() {
+    if (initialized && context.displayMode === "fullscreen" && !referencePage && pageCard) {
+      referencePage = pageCard;
+      card.hidden = true;
+      void refreshLaunch().then(showPageCard);
+      return;
+    }
+    showPageCard();
+  }
+
+  async function openPageCard() {
+    if (!initialized || !pageCard || openingCard) return;
+    openingCard = true;
+    openCardButton.disabled = true;
+    try {
+      const modeResult = await request("ui/request-display-mode", { mode: "fullscreen" });
+      if ((modeResult?.mode ?? context.displayMode) !== "fullscreen")
+        throw new Error(t("cannotExpandCard"));
+      referencePage = pageCard;
+      card.hidden = true;
+      await refreshLaunch();
+    } catch (error) {
+      show("failed", error.message);
+    } finally {
+      openingCard = false;
+      showPageCard();
+    }
+  }
+
   function fromResult(result) {
     if (ready) return;
+    if (usePageCard) {
+      const payload = resultPayload(result);
+      const target = (payload?._meta ?? payload)?.showaiPageCard;
+      if (!target) return;
+      pageCard = target;
+      status.hidden = true;
+      presentPageCard();
+      return;
+    }
     const target = launchFrom(result);
     if (target && !launch) launch = target.url.href;
     if (target && initialized) void refreshLaunch();
@@ -289,7 +371,7 @@ body { margin: 0 }
         throw new Error(t("invalidReferenceFile"));
       const target = await callWorkbench("workbench_resolve_reference", { source });
       if (file !== fileInput) return;
-      filePage = target;
+      referencePage = target;
       if (!ready) await refreshLaunch();
       else {
         status.hidden = true;
@@ -304,7 +386,8 @@ body { margin: 0 }
   }
 
   async function refreshLaunch() {
-    if (!initialized || refreshing || ready || (useFileEntrypoint && !filePage)) return;
+    if (!initialized || refreshing || ready ||
+        ((useFileEntrypoint || usePageCard) && !referencePage)) return;
     clearTimeout(launchTimer);
     const opener = context.toolInfo?.tool?.name;
     mode ??= opener?.endsWith("workbench_open_page") ? "thread" : "global";
@@ -364,6 +447,7 @@ body { margin: 0 }
     }
   }
 
+  openCardButton?.addEventListener("click", openPageCard);
   retry.addEventListener("click", () => {
     if (useFileEntrypoint) void readReferenceFile();
     else void refreshLaunch();
@@ -388,7 +472,7 @@ body { margin: 0 }
     if (data.method === "ui/notifications/host-context-changed") {
       const previous = context["openai/deepLink"]?.url;
       configure({ ...context, ...data.params });
-      if (ready && !useFileEntrypoint && previous !== context["openai/deepLink"]?.url) {
+      if (ready && !useFileEntrypoint && !usePageCard && previous !== context["openai/deepLink"]?.url) {
         const target = currentUrl();
         const pageId = target.searchParams.get("page");
         if (pageId) displayPage(
@@ -404,20 +488,21 @@ body { margin: 0 }
     receiveFileInput(event.detail?.globals?.toolInput);
     fromResult(event.detail?.globals?.toolResponseMetadata);
   });
+  show("loading");
   receiveFileInput(window.openai?.toolInput);
   fromResult(window.openai?.toolResponseMetadata);
-  show("loading");
   request("ui/initialize", {
     appInfo: { name: "ShowAI", version: "1.0.0" },
-    appCapabilities: {},
+    appCapabilities: usePageCard ? { availableDisplayModes: ["inline", "fullscreen"] } : {},
     protocolVersion: "2026-01-26",
   }).then(result => {
     capabilities = result?.hostCapabilities || {};
     configure(result?.hostContext);
     initialized = true;
-    if (!ready) show("loading");
+    if (!ready && !pageCard) show("loading");
     parent.postMessage({ jsonrpc: "2.0", method: "ui/notifications/initialized" }, "*");
-    if (useFileEntrypoint) {
+    if (usePageCard) presentPageCard();
+    else if (useFileEntrypoint) {
       if (fileInput) void readReferenceFile();
       else launchTimer = setTimeout(() => show("failed", t("missingReferenceFile")), 8000);
     } else if (mode) void refreshLaunch();
