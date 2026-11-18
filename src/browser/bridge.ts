@@ -1,4 +1,7 @@
+import SourceRuntimeWorker from "../surface/source-runtime-worker.ts?worker&inline";
+import CubicInputWorker from "../surface/portable-cubic-input-worker.ts?worker&inline";
 import { chooseLocalPath, type FileDialogOptions } from "./FileDialog";
+import { browserSearch, browserUrl, codexWorkbench, openCodexWorkbenchLink, reportCodexWorkbenchReady, type CodexWorkbenchConnection } from "./codex-workbench";
 import {
   LOCAL_FILE_TYPES,
   type LocalResourceKind,
@@ -44,13 +47,21 @@ const failure = (code: string, message: string) =>
 
 declare global {
   interface Window {
-    __SHOWAI_LOCAL__?: { token: string };
+    __SHOWAI_LOCAL__?: {
+      token: string;
+      codexWorkbench?: CodexWorkbenchConnection;
+      apiOrigin?: string;
+      search?: string;
+    };
   }
 }
 
 export function installBrowserBridge() {
   const config = window.__SHOWAI_LOCAL__;
   if (!config || window.showai) return;
+  if (window.__SHOWAI_CODEX_HOST__)
+    window.__SHOWAI_CODEX_HOST__.createWorker = (kind) =>
+      kind === "source" ? new SourceRuntimeWorker() : new CubicInputWorker();
   const listeners = new Set<(change: DesktopChange) => void>();
   const closeListeners = new Set<CloseListenerEntry>();
   const reloadListeners = new Set<CloseListenerEntry>();
@@ -59,7 +70,8 @@ export function installBrowserBridge() {
   const client = crypto.randomUUID();
   let renewing: Promise<boolean> | undefined;
   function renewToken() {
-    renewing ??= fetch("/", { cache: "no-store" })
+    const path = config!.apiOrigin ? `/${config!.search ?? ""}` : "/";
+    renewing ??= fetch(browserUrl(path), { cache: "no-store" })
       .then(async (response) => {
         const token = response.ok ? pageToken(await response.text()) : undefined;
         if (!token || token === config!.token) return false;
@@ -78,7 +90,7 @@ export function installBrowserBridge() {
   ): Promise<T> {
     let response: Response;
     try {
-      response = await fetch(`/api/${route}`, {
+      response = await fetch(browserUrl(`/api/${route}`), {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -116,6 +128,12 @@ export function installBrowserBridge() {
     args: Record<string, unknown>,
     prepare?: () => Promise<boolean>,
   ): Promise<T | null> {
+    if (codexWorkbench()) {
+      if (prepare && !(await prepare())) return null;
+      const result = await request<T>("invoke", { action, args });
+      await openCodexWorkbenchLink((result as { url: string }).url);
+      return result;
+    }
     const opened = window.open(
       "about:blank",
       "_blank",
@@ -252,10 +270,10 @@ export function installBrowserBridge() {
     }
     return request<T>("invoke", { action, args });
   }
-  if (!new URLSearchParams(location.search).has("componentPreview")) {
+  if (!browserSearch().has("componentPreview")) {
     const connect = () => {
       const events = new EventSource(
-        `/api/events?token=${encodeURIComponent(config.token)}&client=${client}`,
+        browserUrl(`/api/events?token=${encodeURIComponent(config.token)}&client=${client}`),
       );
       events.onmessage = (event) => {
         const change = JSON.parse(event.data) as DesktopChange;
@@ -340,4 +358,5 @@ export function installBrowserBridge() {
         }
       : {}),
   };
+  reportCodexWorkbenchReady();
 }

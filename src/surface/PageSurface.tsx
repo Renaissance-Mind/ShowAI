@@ -978,7 +978,7 @@ export default function PageSurface({
               onSelect: () => askAssistant(ids, anchor),
             },
             {
-              label: tc("copyReference"),
+              label: assistant.referenceLabel ?? tc("copyReference"),
               icon: <AtSign size={14} />,
               onSelect: () => assistant.reference(boardTarget(ids, anchor)),
             },
@@ -2029,9 +2029,9 @@ export default function PageSurface({
                     ...(assistant
                       ? [
                           {
-                            label: board.ids.size
+                            label: assistant.referenceLabel ?? (board.ids.size
                               ? tc("copyReference")
-                              : t("menu.referenceBoard"),
+                              : t("menu.referenceBoard")),
                             icon: <AtSign size={14} />,
                             separatorBefore: true,
                             onSelect: () =>

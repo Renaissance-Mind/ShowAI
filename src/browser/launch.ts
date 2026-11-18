@@ -1,4 +1,4 @@
-import { dirname, join, resolve } from "node:path";
+import { dirname, isAbsolute, join, resolve } from "node:path";
 import { homedir } from "node:os";
 import { fileURLToPath } from "node:url";
 import { access } from "node:fs/promises";
@@ -8,6 +8,32 @@ import { translator } from "../i18n";
 import messages from "../i18n/messages/workbench";
 
 const t = translator(messages);
+
+async function browserRuntime() {
+  const cliEntry = process.env.SHOWAI_RUNTIME_ENTRY ?? fileURLToPath(import.meta.url);
+  const runtimeWeb = resolve(dirname(cliEntry), "../web");
+  const webRoot = await access(join(runtimeWeb, "index.html")).then(
+    () => runtimeWeb,
+    () => resolve(dirname(cliEntry), "../dist"),
+  );
+  return { cliEntry, webRoot };
+}
+
+export async function startCodexWorkbenchBrowser(options: {
+  home: string;
+  profile: string;
+  key: string;
+}) {
+  if (!isAbsolute(options.profile))
+    throw new Error("SHOWAI_CODEX_WORKBENCH_PROFILE must be an absolute directory.");
+  return startBrowserServer({
+    ...await browserRuntime(),
+    home: options.home,
+    settingsPath: join(options.profile, "settings.json"),
+    agentWorkspaceRoot: join(options.profile, "agent-workspaces"),
+    codexWorkbench: { key: options.key },
+  });
+}
 
 export async function runBrowser(options: {
   home?: string;
@@ -20,18 +46,10 @@ export async function runBrowser(options: {
     throw new Error(
       "--port must be an integer between 0 and 65535 (0 chooses a free port).",
     );
-  const cliEntry =
-    process.env.SHOWAI_RUNTIME_ENTRY ?? fileURLToPath(import.meta.url);
-  const runtimeWeb = resolve(dirname(cliEntry), "../web");
-  const webRoot = await access(join(runtimeWeb, "index.html")).then(
-    () => runtimeWeb,
-    () => resolve(dirname(cliEntry), "../dist"),
-  );
   const server = await startBrowserServer({
+    ...await browserRuntime(),
     home: options.home,
     port,
-    cliEntry,
-    webRoot,
     settingsPath: join(homedir(), ".showai-browser", "settings.json"),
   });
   if (options.json)

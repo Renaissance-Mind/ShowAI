@@ -19,6 +19,7 @@ import { openLibrary } from "../core/open-library";
 import { recordConnections } from "./mcp-connections";
 import { recordMcpCalls } from "./mcp-call-log";
 import { mcpChangeContext } from "./mcp-actor";
+import { registerCodexWorkbench, type OpenCodexWorkbench } from "./codex-workbench";
 
 export function createLibraryMcpServer(options: {
   root: string;
@@ -159,7 +160,7 @@ export function createLibraryMcpServer(options: {
 }
 
 export async function startLibraryMcp(
-  options: Parameters<typeof createLibraryMcpServer>[0],
+  options: Parameters<typeof createLibraryMcpServer>[0] & { openWorkbench?: OpenCodexWorkbench },
 ) {
   await openLibrary(options.root);
   const transport = new StdioServerTransport(process.stdin, process.stdout, {
@@ -167,7 +168,14 @@ export async function startLibraryMcp(
   });
   recordConnections(transport, options.root);
   recordMcpCalls(transport, options.root);
-  await createLibraryMcpServer(options).connect(transport);
+  const server = createLibraryMcpServer(options);
+  if (options.openWorkbench) {
+    registerCodexWorkbench(server, options.openWorkbench);
+    process.stdin.once("end", () =>
+      void server.close().catch((error) => console.error("ShowAI MCP shutdown:", error)),
+    );
+  }
+  await server.connect(transport);
   process.stderr.write(
     "ShowAI MCP connected to the configured library. Select projectId explicitly.\n",
   );

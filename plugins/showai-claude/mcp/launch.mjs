@@ -168,7 +168,9 @@ async function probeKey(config, text) {
 }
 
 async function probe(config, text, env) {
-  const cachePath = join(home, "local", "agent-runtime-probe.json");
+  const cachePath = env.SHOWAI_CODEX_WORKBENCH_PROFILE
+    ? join(env.SHOWAI_CODEX_WORKBENCH_PROFILE, "agent-runtime-probe.json")
+    : join(home, "local", "agent-runtime-probe.json");
   const key = await probeKey(config, text).catch((error) => {
     throw new LaunchProblem("RUNTIME_UNAVAILABLE", error.message);
   });

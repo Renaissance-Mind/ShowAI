@@ -1,5 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { flushSync } from "react-dom";
+import { browserSearch, codexWorkbench } from "../browser/codex-workbench";
 import {
   addWorkspaceTab,
   closeWorkspaceTab,
@@ -38,6 +39,9 @@ export function useWorkspaceTabs({
   onError: (error: unknown) => void;
   beforeClose?: (tabId: string) => Promise<boolean>;
 }) {
+  const embed = codexWorkbench();
+  const storageKey = (library: string) =>
+    embed ? `showai:tabs:${library}:codex:${embed.instance}` : `showai:tabs:${library}`;
   const [state, setState] = useState(() => createWorkspace(entry));
   const current = useRef(state);
   const [switching, setSwitching] = useState(false);
@@ -59,8 +63,8 @@ export function useWorkspaceTabs({
     if (!library.current) return;
     try {
       const bytes = JSON.stringify({ version: 1, ...next });
-      sessionStorage.setItem(`showai:tabs:${library.current}`, bytes);
-      localStorage.setItem(`showai:tabs:last:${library.current}`, bytes);
+      sessionStorage.setItem(storageKey(library.current), bytes);
+      if (!embed) localStorage.setItem(`showai:tabs:last:${library.current}`, bytes);
     } catch (error) {
       latest.current.onError(error);
     }
@@ -136,12 +140,12 @@ export function useWorkspaceTabs({
       library.current = home;
       let saved: WorkspaceTabsState | undefined;
       let previousLaunch = false;
-      const params = new URLSearchParams(location.search);
+      const params = browserSearch();
       try {
         saved = parseWorkspaceTabs(
-          sessionStorage.getItem(`showai:tabs:${home}`),
+          sessionStorage.getItem(storageKey(home)),
         );
-        if (!saved && firstLibrary && params.get("restore") === "tabs") {
+        if (!embed && !saved && firstLibrary && params.get("restore") === "tabs") {
           saved = parseWorkspaceTabs(
             localStorage.getItem(`showai:tabs:last:${home}`),
           );

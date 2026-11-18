@@ -144,6 +144,8 @@ CLI：`showai pages read PAGE --project PROJECT --view image --capture viewport 
 
 ## 可选的对话持续更新
 
+支持插件界面的 Codex 桌面端可以从主侧栏打开 ShowAI 项目工作台，也可以在聊天右侧打开同一个 Page 和 Board 编辑器。选中内容后用「引用到 Codex 对话」交给当前聊天。Codex 按引用用 ShowAI MCP 读取对应对象，写入原页面之前核对版本。
+
 Codex 插件声明 `SHOWAI_HOST_DISPLAY=mcp-app`。`show_component` 的 `delivery:"auto"` 使用原生视图；内容分批到达时加 `live:true`，先展示第一批有效内容，再更新同一显示区。小任务一次给完，正式页面创作流程保持不变。旧安装若仍声明 `codex-visualize`，可在支持 MCP Apps 的 Codex 中显式使用 `delivery:"mcp-app"`；旧声明仍保留文件式交付含义。
 
 页面创作继续使用 page_create、page_apply、page_save 与 page_present。会话可用 `show_component({kind,data,live:true,delivery:"mcp-app"})` 创建一个可持续更新的 MCP Apps 显示区。先查 `showai_capabilities.presentation.liveUpdates`，并确认宿主提供 serverTools；文件片段展示不代表支持持续更新。当前句柄属于原本机 MCP 连接，30 分钟未访问后过期，重连后不恢复；最多 32 份，每份源内容最多 16 MiB。

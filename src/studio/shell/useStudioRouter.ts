@@ -1,3 +1,4 @@
+import { browserSearch } from "../../browser/codex-workbench";
 import {
   useEffect,
   useRef,
@@ -360,7 +361,7 @@ export function useStudioRouter({
         console.warn("Could not read the project list cache", error);
       }
       const verification = refresh();
-      const params = new URLSearchParams(location.search);
+      const params = browserSearch();
       const projectId = params.get("project"),
         pageId = params.get("page"),
         folderId = params.get("folder"),

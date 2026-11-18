@@ -732,7 +732,11 @@ export class DesktopPluginInstaller {
             type: "stdio",
             command: `./mcp/${launcher}`,
             args: [],
-            env: { ...server.env, SHOWAI_HOST_DISPLAY: HOST_PROFILES.codex },
+            env: {
+              ...server.env,
+              SHOWAI_HOST_DISPLAY: HOST_PROFILES.codex,
+              SHOWAI_CODEX_WORKBENCH_PROFILE: join(this.options.root, "codex-workbench"),
+            },
           },
         },
       });

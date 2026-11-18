@@ -229,6 +229,10 @@ After creating or organizing a new ShowAI page, MCP Agents save it and call page
 
 Bundled is the default. The reader, content and exact custom runtimes travel together; raster images must be embedded for offline delivery. HTML and inline exports also save editable source JSON. A static site includes relative navigation, source files and shared reader assets, and is intended for HTTP/static hosting. Whole-project export omits archived pages.
 
+### ShowAI workbench in Codex desktop
+
+On supported Codex desktop installations, the ShowAI sidebar entry opens the project workbench. The ShowAI tab beside a chat opens the same Page and Board editor. In that editor, **Reference in Codex chat** attaches a versioned reference to a selection. Codex uses ShowAI MCP to read the referenced objects and checks their version before writing to the original page.
+
 ### Reader compilation and inline limits
 
 HTML and inline export compile the selected page's native components and dependency closure from the software's fingerprinted reader archive. G2 exports include selected drawing functions and their required libraries; site export uses the union across pages and shares the reader. `runtime info.readerCompilation.mode` reports `page-dependencies` when this capability is installed; `prebuilt` means a legacy/template reader is in use. Explicit viewer templates remain supported.

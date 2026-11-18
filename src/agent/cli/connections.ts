@@ -23,6 +23,8 @@ async function credential(
     : process.env[environment];
 }
 
+const loadBrowser = () => import("../../browser/launch");
+
 const sync = (
   actions: string[],
   options: CommandDeclaration["options"],
@@ -43,7 +45,7 @@ export const connectionCommands: CommandDeclaration[] = [
     help: ["serve [--home PATH] [--port PORT] [--no-open]"],
     async run(args) {
       requireCount(args, 1);
-      const { runBrowser } = await import("../../browser/launch");
+      const { runBrowser } = await loadBrowser();
       await runBrowser({
         home: option(args, "home"),
         port: option(args, "port"),
@@ -97,9 +99,15 @@ export const connectionCommands: CommandDeclaration[] = [
         : undefined;
       if (!option(args, "project")) {
         const { startLibraryMcp } = await import("../mcp-library");
+        const profile = process.env.SHOWAI_CODEX_WORKBENCH_PROFILE;
+        const home = service.store.root;
         await startLibraryMcp({
-          root: service.store.root,
+          root: home,
           presentationDirectory,
+          ...(profile ? {
+            openWorkbench: async (key) =>
+              (await loadBrowser()).startCodexWorkbenchBrowser({ home, profile, key }),
+          } : {}),
         });
       } else {
         const { startMcp } = await import("../mcp");

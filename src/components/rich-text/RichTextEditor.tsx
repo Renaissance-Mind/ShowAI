@@ -2162,7 +2162,7 @@ export default function RichTextEditor({
                       }}
                     >
                       <AtSign size={15} />
-                      {tc("copyReference")}
+                      {assistant.referenceLabel ?? tc("copyReference")}
                     </button>
                   )}
                   {comments?.block(editor.state.doc.nodeAt(hover.pos)?.attrs.id, () => setBlockMenu(false))}
@@ -2314,8 +2314,8 @@ export default function RichTextEditor({
               <button
                 type="button"
                 className="editor-tool editor-bubble-reference"
-                aria-label={tc("copyReference")}
-                title={t("assistant.referenceSelection", {
+                aria-label={assistant.referenceLabel ?? tc("copyReference")}
+                title={assistant.referenceLabel ?? t("assistant.referenceSelection", {
                   count: bubbleBlockCount,
                 })}
                 onClick={() => {

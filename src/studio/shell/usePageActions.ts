@@ -21,6 +21,8 @@ import { insertComponent } from "../../surface/component-insertion";
 import { desktop } from "../../host/bridge";
 import { formatSize } from "../../lib/format-size";
 import { useTranslator } from "../../i18n/react";
+import { codexWorkbench, codexWorkbenchCanReference, openCodexWorkbenchLink, rememberCodexWorkbenchPage, sendCodexWorkbenchReference } from "../../browser/codex-workbench";
+import codexWorkbenchMessages from "../../i18n/messages/codex-workbench";
 import assistantMessages from "../../i18n/messages/assistant";
 import commonMessages from "../../i18n/messages/common";
 import importMessages from "../../i18n/messages/imports";
@@ -154,6 +156,18 @@ export function usePageActions({
     const timer = setTimeout(() => setExportReceipt(null), 10000);
     return () => clearTimeout(timer);
   }, [exportReceipt]);
+  const tcodex = useTranslator(codexWorkbenchMessages);
+  useEffect(() => {
+    rememberCodexWorkbenchPage(page.projectId, activePageId ?? undefined);
+  }, [page.projectId, activePageId]);
+  const referenceOwner = useRef<string | undefined>(undefined);
+  const activeReferenceScope = `${page.projectId ?? ""}:${activePageId ?? ""}`;
+  useEffect(() => {
+    if (!referenceOwner.current || referenceOwner.current === activeReferenceScope) return;
+    referenceOwner.current = undefined;
+    void sendCodexWorkbenchReference().catch(report);
+  }, [activeReferenceScope, report]);
+
   async function copyPageReference(projectId: string, target: AgentTarget) {
     const pageId = target.pageId;
     if (!pageId) return;
@@ -179,9 +193,17 @@ export function usePageActions({
       target,
       ...(record ? { expectedHash: record.hash } : {}),
     });
-    await desktop.invoke("clipboard:write", {
-      text: formatReference(reference, referenceHeading(ta, reference)),
-    });
+    const text = formatReference(reference, referenceHeading(ta, reference));
+    const connection = codexWorkbench();
+    if (connection && codexWorkbenchCanReference()) {
+      await sendCodexWorkbenchReference(reference, text, target.components);
+      if (connection.mode === "thread") referenceOwner.current = activeReferenceScope;
+      setNotice(tcodex(connection.mode === "thread" ? "referenced" : "drafted", {
+        version: referenceVersion(reference),
+      }));
+      return;
+    }
+    await desktop.invoke("clipboard:write", { text });
     setNotice(
       ta("pageReference.copied", { version: referenceVersion(reference) }),
     );
@@ -467,7 +489,8 @@ export function usePageActions({
   ) {
     if (!target) return;
     const browserPrint = format === "pdf" && info?.mode === "browser";
-    let printTab = browserPrint ? window.open("", "_blank") : null;
+    const embedded = codexWorkbench();
+    let printTab = browserPrint && !embedded ? window.open("", "_blank") : null;
     setBusy(true);
     setContextMenu(null);
     try {
@@ -486,9 +509,12 @@ export function usePageActions({
           "export:printable",
           { ...target, ...(packaging ? { packaging } : {}) },
         );
-        if (printTab) printTab.location.href = url;
-        else printTab = window.open(url, "_blank");
-        if (!printTab) throw new Error(t("printTabBlocked"));
+        if (embedded) await openCodexWorkbenchLink(url);
+        else {
+          if (printTab) printTab.location.href = url;
+          else printTab = window.open(url, "_blank");
+          if (!printTab) throw new Error(t("printTabBlocked"));
+        }
         resolveProblem(operation("op.exportPage"));
         return;
       }

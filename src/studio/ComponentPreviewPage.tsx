@@ -1,3 +1,4 @@
+import { browserSearch } from "../browser/codex-workbench";
 import { BuiltinPreview } from "../components/BuiltinPreview";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import type {
@@ -22,7 +23,7 @@ export default function ComponentPreviewPage() {
   const [ready, setReady] = useState(false);
   const native = useRef<HTMLDivElement>(null);
   useEffect(() => {
-    const token = new URLSearchParams(location.search).get("previewToken");
+    const token = browserSearch().get("previewToken");
     if (token && (ready || error))
       window.showai?.previewReady?.(token, error || undefined);
   }, [ready, error]);
@@ -31,23 +32,23 @@ export default function ComponentPreviewPage() {
     window.parent.postMessage(
       {
         type: "showai:catalog-preview",
-        key: new URLSearchParams(location.search).get("componentPreview"),
+        key: browserSearch().get("componentPreview"),
         ready,
         error,
       },
-      location.origin,
+      window.origin === "null" ? "*" : window.origin,
     );
   }, [ready, error]);
   useLayoutEffect(() => {
     const args = JSON.parse(
-      new URLSearchParams(location.search).get("componentPreview")!,
+      browserSearch().get("componentPreview")!,
     );
     document.documentElement.dataset.theme =
       args.theme === "dark" ? "dark" : "light";
   }, []);
   useEffect(() => {
     let cancelled = false;
-    const params = new URLSearchParams(location.search);
+    const params = browserSearch();
     const args = JSON.parse(params.get("componentPreview")!) as Record<
       string,
       unknown

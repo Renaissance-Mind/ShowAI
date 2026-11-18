@@ -1,3 +1,4 @@
+import { useCodexReferenceLabel } from "../useCodexReferenceLabel";
 import {
   AppWindow,
   ArrowUpRight,
@@ -92,6 +93,7 @@ export function LibraryItemMenu({
 }) {
   const t = useTranslator(studioMessages);
   const tc = useTranslator(commonMessages);
+  const codexReference = useCodexReferenceLabel();
   const tn = useTranslator(navigationMessages);
   const tfind = useTranslator(findMessages);
   const accountFlow = useTranslator(accountFlowMessages);
@@ -165,7 +167,7 @@ export function LibraryItemMenu({
                 ...(contextMenu.target.kind === "page"
                   ? [
                       {
-                        label: tc("copyReference"),
+                        label: codexReference ?? tc("copyReference"),
                         icon: <AtSign size={15} />,
                         onSelect: action(() =>
                           copyPageReference(contextMenu.target.projectId, {

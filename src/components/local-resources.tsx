@@ -118,7 +118,7 @@ export async function grantLocalResource(
     return bridge.invoke<Grant>("media:resolve", { ref, kind }).then(
       (grant) => ({
         status: "ready",
-        url: new URL(localMediaUrl(grant.token), location.href).href,
+        url: new URL(localMediaUrl(grant.token), window.__SHOWAI_LOCAL__?.apiOrigin ?? location.href).href,
         name: grant.name,
         expiresAt: grant.expiresAt,
       }),

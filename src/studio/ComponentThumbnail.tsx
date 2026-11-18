@@ -1,3 +1,4 @@
+import { browserUrl, codexWorkbench } from "../browser/codex-workbench";
 import { useEffect, useRef, useState } from "react";
 import { ImageOff, Loader2 } from "../ui/icons";
 import type { CatalogComponent } from "../core/component-categories";
@@ -41,6 +42,28 @@ export default function ComponentThumbnail({
   const [error, setError] = useState("");
   const [scale, setScale] = useState(1);
   const key = JSON.stringify({ ...componentPreviewReference(item), theme });
+  const embedding = codexWorkbench();
+  const previewUrl = new URL(browserUrl("/"));
+  previewUrl.searchParams.set("componentPreview", key);
+  if (embedding) previewUrl.searchParams.set("codexWorkbench", embedding.key);
+  const previewAddress = previewUrl.href;
+  const [preview, setPreview] = useState({ address: "", html: "" });
+  useEffect(() => {
+    if (!embedding || !visible) return;
+    const cancel = new AbortController();
+    void fetch(previewAddress, { signal: cancel.signal })
+      .then((response) => {
+        if (!response.ok) throw new Error(`ShowAI preview ${response.status}`);
+        return response.text();
+      })
+      .then((html) => {
+        if (!cancel.signal.aborted) setPreview({ address: previewAddress, html });
+      }, (failure) => {
+        if (!cancel.signal.aborted)
+          setFrameState({ key, ready: false, error: errorMessage(failure) });
+      });
+    return () => cancel.abort();
+  }, [embedding, key, previewAddress, visible]);
   useEffect(() => {
     if (!browser || !visible) return;
     setFrameState({ key, ready: false, error: "" });
@@ -100,9 +123,6 @@ export default function ComponentThumbnail({
         );
     };
   }, [key, visible, browser, image.key]);
-  const previewUrl = new URL(location.href);
-  previewUrl.search = "";
-  previewUrl.searchParams.set("componentPreview", key);
   return (
     <div className="component-card-preview" ref={container} aria-hidden="true">
       {image.key === key && image.data ? (
@@ -112,7 +132,8 @@ export default function ComponentThumbnail({
           <iframe
             ref={frame}
             title={t("thumbnailTitle", { name: componentDisplayName(item) })}
-            src={previewUrl.href}
+            src={embedding ? undefined : previewAddress}
+            srcDoc={embedding && preview.address === previewAddress ? preview.html : undefined}
             tabIndex={-1}
             style={{
               transform: `translate(-50%, -50%) scale(${scale})`,
