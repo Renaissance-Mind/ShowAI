@@ -6,7 +6,7 @@ ShowAI lets your agent answer with interfaces — interactive, archived, and evo
 
 ## Install
 
-**Recommended: install from the ShowAI app.** Download the app from [GitHub Releases](https://github.com/Renaissance-Mind/ShowAI/releases/latest), open it, and use the plugin panel on the welcome screen or under **Settings → Plugins** to install the plugin for Claude Code, Codex or Antigravity. Install the agent first and make its command-line tool available. The app supplies the plugin and runtime; no source checkout or separate Node.js is needed. Restart the Claude Code or Antigravity session, or refresh plugins or restart Codex, then start a new conversation. The connection uses the app's current library; click **Update and enable** after switching libraries or moving the app. Disable a ShowAI plugin enabled from another source before installing the app version. See [Use ShowAI in Claude Code and Codex](https://github.com/Renaissance-Mind/ShowAI/blob/main/docs/codex.md).
+**Recommended: install from the ShowAI app.** Download the app from [GitHub Releases](https://github.com/Renaissance-Mind/ShowAI/releases/latest), open it, and use the plugin panel on the welcome screen or under **Settings → Plugins** to install the plugin for Claude Code, Codex or Antigravity. Install the agent first and make its command-line tool available. The app supplies the plugin and runtime; no source checkout or separate Node.js is needed. Restart the Claude Code or Antigravity session, or refresh plugins or restart Codex, then start a new conversation. The connection uses the app's current library; click **Update and enable** after switching libraries or moving the app. If the app reports a conflicting plugin source, disable the listed plugin in the host before installing the app version. See [Use ShowAI in Claude Code and Codex](https://github.com/Renaissance-Mind/ShowAI/blob/main/docs/codex.md).
 
 ### From a source checkout
 
@@ -18,7 +18,9 @@ npm run plugin:install -- --json
 npm run plugin:update -- --json
 ```
 
-The installer uses official Codex plugin commands and verifies enabled state, version and file fingerprints. It records artifacts/codex-plugin-install.json. Installation, host capability refresh and a conversation loading current tools/Skills are separate steps. Use the host's supported refresh procedure and confirm the current tools in a new conversation.
+The installer uses official Codex plugin commands and verifies enabled state, version and file fingerprints. For this source install, the receipt is `artifacts/codex-plugin-install.json`. Installation, host capability refresh and a conversation loading current tools/Skills are separate steps. Use the host's supported refresh procedure and confirm the current tools in a new conversation.
+
+To test the Codex workbench alongside the app plugin, build the checkout and run `npm run plugin:install -- --workbench-test <marketplace-directory> --home <absolute-library-path> --json`. This installs `showai-workbench-test`, binds it to the built runtime and selected library, and writes `codex-plugin-install.json` in the test marketplace directory.
 
 For everyday use, install the Claude Code plugin from the App; it connects the stable runtime. For development, start an instance (`npm run dev:open -- --port <port> --home <library>`), then in that checkout (the main directory or a worktree) run:
 
@@ -26,7 +28,9 @@ For everyday use, install the Claude Code plugin from the App; it connects the s
 npm run plugin:claude -- --port <port> --json
 ```
 
-The main directory gets `showai-dev` and a worktree gets `showai-dev-<worktree name>` (its name under `.git/worktrees/`), pinned to that instance's runtime and library. The plugin is enabled only in this checkout's `.claude/settings.json`, which also turns off the App-installed `showai` here, so a session sees one ShowAI plugin. `--remove` uninstalls this checkout's plugin; `--prune` cleans up after deleted worktrees. The receipt is artifacts/claude-plugin-install.json.
+Claude Code enables `showai-dev` in the main checkout or `showai-dev-<worktree name>` in a linked worktree. The name comes from Git’s worktree directory. The development plugin uses the selected instance’s runtime and library. If `showai@showai-desktop` is enabled globally, both plugins are available in that checkout. Choose the development plugin by name when testing.
+
+The installer writes `artifacts/claude-plugin-install.json` in the checkout. Run `npm run plugin:claude -- --remove` before deleting the worktree. Use `npm run plugin:claude -- --prune` to clean up plugins for worktrees already removed.
 
 For Antigravity (`agy` on PATH), install from the registered runtime or bind to a running development instance:
 

@@ -6,7 +6,7 @@ ShowAI 让 Agent 用界面回答——可以交互、可以归档、在使用中
 
 ## 安装
 
-**推荐从 ShowAI App 安装。** 从 [GitHub Releases](https://github.com/Renaissance-Mind/ShowAI/releases/latest) 下载并打开 App，在欢迎页或「设置 → 插件」中为 Claude Code、Codex 或 Antigravity 安装插件。先安装 Agent，并确保其命令行工具可用。App 提供插件和运行时，无需源码，也无需单独安装 Node.js。安装后 Claude Code 或 Antigravity 重启会话，Codex 刷新插件或重启，然后新开对话。连接使用 App 当前的内容库；切换内容库或移动 App 后点「更新并启用」。已有其他来源的 ShowAI 插件时，先在 Agent 中停用原插件，再安装 App 版本。详见[在 Claude Code 与 Codex 中使用](https://github.com/Renaissance-Mind/ShowAI/blob/main/docs/i18n/codex.zh-CN.md)。
+**推荐从 ShowAI App 安装。** 从 [GitHub Releases](https://github.com/Renaissance-Mind/ShowAI/releases/latest) 下载并打开 App，在欢迎页或「设置 → 插件」中为 Claude Code、Codex 或 Antigravity 安装插件。先安装 Agent，并确保其命令行工具可用。App 提供插件和运行时，无需源码，也无需单独安装 Node.js。安装后 Claude Code 或 Antigravity 重启会话，Codex 刷新插件或重启，然后新开对话。连接使用 App 当前的内容库；切换内容库或移动 App 后点「更新并启用」。如果 App 提示插件来源冲突，先在宿主中停用提示列出的插件，再安装 App 版本。详见[在 Claude Code 与 Codex 中使用](https://github.com/Renaissance-Mind/ShowAI/blob/main/docs/i18n/codex.zh-CN.md)。
 
 ### 从源码安装
 
@@ -18,7 +18,9 @@ npm run plugin:install -- --json
 npm run plugin:update -- --json
 ```
 
-安装器使用官方 Codex 插件命令，核验启用状态、版本与文件指纹，回执位于 artifacts/codex-plugin-install.json。安装完成、宿主能力刷新和会话加载是三个环节。按宿主支持的方式刷新，并在新对话确认当前工具与 Skill。
+安装器使用官方 Codex 插件命令，核验启用状态、版本与文件指纹，这次源码安装的回执位于 `artifacts/codex-plugin-install.json`。安装完成、宿主能力刷新和会话加载是三个环节。按宿主支持的方式刷新，并在新对话确认当前工具与 Skill。
+
+要在保留 App 插件的同时测试 Codex 工作台，先构建当前源码，再运行 `npm run plugin:install -- --workbench-test <测试市场目录> --home <内容库绝对路径> --json`。安装器以 `showai-workbench-test` 的名称安装测试插件，绑定本次构建的运行时与指定内容库，并将 `codex-plugin-install.json` 写入测试市场目录。
 
 Claude Code 的日常插件从 App 安装，连接稳定版。开发时先启动一个开发实例（`npm run dev:open -- --port <端口> --home <内容库>`），再在该源码目录（主目录或 worktree）执行：
 
@@ -26,7 +28,9 @@ Claude Code 的日常插件从 App 安装，连接稳定版。开发时先启动
 npm run plugin:claude -- --port <端口> --json
 ```
 
-主目录安装 `showai-dev`，worktree 安装 `showai-dev-<worktree 名>`（即 `.git/worktrees/` 下的名称），固定连接这个开发实例的运行时与内容库。插件只在这个目录的 `.claude/settings.json` 中启用，并在这里停用 App 安装的 `showai`，所以一个会话只看到一个 ShowAI 插件。`--remove` 卸载本目录的开发插件；worktree 删除后用 `--prune` 清理。回执位于 artifacts/claude-plugin-install.json。
+Claude Code 在主目录启用 `showai-dev`，在 worktree 启用 `showai-dev-<worktree 名>`，名称取自 Git 的 worktree 目录。开发插件使用所选实例的运行时与内容库。全局启用了 `showai@showai-desktop` 时，两套插件在该目录下都可用，测试时按名称选择开发插件。
+
+安装器将回执写入当前源码目录的 `artifacts/claude-plugin-install.json`。删除 worktree 前，在该目录运行 `npm run plugin:claude -- --remove` 卸载开发插件。worktree 已删除时，运行 `npm run plugin:claude -- --prune` 清理遗留插件。
 
 Antigravity（PATH 中有 `agy`）可连接已登记运行时或运行中的开发实例：
 
