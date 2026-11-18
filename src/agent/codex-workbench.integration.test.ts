@@ -56,14 +56,22 @@ it("opens both Codex workbench entries and saves into the MCP library", async ()
     const denied = await fetch(threadUrl.origin);
     expect(denied.status).toBe(403);
 
-    const origin = "https://web-sandbox.oaiusercontent.com";
+    const origin = "codex-sandbox://web-sandbox.oaiusercontent.com";
     const allowed = await fetch(new URL("/api/invoke", threadUrl), {
       method: "OPTIONS",
       headers: { Origin: origin, "Access-Control-Request-Headers": "Authorization, Content-Type" },
     });
     expect(allowed.status).toBe(204);
-    const forbidden = await fetch(threadUrl, { headers: { Origin: "https://outside.example" } });
-    expect(forbidden.status).toBe(403);
+    expect(allowed.headers.get("access-control-allow-origin")).toBe(origin);
+    for (const forbiddenOrigin of [
+      "https://outside.example",
+      "codex-sandbox://web-sandbox.oaiusercontent.com.outside.example",
+      "codex-sandbox://web-sandbox.oaiusercontent.com:8080",
+      "null",
+    ]) {
+      const forbidden = await fetch(threadUrl, { headers: { Origin: forbiddenOrigin } });
+      expect(forbidden.status).toBe(403);
+    }
 
     const bootstrap = await fetch(threadUrl, { headers: { Origin: origin } });
     expect(bootstrap.status).toBe(200);

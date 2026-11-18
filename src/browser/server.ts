@@ -72,9 +72,20 @@ export interface BrowserServerOptions {
   development?: { origin: string; token: string; sourceCommit?: string };
 }
 
+const codexSandboxDomains = [
+  "web-sandbox.oaiusercontent.com",
+  "staging-web-sandbox.oaiusercontent.com",
+];
+
 function allowsCodexOrigin(value: string): boolean {
   if (value === "app://-") return true;
   const url = URL.parse(value);
+  if (url?.protocol === "codex-sandbox:") {
+    return value === `codex-sandbox://${url.hostname}` &&
+      codexSandboxDomains.some((domain) =>
+        url.hostname === domain || url.hostname.endsWith(`.${domain}`),
+      );
+  }
   return url?.origin === value && url.protocol === "https:" &&
     (url.hostname === "chatgpt.com" ||
       url.hostname.endsWith(".chatgpt.com") ||
