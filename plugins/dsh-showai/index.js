@@ -1,13 +1,15 @@
+import { createHash, randomUUID } from "node:crypto";
 import { createServer } from "node:http";
 import { mkdir, readFile, readdir, rename, rm, stat, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join } from "node:path";
 
 export const PREVIEW_ROUTE = "/showai-page-preview";
-const PRESENTATION_TOOL = /^mcp__[A-Za-z0-9_-]+__(?:page_present|render_document|show_component)$/;
+const PRESENTATION_TOOL = /^mcp__showai__(?:page_present|render_document|show_component)$/;
 const MAX_PREVIEWS = 40;
 const MAX_PREVIEW_BYTES = 12 * 1024 * 1024;
-const PREVIEW_NAME = /^[A-Za-z0-9_-]{1,96}\.html$/;
+const SIMPLE_ID = /^[A-Za-z0-9_-]{1,96}$/;
+const PREVIEW_NAME = /^(?:[A-Za-z0-9_-]{1,96}|id\.[a-f0-9]{64})\.html$/;
 const FRAGMENT_LANGUAGE = /<section\b[^>]*\blang="([A-Za-z0-9-]{1,32})"/i;
 
 function cacheRoot() {
@@ -16,7 +18,10 @@ function cacheRoot() {
 }
 
 function fileNameFor(callId) {
-  return `${String(callId).replace(/[^A-Za-z0-9_-]/g, "_")}.html`;
+  const id = String(callId);
+  return SIMPLE_ID.test(id)
+    ? id + ".html"
+    : "id." + createHash("sha256").update(id).digest("hex") + ".html";
 }
 
 function escapeHtmlText(value) {
@@ -94,6 +99,8 @@ async function prune(root) {
 }
 
 async function cachePreview(callId, presentation, root) {
+  const { size } = await stat(presentation.source);
+  if (size > MAX_PREVIEW_BYTES) throw new Error(`preview is ${size} bytes; outside the cache budget`);
   const body = completePreviewDocument(await readFile(presentation.source), presentation.title);
   if (body.byteLength === 0 || body.byteLength > MAX_PREVIEW_BYTES) {
     throw new Error(`preview is ${body.byteLength} bytes; outside the cache budget`);
@@ -101,7 +108,7 @@ async function cachePreview(callId, presentation, root) {
   await mkdir(root, { recursive: true });
   const name = fileNameFor(callId);
   const target = join(root, name);
-  const temporary = join(root, `.${name}.${process.pid}.${Date.now()}.tmp`);
+  const temporary = join(root, `.${name}.${randomUUID()}.tmp`);
   try {
     await writeFile(temporary, body);
     await rename(temporary, target);
@@ -112,11 +119,7 @@ async function cachePreview(callId, presentation, root) {
   await prune(root);
 }
 
-async function readPreview(name) {
-  return completePreviewDocument(await readFile(join(cacheRoot(), name)));
-}
-
-function startPreviewOrigin(log) {
+function startPreviewOrigin(root, log) {
   const server = createServer((request, response) => {
     void (async () => {
       let name = "";
@@ -132,7 +135,7 @@ function startPreviewOrigin(log) {
       }
       let body;
       try {
-        body = await readPreview(name);
+        body = completePreviewDocument(await readFile(join(root, name)));
       } catch {
         response.writeHead(404, { "content-type": "text/plain; charset=utf-8" });
         response.end("not found");
@@ -171,7 +174,7 @@ export function apply(ctx) {
   const ready = (async () => {
     await mkdir(root, { recursive: true });
     await prune(root);
-    return startPreviewOrigin(log);
+    return startPreviewOrigin(root, log);
   })().catch((error) => {
     log?.warn?.(`showai-page: preview origin failed to start: ${error?.message ?? error}`);
     return undefined;
@@ -185,7 +188,7 @@ export function apply(ctx) {
   );
 
   ctx.on("tools/result", (exec, result) => {
-    if (!PRESENTATION_TOOL.test(exec.name)) return;
+    if (!PRESENTATION_TOOL.test(exec.name) || exec.callId == null || exec.callId === "") return;
     const presentation = presentationFromResult(result);
     if (presentation === undefined) return;
     void cachePreview(exec.callId, presentation, root).catch((error) => {
@@ -204,9 +207,11 @@ export function apply(ctx) {
           const origin = await ready;
           let name = "";
           try {
-            name = decodeURIComponent(
-              new URL(request.url ?? "/", "http://127.0.0.1").pathname.slice(PREVIEW_ROUTE.length + 1),
-            );
+            const url = new URL(request.url ?? "/", "http://127.0.0.1");
+            const callId = url.searchParams.get("callId");
+            name = url.pathname === PREVIEW_ROUTE + "/by-id" && callId
+              ? fileNameFor(callId)
+              : decodeURIComponent(url.pathname.slice(PREVIEW_ROUTE.length + 1));
           } catch {
             name = "";
           }

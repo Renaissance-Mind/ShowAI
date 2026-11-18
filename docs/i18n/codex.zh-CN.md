@@ -66,7 +66,7 @@ npm run plugin:install -- --json
 npm run plugin:update -- --json
 ```
 
-要在保留 App 插件的同时测试 Codex 工作台，先构建当前源码，再运行 `npm run plugin:install -- --workbench-test <测试市场目录> --home <内容库绝对路径> --json`。安装器以 `showai-workbench-test` 的名称安装测试插件，绑定本次构建的运行时与指定内容库，并将 `codex-plugin-install.json` 写入测试市场目录。
+要在保留 App 插件的同时测试 Codex 工作台，先构建当前源码，再运行 `npm run plugin:install -- --workbench-test <测试市场目录> --home <内容库绝对路径> --json`。安装器以 `showai-workbench-test` 的名称安装测试插件，绑定本次构建的运行时与指定内容库，并将 `codex-plugin-install.json` 写入测试市场目录。并行测试其他 checkout 时，为它指定独立目录，并加 `--workbench-channel <名称>` 分别注册插件和 MCP。
 
 安装器使用官方 Codex 插件命令，并核验版本、启用状态和文件指纹。
 

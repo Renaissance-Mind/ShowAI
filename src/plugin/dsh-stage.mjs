@@ -2,23 +2,23 @@ import { createHash } from "node:crypto";
 import {
   cp,
   mkdir,
+  mkdtemp,
   readFile,
   readdir,
   realpath,
-  rename,
   rm,
   writeFile,
 } from "node:fs/promises";
 import { homedir } from "node:os";
 import { dirname, isAbsolute, join, resolve } from "node:path";
-import { bindHostSkills } from "./host-package.mjs";
+import { bindHostSkills, publishPluginDirectory } from "./host-package.mjs";
 
 export const DSH_BUNDLE = "@showai/dsh-showai";
 export const DSH_LEGACY_BUNDLES = [
   "@showai/dsh-showai-preview",
   "@showai/dsh-showai-page",
 ];
-const BUNDLE_FILES = [
+export const DSH_BUNDLE_FILES = [
   "package.json",
   "cordis.patch.yml",
   "index.js",
@@ -101,6 +101,13 @@ export async function stageDshBundle({
     throw new Error(
       "Invalid ShowAI DeepSeek Harness bundle or agent plugin source.",
     );
+  const existing = await readOptional(join(target, "package.json"));
+  const entries = await readdir(target).catch((error) => {
+    if (error.code === "ENOENT") return [];
+    throw error;
+  });
+  if (entries.length && (!existing || JSON.parse(existing).name !== DSH_BUNDLE))
+    throw new Error(`Another package owns the DeepSeek bundle directory: ${target}`);
   const before = await dshFingerprint(pluginRoot);
   const version = `${bundle.version}+showai.${plugin.version}`;
   const server = {
@@ -113,12 +120,10 @@ export async function stageDshBundle({
     },
     cwd: home,
   };
-  const staging = `${target}.staging-${process.pid}-${Date.now()}`;
   await mkdir(dirname(target), { recursive: true });
-  await rm(staging, { recursive: true, force: true });
+  const staging = await mkdtemp(target + ".staging-");
   try {
-    await mkdir(staging);
-    for (const file of BUNDLE_FILES)
+    for (const file of DSH_BUNDLE_FILES)
       await cp(join(bundleRoot, file), join(staging, file));
     await bindHostSkills({
       source: pluginRoot,
@@ -143,8 +148,7 @@ export async function stageDshBundle({
       throw new Error(
         "The ShowAI agent plugin changed while staging. Retry after the build finishes.",
       );
-    await rm(target, { recursive: true, force: true });
-    await rename(staging, target);
+    await publishPluginDirectory(staging, target);
   } catch (error) {
     await rm(staging, { recursive: true, force: true });
     throw error;

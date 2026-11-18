@@ -27,6 +27,7 @@ export function writeHostLauncher(
   target: string,
   profile: HostProfile,
 ): Promise<void>;
+export function publishPluginDirectory(staging: string, target: string): Promise<void>;
 export function stageHostPlugin(options: {
   source: string;
   target: string;

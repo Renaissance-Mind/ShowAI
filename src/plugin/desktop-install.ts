@@ -2,6 +2,7 @@ import {
   access,
   cp,
   mkdir,
+  mkdtemp,
   readFile,
   readdir,
   realpath,
@@ -27,8 +28,14 @@ import {
   type RuntimeLaunch,
 } from "../agent/runtime";
 import { PluginInstallError, VERIFIED_HOST_VERSIONS } from "./plugin-errors";
-import { bindHostSkills, HOST_PROFILES, writeHostLauncher } from "./host-package.mjs";
 import {
+  bindHostSkills,
+  HOST_PROFILES,
+  writeHostLauncher,
+  publishPluginDirectory,
+} from "./host-package.mjs";
+import {
+  DSH_BUNDLE_FILES,
   inspectDshProfile,
   stageDshBundle,
   type DshProfileState,
@@ -113,7 +120,7 @@ export function pluginInstallerAction(
   }
 }
 
-export async function pluginFingerprint(root: string) {
+async function fileHashes(root: string) {
   const files: [string, string][] = [];
   async function visit(directory: string, prefix = "") {
     for (const entry of (
@@ -137,12 +144,40 @@ export async function pluginFingerprint(root: string) {
     }
   }
   await visit(root);
+  return files;
+}
+
+function fingerprint(files: [string, string][]) {
   return {
     verifiedFiles: files.length,
     treeSha256: createHash("sha256")
       .update(JSON.stringify(files))
       .digest("hex"),
   };
+}
+
+export async function pluginFingerprint(root: string) {
+  return fingerprint(await fileHashes(root));
+}
+
+function hostFiles(host: PluginHost, files: [string, string][]) {
+  return files.filter(([name]) => {
+    if (name.startsWith("host-adapters/"))
+      return (
+        name === `host-adapters/${host}.md` ||
+        (host === "codex" &&
+          [
+            "host-adapters/codex-entry.md",
+            "host-adapters/launch.mjs.in",
+          ].includes(name))
+      );
+    if (name === "skills/use-showai/references/host-adapter.md") return false;
+    if (host === "deepseek")
+      return name.startsWith("skills/") || name === "mcp/launch.mjs";
+    if (name.startsWith(".claude-plugin/")) return host === "claude";
+    if (name === "mcp.json" || name === ".mcp.json") return false;
+    return host !== "codex" || name !== "mcp/launch.mjs";
+  });
 }
 
 async function exists(path: string, mode = constants.F_OK) {
@@ -185,28 +220,16 @@ function dshSteps(path: string, state: DshProfileState): DshPendingSteps {
   };
 }
 
-async function writeLauncher(
-  directory: string,
-  server: { command: string; args: string[] },
-) {
+function launcherScript(server: { command: string; args: string[] }) {
   const words = [server.command, ...server.args];
   if (process.platform === "win32") {
     const line = words.map((word) => `"${word}"`).join(" ");
-    await writeFile(
-      join(directory, "showai-mcp.cmd"),
-      `@echo off\r\n${line} %*\r\n`,
-    );
-    return "showai-mcp.cmd";
+    return { name: "showai-mcp.cmd", text: `@echo off\r\n${line} %*\r\n` };
   }
   const line = words
     .map((word) => `'${word.replaceAll("'", `'\\''`)}'`)
     .join(" ");
-  await writeFile(
-    join(directory, "showai-mcp"),
-    `#!/bin/sh\nexec ${line} "$@"\n`,
-    { mode: 0o755 },
-  );
-  return "showai-mcp";
+  return { name: "showai-mcp", text: `#!/bin/sh\nexec ${line} "$@"\n` };
 }
 
 export async function hostExecutable(host: PluginHost) {
@@ -419,7 +442,7 @@ export class DesktopPluginInstaller {
     };
   }
 
-  private async expectedVersion() {
+  private async packageSource() {
     const manifest = JSON.parse(
       await readFile(join(this.options.pluginRoot(), "plugin.json"), "utf8"),
     );
@@ -428,29 +451,98 @@ export class DesktopPluginInstaller {
         "PLUGIN_BUNDLE_INVALID",
         "Invalid bundled ShowAI plugin.",
       );
-    const original = await pluginFingerprint(this.options.pluginRoot());
-    const version = `${manifest.version}+desktop.${createHash("sha256")
-      .update(JSON.stringify([original.treeSha256, this.options.runtime()]))
-      .digest("hex")
-      .slice(0, 12)}`;
-    return { manifest, original, version };
+    const files = await fileHashes(this.options.pluginRoot());
+    const { home, cli } = this.options.runtime();
+    return { manifest, files, runtime: { home, cli } };
   }
 
-  private async dshSource() {
-    const [bundle, plugin] = await Promise.all([
-      pluginFingerprint(this.options.dshBundleRoot()),
-      pluginFingerprint(this.options.pluginRoot()),
-    ]);
-    return createHash("sha256")
-      .update(
-        JSON.stringify([
-          bundle.treeSha256,
-          plugin.treeSha256,
-          this.options.runtime(),
-        ]),
-      )
+  private hostLaunch(
+    host: Exclude<PluginHost, "deepseek">,
+    runtime: { home: string; cli: RuntimeLaunch },
+  ) {
+    const bindingId = createHash("sha256")
+      .update(JSON.stringify([this.options.channel, runtime.home, runtime.cli]))
+      .digest("hex");
+    const record = join(
+      this.options.root,
+      "runtimes",
+      host,
+      bindingId + ".json",
+    );
+    const env = {
+      ...runtime.cli.env,
+      SHOWAI_HOME: runtime.home,
+      SHOWAI_RUNTIME_CONFIG: record,
+      SHOWAI_HOST_DISPLAY: HOST_PROFILES[host],
+      ...(host === "codex" && {
+        SHOWAI_CODEX_WORKBENCH_PROFILE: join(
+          this.options.root,
+          "codex-workbench",
+        ),
+      }),
+    };
+    const server = {
+      command: runtime.cli.command,
+      args: [join(this.options.root, host, "plugins/showai/mcp/launch.mjs")],
+      env,
+    };
+    if (host === "codex") {
+      const launcher = launcherScript(server);
+      return {
+        record,
+        launcher,
+        filename: "mcp.json",
+        config: {
+          $schema: "https://agent-plugins.org/schemas/1.0.0/mcp.schema.json",
+          mcpServers: {
+            showai: {
+              type: "stdio",
+              command: "./mcp/" + launcher.name,
+              args: [],
+              env,
+            },
+          },
+        },
+      };
+    }
+    return {
+      record,
+      filename: host === "claude" ? ".mcp.json" : "mcp_config.json",
+      config: { mcpServers: { showai: server } },
+    };
+  }
+
+  private async expectedVersion(
+    host: PluginHost,
+    source = this.packageSource(),
+  ) {
+    const { manifest, files, runtime } = await source;
+    const inputs: unknown[] = [
+      manifest.version,
+      hostFiles(host, files),
+      runtime,
+    ];
+    if (host === "deepseek") {
+      inputs.push(
+        await Promise.all(
+          DSH_BUNDLE_FILES.map(async (name) => [
+            name,
+            createHash("sha256")
+              .update(await readFile(join(this.options.dshBundleRoot(), name)))
+              .digest("hex"),
+          ]),
+        ),
+      );
+    } else {
+      inputs.push(this.hostLaunch(host, runtime));
+    }
+    const digest = createHash("sha256")
+      .update(JSON.stringify(inputs))
       .digest("hex")
       .slice(0, 12);
+    return host === "deepseek"
+      ? digest
+      : `${manifest.version}+desktop.${digest}`;
   }
 
   private async inspect(
@@ -471,7 +563,7 @@ export class DesktopPluginInstaller {
       join(this.options.root, `${host}-install.json`),
       "utf8",
     ).then(
-      (text) => JSON.parse(text) as { home?: unknown },
+      (text) => JSON.parse(text) as { home?: unknown; version?: string },
       (error: NodeJS.ErrnoException) => {
         if (error.code === "ENOENT") return undefined;
         throw error;
@@ -499,7 +591,9 @@ export class DesktopPluginInstaller {
       current: !!own?.version && !!expected && own.version === (await expected),
       expected: expected ? await expected : undefined,
       installedPath: own?.installedPath ?? own?.installPath ?? own?.path,
-      ...(own && typeof receipt?.home === "string"
+      ...(own &&
+      receipt?.version === own.version &&
+      typeof receipt?.home === "string"
         ? { boundHome: receipt.home }
         : {}),
       otherSources: items
@@ -532,7 +626,7 @@ export class DesktopPluginInstaller {
 
   async status(only?: PluginHost) {
     await mkdir(this.options.root, { recursive: true });
-    let expected: Promise<string> | undefined;
+    let source: ReturnType<DesktopPluginInstaller["packageSource"]> | undefined;
     const manual = await this.manualPaths();
     return Promise.all(
       (only ? [only] : PLUGIN_HOSTS).map(
@@ -551,11 +645,7 @@ export class DesktopPluginInstaller {
             return await this.inspect(
               host,
               executable,
-              host === "deepseek"
-                ? this.dshSource()
-                : (expected ??= this.expectedVersion().then(
-                    (item) => item.version,
-                  )),
+              this.expectedVersion(host, (source ??= this.packageSource())),
             );
           } catch (error) {
             return {
@@ -596,8 +686,9 @@ export class DesktopPluginInstaller {
         "Install DeepSeek Harness first, then refresh.",
         { host: "deepseek" },
       );
-    const runtime = this.options.runtime();
-    const source = await this.dshSource();
+    const input = this.packageSource();
+    const { runtime } = await input;
+    const source = await this.expectedVersion("deepseek", input);
     const staged = await stageDshBundle({
       target: this.dshTarget(),
       bundleRoot: this.options.dshBundleRoot(),
@@ -677,103 +768,69 @@ export class DesktopPluginInstaller {
           );
       }
     }
-    const runtime = this.options.runtime();
-    const { manifest, original, version } = await this.expectedVersion();
-    await rm(source, { recursive: true, force: true });
-    await cp(this.options.pluginRoot(), source, {
-      recursive: true,
-      errorOnExist: true,
-      force: false,
-    });
-    if ((await pluginFingerprint(source)).treeSha256 !== original.treeSha256)
-      throw new PluginInstallError(
-        "PLUGIN_BUNDLE_CHANGED",
-        "The bundled plugin changed while being copied. Retry after the build finishes.",
-      );
-    await bindHostSkills({
-      source: this.options.pluginRoot(),
-      target: source,
-      profile: host,
-    });
-    await rm(join(source, "host-adapters"), { recursive: true, force: true });
+    const sourceInfo = this.packageSource();
+    const { manifest, files, runtime } = await sourceInfo;
+    const original = fingerprint(files);
+    const version = await this.expectedVersion(host, sourceInfo);
     const json = async (path: string, value: unknown) => {
       await writeFile(path, JSON.stringify(value, null, 2) + "\n");
     };
-    const record = join(this.options.root, `${host}-runtime.json`);
-    await writeRuntimeRecord(
-      record,
-      runtime.home,
-      runtime.cli,
-      this.options.channel,
-    );
-    const server = {
-      command: runtime.cli.command,
-      args: [join(source, "mcp/launch.mjs")],
-      env: {
-        ...runtime.cli.env,
-        SHOWAI_HOME: runtime.home,
-        SHOWAI_RUNTIME_CONFIG: record,
-      },
-    };
-    await json(join(source, "plugin.json"), { ...manifest, version });
-    const claudeManifest = JSON.parse(
-      await readFile(join(source, ".claude-plugin/plugin.json"), "utf8"),
-    );
-    await json(join(source, ".claude-plugin/plugin.json"), {
-      ...claudeManifest,
-      version,
-    });
-    if (host === "codex") {
-      await writeHostLauncher(this.options.pluginRoot(), source, host);
-      const launcher = await writeLauncher(join(source, "mcp"), server);
-      await json(join(source, "mcp.json"), {
-        $schema: "https://agent-plugins.org/schemas/1.0.0/mcp.schema.json",
-        mcpServers: {
-          showai: {
-            type: "stdio",
-            command: `./mcp/${launcher}`,
-            args: [],
-            env: {
-              ...server.env,
-              SHOWAI_HOST_DISPLAY: HOST_PROFILES.codex,
-              SHOWAI_CODEX_WORKBENCH_PROFILE: join(this.options.root, "codex-workbench"),
-            },
-          },
-        },
+    await mkdir(join(marketplace, "plugins"), { recursive: true });
+    const staging = await mkdtemp(join(marketplace, "plugins/.showai-"));
+    try {
+      await cp(this.options.pluginRoot(), staging, {
+        recursive: true,
       });
-      await rm(join(source, ".claude-plugin"), {
+      if ((await pluginFingerprint(staging)).treeSha256 !== original.treeSha256)
+        throw new PluginInstallError(
+          "PLUGIN_BUNDLE_CHANGED",
+          "The bundled plugin changed while being copied. Retry after the build finishes.",
+        );
+      await bindHostSkills({
+        source: this.options.pluginRoot(),
+        target: staging,
+        profile: host,
+      });
+      await rm(join(staging, "host-adapters"), {
         recursive: true,
         force: true,
       });
-      await rm(join(source, ".mcp.json"), { force: true });
-    } else if (host === "claude") {
-      await json(join(source, ".mcp.json"), {
-        mcpServers: {
-          showai: {
-            ...server,
-            env: { ...server.env, SHOWAI_HOST_DISPLAY: HOST_PROFILES.claude },
-          },
-        },
+      const launch = this.hostLaunch(host, runtime);
+      await writeRuntimeRecord(
+        launch.record,
+        runtime.home,
+        runtime.cli,
+        this.options.channel,
+      );
+      await json(join(staging, launch.filename), launch.config);
+      await json(join(staging, "plugin.json"), { ...manifest, version });
+      const claudeManifest = JSON.parse(
+        await readFile(join(staging, ".claude-plugin/plugin.json"), "utf8"),
+      );
+      await json(join(staging, ".claude-plugin/plugin.json"), {
+        ...claudeManifest,
+        version,
       });
-      await rm(join(source, "mcp.json"), { force: true });
-    } else {
-      await json(join(source, "mcp_config.json"), {
-        mcpServers: {
-          showai: {
-            ...server,
-            env: {
-              ...server.env,
-              SHOWAI_HOST_DISPLAY: HOST_PROFILES.antigravity,
-            },
-          },
-        },
-      });
-      await rm(join(source, ".claude-plugin"), {
-        recursive: true,
-        force: true,
-      });
-      await rm(join(source, ".mcp.json"), { force: true });
-      await rm(join(source, "mcp.json"), { force: true });
+      if (launch.launcher) {
+        await writeHostLauncher(this.options.pluginRoot(), staging, host);
+        await writeFile(
+          join(staging, "mcp", launch.launcher.name),
+          launch.launcher.text,
+          { mode: 0o755 },
+        );
+      }
+      if (host !== "claude") {
+        await rm(join(staging, ".claude-plugin"), {
+          recursive: true,
+          force: true,
+        });
+        await rm(join(staging, ".mcp.json"), { force: true });
+      }
+      if (host !== "codex")
+        await rm(join(staging, "mcp.json"), { force: true });
+      await publishPluginDirectory(staging, source);
+    } finally {
+      await rm(staging, { recursive: true, force: true });
     }
     await mkdir(join(marketplace, ".agents/plugins"), { recursive: true });
     await mkdir(join(marketplace, ".claude-plugin"), { recursive: true });

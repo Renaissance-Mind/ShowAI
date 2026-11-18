@@ -1,5 +1,14 @@
-import { cp, mkdir, readFile, readdir, rm, writeFile } from "node:fs/promises";
-import { createHash } from "node:crypto";
+import {
+  cp,
+  mkdir,
+  mkdtemp,
+  readFile,
+  readdir,
+  rename,
+  rm,
+  writeFile,
+} from "node:fs/promises";
+import { createHash, randomUUID } from "node:crypto";
 import { dirname, isAbsolute, join, resolve, relative, sep } from "node:path";
 
 export const HOST_PROFILES = {
@@ -116,6 +125,24 @@ export async function writeHostLauncher(source, target, profile) {
   await writeFile(join(target, "mcp/launch.mjs"), parts.join(cache));
 }
 
+export async function publishPluginDirectory(staging, target) {
+  const previous = target + ".previous-" + randomUUID();
+  const moved = await rename(target, previous).then(
+    () => true,
+    (error) => {
+      if (error.code === "ENOENT") return false;
+      throw error;
+    },
+  );
+  try {
+    await rename(staging, target);
+  } catch (error) {
+    if (moved) await rename(previous, target);
+    throw error;
+  }
+  if (moved) await rm(previous, { recursive: true });
+}
+
 export async function stageHostPlugin({ source, target, profile }) {
   if (!["codex", "claude", "antigravity"].includes(profile))
     throw new Error(`Use the native bundle packager for ${profile}.`);
@@ -146,40 +173,52 @@ export async function stageHostPlugin({ source, target, profile }) {
   });
   if (entries.length && !previous)
     throw new Error(`Refusing to replace a non-generated plugin: ${target}`);
-  await rm(target, { recursive: true, force: true });
   await mkdir(dirname(target), { recursive: true });
-  await cp(source, target, {
-    recursive: true,
-    filter: (file) => relative(source, file).split(sep)[0] !== "host-adapters",
-  });
-  const receipt = await bindHostSkills({ source, target, profile });
-  if (profile === "codex") {
-    await writeHostLauncher(source, target, profile);
-    await rm(join(target, ".claude-plugin"), { recursive: true, force: true });
-    await rm(join(target, ".mcp.json"), { force: true });
-  } else if (profile === "claude") {
-    await rm(join(target, "mcp.json"), { force: true });
-  } else {
-    await rm(join(target, ".claude-plugin"), { recursive: true, force: true });
-    await rm(join(target, ".mcp.json"), { force: true });
-    await rm(join(target, "mcp.json"), { force: true });
-    await writeFile(
-      join(target, "mcp_config.json"),
-      JSON.stringify(
-        {
-          mcpServers: {
-            showai: {
-              command: "node",
-              args: ["./mcp/launch.mjs"],
-              cwd: "./",
-              env: { SHOWAI_HOST_DISPLAY: receipt.declaredHostDisplay },
+  const staging = await mkdtemp(join(dirname(target), ".host-package-"));
+  try {
+    await cp(source, staging, {
+      recursive: true,
+      filter: (file) =>
+        relative(source, file).split(sep)[0] !== "host-adapters",
+    });
+    const receipt = await bindHostSkills({ source, target: staging, profile });
+    if (profile === "codex") {
+      await writeHostLauncher(source, staging, profile);
+      await rm(join(staging, ".claude-plugin"), {
+        recursive: true,
+        force: true,
+      });
+      await rm(join(staging, ".mcp.json"), { force: true });
+    } else if (profile === "claude") {
+      await rm(join(staging, "mcp.json"), { force: true });
+    } else {
+      await rm(join(staging, ".claude-plugin"), {
+        recursive: true,
+        force: true,
+      });
+      await rm(join(staging, ".mcp.json"), { force: true });
+      await rm(join(staging, "mcp.json"), { force: true });
+      await writeFile(
+        join(staging, "mcp_config.json"),
+        JSON.stringify(
+          {
+            mcpServers: {
+              showai: {
+                command: "node",
+                args: ["./mcp/launch.mjs"],
+                cwd: "./",
+                env: { SHOWAI_HOST_DISPLAY: receipt.declaredHostDisplay },
+              },
             },
           },
-        },
-        null,
-        2,
-      ) + "\n",
-    );
+          null,
+          2,
+        ) + "\n",
+      );
+    }
+    await publishPluginDirectory(staging, target);
+    return receipt;
+  } finally {
+    await rm(staging, { recursive: true, force: true });
   }
-  return receipt;
 }

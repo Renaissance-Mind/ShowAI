@@ -1,3 +1,4 @@
+export const DSH_BUNDLE_FILES: readonly string[];
 export declare const DSH_BUNDLE: string;
 export declare const DSH_LEGACY_BUNDLES: string[];
 export declare function dshHome(): string;

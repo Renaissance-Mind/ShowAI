@@ -54,7 +54,7 @@ closes that gap without changing the wire contract.
 Host half (`index.js`):
 
 1. Observes the settled `tools/result` of a ShowAI presentation tool and copies
-   the delivered HTML into `$DSH_HOME/cache/showai-page/<callId>.html`. Both
+   the delivered HTML into `$DSH_HOME/cache/showai-page/<callId>.html`. Long IDs and IDs with punctuation use a SHA-256 cache key. Both
    root calls and PTC subcalls are handled, because both reach the same keyed
    Client view.
 2. Turns the delivered file into a complete document. `delivery.html` is already
@@ -67,7 +67,7 @@ Host half (`index.js`):
    session data or `/api`, while they keep a real origin for storage and workers.
 4. Registers one same-origin route on the Harness web server,
    `/showai-page-preview/<callId>.html`, which answers the card's `HEAD`
-   availability probe from the cache and `302`s a real load to the preview
+   availability probe from the cache. Complex IDs use `/showai-page-preview/by-id?callId=…`. A real load redirects to the preview
    origin. The browser gets no CORS access to that origin, only a navigation.
 
 Client half (`client.js`):
@@ -116,7 +116,7 @@ npm test
 
 预览行将 ShowAI page_present 与 render_document 的结果呈现在对话中，提供刷新、展开、新标签页与完整 HTML 操作。
 
-ShowAI 返回 delivery.inline/html 文件路径与 MCP _meta.showai.inline。Harness 桥保留文字但不传递 _meta，因此本 bundle 在工具结果完成后把 HTML 复制到 $DSH_HOME/cache/showai-page/<callId>.html，并从独立随机 loopback origin 提供。该 origin 无法读取 Harness DOM、会话或 /api，同时可使用自己的存储与 worker。
+ShowAI 返回 delivery.inline/html 文件路径与 MCP _meta.showai.inline。Harness 桥保留文字但不传递 _meta，因此本 bundle 在工具结果完成后把 HTML 保存到 $DSH_HOME/cache/showai-page/。较长或带特殊字符的调用 ID 使用 SHA-256 缓存键。插件从独立的本机 HTTP 地址提供预览。该 origin 无法读取 Harness DOM、会话或 /api，同时可使用自己的存储与 worker。
 
 delivery.html 已是完整文件，按原字节保存；delivery.inline 通常是供宿主嵌入的阅读器片段，缓存会补上 doctype、head 与 body 外壳。直接以片段作为文档加载会进入 quirks mode，导致 KaTeX 停用并改变布局；旧缓存片段在读取时也会补外壳。client.js 为两个工具注册 tool.call.toolview，使用 sandbox iframe 显示；可用性探测会短暂重试，因为宿主在结果之后异步写入缓存。预览用 delivery.inline，而“打开完整 HTML”使用 delivery.html；“局部”标签只在调用确实带 blockIds 选择时出现。缓存保留最近 40 页，进程重启后旧对话仍可读取。
 

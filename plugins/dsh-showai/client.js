@@ -81,8 +81,11 @@ window.__ModuleLoader__.load({
 `;
     const tagId = "@showai/dsh-showai/preview.css";
 
-    function previewFile(callId) {
-      return `${String(callId).replace(/[^A-Za-z0-9_-]/g, "_")}.html`;
+    function previewUrl(callId, query) {
+      const id = String(callId);
+      return /^[A-Za-z0-9_-]{1,96}$/.test(id)
+        ? ROUTE + "/" + id + ".html?" + query
+        : ROUTE + "/by-id?callId=" + encodeURIComponent(id) + "&" + query;
     }
 
     function textOf(content) {
@@ -159,8 +162,8 @@ window.__ModuleLoader__.load({
       const [expanded, setExpanded] = React.useState(false);
       const [reload, setReload] = React.useState(0);
       const [probe, setProbe] = React.useState("idle");
-      const url = `${ROUTE}/${encodeURIComponent(previewFile(callId))}`;
-      const probeUrl = `${url}?probe=${reload}`;
+      const url = previewUrl(callId, "v=" + reload);
+      const probeUrl = previewUrl(callId, "probe=" + reload);
 
       React.useEffect(() => {
         if (!model.hasPage) {
@@ -324,7 +327,7 @@ window.__ModuleLoader__.load({
               probe === "ready"
                 ? h("iframe", {
                     key: `${reload}`,
-                    src: `${url}?v=${reload}`,
+                    src: url,
                     title: model.title ?? tr("row.title"),
                     sandbox:
                       "allow-scripts allow-same-origin allow-forms allow-modals allow-popups allow-downloads",
@@ -349,7 +352,6 @@ window.__ModuleLoader__.load({
       );
     }
 
-    const PRESENTATION_TOOL = /^mcp__[A-Za-z0-9_-]+__(?:page_present|render_document|show_component)$/;
 
     function presentationOf(message) {
       if (message === null || typeof message !== "object" || message.isError === true) return undefined;
@@ -386,15 +388,16 @@ window.__ModuleLoader__.load({
       start: (_context, match) => ({ turn: match.event.data.turn, calls: new Map(), pages: [] }),
       update: (context, match) => {
         if (match.event.type === "tool/call") {
+          if (!TOOLS.includes(match.event.data.name)) return context.state;
           const calls = new Map(context.state.calls);
-          calls.set(String(match.event.data.callId), String(match.event.data.name ?? ""));
+          calls.set(String(match.event.data.callId), match.event.data.name);
           return { ...context.state, calls };
         }
         if (match.event.type !== "tool/result") return context.state;
         const message = match.event.data.message;
         const callId = message === null || typeof message !== "object" ? "" : String(message.source?.callId ?? "");
         if (callId === "") return context.state;
-        if (!PRESENTATION_TOOL.test(context.state.calls.get(callId) ?? "")) return context.state;
+        if (!TOOLS.includes(context.state.calls.get(callId))) return context.state;
         const presentation = presentationOf(message);
         if (presentation === undefined) return context.state;
         const pages = context.state.pages.filter((page) => page.callId !== callId);
@@ -438,8 +441,8 @@ window.__ModuleLoader__.load({
       const [open, setOpen] = React.useState(true);
       const [expanded, setExpanded] = React.useState(false);
       const [reload, setReload] = React.useState(0);
-      const url = `${ROUTE}/${encodeURIComponent(previewFile(page.callId))}`;
       const title = page.title ?? tr("row.title");
+      const url = previewUrl(page.callId, "v=" + reload);
       return h(
         "div",
         { className: "showai-page-tailCard", "data-showai-tail": page.callId },
@@ -502,7 +505,7 @@ window.__ModuleLoader__.load({
               key: `${page.callId}:${reload}`,
               className: "showai-page-tailFrame",
               style: { height: expanded ? EXPANDED_HEIGHT : `${TAIL_HEIGHT}px` },
-              src: `${url}?v=${reload}`,
+              src: url,
               title,
               sandbox:
                 "allow-scripts allow-same-origin allow-forms allow-modals allow-popups allow-downloads",

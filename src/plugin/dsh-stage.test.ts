@@ -97,6 +97,26 @@ test("stages the bundle with Skills, the launcher and a literal MCP row", async 
   ).toEqual([]);
 });
 
+test("refuses to overwrite another package in the configured directory", async () => {
+  const home = await mkdtemp(join(tmpdir(), "showai-dsh-owner-"));
+  roots.push(home);
+  const target = join(home, "plugin");
+  const runtime = { command: process.execPath, env: {} };
+  await mkdir(target);
+  const manifest = JSON.stringify({ name: "another-plugin", version: "1.0.0" });
+  await writeFile(join(target, "package.json"), manifest);
+  await expect(
+    stageDshBundle({
+      target,
+      home,
+      runtime,
+      bundleRoot: resolve("plugins/dsh-showai"),
+      pluginRoot: resolve("plugins/showai"),
+    }),
+  ).rejects.toThrow("Another package");
+  expect(await readFile(join(target, "package.json"), "utf8")).toBe(manifest);
+});
+
 test("publishes every staged Skill without its frontmatter", async () => {
   const { target } = await stage();
   for (const file of ["mcp/launch.mjs", "skills/use-showai/SKILL.md"]) {

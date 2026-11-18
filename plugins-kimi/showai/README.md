@@ -4,14 +4,14 @@
 
 ## English
 
-This plugin includes nine shared Skills and a local MCP launcher. It connects Kimi Work to the ShowAI runtime registered for the selected content library, shows components in conversation, and creates saved interactive pages through four stages: intent, material, logic and design.
+This plugin includes six shared Skills and a local MCP launcher. It connects Kimi Work to the ShowAI runtime registered for the selected content library, shows components in conversation, and helps you create, revise and review saved interactive pages.
 
 ### Install and update
 
-1. Install and start ShowAI so it registers its runtime. This plugin requires the four-stage template workflow and the merged MCP tool surface (v2). Installing the plugin does not update ShowAI itself.
+1. Install and start ShowAI so it registers its runtime. This plugin requires a registered runtime that provides the ShowAI MCP tools. Installing the plugin does not update ShowAI itself.
 2. Register this directory (`plugins-kimi/showai`) as a local plugin in Kimi Work. In a Kimi Work session, ask it to register this directory using its built-in plugin manager. The MCP command runs with the installed plugin as its working directory. The launcher uses `sh` and Node.js 22.12+ from the host's PATH; Kimi for macOS supplies both. Other hosts need a POSIX shell and Node on PATH. The shell entry avoids Kimi's native-binary rewrite of a direct `node` manifest command, which does not launch JavaScript correctly in its Electron host.
 3. Open **Plugins → Personal → ShowAI** and install or update it. Registration alone does not install the plugin. Verify that the plugin details list both the ShowAI Skill and the ShowAI MCP server.
-4. Enable the plugin and verify a real `showai_capabilities` call. Tool names may have a host prefix. An existing conversation may need to refresh its available tools; use the host's refresh flow and verify the call again.
+4. Enable the plugin and call `showai_capabilities`. To create and revise saved pages, verify that `templateWorkflow.protocol` is `showai-template-workflow-v3`. Tool names may have a host prefix. An existing conversation may need to refresh its available tools; use the host's refresh flow and verify the call again.
 
 The default library is `~/.showai`. To select another library, set an absolute `SHOWAI_HOME` in this plugin's MCP environment and register the intended runtime for that library. `SHOWAI_RUNTIME_CONFIG` can select its runtime receipt, whose `home` must match. Reconnect after changing the host configuration. The launcher never scans other libraries or silently switches after a failure.
 
@@ -29,14 +29,14 @@ See [Agent integration](https://github.com/Renaissance-Mind/ShowAI/blob/main/doc
 
 ## 简体中文
 
-本插件包含九个公共 Skill 和本机 MCP 启动器，连接所选内容库已注册的 ShowAI 运行时。支持在对话里直接展示组件，以及按理解意图、收集材料、呈现逻辑、设计稿四阶段创建可保存的交互页面。
+本插件包含六个公共 Skill 和本机 MCP 启动器，连接所选内容库已注册的 ShowAI 运行时。支持在对话里直接展示组件，以及创建、续改和评审可保存的交互页面。
 
 ### 安装与更新
 
-1. 安装并启动 ShowAI，让应用注册运行时。运行时需要支持四阶段模板流程与合并后的 MCP 工具接口（v2）；安装插件不会更新 ShowAI 应用。
+1. 安装并启动 ShowAI，让应用注册运行时。插件通过登记的运行时调用 ShowAI MCP 工具。
 2. 将本目录（`plugins-kimi/showai`）注册为 Kimi Work 本机插件。可以在 Kimi Work 会话里要求它使用内置插件管理工具注册该目录。MCP 以安装后的插件目录为工作目录，通过 `sh` 调用宿主 PATH 中的 Node.js 22.12+；macOS 版 Kimi 自带所需环境，其他宿主需提供 POSIX shell 和 Node。该启动方式适配 Kimi 的 Electron 宿主，避免直接声明 `node` 时被重写为无法启动 JavaScript 的宿主内部子命令。
 3. 打开「插件 → 个人 → ShowAI」并安装或更新。注册成功还不代表安装成功；插件详情应同时列出 ShowAI Skill 和 ShowAI MCP 服务。
-4. 启用插件，实际调用一次 `showai_capabilities`。工具名称可能带宿主前缀；已有会话需要刷新可用工具时，沿宿主流程刷新后重新验证调用。
+4. 启用插件，调用 `showai_capabilities`。创建或续改页面前，确认 `templateWorkflow.protocol` 为 `showai-template-workflow-v3`。工具名称可能带宿主前缀；已有会话需要刷新可用工具时，沿宿主流程刷新后重新验证调用。
 
 默认内容库为 `~/.showai`。选择其他内容库时，在本插件 MCP 环境中设置绝对路径 `SHOWAI_HOME`，并为该内容库注册目标运行时。可用 `SHOWAI_RUNTIME_CONFIG` 指定运行时回执，其 `home` 必须匹配。修改宿主配置后重新连接；启动器不会扫描其他库或在失败后自动换库。
 
@@ -56,4 +56,4 @@ Widget 使用返回的离线 inline 文件：原样复制到 Widget 工作区，
 
 The workflows and launcher are generated from `plugins/showai`; Kimi keeps its manifest, shell entry, icon and Widget adapter. Run `npm run package:plugin` after changing common instructions or `plugins/showai/host-adapters/kimi.md`. Do not edit this package’s generated Skills or MCP launcher. `host-profile.json` records the common version and file fingerprints.
 
-工作流和 MCP 启动器自动从公共源码生成，Kimi 独立维护 manifest、shell 入口、图标与 Widget 适配。修改公共内容或 Kimi 适配后运行 `npm run package:plugin`，不手改生成副本。原先单独维护的 showai Skill 已由同一套九个公共 Skill 取代。
+工作流和 MCP 启动器自动从公共源码生成，Kimi 独立维护 manifest、shell 入口、图标与 Widget 适配。修改公共内容或 Kimi 适配后运行 `npm run package:plugin`，不手改生成副本。

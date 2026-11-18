@@ -193,6 +193,12 @@ test("the Turn tail keeps a presented page outside the folded process", async ()
       message: { isError: false, source: { callId: "call_bash" }, content: [{ type: "text", text: "ok" }] },
     },
   });
+  feed({ type: "tool/call", seq: 6, data: { turn: 7, callId: "report", name: "mcp__other__page_present" } });
+  feed({ type: "tool/result", seq: 7, data: { turn: 7, message: {
+    source: { callId: "report" }, content: [{ type: "text", text: JSON.stringify({
+      ok: true, data: { title: "Other report", delivery: { inline: "/tmp/other-report.html" } },
+    }) }],
+  } } });
   assert.equal(context.state.pages.length, 1);
 
   const published = definition.buildLocationData({ kind: definition.kind, state: context.state }, "turn");
@@ -219,6 +225,11 @@ test("the Turn tail keeps a presented page outside the folded process", async ()
   assert.doesNotMatch(markup, /showai-page-preview\/call_bash/);
 
   assert.equal(renderToStaticMarkup(React.createElement(tail, { turn, seq: 4, t: (key) => key })), "");
+
+  const special = { ...context.state.pages[0], callId: "step:1" };
+  const specialTurn = { data: new Map([["showai-page", { pages: [special] }]]) };
+  const specialCard = renderToStaticMarkup(React.createElement(tail, { turn: specialTurn, seq: 9, t: (key) => key }));
+  assert.match(specialCard, /by-id\?callId=step%3A1&amp;v=0/);
 
   const empty = renderToStaticMarkup(
     React.createElement(tail, { turn: { data: new Map() }, seq: 9, t: (key) => key }),

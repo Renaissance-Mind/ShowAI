@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import { afterEach, describe, expect, test } from "vitest";
 import {
   mkdir,
+  cp,
   mkdtemp,
   readFile,
   readdir,
@@ -171,6 +172,20 @@ describe("host-specific plugin distributions", () => {
       expect(await stageHostPlugin({ source, target, profile })).toEqual(first);
     },
   );
+
+  test("a failed rebuild keeps the previous working package", async () => {
+    const dir = await directory();
+    const inputs = join(dir, "inputs"),
+      target = join(dir, "packaged");
+    await cp(source, inputs, { recursive: true });
+    await stageHostPlugin({ source: inputs, target, profile: "codex" });
+    const before = await skillFiles(target);
+    await rm(join(inputs, "host-adapters/codex-entry.md"));
+    await expect(
+      stageHostPlugin({ source: inputs, target, profile: "codex" }),
+    ).rejects.toMatchObject({ code: "ENOENT" });
+    expect(await skillFiles(target)).toEqual(before);
+  });
 
   test("rejects an unrelated destination and never rebinds the common source", async () => {
     const target = await directory();

@@ -1,7 +1,7 @@
 {
   "displayName": "ShowAI",
   "shortDescription": "Create ShowAI pages and present them inline in Kimi conversations",
-  "longDescription": "Connect to the ShowAI runtime registered for the selected library. Show components in the conversation, create saved pages through intent, material, logic and design stages, and deliver offline interactive previews through Kimi Work Widgets or complete HTML files.",
+  "longDescription": "Connect to the ShowAI runtime registered for the selected library. Show components in the conversation, create, revise and review saved pages, and deliver offline interactive previews through Kimi Work Widgets or complete HTML files.",
   "developerName": "Renaissance Mind",
   "tryPrompts": [
     "Turn this research into a ShowAI page and show it in our conversation",

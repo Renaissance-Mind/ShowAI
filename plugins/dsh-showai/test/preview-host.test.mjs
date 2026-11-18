@@ -99,6 +99,11 @@ test("the Host caches complete documents and serves legacy fragments in standard
       },
     );
 
+    listener(
+      { callId: "another_provider", name: "mcp__other__page_present" },
+      { content: [{ type: "text", text: JSON.stringify({ ok: true, data: { delivery: { inline } } }) }] },
+    );
+
     const cached = join(cache, "call_test.html");
     await waitForFile(cached);
     const cachedText = await readFile(cached, "utf8");
@@ -127,8 +132,29 @@ test("the Host caches complete documents and serves legacy fragments in standard
     await waitForFile(nested);
     assert.match(await readFile(nested, "utf8"), /^<!doctype html>/i);
 
+    await assert.rejects(stat(join(cache, "another_provider.html")), { code: "ENOENT" });
     const route = harness.routes.get(PREVIEW_ROUTE);
     assert.equal(route.kind, "prefix");
+
+    const ids = ["step:1", "step_1", "call_" + "x".repeat(140)];
+    const locations = [];
+    for (const [index, id] of ids.entries()) {
+      const item = join(home, "preview-" + index + ".html");
+      await writeFile(item, "<!doctype html><p>Result " + index + "</p>");
+      listener({ callId: id, name: "mcp__showai__show_component" }, {
+        content: [{ type: "text", text: JSON.stringify({ ok: true, data: { delivery: { inline: item } } }) }],
+      });
+      const [req, res] = createExchange("GET", PREVIEW_ROUTE + "/by-id?callId=" + encodeURIComponent(id));
+      for (let attempt = 0; attempt < 100 && res.status !== 302; attempt++) {
+        await route.handler(req, res);
+        if (res.status !== 302) await new Promise(resolve => setTimeout(resolve, 10));
+      }
+      assert.equal(res.status, 302);
+      locations.push(res.headers.location);
+      const content = await fetch(res.headers.location).then(reply => reply.text());
+      assert.match(content, new RegExp("Result " + index));
+    }
+    assert.equal(new Set(locations).size, ids.length);
 
     const [headRequest, head] = createExchange("HEAD", `${PREVIEW_ROUTE}/call_test.html`);
     await route.handler(headRequest, head);

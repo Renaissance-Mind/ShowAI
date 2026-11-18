@@ -149,6 +149,18 @@ describe.skipIf(!output || !config)(
       "%s installs, repeats, updates the library and starts MCP without Node on PATH",
       async (host) => {
         const first = await installer.install(host);
+        const firstHome = home;
+        const manifestName =
+          host === "codex"
+            ? "mcp.json"
+            : host === "claude"
+              ? ".mcp.json"
+              : "mcp_config.json";
+        const initialManifest = JSON.parse(
+          await readFile(join(first.installedPath, manifestName), "utf8"),
+        );
+        const firstBinding =
+          initialManifest.mcpServers.showai.env.SHOWAI_RUNTIME_CONFIG;
         expect(first.verifiedFiles).toBeGreaterThan(20);
         if (host === "codex") await codexServerTools(root, first.installedPath);
         const state = async () =>
@@ -163,18 +175,11 @@ describe.skipIf(!output || !config)(
         const changed = await installer.install(host);
         expect(changed.version).not.toBe(first.version);
         expect(await state()).toMatchObject({ enabled: true, current: true });
+        expect(JSON.parse(await readFile(firstBinding, "utf8")).home).toBe(
+          firstHome,
+        );
         const manifest = JSON.parse(
-          await readFile(
-            join(
-              changed.installedPath,
-              host === "codex"
-                ? "mcp.json"
-                : host === "claude"
-                  ? ".mcp.json"
-                  : "mcp_config.json",
-            ),
-            "utf8",
-          ),
+          await readFile(join(changed.installedPath, manifestName), "utf8"),
         );
         const server = manifest.mcpServers.showai;
         expect(
@@ -496,6 +501,51 @@ describe.skipIf(!output || !config)(
         await client.close();
       }
     }, 120000);
+    test("a Codex-only instruction update only invalidates Codex", async () => {
+      const states = async () =>
+        Object.fromEntries(
+          (await installer.status()).map((item) => [item.host, item.expected]),
+        );
+      const before = await states();
+      const path = join(bundle, "host-adapters/codex-entry.md");
+      const original = await readFile(path, "utf8");
+      try {
+        await writeFile(path, original + "\nAdditional Codex instructions.\n");
+        const after = await states();
+        for (const host of ["codex", "claude", "antigravity", "deepseek"])
+          expect(before[host], host).toBeTruthy();
+        expect(after.codex).not.toBe(before.codex);
+        for (const host of ["claude", "antigravity", "deepseek"])
+          expect(after[host], host).toBe(before[host]);
+      } finally {
+        await writeFile(path, original);
+      }
+    });
+    test("invalid replacement content leaves the installed Codex launcher available", async () => {
+      const first = await installer.install("codex");
+      const staged = join(
+        root,
+        "profile/external-plugins/codex/plugins/showai/mcp",
+      );
+      const before = await readFile(join(staged, "launch.mjs"), "utf8");
+      const template = join(bundle, "host-adapters/launch.mjs.in");
+      const original = await readFile(template, "utf8");
+      try {
+        await writeFile(
+          template,
+          original.replace("__SHOWAI_PROBE_CACHE_PATH__", "undefined"),
+        );
+        await expect(installer.install("codex")).rejects.toThrow(
+          "probe cache path",
+        );
+        expect(await readFile(join(staged, "launch.mjs"), "utf8")).toBe(before);
+        expect((await installer.status("codex"))[0].version).toBe(
+          first.version,
+        );
+      } finally {
+        await writeFile(template, original);
+      }
+    });
     test("rejects arbitrary host names", async () => {
       await expect(installer.install("sh")).rejects.toThrow(
         "Unknown plugin host",
