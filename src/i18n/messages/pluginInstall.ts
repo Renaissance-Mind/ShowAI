@@ -2,6 +2,9 @@ import { defineMessages } from "../index";
 
 export default defineMessages("pluginInstall", {
   "zh-CN": {
+    "rescanHost": "重新检测 {host}",
+    "retryHost": "重试此项",
+    "updateHost": "更新 {host}",
     refresh: "重新检测",
     scanning: "正在检测…",
     scanningHosts: "正在检测这台电脑上的 Agent…",
@@ -102,6 +105,9 @@ export default defineMessages("pluginInstall", {
     "launch.title": "手动添加 MCP",
   },
   en: {
+    "rescanHost": "Check {host} again",
+    "retryHost": "Retry this update",
+    "updateHost": "Update {host}",
     refresh: "Check again",
     scanning: "Checking…",
     scanningHosts: "Checking the Agents on this computer…",

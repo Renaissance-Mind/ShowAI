@@ -17,6 +17,7 @@ export interface ProjectGrant {
   projectIds: string[];
   projectAccess?: "selected" | "account";
   scopes: string[];
+  lastCallAt?: string;
 }
 type Client = {
   client_id: string;
@@ -192,6 +193,13 @@ export class McpAuthorization {
       db.exec("DELETE FROM records WHERE kind='flow'");
     return new McpAuthorization(url, servers, db, local);
   }
+  recordSuccessfulCall(id: string) {
+    this.db
+      .prepare(
+        "UPDATE records SET value=json_set(value, '$.lastCallAt', ?) WHERE kind='grant' AND key=? AND expires>?",
+      )
+      .run(new Date().toISOString(), id, Date.now());
+  }
   connections() {
     return (
       this.db
@@ -207,6 +215,7 @@ export class McpAuthorization {
         projectIds: grant.projectIds,
         projectAccess: grant.projectAccess,
         scopes: grant.scopes,
+        lastCallAt: grant.lastCallAt,
       };
     });
   }

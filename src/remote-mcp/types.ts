@@ -50,6 +50,7 @@ export interface RemoteMcpStatus {
     name: string;
     projectIds: string[];
     scopes: string[];
+    lastCallAt?: string;
   }>;
   projects: Array<{ id: string; name: string }>;
   executables: { cloudflare: string | null; tailscale: string | null };
@@ -63,6 +64,8 @@ export interface RemoteMcpConnectionSummary {
   config: RemoteMcpConfig;
   url?: string;
   reachable?: boolean;
+  checkedAt?: string;
+  tokenSaved?: boolean;
   clients: number;
   error?: string;
 }

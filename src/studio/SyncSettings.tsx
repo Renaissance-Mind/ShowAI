@@ -1,4 +1,6 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useSessionDraft } from "./session-draft";
+import { settingsTabKeyDown } from "./settings-tab-keys";
+import { useEffect, useMemo, useId, useRef, useState } from "react";
 import {
   Database,
   FolderOpen,
@@ -55,21 +57,27 @@ const pendingInvite = () =>
 export default function SyncSettings({
   request,
   onOpenProject,
+  home,
 }: {
   request?: ProjectSyncRequest;
+  home?: string;
   onOpenProject?: (projectId: string) => Promise<void>;
 }) {
   const f = useTranslator(flowMessages);
+  const viewId = useId();
   const handledRequest = useRef<number | undefined>(undefined);
   const [uploadProject, setUploadProject] = useState<ProjectSyncRequest | null>(
     null,
   );
   const [joinIntent, setJoinIntent] = useState(false);
-  const [activeView, setActiveView] = useState<"accounts" | "projects">(
+  const [activeView, setActiveView] = useSessionDraft<"accounts" | "projects">(
+    `sync-settings-view:${home ?? ""}`,
     "projects",
   );
-  const [projectFilter, setProjectFilter] = useState("all");
-  const initialized = useRef(false);
+  const [projectFilter, setProjectFilter] = useSessionDraft(
+    `sync-settings-filter:${home ?? ""}`,
+    "all",
+  );
   const [dashboardFocused, setDashboardFocused] = useState(false);
   const t = useTranslator(messages);
   const tc = useTranslator(common);
@@ -159,14 +167,6 @@ export default function SyncSettings({
     }, 3000);
     return () => clearInterval(timer);
   }, [refresh]);
-  useEffect(() => {
-    if (!status || initialized.current) return;
-    initialized.current = true;
-    if (!status.connections.some((item) => !item.signedOut) && !request) {
-      setActiveView("accounts");
-      openConnect();
-    }
-  }, [status, request]);
   useEffect(() => {
     if (!message) return;
     const timer = setTimeout(() => setMessage(""), 6000);
@@ -405,7 +405,6 @@ export default function SyncSettings({
       return;
     }
     setActiveView("projects");
-    setProjectFilter(connectionId);
     setMessage(f("connected"));
   }
   function openConnect(next: { url?: string; account?: string } = {}) {
@@ -450,25 +449,40 @@ export default function SyncSettings({
     <div className="sync-settings" aria-busy={busy}>
       <nav
         className="sync-view-tabs sync-flat-tabs"
+        role="tablist"
         aria-label={f("projects.navigation")}
+        onKeyDown={settingsTabKeyDown}
       >
         <button
           type="button"
-          aria-pressed={activeView === "accounts"}
+          role="tab"
+          id={`${viewId}-accounts-tab`}
+          aria-controls={`${viewId}-accounts-panel`}
+          aria-selected={activeView === "accounts"}
+          tabIndex={activeView === "accounts" ? 0 : -1}
           onClick={() => setActiveView("accounts")}
         >
           {f("accounts")}
         </button>
         <button
           type="button"
-          aria-pressed={activeView === "projects"}
+          role="tab"
+          id={`${viewId}-projects-tab`}
+          aria-controls={`${viewId}-projects-panel`}
+          aria-selected={activeView === "projects"}
+          tabIndex={activeView === "projects" ? 0 : -1}
           onClick={() => setActiveView("projects")}
         >
           {f("projects.title")}
         </button>
       </nav>
       {activeView === "accounts" && (
-        <section className="sync-accounts-view">
+        <section
+          className="sync-accounts-view"
+          role="tabpanel"
+          id={`${viewId}-accounts-panel`}
+          aria-labelledby={`${viewId}-accounts-tab`}
+        >
           <div className="sync-manager-heading">
             <h2>{showConnect ? f("auth.title") : f("accounts")}</h2>
             <div className="sync-manager-actions">
@@ -642,7 +656,11 @@ export default function SyncSettings({
         </section>
       )}
       {activeView === "projects" && (
-        <>
+        <section
+          role="tabpanel"
+          id={`${viewId}-projects-panel`}
+          aria-labelledby={`${viewId}-projects-tab`}
+        >
           <ProjectManager
             status={status}
             localProjects={localProjects}
@@ -811,7 +829,7 @@ export default function SyncSettings({
               )}
             </div>
           )}
-        </>
+        </section>
       )}
       {(error || message) && !panel && (
         <div
@@ -1127,10 +1145,19 @@ export default function SyncSettings({
                     }
                     onClick={() =>
                       void run(async () => {
-                        await desktop.invoke("sync:resolve", {
-                          projectId: conflict.projectId,
-                          choices,
-                        });
+                        const resolved = await desktop.invoke<Status>(
+                          "sync:resolve",
+                          {
+                            projectId: conflict.projectId,
+                            choices,
+                          },
+                        );
+                        const binding = resolved?.projects.find(
+                          (item) => item.projectId === conflict.projectId,
+                        );
+                        if (binding?.status === "conflict")
+                          throw new Error(t("newConflictVersion"));
+                        if (binding?.error) throw new Error(binding.error);
                         setConflict(null);
                         setPanel(null);
                       })
@@ -1138,6 +1165,43 @@ export default function SyncSettings({
                   >
                     {t("saveMergeAndSync")}
                   </button>
+                  {error && (
+                    <button
+                      className="settings-button"
+                      disabled={busy}
+                      onClick={() =>
+                        void run(async () => {
+                          await desktop.invoke("sync:run", {
+                            projectId: conflict.projectId,
+                          });
+                          const latest =
+                            await desktop.invoke<SyncConflict | null>(
+                              "sync:conflict",
+                              { projectId: conflict.projectId },
+                            );
+                          const previous = new Map(
+                            conflict.files.map((file) => [file.path, file]),
+                          );
+                          setChoices(
+                            Object.fromEntries(
+                              (latest?.files ?? []).flatMap((file) => {
+                                const old = previous.get(file.path);
+                                const choice = choices[file.path];
+                                return choice &&
+                                  old?.local === file.local &&
+                                  old.remote === file.remote
+                                  ? [[file.path, choice]]
+                                  : [];
+                              }),
+                            ),
+                          );
+                          setConflict(latest);
+                        })
+                      }
+                    >
+                      {t("reloadConflict")}
+                    </button>
+                  )}
                   <button
                     className="settings-button"
                     onClick={() => setPanel(null)}

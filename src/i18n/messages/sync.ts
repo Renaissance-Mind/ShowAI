@@ -2,6 +2,8 @@ import { defineMessages } from "../index";
 
 export default defineMessages("sync", {
   "zh-CN": {
+    "newConflictVersion": "同步状态有变化，请加载最新版本后重新确认。",
+    "reloadConflict": "加载最新版本",
     "role.admin": "管理员",
     "role.editor": "编辑者",
     "role.viewer": "查看者",
@@ -310,6 +312,8 @@ export default defineMessages("sync", {
     "methods.remove": "移除",
   },
   en: {
+    "newConflictVersion": "Sync state changed. Load the latest versions and review your choices.",
+    "reloadConflict": "Load latest versions",
     "role.admin": "Admin",
     "role.editor": "Editor",
     "role.viewer": "Viewer",

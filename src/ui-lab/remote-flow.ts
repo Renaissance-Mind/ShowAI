@@ -88,7 +88,7 @@ export function remoteConnectionFlow(locale: Locale = "zh-CN"): UiFlow {
       root = `.remote-settings[data-remote-provider="${p.provider}"]`,
       panel = (tab: string) =>
         selector(
-          `${root} [role="tabpanel"]:not([hidden])[aria-label="${t(tab as "network" | "permissions" | "clients")}"]`,
+          `${root}[data-remote-tab="${tab}"] .rm-detail-body > .rm-tab-panel:not([hidden])`,
         );
     const open = async (ctx: SceneContext) => {
       await home(ctx);
@@ -137,7 +137,7 @@ export function remoteConnectionFlow(locale: Locale = "zh-CN"): UiFlow {
                 role: "textbox" as const,
                 name: t("tunnelToken"),
               }),
-              b("route", t("localRoute")),
+              b("route", t("generateRoute")),
             ]
           : p.id === "tailnet" || p.id === "funnel"
             ? [

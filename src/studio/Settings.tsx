@@ -1,3 +1,7 @@
+import { writeSessionDraft } from "./session-draft";
+import { useState } from "react";
+import ExpandableSearch from "../components/ExpandableSearch";
+import { pluginNeedsUpdate, usePluginHosts } from "./usePluginHosts";
 import {
   Bot,
   Puzzle,
@@ -99,12 +103,16 @@ export function SettingsNavigation({
   section,
   onSelect,
   platform,
+  pluginHome,
 }: {
   section: SettingsSection;
   onSelect: (section: SettingsSection) => void;
   platform?: string;
+  pluginHome?: string;
 }) {
   const t = useTranslator(messages);
+  const { hosts } = usePluginHosts(pluginHome ?? null);
+  const updates = hosts.filter(pluginNeedsUpdate).length;
   return (
     <div className="settings-category-sidebar">
       <div className="settings-nav-label">{t("title")}</div>
@@ -114,15 +122,127 @@ export function SettingsNavigation({
           .map(({ id, label, icon: Icon }) => (
             <button
               key={id}
+              aria-label={t(label)}
+              aria-description={
+                id === "plugins" && updates > 0
+                  ? t("pluginUpdates", { count: updates })
+                  : undefined
+              }
               aria-current={section === id ? "page" : undefined}
               onClick={() => onSelect(id)}
             >
               <Icon size={17} strokeWidth={1.7} aria-hidden="true" />
               {t(label)}
+              {id === "plugins" && updates > 0 && (
+                <span className="settings-nav-updates" aria-hidden="true">
+                  {updates}
+                </span>
+              )}
             </button>
           ))}
       </nav>
     </div>
+  );
+}
+
+export function SettingsSearch({
+  platform,
+  onSelect,
+  onShortcuts,
+}: {
+  platform?: string;
+  onSelect: (section: SettingsSection) => void;
+  onShortcuts: () => void;
+}) {
+  const t = useTranslator(messages);
+  const [query, setQuery] = useState("");
+  const options = sections
+    .filter(({ id }) => availableSettingsSection(id, platform) === id)
+    .map(({ id, label }) => ({ id, name: t(label), target: "" }));
+  options.push(
+    { id: "appearance", name: t("language"), target: "settings-language" },
+    { id: "appearance", name: t("theme"), target: "settings-theme-title" },
+    { id: "about", name: t("keyboardShortcuts"), target: "shortcuts" },
+    {
+      id: "about",
+      name: t("searchDiagnostics"),
+      target: "feedback-diagnostics-title",
+    },
+  );
+  if (availableSettingsSection("general", platform) === "general")
+    options.push(
+      { id: "general", name: t("library"), target: "settings-library-title" },
+      {
+        id: "general",
+        name: t("workRecords"),
+        target: "settings-work-records-title",
+      },
+      {
+        id: "general",
+        name: t("searchBackup"),
+        target: "settings-backup-title",
+      },
+    );
+  options.push({
+    id: "agent",
+    name: t("searchModel"),
+    target: "agent-sources-title",
+  });
+  const matches = options.filter(({ name }) =>
+    name.toLocaleLowerCase().includes(query.trim().toLocaleLowerCase()),
+  );
+  function select(option: (typeof options)[number]) {
+    setQuery("");
+    onSelect(option.id);
+    if (option.target === "shortcuts") {
+      onShortcuts();
+      return;
+    }
+    requestAnimationFrame(() => {
+      const target =
+        (option.target ? document.getElementById(option.target) : null) ??
+        document.querySelector<HTMLElement>(".studio-settings h2");
+      if (!target) return;
+      for (
+        let parent = target.parentElement;
+        parent;
+        parent = parent.parentElement
+      )
+        if (parent instanceof HTMLDetailsElement) parent.open = true;
+      if (target.tabIndex < 0) target.tabIndex = -1;
+      target.scrollIntoView({ block: "nearest" });
+      target.focus({ preventScroll: true });
+    });
+  }
+  return (
+    <ExpandableSearch
+      label={t("searchSettings")}
+      value={query}
+      onChange={setQuery}
+      onKeyDown={(event) => {
+        if (
+          event.key === "Enter" &&
+          event.target instanceof HTMLInputElement &&
+          matches[0]
+        ) {
+          event.preventDefault();
+          select(matches[0]);
+        }
+      }}
+    >
+      <div className="settings-search-results">
+        {matches.map((option) => (
+          <button
+            key={option.target || option.id}
+            type="button"
+            onClick={() => select(option)}
+          >
+            {option.name}
+          </button>
+        ))}
+        {!matches.length && <p>{t("noSettingsResults")}</p>}
+      </div>
+    </ExpandableSearch>
   );
 }
 
@@ -163,6 +283,7 @@ export function SettingsPanel({
   appearance,
   theme: currentTheme,
   onAppearanceChange,
+  onSelectSection,
   onChooseHome,
   onCopyHome,
   onMigrate,
@@ -178,6 +299,7 @@ export function SettingsPanel({
   appearance: AppearancePreference;
   theme: "light" | "dark";
   onAppearanceChange: (appearance: AppearancePreference) => void;
+  onSelectSection: (section: SettingsSection) => void;
   onChooseHome: () => void;
   onCopyHome: () => void;
   onCopyConfig?: () => void;
@@ -201,7 +323,11 @@ export function SettingsPanel({
       )}
       {section === "icons" && <IconViewer />}
       {section === "sync" && (
-        <SyncSettings request={syncRequest} onOpenProject={onOpenProject} />
+        <SyncSettings
+          request={syncRequest}
+          onOpenProject={onOpenProject}
+          home={info?.home}
+        />
       )}
       {section === "general" && (
         <section
@@ -250,7 +376,9 @@ export function SettingsPanel({
           )}
         </section>
       )}
-      {section === "general" && info && <WorkRecordsSettings key={`records:${info.home}`} />}
+      {section === "general" && info && (
+        <WorkRecordsSettings key={`records:${info.home}`} />
+      )}
       {section === "general" && info?.libraryVersion === 2 && (
         <LibrarySpace key={`space:${info.home}`} home={info.home} />
       )}
@@ -259,9 +387,10 @@ export function SettingsPanel({
           className="settings-group"
           aria-labelledby="settings-theme-title"
         >
-          <h2 id="settings-theme-title">{t("interface")}</h2>
           <fieldset className="settings-theme-options">
-            <legend className="settings-theme-legend">{t("theme")}</legend>
+            <legend id="settings-theme-title" className="settings-theme-legend">
+              {t("theme")}
+            </legend>
             {(["system", "light", "dark"] as const).map((option) => {
               const selected = appearance === option;
               const Icon =
@@ -275,6 +404,12 @@ export function SettingsPanel({
                     type="radio"
                     name="settings-theme"
                     value={option}
+                    aria-label={t(option === "system" ? "themeSystem" : option)}
+                    aria-describedby={
+                      option === "system"
+                        ? "settings-system-effective"
+                        : undefined
+                    }
                     checked={selected}
                     onChange={() => onAppearanceChange(option)}
                   />
@@ -285,6 +420,14 @@ export function SettingsPanel({
                     <Icon size={16} strokeWidth={1.7} aria-hidden="true" />
                     <span>
                       {t(option === "system" ? "themeSystem" : option)}
+                      {option === "system" && (
+                        <small
+                          id="settings-system-effective"
+                          className="settings-theme-effective"
+                        >
+                          {t("effectiveTheme", { theme: t(currentTheme) })}
+                        </small>
+                      )}
                     </span>
                     <span className="settings-radio-mark" aria-hidden="true" />
                   </span>
@@ -318,12 +461,22 @@ export function SettingsPanel({
           </div>
         </section>
       )}
-      {section === "agent" && <AgentSettings />}
+      {section === "agent" && (
+        <AgentSettings
+          onAccounts={() => {
+            writeSessionDraft(
+              `sync-settings-view:${info?.home ?? ""}`,
+              "accounts",
+            );
+            onSelectSection("sync");
+          }}
+        />
+      )}
       {section === "remote" &&
         (info?.mode === "browser" ? (
           <p className="settings-help">{tr("desktopOnly")}</p>
         ) : (
-          <RemoteMcpSettings />
+          <RemoteMcpSettings home={info?.home} />
         ))}
       {section === "plugins" && (
         <>

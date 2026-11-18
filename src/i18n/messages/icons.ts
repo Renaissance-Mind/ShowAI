@@ -2,6 +2,7 @@ import { defineMessages } from "../index";
 
 export default defineMessages("icons", {
   "zh-CN": {
+    "downloadedSvg": "已请求下载 SVG",
     "category.all": "全部",
     "category.text": "文字与排版",
     "category.content": "内容与数据",
@@ -35,6 +36,7 @@ export default defineMessages("icons", {
     copyFailed: "复制失败：{error}",
   },
   en: {
+    "downloadedSvg": "SVG download requested",
     "category.all": "All",
     "category.text": "Text & typography",
     "category.content": "Content & data",

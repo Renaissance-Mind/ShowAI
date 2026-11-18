@@ -689,19 +689,20 @@ export default function Studio() {
         <AppUpdateNotice
           state={appUpdate.state}
           run={appUpdate.run}
-          hidden={view === "settings" && settingsSection === "about"}
+          hidden={view === "settings"}
         />
         <PluginUpdateNotice
           home={
-            info && info.mode !== "browser" && capabilities.localPlugins
+            info &&
+            view !== "settings" &&
+            info.mode !== "browser" &&
+            capabilities.localPlugins
               ? info.home
               : null
           }
           hidden={
             appUpdate.state?.phase === "ready" ||
-            (view === "settings" &&
-              (settingsSection === "plugins" ||
-                settingsSection === "remote")) ||
+            view === "settings" ||
             (view === "docs" && docPage?.id === WELCOME_DOC) ||
             (view === "projects" && workspaceReady && welcoming && !showDocs)
           }

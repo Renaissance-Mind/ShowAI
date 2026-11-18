@@ -790,3 +790,40 @@
   gap: 5px;
   align-items: center;
 }
+
+.rm-route-name-button {
+  font: inherit;
+  text-align: start;
+}
+.rm-route-name-button:hover {
+  text-decoration: underline;
+}
+.rm-route-open small,
+.rm-tag time {
+  color: var(--muted);
+}
+.rm-permission-picker {
+  flex-wrap: wrap;
+}
+.rm-permission-picker button:has(span) {
+  width: auto;
+  gap: 4px;
+  padding-inline: 7px;
+}
+.rm-error .rm-button {
+  flex: none;
+}
+
+.rm-draft-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-block: 10px;
+}
+.rm-draft-actions .settings-help {
+  margin: 0;
+}
+
+.rm-input-action > .rm-button {
+  min-height: 38px;
+}

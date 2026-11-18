@@ -49,6 +49,7 @@ export interface AppUpdateState {
     | "failed";
   version?: string;
   percent?: number;
+  retryDownload?: boolean;
   checkedAt?: string;
   error?: string;
 }
@@ -92,12 +93,7 @@ export type CloseBlockerCode =
   | "NO_REPLY";
 
 export type CloseSource =
-  | "pages"
-  | "datasets"
-  | "assistant"
-  | "sidebar"
-  | "workbench"
-  | "window";
+  "pages" | "datasets" | "assistant" | "sidebar" | "workbench" | "window";
 
 export interface CloseBlocker {
   code: CloseBlockerCode;

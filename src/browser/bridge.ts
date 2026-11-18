@@ -184,6 +184,11 @@ export function installBrowserBridge() {
         kind: "directory",
       },
       "export:site": { title: t("title.siteOutput"), kind: "directory" },
+      "settings:chooseFolder": {
+        title: t("title.dataDirectory"),
+        kind: "directory",
+        initialPath: typeof args.path === "string" ? args.path : undefined,
+      },
       "settings:chooseHome": {
         title: t("title.dataDirectory"),
         kind: "directory",

@@ -242,3 +242,27 @@
     flex-wrap: wrap;
   }
 }
+
+.icon-viewer-name {
+  max-width: 100%;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.icon-viewer-preview-toggle {
+  display: none;
+}
+@media (max-width: 800px) {
+  .icon-viewer-preview-toggle {
+    display: inline-flex;
+    grid-row: 1;
+    justify-self: start;
+  }
+  .icon-viewer-detail {
+    grid-row: 2;
+  }
+  .icon-viewer-layout[data-preview-open="false"] .icon-viewer-detail {
+    display: none;
+  }
+}

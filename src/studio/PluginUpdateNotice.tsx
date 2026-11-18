@@ -50,7 +50,9 @@ export default function PluginUpdateNotice({
       <div className="plugin-update-notice" role="status">
         <div className="plugin-update-notice-text">
           {result.updated.length > 0 && (
-            <p>{t("batchUpdated", { hosts: pluginHostList(result.updated) })}</p>
+            <p>
+              {t("batchUpdated", { hosts: pluginHostList(result.updated) })}
+            </p>
           )}
           {result.failed.map((item) => (
             <p key={item.host} role="alert" className="plugin-install-error">
@@ -131,7 +133,13 @@ export default function PluginUpdateNotice({
           }
         >
           {busy && <Loader2 size={13} className="studio-spin" aria-hidden />}
-          {busy ? t("updatingAll") : t("updateAll")}
+          {busy
+            ? t("updatingAll")
+            : outdated.length === 1
+              ? t("updateHost", {
+                  host: pluginHostList(outdated.map((item) => item.host)),
+                })
+              : t("updateAll")}
         </button>
       </div>
     </div>

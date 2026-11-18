@@ -321,8 +321,9 @@ export function StudioViews({
           }}
           info={info}
           appearance={appearance.preference}
-          theme={appearance.theme}
+          theme={appearance.systemTheme}
           onAppearanceChange={appearance.setPreference}
+          onSelectSection={setSettingsSection}
           onMigrate={() => setDialog({ type: "migration" })}
           onOpenShortcuts={() => setDialog({ type: "shortcuts" })}
           feedbackRequest={feedbackRequest}

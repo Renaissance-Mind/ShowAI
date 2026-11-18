@@ -2,7 +2,7 @@
 
 **Language:** English | [简体中文](i18n/icons.zh-CN.md) · [Documentation](README.md)
 
-Open **Settings → Icons** to browse the application icon catalog. Search by English name or Chinese category, compare size, stroke, color and light/dark backgrounds, then copy the name or SVG or download the preview.
+Open **Settings → Icon library** to browse the application icon catalog. Search by English name or Chinese category, compare size, stroke, color and light/dark backgrounds, then copy the name or SVG or download the preview.
 
 ## Shared source
 

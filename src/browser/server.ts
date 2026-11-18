@@ -379,6 +379,8 @@ export async function startBrowserServer(options: BrowserServerOptions) {
             await openLocalPath(path, !!page);
             return null;
           }
+          case "settings:chooseFolder":
+            return selectedPath(args, true);
           case "settings:chooseHome": {
             if (fixedHome)
               throw new CoreError(

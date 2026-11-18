@@ -65,7 +65,9 @@ test.skipIf(!address)(
       resumed = new RemoteMcpManager(config);
     const service = new AgentService({ root: config.home() });
     const project = await service.createProject("LAN acceptance");
-    let connection: Client | undefined, restored: Client | undefined;
+    let connection: Client | undefined,
+      second: Client | undefined,
+      restored: Client | undefined;
     try {
       await manager.start({
         provider: "lan",
@@ -80,6 +82,26 @@ test.skipIf(!address)(
         origin = new URL(state.url!).origin;
       expect(new URL(state.url!).hostname).toBe(address);
       expect(state.executables).toEqual({ cloudflare: null, tailscale: null });
+      await expect(
+        manager.configure({ ...state.config, port: 1 }, undefined, true),
+      ).rejects.toThrow();
+      await expect(
+        manager.configure(
+          {
+            ...state.config,
+            access: "selected",
+            projects: [{ id: randomUUID(), write: false }],
+          },
+          undefined,
+          true,
+        ),
+      ).rejects.toThrow();
+      expect(await manager.status()).toMatchObject({
+        phase: "running",
+        url: state.url,
+        config: state.config,
+      });
+      expect((await fetch(origin + "/health")).ok).toBe(true);
       const initialize = {
         jsonrpc: "2.0",
         id: 1,
@@ -140,12 +162,36 @@ test.skipIf(!address)(
       expect(JSON.stringify(await service.listProjects())).toContain(
         "Created over LAN",
       );
+      const secondReceipt = await manager.createAccessKey("Second workstation");
+      second = await client(state.url!, secondReceipt.token);
+      expect(
+        (await second.callTool({ name: "projects_list", arguments: {} }))
+          .isError,
+      ).not.toBe(true);
+      const calls = (await manager.status()).clients.map((item) => ({
+        id: item.id,
+        lastCallAt: item.lastCallAt,
+      }));
+      expect(calls).toEqual(
+        expect.arrayContaining([
+          { id: receipt.id, lastCallAt: expect.any(String) },
+          { id: secondReceipt.id, lastCallAt: expect.any(String) },
+        ]),
+      );
+      await second.close();
+      second = undefined;
       await connection.close();
       connection = undefined;
       await manager.suspend();
       await resumed.restore();
       const after = await ready(resumed);
       expect(after.url).toBe(state.url);
+      expect(
+        after.clients.map((item) => ({
+          id: item.id,
+          lastCallAt: item.lastCallAt,
+        })),
+      ).toEqual(calls);
       restored = await client(after.url!, receipt.token);
       const listed = await restored.callTool({
         name: "projects_list",
@@ -180,6 +226,7 @@ test.skipIf(!address)(
       }
     } finally {
       await connection?.close();
+      await second?.close();
       await restored?.close();
       await manager.suspend();
       await resumed.stop();

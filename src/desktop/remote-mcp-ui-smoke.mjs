@@ -173,7 +173,14 @@ try {
     .getByRole("textbox", { name: "项目名称", exact: true })
     .fill("Remote flow verification");
   await page.getByRole("button", { name: "创建项目", exact: true }).click();
-  await page.getByRole("button", { name: "设置", exact: true }).click();
+  await page
+    .getByRole("tab", { name: "Remote flow verification", exact: true })
+    .and(page.locator('[aria-selected="true"]'))
+    .waitFor();
+  await page
+    .getByRole("navigation", { name: "主要导航", exact: true })
+    .getByRole("button", { name: "设置", exact: true })
+    .click();
   await page.getByRole("button", { name: "远程连接", exact: true }).click();
   const shot = async (name) => {
     await page.evaluate(async () => {
@@ -223,6 +230,15 @@ try {
   await button("指定项目").click();
   await button("Remote flow verification：只读").click();
   await button("保存配置").click();
+  await page.waitForFunction(async () => {
+    const state = await window.showai.invoke("remoteMcp:status", {
+      provider: "lan",
+    });
+    return (
+      state.config.projects.length === 1 &&
+      state.config.projects[0].write === false
+    );
+  });
   assert.deepEqual(
     (await status("lan")).config.projects.map((p) => p.write),
     [false],
@@ -230,6 +246,12 @@ try {
   await shot("project-permissions");
   await button("全部项目").click();
   await button("保存配置").click();
+  await page.waitForFunction(async () => {
+    const state = await window.showai.invoke("remoteMcp:status", {
+      provider: "lan",
+    });
+    return state.config.access === "all";
+  });
   await tab("网络配置").click();
   const addresses = page.getByRole("combobox", {
     name: "本机网络地址",
@@ -249,7 +271,7 @@ try {
     assert.ok(lan.url.startsWith("http://"));
     assert.ok(!JSON.stringify(lan).includes(token));
     await shot("lan-client-key");
-    await button("去客户端发送消息").click();
+    await button("下一步：验证连接").click();
     await shot("lan-client-message");
     const response = await fetch(lan.url, {
       method: "POST",
@@ -303,6 +325,8 @@ try {
   await shot("tailscale-private-setup");
   await button("返回连接列表").click();
   await button("配置Cloudflare 自有域名").click();
+  assert.equal((await status("cloudflare")).config.port, 0);
+  await button("生成回源地址").click();
   await page.waitForFunction(
     async () =>
       (
@@ -338,8 +362,12 @@ try {
   await page.keyboard.press("Tab");
   assert.equal(
     await page
-      .getByRole("switch", { name: "启用Tailscale 私网", exact: true })
-      .evaluate((el) => el === document.activeElement),
+      .locator('[data-connection="lan"]')
+      .evaluate(
+        (el) =>
+          el.contains(document.activeElement) &&
+          document.activeElement !== el.querySelector(".rm-route-name-button"),
+      ),
     true,
   );
   assert.equal(
@@ -368,7 +396,7 @@ try {
       ),
     );
     await shot("chatgpt-oauth-dark-narrow");
-    await button("去客户端发送消息").click();
+    await button("下一步：验证连接").click();
     await page.locator('.rm-client-area[data-client-view="verify"]').waitFor();
     await verifyDesktopApproval(
       new URL(publicStatus.url).origin,

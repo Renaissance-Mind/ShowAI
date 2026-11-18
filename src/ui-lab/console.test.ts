@@ -211,7 +211,7 @@ test("flow branches jump to the message screen and authorization states remain o
   ).toBe(1);
   expect(
     await frame().locator(".rm-message-task [role=status]").textContent(),
-  ).toBe("尚未收到客户端请求");
+  ).toBe("等待客户端发起授权");
   await shot("client-message");
   await page
     .getByRole("region", { name: "界面状态", exact: true })

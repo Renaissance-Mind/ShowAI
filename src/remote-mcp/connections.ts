@@ -149,15 +149,19 @@ export class RemoteMcpConnections {
         config: value.config,
         url: value.url,
         reachable: value.reachable,
+        checkedAt: value.checkedAt,
+        tokenSaved: value.tokenSaved,
         clients: value.clients.length,
         error: value.error,
       })),
     };
   }
-  async configure(value: unknown, token?: unknown) {
+  async configure(value: unknown, token?: unknown, restart = false) {
     const config = validateRemoteMcpConfig(value);
     await this.select(config.provider);
-    await (await this.manager(config.provider)).configure(config, token);
+    await (
+      await this.manager(config.provider)
+    ).configure(config, token, restart);
     return this.status(false, config.provider);
   }
   async prepare(value: unknown) {
@@ -166,7 +170,7 @@ export class RemoteMcpConnections {
     await (await this.manager(config.provider)).prepare(config);
     return this.status(false, config.provider);
   }
-  async start(value: unknown, token?: unknown) {
+  async start(value: unknown, token?: unknown, replace = false) {
     const config = validateRemoteMcpConfig(value);
     await this.select(config.provider);
     if (
@@ -177,7 +181,7 @@ export class RemoteMcpConnections {
       config.executable =
         (await this.status(false, config.provider)).executables.cloudflare ??
         "";
-    await (await this.manager(config.provider)).start(config, token);
+    await (await this.manager(config.provider)).start(config, token, replace);
     return this.status(false, config.provider);
   }
   async stop(provider?: unknown) {

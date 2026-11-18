@@ -92,7 +92,9 @@ export function pluginInstallerAction(
 ) {
   switch (action) {
     case "plugins:status":
-      return installer.status();
+      return installer.status(
+        args.host === undefined ? undefined : pluginHost(args.host),
+      );
     case "plugins:install":
       return installer.install(args.host);
     case "plugins:runtime":
@@ -104,7 +106,10 @@ export function pluginInstallerAction(
     case "plugins:launchConfig":
       return installer.launchConfig();
     default:
-      throw new PluginInstallError("PLUGIN_UNKNOWN_HOST", `Unknown plugin action: ${action}`);
+      throw new PluginInstallError(
+        "PLUGIN_UNKNOWN_HOST",
+        `Unknown plugin action: ${action}`,
+      );
   }
 }
 
@@ -307,11 +312,7 @@ export class DesktopPluginInstaller {
     };
   }
 
-  private async command(
-    executable: string,
-    args: string[],
-    timeout = 120000,
-  ) {
+  private async command(executable: string, args: string[], timeout = 120000) {
     const env: NodeJS.ProcessEnv = {
       ...process.env,
       PATH: executablePaths().join(delimiter),
@@ -495,8 +496,7 @@ export class DesktopPluginInstaller {
       installed: !!own && (host !== "codex" || own.installed === true),
       enabled: own?.enabled === true,
       version: own?.version,
-      current:
-        !!own?.version && !!expected && own.version === (await expected),
+      current: !!own?.version && !!expected && own.version === (await expected),
       expected: expected ? await expected : undefined,
       installedPath: own?.installedPath ?? own?.installPath ?? own?.path,
       ...(own && typeof receipt?.home === "string"
@@ -530,12 +530,12 @@ export class DesktopPluginInstaller {
     };
   }
 
-  async status() {
+  async status(only?: PluginHost) {
     await mkdir(this.options.root, { recursive: true });
     let expected: Promise<string> | undefined;
     const manual = await this.manualPaths();
     return Promise.all(
-      PLUGIN_HOSTS.map(
+      (only ? [only] : PLUGIN_HOSTS).map(
         async (host): Promise<PluginInstallation> => {
           const executable = await this.hostExecutable(host);
           const base = {

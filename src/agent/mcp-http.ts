@@ -747,11 +747,13 @@ export async function createMcpHttpApp(options: McpHttpOptions) {
         body.method === "tools/call" &&
         output.result &&
         !output.result.isError
-      )
+      ) {
+        authorization.recordSuccessfulCall(grant.id);
         options.local.onCall?.(
           String((body.params as { name?: string })?.name),
           grant.id,
         );
+      }
       if (output.result?.tools)
         for (const tool of output.result.tools) {
           if (

@@ -2,6 +2,10 @@ import { defineMessages } from "../index";
 
 export default defineMessages("agentSettings", {
   "zh-CN": {
+    "serverModelOptions": "服务器模型资源",
+    "modelTestFailed": "模型调用失败。可以查看下方执行记录并重新测试。",
+    "modelRetryAfterLimit": "模型调用限流。请稍后重新测试。",
+    "deviceSettings": "连接 iPad",
     remoteMacHelp:
       "在所选 Mac 的 ShowAI 设置中配置 Agent 和模型来源。iPad 使用该 Mac 的现有配置。",
     "state.running": "执行中",
@@ -28,7 +32,7 @@ export default defineMessages("agentSettings", {
     current: "当前",
     "availability.passed": "调用通过",
     "availability.failed": "调用失败",
-    "availability.ready": "已有登录／来源",
+    "availability.ready": "已检测到登录或来源",
     "availability.untested": "待测试",
     "availability.missing": "未找到",
     testAgent: "测试 {name}",
@@ -135,6 +139,10 @@ export default defineMessages("agentSettings", {
     "resources.saved": "已保存到来源服务器，其他绑定设备现在可以检索使用。",
   },
   en: {
+    "serverModelOptions": "Server model resources",
+    "modelTestFailed": "The model test failed. Review the execution record below and try again.",
+    "modelRetryAfterLimit": "Model rate limit reached. Try the test again later.",
+    "deviceSettings": "Connect iPad",
     remoteMacHelp:
       "Configure the Agent and model source in ShowAI on the selected Mac. iPad uses that Mac's configuration.",
     "state.running": "Running",
@@ -162,7 +170,7 @@ export default defineMessages("agentSettings", {
     current: "Current",
     "availability.passed": "Test passed",
     "availability.failed": "Test failed",
-    "availability.ready": "Signed in / source set",
+    "availability.ready": "Sign-in or source detected",
     "availability.untested": "Not tested",
     "availability.missing": "Not found",
     testAgent: "Test {name}",

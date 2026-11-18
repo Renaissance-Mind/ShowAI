@@ -145,10 +145,6 @@ export function ReportProblemForm({
       );
       if (opened) opened.opener = null;
       else if (draft.mode !== "desktop") throw new Error(t("report.notOpened"));
-      setKind("problem");
-      setSummary("");
-      setSteps("");
-      setContext(undefined);
       return text ? t("report.githubOpened") : t("report.githubOpenedPlain");
     });
   const copyAll = () =>
@@ -229,6 +225,7 @@ export function ReportProblemForm({
         </div>
       )}
       <h3>{t("diag.title")}</h3>
+      <p className="feedback-muted">{t("diag.privacy")}</p>
       <DiagnosticsPreview text={diagnostics.text} error={diagnostics.error} />
       <div className="feedback-actions">
         <button

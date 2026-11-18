@@ -1,3 +1,4 @@
+import { settingsTabKeyDown } from "./settings-tab-keys";
 import { useEffect, useId, useRef, useState } from "react";
 import { AtSign, KeyRound, Loader2, RotateCcw, UserRound } from "../ui/icons";
 import { useTranslator } from "../i18n/react";
@@ -27,6 +28,11 @@ export default function AccountLogin({
   const f = useTranslator(messages),
     t = useTranslator(syncMessages);
   const id = useId();
+  const credential = useRef<HTMLInputElement>(null);
+  const [advanced, setAdvanced] = useState(
+    initial.url !== "https://showai.renaissancemind.ai/cloud",
+  );
+  const [changedServer, setChangedServer] = useState(false);
   const [url, setUrl] = useState(initial.url),
     [probe, setProbe] = useState(initial.url),
     [retry, setRetry] = useState(0);
@@ -73,9 +79,19 @@ export default function AccountLogin({
       generation.current++;
     };
   }, [probe, retry]);
-  const methods = info
+  const allMethods = info
     ? loginMethods(info.auth)
     : (["password", "token", "github", "google"] as Method[]);
+  const methods = allMethods.filter(
+    (value) =>
+      value !== "token" ||
+      advanced ||
+      method === "token" ||
+      allMethods.length === 1,
+  );
+  useEffect(() => {
+    if (error && !busy) credential.current?.focus();
+  }, [error, busy]);
   const ready = !!info && !checking && !serverError && probe === url.trim();
   const labels: Record<Method, string> = {
     password: f("auth.password"),
@@ -109,35 +125,48 @@ export default function AccountLogin({
   }
   return (
     <div className="sync-login">
-      <label className="sync-field sync-server-field">
-        <span>
-          {t("serverUrl")}
-          {checking && (
-            <Loader2
-              className="sync-spin"
-              size={14}
-              aria-label={f("auth.checking")}
-            />
-          )}
-        </span>
-        <input
-          type="url"
-          aria-label={t("serverUrl")}
-          value={url}
-          onChange={(e) => {
-            setUrl(e.target.value);
-            setSecret("");
-            setError("");
-          }}
-          onBlur={() => setProbe(url.trim())}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") {
-              e.preventDefault();
-              setProbe(url.trim());
-            }
-          }}
-        />
-      </label>
+      <details
+        className="sync-login-advanced"
+        open={advanced}
+        onToggle={(event) => setAdvanced(event.currentTarget.open)}
+      >
+        <summary>{f("auth.otherConnection")}</summary>
+        <label className="sync-field sync-server-field">
+          <span>
+            {t("serverUrl")}
+            {checking && (
+              <Loader2
+                className="sync-spin"
+                size={14}
+                aria-label={f("auth.checking")}
+              />
+            )}
+          </span>
+          <input
+            type="url"
+            aria-label={t("serverUrl")}
+            value={url}
+            onChange={(e) => {
+              setUrl(e.target.value);
+              setChangedServer(true);
+              setSecret("");
+              setError("");
+            }}
+            onBlur={() => setProbe(url.trim())}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                setProbe(url.trim());
+              }
+            }}
+          />
+        </label>
+        {changedServer && ready && (
+          <p className="settings-help" role="status">
+            {f("auth.serverChanged")}
+          </p>
+        )}
+      </details>
       {serverError && (
         <div className="sync-error" role="alert">
           {serverError}
@@ -159,8 +188,9 @@ export default function AccountLogin({
         className="sync-login-tabs"
         role="tablist"
         aria-label={f("auth.methods")}
+        onKeyDown={settingsTabKeyDown}
       >
-        {methods.map((value, index) => (
+        {methods.map((value) => (
           <button
             key={value}
             id={`${id}-${value}`}
@@ -171,22 +201,6 @@ export default function AccountLogin({
             tabIndex={method === value ? 0 : -1}
             disabled={busy || !ready}
             onClick={() => choose(value)}
-            onKeyDown={(e) => {
-              if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(e.key))
-                return;
-              e.preventDefault();
-              const next =
-                e.key === "Home"
-                  ? 0
-                  : e.key === "End"
-                    ? methods.length - 1
-                    : (index +
-                        (e.key === "ArrowRight" ? 1 : -1) +
-                        methods.length) %
-                      methods.length;
-              choose(methods[next]);
-              document.getElementById(`${id}-${methods[next]}`)?.focus();
-            }}
           >
             {icon(value)}
             <span>{labels[value]}</span>
@@ -267,6 +281,9 @@ export default function AccountLogin({
               <input
                 required
                 type="password"
+                ref={credential}
+                aria-invalid={!!error}
+                aria-describedby={error ? `${id}-credential-error` : undefined}
                 autoComplete={
                   method === "token"
                     ? "off"
@@ -291,7 +308,11 @@ export default function AccountLogin({
               </label>
             )}
             {error && (
-              <p className="sync-error" role="alert">
+              <p
+                id={`${id}-credential-error`}
+                className="sync-error"
+                role="alert"
+              >
                 {error}
               </p>
             )}

@@ -1,3 +1,4 @@
+import settingsMessages from "../i18n/messages/settings";
 import { useCallback, useEffect, useState } from "react";
 import { Loader2, RefreshCw } from "../ui/icons";
 import { desktop, errorMessage } from "../host/bridge";
@@ -19,6 +20,8 @@ function bytes(value: number) {
 }
 export default function LibrarySpace({ home }: { home: string }) {
   const t = useTranslator(messages);
+  const ts = useTranslator(settingsMessages);
+  const [archiveError, setArchiveError] = useState("");
   const [storage, setStorage] = useState<LibraryStorage | null>(null);
   const [plan, setPlan] = useState<CleanupPlan | null>(null),
     [busy, setBusy] = useState(false),
@@ -97,30 +100,37 @@ export default function LibrarySpace({ home }: { home: string }) {
         <div className="library-space-section-content">
           <p className="library-space-summary">
             {storage
-              ? t("summary", {
-                  size: bytes(storage.totalBytes),
-                  allocated: bytes(storage.allocatedBytes),
-                  count: storage.files.toLocaleString(getLocale()),
-                })
+              ? t("diskUsed", { size: bytes(storage.allocatedBytes) })
               : t("checkingFiles")}
           </p>
           {storage && (
-            <div className="library-space-breakdown">
-              {Object.entries(storage.categories)
-                .filter(([, item]) => item.files)
-                .map(([name, item]) => (
-                  <div key={name}>
-                    <span>{t(`category.${name as StorageCategory}`)}</span>
-                    <span>{bytes(item.bytes)}</span>
-                  </div>
-                ))}
+            <details className="settings-disclosure">
+              <summary>{t("storageDetails")}</summary>
               <p>
-                {t("gitSummary", {
-                  packs: storage.git.packs.toLocaleString(getLocale()),
-                  objects: storage.git.looseObjects.toLocaleString(getLocale()),
+                {t("summary", {
+                  size: bytes(storage.totalBytes),
+                  allocated: bytes(storage.allocatedBytes),
+                  count: storage.files.toLocaleString(getLocale()),
                 })}
               </p>
-            </div>
+              <div className="library-space-breakdown">
+                {Object.entries(storage.categories)
+                  .filter(([, item]) => item.files)
+                  .map(([name, item]) => (
+                    <div key={name}>
+                      <span>{t(`category.${name as StorageCategory}`)}</span>
+                      <span>{bytes(item.bytes)}</span>
+                    </div>
+                  ))}
+                <p>
+                  {t("gitSummary", {
+                    packs: storage.git.packs.toLocaleString(getLocale()),
+                    objects:
+                      storage.git.looseObjects.toLocaleString(getLocale()),
+                  })}
+                </p>
+              </div>
+            </details>
           )}
         </div>
       </section>
@@ -133,26 +143,6 @@ export default function LibrarySpace({ home }: { home: string }) {
               disabled={busy}
               onClick={() =>
                 void run(async () => {
-                  const result = await desktop.invoke<{
-                    beforeBytes: number;
-                    afterBytes: number;
-                  }>("library:compact");
-                  setNotice(
-                    t("toast.compacted", {
-                      before: bytes(result.beforeBytes),
-                      after: bytes(result.afterBytes),
-                    }),
-                  );
-                })
-              }
-            >
-              {t("compactNow")}
-            </button>
-            <button
-              className="settings-button"
-              disabled={busy}
-              onClick={() =>
-                void run(async () => {
                   setPlan(
                     await desktop.invoke<CleanupPlan>("library:cleanupPlan"),
                   );
@@ -160,18 +150,6 @@ export default function LibrarySpace({ home }: { home: string }) {
               }
             >
               {t("findCleanup")}
-            </button>
-            <button
-              className="settings-button"
-              disabled={busy}
-              onClick={() =>
-                void run(async () => {
-                  await desktop.invoke("library:rebuildIndex");
-                  setNotice(t("toast.indexRebuilt"));
-                })
-              }
-            >
-              {t("rebuildIndex")}
             </button>
             <button
               className="settings-button"
@@ -227,6 +205,44 @@ export default function LibrarySpace({ home }: { home: string }) {
               </div>
             </div>
           )}
+          <details className="settings-disclosure">
+            <summary>{t("advancedMaintenance")}</summary>
+            <p className="settings-help">{t("maintenanceEffects")}</p>
+            <div className="library-space-actions">
+              <button
+                className="settings-button"
+                disabled={busy}
+                onClick={() =>
+                  void run(async () => {
+                    const result = await desktop.invoke<{
+                      beforeBytes: number;
+                      afterBytes: number;
+                    }>("library:compact");
+                    setNotice(
+                      t("toast.compacted", {
+                        before: bytes(result.beforeBytes),
+                        after: bytes(result.afterBytes),
+                      }),
+                    );
+                  })
+                }
+              >
+                {t("compactNow")}
+              </button>
+              <button
+                className="settings-button"
+                disabled={busy}
+                onClick={() =>
+                  void run(async () => {
+                    await desktop.invoke("library:rebuildIndex");
+                    setNotice(t("toast.indexRebuilt"));
+                  })
+                }
+              >
+                {t("rebuildIndex")}
+              </button>
+            </div>
+          </details>
           {plan && (
             <div className="library-space-plan">
               <p>
@@ -267,7 +283,7 @@ export default function LibrarySpace({ home }: { home: string }) {
       <section className="library-space-section" aria-label={t("fullArchive")}>
         <div className="settings-row">
           <div className="settings-row-text">
-            <h3>{t("fullArchive")}</h3>
+            <h3 id="settings-backup-title">{t("fullArchive")}</h3>
           </div>
         </div>
         <div className="library-space-section-content">
@@ -276,24 +292,69 @@ export default function LibrarySpace({ home }: { home: string }) {
               aria-label={t("archiveLocation")}
               placeholder={t("archivePlaceholder")}
               value={archivePath}
-              onChange={(event) => setArchivePath(event.target.value)}
+              aria-invalid={!!archiveError}
+              aria-describedby={
+                archiveError ? "library-backup-error" : undefined
+              }
+              onChange={(event) => {
+                setArchivePath(event.target.value);
+                setArchiveError("");
+              }}
             />
             <button
               className="settings-button"
-              disabled={busy || !archivePath.trim()}
+              type="button"
+              disabled={busy}
               onClick={() =>
-                void run(async () => {
-                  const result = await desktop.invoke<{ path: string }>(
-                    "library:archive",
-                    { out: archivePath },
-                  );
-                  setNotice(t("toast.archived", { path: result.path }));
-                })
+                void desktop
+                  .invoke<string | null>("settings:chooseFolder")
+                  .then(
+                    (folder) => {
+                      if (folder)
+                        setArchivePath(
+                          folder.replace(/[/\\]$/, "") +
+                            "/ShowAI-backup-" +
+                            new Date().toISOString().replace(/[:.]/g, "-"),
+                        );
+                      setArchiveError("");
+                    },
+                    (reason) => setArchiveError(errorMessage(reason)),
+                  )
               }
+            >
+              {ts("chooseFolder")}
+            </button>
+            <button
+              className="settings-button"
+              disabled={busy || !archivePath.trim()}
+              onClick={() => {
+                setArchiveError("");
+                void run(async () => {
+                  const result = await desktop
+                    .invoke<{ path: string }>("library:archive", {
+                      out: archivePath.trim(),
+                    })
+                    .catch((reason) => {
+                      setArchiveError(errorMessage(reason));
+                      return null;
+                    });
+                  if (result)
+                    setNotice(t("toast.archived", { path: result.path }));
+                }, false);
+              }}
             >
               {t("saveArchive")}
             </button>
           </div>
+          {archiveError && (
+            <p
+              id="library-backup-error"
+              className="studio-form-error"
+              role="alert"
+            >
+              {archiveError}
+            </p>
+          )}
         </div>
       </section>
       {storage?.maintenance?.state === "running" && (

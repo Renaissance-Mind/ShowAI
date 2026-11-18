@@ -1,6 +1,12 @@
 import { defineMessages } from "../index";
 export default defineMessages("accountFlow", {
   "zh-CN": {
+    "clearProjectFilters": "清除筛选",
+    "downloadCompact": "下载",
+    "projects.onDevice": "已在本机",
+    "projects.unpublished": "服务器尚无同步版本",
+    "auth.serverChanged": "服务器已切换，请选择登录方式。",
+    "auth.otherConnection": "其他连接方式",
     "projects.downloadFirst": "请先下载到本机",
     "projects.signInToSave": "登录账号以保存到服务器",
     "projects.backToCreate": "返回新建项目",
@@ -124,6 +130,12 @@ export default defineMessages("accountFlow", {
     accountAdvanced: "账号绑定与高级设置",
   },
   en: {
+    "clearProjectFilters": "Clear filters",
+    "downloadCompact": "Download",
+    "projects.onDevice": "On this device",
+    "projects.unpublished": "No version on the server yet",
+    "auth.serverChanged": "Server changed. Choose a sign-in method.",
+    "auth.otherConnection": "Other connection options",
     "projects.downloadFirst": "Download to this device first",
     "projects.signInToSave": "Sign in to save to a server",
     "projects.backToCreate": "Back to new project",

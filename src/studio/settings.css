@@ -771,7 +771,11 @@
   border-radius: 6px;
   background: var(--paper);
   color: var(--text);
-  font: 12px ui-monospace, "SFMono-Regular", Consolas, monospace;
+  font:
+    12px ui-monospace,
+    "SFMono-Regular",
+    Consolas,
+    monospace;
 }
 .plugin-launch-config .settings-config {
   margin-top: 12px;
@@ -837,4 +841,52 @@
   color: var(--text);
   font-family: ui-monospace, "SFMono-Regular", Consolas, monospace;
   font-size: 12px;
+}
+
+.settings-nav-updates {
+  margin-inline-start: auto;
+  color: var(--text);
+  font-size: 11px;
+  padding: 1px 7px;
+  border-radius: 99px;
+  background: var(--accent-soft);
+}
+.settings-search-results {
+  display: grid;
+  padding: 5px;
+}
+.settings-search-results button {
+  text-align: start;
+  padding: 8px;
+  border-radius: 5px;
+}
+.settings-search-results button:hover,
+.settings-search-results button:focus-visible {
+  background: var(--accent-soft);
+}
+.settings-theme-effective {
+  display: block;
+  color: var(--muted);
+  font-weight: 400;
+}
+@media (max-width: 830px) {
+  .settings-theme-options {
+    grid-template-columns: 1fr;
+  }
+  .settings-theme-preview {
+    max-height: 88px;
+  }
+}
+
+.settings-disclosure {
+  margin-block: 8px;
+}
+.settings-disclosure > summary {
+  cursor: pointer;
+  color: var(--muted);
+  width: fit-content;
+}
+.work-records-form,
+.library-space-archive {
+  flex-wrap: wrap;
 }
