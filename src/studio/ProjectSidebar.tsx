@@ -5,7 +5,7 @@ import {
   type SetStateAction,
   type ReactNode,
 } from "react";
-import { ChevronDown, ChevronRight, MoreHorizontal, Plus } from "../ui/icons";
+import { ChevronRight, MoreHorizontal, Plus } from "../ui/icons";
 import type {
   ProjectGroup,
   ProjectSummary,
@@ -98,11 +98,7 @@ export default function ProjectSidebar({
             aria-expanded={!collapsed[id]}
             onClick={() => toggle(id)}
           >
-            {collapsed[id] ? (
-              <ChevronRight size={13} />
-            ) : (
-              <ChevronDown size={13} />
-            )}
+            <ChevronRight size={13} aria-hidden="true" />
             <span>{name}</span>
           </button>
         ) : id === "projects" && onManage ? (

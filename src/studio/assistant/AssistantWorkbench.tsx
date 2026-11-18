@@ -6,7 +6,6 @@ import {
   useRef,
   useState,
   useSyncExternalStore,
-  type CSSProperties,
   type KeyboardEvent,
   type PointerEvent,
   type ReactNode,
@@ -1234,7 +1233,7 @@ export default function AssistantWorkbench({
           aria-label={t("panel.title")}
           data-presence={presence.state}
           inert={presence.state === "exiting"}
-          style={{ width, "--assistant-width": `${width}px` } as CSSProperties}
+          style={{ width }}
         >
           <div
             className="assistant-resize"

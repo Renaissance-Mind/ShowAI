@@ -3,7 +3,6 @@
   position: relative;
   flex: 0 0 auto;
   width: var(--navigation-width);
-  transition: width var(--duration-base) var(--ease-in-out);
 }
 .studio-sidebar-shell > .studio-sidebar {
   position: absolute;
@@ -52,9 +51,6 @@
 .studio-sidebar-resizer:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: -2px;
-}
-.studio-sidebar-shell[data-sidebar-resizing] {
-  transition: none;
 }
 .studio:has(.studio-sidebar-shell[data-sidebar-resizing]),
 .studio:has(.studio-sidebar-shell[data-sidebar-resizing]) * {
@@ -192,7 +188,6 @@
   }
 }
 @media (prefers-reduced-motion: reduce) {
-  .studio-sidebar-shell,
   .studio-sidebar-shell > .studio-sidebar {
     transition: none;
   }

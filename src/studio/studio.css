@@ -191,6 +191,12 @@
   color: var(--muted);
   border-radius: 4px;
 }
+:is(.studio-tree-chevron, .studio-section-toggle) > svg {
+  transition: transform var(--duration-fast) var(--ease-out);
+}
+:is(.studio-tree-chevron, .studio-section-toggle)[aria-expanded="true"] > svg {
+  transform: rotate(90deg);
+}
 .studio-tree-children {
   margin: 1px 0 3px 16px;
 }

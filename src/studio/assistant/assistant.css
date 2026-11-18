@@ -1,4 +1,5 @@
 .assistant-panel {
+  --assistant-offset: 10px;
   position: relative;
   display: flex;
   flex-direction: column;
@@ -10,26 +11,21 @@
   background: var(--paper);
   color: var(--text);
   font: 13px/1.5 var(--font-ui, var(--font-sans, system-ui, sans-serif));
+  transition:
+    translate var(--duration-base) var(--ease-out),
+    opacity var(--duration-base) var(--ease-out);
 }
-.assistant-panel {
-  --assistant-travel: min(var(--assistant-width), 50vw);
-}
-.assistant-panel[data-presence="entering"] {
-  animation: assistant-panel-in var(--duration-base) var(--ease-in-out);
-}
+.assistant-panel[data-presence="hidden"],
 .assistant-panel[data-presence="exiting"] {
-  animation: assistant-panel-out var(--duration-fast) var(--ease-in-out)
-    forwards;
+  translate: var(--assistant-offset) 0;
+  opacity: 0;
+  transition-duration: var(--duration-fast);
   pointer-events: none;
 }
-@keyframes assistant-panel-in {
-  from {
-    margin-right: calc(-1 * var(--assistant-travel));
-  }
-}
-@keyframes assistant-panel-out {
-  to {
-    margin-right: calc(-1 * var(--assistant-travel));
+@starting-style {
+  .assistant-panel[data-presence="entering"] {
+    translate: var(--assistant-offset) 0;
+    opacity: 0;
   }
 }
 .assistant-resize {
@@ -597,7 +593,7 @@
     inset: 36px 0 0 auto;
     z-index: 150;
     width: min(100vw, 420px) !important;
-    --assistant-travel: min(100vw, 420px);
+    --assistant-offset: 100%;
     max-width: 100vw;
     box-shadow: var(--shadow-dialog);
   }
