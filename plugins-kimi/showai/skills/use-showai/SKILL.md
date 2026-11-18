@@ -23,7 +23,7 @@ Agent 通过 MCP 操作 ShowAI。App、网页、CLI 和 MCP 共用内容核心�
 
 区分“创作或修改作品”和“查找、阅读或管理”的依据，是这次任务会不会写作品内容：新建一页，或改写、补充、重组已有页面的内容，都在决定读者看到什么、怎样讲清楚，进入 show-document；找页面、读内容回答问题、移动整理、接数据源、处理冲突和草稿，不改作品内容，留在本 Skill。区分“在对话里看”和“创作”的依据，是结果要不要留存、继续编辑或交给别人。展示之后用户要保存时按 show-visual 的“之后要保存”处理。展示不写入任何内容库；创作路径的连接或保存失败不改用展示，展示失败也不自动建项目。
 
-用户提到 Codex 的 ShowAI 工作台、聊天右侧编辑器或当前选区时，先读 [当前宿主适配](references/host-adapter.md)。收到 `showai.reference` 后，按 [用户引用](references/user-references.md) 核对目标，再按上表处理。
+在 Codex 中处理 ShowAI 工作台、聊天右侧的 ShowAI 编辑器或其中的选区时，先读 [当前宿主适配](references/host-adapter.md)。收到 `showai.reference` 后，按 [用户引用](references/user-references.md) 核对目标，再按上表处理。
 
 ## 核对连接和归属
 
