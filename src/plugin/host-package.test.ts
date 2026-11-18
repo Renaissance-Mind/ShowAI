@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { afterEach, describe, expect, test } from "vitest";
 import {
   mkdir,
@@ -32,6 +33,24 @@ async function directory() {
   return path;
 }
 
+async function expectedWorkflowHashes(
+  common: Record<string, string>,
+  profile: string,
+) {
+  if (profile !== "codex") return common;
+  const entry = "use-showai/SKILL.md";
+  const original = await readFile(join(source, "skills", entry), "utf8");
+  const note = await readFile(
+    join(source, "host-adapters/codex-entry.md"),
+    "utf8",
+  );
+  const bound = original.trimEnd() + "\n\n" + note;
+  return {
+    ...common,
+    [entry]: createHash("sha256").update(bound).digest("hex"),
+  };
+}
+
 describe("host-specific plugin distributions", () => {
   test("committed marketplace and Kimi packages match their single shared source", async () => {
     const codexConfig = JSON.parse(
@@ -46,6 +65,11 @@ describe("host-specific plugin distributions", () => {
         ([name]) => name !== HOST_GUIDE,
       ),
     );
+    const sharedLauncher = await readFile(
+      join(source, "mcp/launch.mjs"),
+      "utf8",
+    );
+    expect(sharedLauncher).not.toContain("SHOWAI_CODEX_WORKBENCH_PROFILE");
     const version = JSON.parse(
       await readFile(join(source, "plugin.json"), "utf8"),
     ).version;
@@ -56,11 +80,16 @@ describe("host-specific plugin distributions", () => {
       ["kimi", resolve("plugins-kimi/showai")],
     ]) {
       const files = await skillFiles(join(target, "skills"));
+      const launcher = await readFile(join(target, "mcp/launch.mjs"), "utf8");
+      expect(launcher).not.toContain("__SHOWAI_PROBE_CACHE_PATH__");
+      if (profile === "codex")
+        expect(launcher).toContain("SHOWAI_CODEX_WORKBENCH_PROFILE");
+      else expect(launcher).toBe(sharedLauncher);
       expect(
         Object.fromEntries(
           Object.entries(files).filter(([name]) => name !== HOST_GUIDE),
         ),
-      ).toEqual(common);
+      ).toEqual(await expectedWorkflowHashes(common, profile));
       expect(await readFile(join(target, "skills", HOST_GUIDE), "utf8")).toBe(
         await readFile(join(source, "host-adapters", `${profile}.md`), "utf8"),
       );
@@ -94,7 +123,7 @@ describe("host-specific plugin distributions", () => {
         Object.fromEntries(
           Object.entries(actual).filter(([name]) => name !== HOST_GUIDE),
         ),
-      ).toEqual(common);
+      ).toEqual(await expectedWorkflowHashes(common, profile));
       expect(receipt.commonFiles).toEqual(common);
       const adapter = await readFile(
         join(target, "skills", HOST_GUIDE),
@@ -103,6 +132,12 @@ describe("host-specific plugin distributions", () => {
       expect(adapter).toBe(
         await readFile(join(source, "host-adapters", `${profile}.md`), "utf8"),
       );
+      expect(adapter.includes("引用到 Codex 对话")).toBe(profile === "codex");
+      const entrySkill = await readFile(
+        join(target, "skills/use-showai/SKILL.md"),
+        "utf8",
+      );
+      expect(entrySkill.includes("## Codex 工作台")).toBe(profile === "codex");
       if (profile !== "codex") expect(adapter).not.toContain("visualize");
       expect((await readdir(join(target, "skills"))).sort()).toEqual(
         (await readdir(join(source, "skills"))).sort(),

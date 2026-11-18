@@ -20,7 +20,13 @@ export function bindHostSkills(options: {
   commonSha256: string;
   commonFiles: Record<string, string>;
   adapterSha256: string;
+  entrySha256?: string;
 }>;
+export function writeHostLauncher(
+  source: string,
+  target: string,
+  profile: HostProfile,
+): Promise<void>;
 export function stageHostPlugin(options: {
   source: string;
   target: string;

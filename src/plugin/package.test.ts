@@ -78,13 +78,9 @@ async function packageSkill(
     join(root, "plugins/showai/mcp/launch.mjs"),
     join(fixture, "plugins/showai/mcp/launch.mjs"),
   );
-  await copyFile(
-    join(root, "plugins/showai/skills/use-showai/references/host-adapter.md"),
-    join(
-      fixture,
-      "plugins/showai/skills/use-showai/references/host-adapter.md",
-    ),
-  );
+  await cp(join(root, "plugins/showai/skills"), join(fixture, "plugins/showai/skills"), {
+    recursive: true,
+  });
   await copyFile(
     join(root, "src/portable/template-bundle.mjs"),
     join(fixture, "src/portable/template-bundle.mjs"),
@@ -139,7 +135,7 @@ describe("plugin packaging", () => {
         ].join(eol),
       );
       expect(result.stdout).toContain(
-        "Prepared ShowAI MCP plugin 0.8.0: example, show-document, show-visual, use-showai",
+        "Prepared ShowAI MCP plugin 0.8.0: collaborate-canvas, create-component, create-template, example, show-document, show-visual, use-showai",
       );
     },
   );

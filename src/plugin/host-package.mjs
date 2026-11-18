@@ -53,12 +53,24 @@ export async function bindHostSkills({ source, target, profile }) {
   const commonFiles = Object.fromEntries(
     Object.entries(sourceFiles).filter(([name]) => name !== HOST_GUIDE),
   );
+  const expected = { ...commonFiles };
+  const entry = "use-showai/SKILL.md";
+  const notePath = join(source, "host-adapters/codex-entry.md");
+  const note =
+    profile === "codex" ? await readFile(notePath, "utf8") : undefined;
+  if (note !== undefined) {
+    const original = await readFile(join(source, "skills", entry), "utf8");
+    const bound = original.trimEnd() + "\n\n" + note;
+    await writeFile(join(target, "skills", entry), bound);
+    expected[entry] = hash(bound);
+  }
   const copied = await skillFiles(join(target, "skills"));
   const copiedCommon = Object.fromEntries(
     Object.entries(copied).filter(([name]) => name !== HOST_GUIDE),
   );
   if (
-    JSON.stringify(copiedCommon) !== JSON.stringify(commonFiles) ||
+    JSON.stringify(copiedCommon) !== JSON.stringify(expected) ||
+    (note !== undefined && (await readFile(notePath, "utf8")) !== note) ||
     JSON.stringify(await skillFiles(join(source, "skills"))) !==
       JSON.stringify(sourceFiles) ||
     (await readFile(join(source, "host-adapters", `${profile}.md`), "utf8")) !==
@@ -78,12 +90,30 @@ export async function bindHostSkills({ source, target, profile }) {
     commonSha256: hash(JSON.stringify(commonFiles)),
     commonFiles,
     adapterSha256: hash(adapter),
+    ...(profile === "codex" && { entrySha256: expected[entry] }),
   };
   await writeFile(
     join(target, "host-profile.json"),
     JSON.stringify(receipt, null, 2) + "\n",
   );
   return receipt;
+}
+
+export async function writeHostLauncher(source, target, profile) {
+  const template = await readFile(
+    join(source, "host-adapters/launch.mjs.in"),
+    "utf8",
+  );
+  const parts = template.split("__SHOWAI_PROBE_CACHE_PATH__");
+  if (parts.length !== 2)
+    throw new Error(
+      "Expected one probe cache path in the MCP launcher template.",
+    );
+  const cache =
+    profile === "codex"
+      ? 'join(env.SHOWAI_CODEX_WORKBENCH_PROFILE || join(home, "local"), "agent-runtime-probe.json")'
+      : 'join(home, "local", "agent-runtime-probe.json")';
+  await writeFile(join(target, "mcp/launch.mjs"), parts.join(cache));
 }
 
 export async function stageHostPlugin({ source, target, profile }) {
@@ -124,6 +154,7 @@ export async function stageHostPlugin({ source, target, profile }) {
   });
   const receipt = await bindHostSkills({ source, target, profile });
   if (profile === "codex") {
+    await writeHostLauncher(source, target, profile);
     await rm(join(target, ".claude-plugin"), { recursive: true, force: true });
     await rm(join(target, ".mcp.json"), { force: true });
   } else if (profile === "claude") {

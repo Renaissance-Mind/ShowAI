@@ -27,7 +27,7 @@ import {
   type RuntimeLaunch,
 } from "../agent/runtime";
 import { PluginInstallError, VERIFIED_HOST_VERSIONS } from "./plugin-errors";
-import { bindHostSkills, HOST_PROFILES } from "./host-package.mjs";
+import { bindHostSkills, HOST_PROFILES, writeHostLauncher } from "./host-package.mjs";
 import {
   inspectDshProfile,
   stageDshBundle,
@@ -724,6 +724,7 @@ export class DesktopPluginInstaller {
       version,
     });
     if (host === "codex") {
+      await writeHostLauncher(this.options.pluginRoot(), source, host);
       const launcher = await writeLauncher(join(source, "mcp"), server);
       await json(join(source, "mcp.json"), {
         $schema: "https://agent-plugins.org/schemas/1.0.0/mcp.schema.json",

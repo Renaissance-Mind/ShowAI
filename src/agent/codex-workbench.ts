@@ -12,7 +12,7 @@ import {
   type CodexWorkbenchMode,
 } from "./codex-workbench-ui";
 
-export type OpenCodexWorkbench = (key: string) => Promise<{
+type OpenCodexWorkbench = (key: string) => Promise<{
   url: string;
   localUrl: string;
   transport: CodexWorkbenchTransport;
@@ -20,7 +20,7 @@ export type OpenCodexWorkbench = (key: string) => Promise<{
 }>;
 
 const legacyWorkbenchUri = "ui://showai/workbench.html";
-export const codexWorkbenchIcons = ([
+const codexWorkbenchIcons = ([
   ["light", lightLogo],
   ["dark", darkLogo],
 ] as const).map(([theme, svg]) => ({
@@ -33,7 +33,19 @@ const readOnly = { readOnlyHint: true, destructiveHint: false, openWorldHint: fa
 const appOnly = { ui: { visibility: ["app"] } };
 const clientId = z.string().regex(/^[\w-]{1,100}$/);
 
-export function registerCodexWorkbench(server: McpServer, open: OpenCodexWorkbench) {
+export function codexWorkbenchConnection(open: OpenCodexWorkbench) {
+  return {
+    icons: codexWorkbenchIcons,
+    configure(server: McpServer) {
+      registerCodexWorkbench(server, open);
+      process.stdin.once("end", () =>
+        void server.close().catch((error) => console.error("ShowAI MCP shutdown:", error)),
+      );
+    },
+  };
+}
+
+function registerCodexWorkbench(server: McpServer, open: OpenCodexWorkbench) {
   const key = randomBytes(32).toString("hex");
   let runtime: ReturnType<OpenCodexWorkbench> | undefined;
   const workbench = () => (runtime ??= open(key).catch((error) => {

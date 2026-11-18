@@ -177,6 +177,14 @@ describe.skipIf(!output || !config)(
           ),
         );
         const server = manifest.mcpServers.showai;
+        expect(
+          await readFile(join(changed.installedPath, "mcp/launch.mjs"), "utf8"),
+        ).toBe(
+          await readFile(
+            resolve("plugins", "showai-" + host, "mcp/launch.mjs"),
+            "utf8",
+          ),
+        );
         if (host === "codex")
           expect(manifest.$schema).toBe(
             "https://agent-plugins.org/schemas/1.0.0/mcp.schema.json",
@@ -234,6 +242,12 @@ describe.skipIf(!output || !config)(
           await client.connect(transport);
           const tools = await client.listTools();
           expect(
+            tools.tools.some((tool) => tool.name === "workbench_open_global"),
+          ).toBe(host === "codex");
+          expect(
+            tools.tools.some((tool) => tool.name === "workbench_open_page"),
+          ).toBe(host === "codex");
+          expect(
             tools.tools.some((tool) => tool.name === "projects_list"),
           ).toBe(true);
           const projects = await client.callTool({
@@ -274,6 +288,16 @@ describe.skipIf(!output || !config)(
           const delivery = (shown.structuredContent as any).data.delivery;
           if (host === "codex") {
             expect(delivery.mode).toBe("mcp-app");
+            const cache = join(
+              server.env.SHOWAI_CODEX_WORKBENCH_PROFILE,
+              "agent-runtime-probe.json",
+            );
+            expect(
+              JSON.parse(await readFile(cache, "utf8")).info.data.home,
+            ).toBe(home);
+            await expect(
+              readFile(join(home, "local/agent-runtime-probe.json")),
+            ).rejects.toMatchObject({ code: "ENOENT" });
             expect(
               (capabilities.structuredContent as any).data.presentation
                 .liveUpdates,
@@ -458,6 +482,9 @@ describe.skipIf(!output || !config)(
       try {
         await client.connect(transport);
         const tools = await client.listTools();
+        expect(
+          tools.tools.some((tool) => tool.name.startsWith("workbench_")),
+        ).toBe(false);
         expect(tools.tools.some((tool) => tool.name === "page_apply")).toBe(
           true,
         );

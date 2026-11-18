@@ -20,8 +20,6 @@ npm run plugin:update -- --json
 
 The installer uses official Codex plugin commands and verifies enabled state, version and file fingerprints. For this source install, the receipt is `artifacts/codex-plugin-install.json`. Installation, host capability refresh and a conversation loading current tools/Skills are separate steps. Use the host's supported refresh procedure and confirm the current tools in a new conversation.
 
-To test the Codex workbench alongside the app plugin, build the checkout and run `npm run plugin:install -- --workbench-test <marketplace-directory> --home <absolute-library-path> --json`. This installs `showai-workbench-test`, binds it to the built runtime and selected library, and writes `codex-plugin-install.json` in the test marketplace directory.
-
 For everyday use, install the Claude Code plugin from the App; it connects the stable runtime. For development, start an instance (`npm run dev:open -- --port <port> --home <library>`), then in that checkout (the main directory or a worktree) run:
 
 ```sh

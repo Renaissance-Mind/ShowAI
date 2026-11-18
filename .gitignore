@@ -212,6 +212,7 @@ plugins/showai/scripts/cli.mjs
 !/plugins/showai/host-adapters/antigravity.md
 !/plugins/showai/host-adapters/claude.md
 !/plugins/showai/host-adapters/codex.md
+!/plugins/showai/host-adapters/codex-entry.md
 !/plugins/showai/host-adapters/deepseek.md
 !/plugins/showai/host-adapters/kimi.md
 !/plugins/showai/host-adapters/mcp-app.md

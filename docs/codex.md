@@ -66,6 +66,8 @@ After pulling an update:
 npm run plugin:update -- --json
 ```
 
+To test the Codex workbench alongside the app plugin, build the checkout and run `npm run plugin:install -- --workbench-test <marketplace-directory> --home <absolute-library-path> --json`. This installs `showai-workbench-test`, binds it to the built runtime and selected library, and writes `codex-plugin-install.json` in the test marketplace directory.
+
 The installer uses official Codex plugin commands and checks installed bytes, version and enabled state.
 
 Claude Code, from the repository root:

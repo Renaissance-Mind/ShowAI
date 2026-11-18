@@ -19,12 +19,12 @@ import { openLibrary } from "../core/open-library";
 import { recordConnections } from "./mcp-connections";
 import { recordMcpCalls } from "./mcp-call-log";
 import { mcpChangeContext } from "./mcp-actor";
-import { codexWorkbenchIcons, registerCodexWorkbench, type OpenCodexWorkbench } from "./codex-workbench";
+import type { McpServerOptions } from "./mcp-tools/tool";
 
 export function createLibraryMcpServer(options: {
   root: string;
   presentationDirectory?: string;
-  icons?: typeof codexWorkbenchIcons;
+  icons?: McpServerOptions["icons"];
 }) {
   const service = new AgentService({ root: options.root });
   const inherited = { ...changeContext(), readerId: randomUUID() };
@@ -161,7 +161,9 @@ export function createLibraryMcpServer(options: {
 }
 
 export async function startLibraryMcp(
-  options: Parameters<typeof createLibraryMcpServer>[0] & { openWorkbench?: OpenCodexWorkbench },
+  { configure, ...options }: Parameters<typeof createLibraryMcpServer>[0] & {
+    configure?: (server: ReturnType<typeof createLibraryMcpServer>) => void;
+  },
 ) {
   await openLibrary(options.root);
   const transport = new StdioServerTransport(process.stdin, process.stdout, {
@@ -169,16 +171,8 @@ export async function startLibraryMcp(
   });
   recordConnections(transport, options.root);
   recordMcpCalls(transport, options.root);
-  const server = createLibraryMcpServer({
-    ...options,
-    icons: options.openWorkbench ? codexWorkbenchIcons : options.icons,
-  });
-  if (options.openWorkbench) {
-    registerCodexWorkbench(server, options.openWorkbench);
-    process.stdin.once("end", () =>
-      void server.close().catch((error) => console.error("ShowAI MCP shutdown:", error)),
-    );
-  }
+  const server = createLibraryMcpServer(options);
+  configure?.(server);
   await server.connect(transport);
   process.stderr.write(
     "ShowAI MCP connected to the configured library. Select projectId explicitly.\n",

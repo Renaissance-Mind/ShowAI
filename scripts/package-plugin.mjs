@@ -15,10 +15,12 @@ import { packageSkillFormats } from "./package-skill-formats.mjs";
 import {
   bindHostSkills,
   stageHostPlugin,
+  writeHostLauncher,
 } from "../src/plugin/host-package.mjs";
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const plugin = join(root, "plugins/showai");
 await packageSkillFormats();
+await writeHostLauncher(plugin, plugin, "mcp-app");
 const args = process.argv.slice(2);
 const settings = {};
 for (let i = 0; i < args.length; i += 2) {

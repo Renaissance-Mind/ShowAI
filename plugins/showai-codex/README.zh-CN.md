@@ -20,8 +20,6 @@ npm run plugin:update -- --json
 
 安装器使用官方 Codex 插件命令，核验启用状态、版本与文件指纹，这次源码安装的回执位于 `artifacts/codex-plugin-install.json`。安装完成、宿主能力刷新和会话加载是三个环节。按宿主支持的方式刷新，并在新对话确认当前工具与 Skill。
 
-要在保留 App 插件的同时测试 Codex 工作台，先构建当前源码，再运行 `npm run plugin:install -- --workbench-test <测试市场目录> --home <内容库绝对路径> --json`。安装器以 `showai-workbench-test` 的名称安装测试插件，绑定本次构建的运行时与指定内容库，并将 `codex-plugin-install.json` 写入测试市场目录。
-
 Claude Code 的日常插件从 App 安装，连接稳定版。开发时先启动一个开发实例（`npm run dev:open -- --port <端口> --home <内容库>`），再在该源码目录（主目录或 worktree）执行：
 
 ```sh

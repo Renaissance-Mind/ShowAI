@@ -99,6 +99,11 @@ test("stages the bundle with Skills, the launcher and a literal MCP row", async 
 
 test("publishes every staged Skill without its frontmatter", async () => {
   const { target } = await stage();
+  for (const file of ["mcp/launch.mjs", "skills/use-showai/SKILL.md"]) {
+    expect(await readFile(join(target, file), "utf8")).toBe(
+      await readFile(resolve("plugins/showai", file), "utf8"),
+    );
+  }
   const provider = createProvider(join(target, "skills"));
   const listed = await provider.list();
   expect(listed.map((skill: { name: string }) => skill.name).sort()).toEqual(

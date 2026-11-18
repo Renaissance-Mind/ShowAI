@@ -3,7 +3,7 @@
   "profile": "codex",
   "declaredHostDisplay": "mcp-app",
   "commonVersion": "0.29.3",
-  "commonSha256": "88d7f1605eed357f04a9b0999d438c3ccd60a9810f4e4aa309e86a28e1ff46b1",
+  "commonSha256": "f6bd980385452d312740f4ddcf11f9cb73b4f9369f43484f79b595ccfa8ee56e",
   "commonFiles": {
     "collaborate-canvas/SKILL.md": "66c1a67e75c0a7cdaa749ad63231f933d8c406095afcda033790220a7c820eea",
     "create-component/references/component-authoring.md": "3debe9a4e5ca925c9336b9c296abd55c65bffdd38a1a7027bc99baaab7c4e037",
@@ -43,7 +43,8 @@
     "use-showai/references/shared-data.md": "21221b22ae80fd305e8a85fb186d96ff33fd366999097ae7ad2ac796579ebf51",
     "use-showai/references/tasks.md": "bf41308c2fe12f877c86b4b27e5eb891fdc55d2978aa5a24e12225bd6d816ade",
     "use-showai/references/user-references.md": "43bfa6e2e946aed17547c2910b8b0249d1aa48cafd780903039a21acff5a8ae3",
-    "use-showai/SKILL.md": "e116d4b3bb0fe8f3b76808db270e7bddaea9be060b4ebb0d26959bcedf790544"
+    "use-showai/SKILL.md": "1d816c90db6689ab62c341aa110312ed6616405c82029a7fe5568be0467af5f0"
   },
-  "adapterSha256": "6f6d4d967feca80c43e58885d562f45ef4a97aad894188443c18af89890b406f"
+  "adapterSha256": "95e5ac2f63a91889748de9e1275d2566996b40dcae4f55d3796e20d5ac7f1237",
+  "entrySha256": "ca4f98a0f80bb9845fed0aa25f1318998ef705e829e8ff5e430cbb7091caaae5"
 }
