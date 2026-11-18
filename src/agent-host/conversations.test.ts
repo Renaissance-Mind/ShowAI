@@ -59,6 +59,10 @@ const npmShim = (script: string) =>
 
 beforeAll(async () => {
   directory = await mkdtemp(join(tmpdir(), "showai-conversations-test-"));
+  await writeFile(
+    join(directory, "package.json"),
+    JSON.stringify({ type: "commonjs" }),
+  );
   library = new FileStore(join(directory, "library"));
   await openLibrary(library.root);
   log = join(directory, "agent-args.jsonl");
