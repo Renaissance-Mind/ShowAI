@@ -1,0 +1,209 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Page search</title>
+    <style>
+      :root {
+        color-scheme: light dark;
+        font:
+          100%/1.5 system-ui,
+          sans-serif;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        max-width: 36rem;
+        margin: 0 auto;
+        padding: 3rem 1rem;
+      }
+      h1 {
+        margin: 0 0 1.25rem;
+        font-size: 1.5rem;
+      }
+      label {
+        display: block;
+        margin-bottom: 0.3rem;
+      }
+      form {
+        display: flex;
+        gap: 0.5rem;
+      }
+      input,
+      button {
+        padding: 0.45rem 0.7rem;
+        font: inherit;
+      }
+      input {
+        flex: 1;
+        min-width: 0;
+      }
+      button {
+        cursor: pointer;
+      }
+      ul {
+        padding-inline-start: 1.4rem;
+      }
+      li {
+        padding: 0.2rem 0;
+      }
+      footer {
+        display: flex;
+        align-items: baseline;
+        flex-wrap: wrap;
+        gap: 0.75rem;
+        margin-top: 1.5rem;
+      }
+      output {
+        overflow-wrap: anywhere;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1 id="heading"></h1>
+      <label for="search" id="label"></label>
+      <form role="search">
+        <input type="search" id="search" autocomplete="off" />
+        <button type="reset" id="clear"></button>
+      </form>
+      <ul id="pages"></ul>
+      <p id="empty" role="status" hidden></p>
+      <footer>
+        <button type="button" id="check"></button>
+        <output id="result" aria-live="polite"></output>
+      </footer>
+    </main>
+    <script>
+      const chinese = navigator.language.toLowerCase().startsWith("zh");
+      const copy = chinese
+        ? {
+            heading: "页面搜索 · 模拟目录",
+            label: "搜索页面",
+            clear: "清空",
+            check: "检查示例",
+            empty: "没有匹配的页面",
+            pages: ["研究计划", "访谈提纲", "访谈记录"],
+            query: "访谈",
+            expected: ["访谈提纲", "访谈记录"],
+            cases: ["筛选", "空结果", "清空"],
+            passed: "3 项检查通过",
+            failed: "失败：",
+          }
+        : {
+            heading: "Page search · mock directory",
+            label: "Search pages",
+            clear: "Clear",
+            check: "Check example",
+            empty: "No matching pages",
+            pages: ["Research plan", "Interview guide", "Interview notes"],
+            query: "interview",
+            expected: ["Interview guide", "Interview notes"],
+            cases: ["Filter", "Empty results", "Clear"],
+            passed: "3 checks passed",
+            failed: "Failed: ",
+          };
+      document.documentElement.lang = chinese ? "zh-CN" : "en";
+      document.title = copy.heading;
+      for (const id of ["heading", "label", "clear", "check", "empty"]) {
+        document.getElementById(id).textContent = copy[id];
+      }
+      const form = document.querySelector("form");
+      const search = document.getElementById("search");
+      const list = document.getElementById("pages");
+      const empty = document.getElementById("empty");
+      const check = document.getElementById("check");
+      const result = document.getElementById("result");
+
+      function render() {
+        const query = search.value.trim().toLowerCase();
+        const matches = copy.pages.filter((title) =>
+          title.toLowerCase().includes(query),
+        );
+        list.replaceChildren(
+          ...matches.map((title) => {
+            const row = document.createElement("li");
+            row.textContent = title;
+            return row;
+          }),
+        );
+        empty.hidden = matches.length > 0;
+      }
+      search.addEventListener("input", render);
+      form.addEventListener("submit", (event) => event.preventDefault());
+      form.addEventListener("reset", (event) => {
+        event.preventDefault();
+        search.value = "";
+        render();
+        search.focus();
+      });
+      search.addEventListener("keydown", (event) => {
+        if (event.key === "Escape" && !event.isComposing) {
+          event.preventDefault();
+          form.reset();
+        }
+      });
+
+      function enter(value) {
+        search.value = value;
+        search.dispatchEvent(new Event("input", { bubbles: true }));
+      }
+      function checkView(name, query, pages) {
+        const expected = { query, pages, empty: pages.length === 0 };
+        const actual = {
+          query: search.value,
+          pages: Array.from(list.children, (row) => row.textContent),
+          empty: !empty.hidden,
+        };
+        if (JSON.stringify(actual) === JSON.stringify(expected)) return "";
+        return name + " " + JSON.stringify({ expected, actual });
+      }
+      check.addEventListener("click", () => {
+        const previous = search.value;
+        enter(copy.query);
+        const filtered = checkView(copy.cases[0], copy.query, copy.expected);
+        enter("no-match-404");
+        const noMatches = checkView(copy.cases[1], "no-match-404", []);
+        document.getElementById("clear").click();
+        const cleared = checkView(copy.cases[2], "", copy.pages);
+        enter(previous);
+        check.focus();
+        const failed = [filtered, noMatches, cleared].filter(Boolean);
+        result.textContent = failed.length
+          ? copy.failed + failed.join(", ")
+          : copy.passed;
+      });
+      render();
+      const stateIds = ["all", "matches", "empty"];
+      const actions = [
+        { title: copy.label, target: "#search" },
+        { title: copy.clear, target: "#clear" },
+        { title: copy.check, target: "#check" },
+      ];
+      const titles = chinese
+        ? ["全部页面", "有匹配结果", "没有匹配结果"]
+        : ["All pages", "Matching pages", "Empty results"];
+      const queries = ["", copy.query, "no-match-404"];
+      const currentState = () =>
+        !search.value.trim()
+          ? "all"
+          : list.children.length
+            ? "matches"
+            : "empty";
+      window.reviewScenario = {
+        entry: "all",
+        states: stateIds.map((id, i) => ({
+          id,
+          title: titles[i],
+          parent: i ? "all" : undefined,
+          match: () => currentState() === id,
+          enter: (ui) => ui.fill("#search", queries[i], copy.label),
+          variants: stateIds,
+          actions,
+        })),
+      };
+    </script>
+  </body>
+</html>
