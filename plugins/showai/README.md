@@ -58,7 +58,7 @@ Edit workflows in `plugins/showai/skills` and host delivery contracts in `plugin
 
 | Target | Distribution | Delivery adaptation |
 | --- | --- | --- |
-| Codex | `plugins/showai-codex` | Local visualization reference |
+| Codex | `plugins/showai-codex` | Native MCP Apps views with a file-based fallback |
 | Claude Code | `plugins/showai-claude` | Host HTML display tool |
 | Antigravity | `plugins/showai-antigravity` | Bundled offline Artifact and inline embed |
 | DeepSeek Harness | Prepared bundle directory | Automatic tool-result preview |
