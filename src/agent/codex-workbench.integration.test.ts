@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
 import { expect, it } from "vitest";
-import { codexWorkbenchUri } from "./codex-workbench-ui";
+import { codexWorkbenchUri, codexWorkbenchThreadUri } from "./codex-workbench-ui";
 import type { ShowDocument } from "../types";
 
 type SavedPage = { document: ShowDocument; hash: string; revision?: string };
@@ -22,12 +22,15 @@ it("opens both Codex workbench entries and saves into the MCP library", async ()
   try {
     await client.connect(transport);
     const { tools } = await client.listTools();
-    expect(tools.find((tool) => tool.name === "workbench_open")?._meta).toMatchObject({
+    expect(tools.find((tool) => tool.name === "workbench_open_global")?._meta).toMatchObject({
       ui: { resourceUri: codexWorkbenchUri, visibility: ["app"] },
       "openai/ui": { entrypoints: [{ type: "global" }] },
     });
+    expect(tools.find((tool) => tool.name === "workbench_open")?._meta).toEqual({
+      ui: { resourceUri: "ui://showai/workbench.html", visibility: ["app"] },
+    });
     expect(tools.find((tool) => tool.name === "workbench_open_page")?._meta).toMatchObject({
-      ui: { resourceUri: codexWorkbenchUri, visibility: ["app"] },
+      ui: { resourceUri: codexWorkbenchThreadUri, visibility: ["app"] },
       "openai/ui": { entrypoints: [{ type: "thread" }] },
     });
     expect(tools.find((tool) => tool.name === "show_component")?._meta?.ui)
@@ -41,7 +44,7 @@ it("opens both Codex workbench entries and saves into the MCP library", async ()
       expect(result.isError, JSON.stringify(result.content)).not.toBe(true);
       return new URL((result._meta!.showaiWorkbench as { url: string }).url);
     };
-    const globalUrl = await open("workbench_open");
+    const globalUrl = await open("workbench_open_global");
     const threadUrl = await open("workbench_open_page");
     expect(globalUrl.origin).toBe(threadUrl.origin);
     expect(globalUrl.searchParams.get("codexMode")).toBe("global");
@@ -179,7 +182,7 @@ it("preserves the shared Board version and a conflicting draft when a Codex pane
   }
 
   try {
-    const global = await open("workbench_open", "global-profile");
+    const global = await open("workbench_open_global", "global-profile");
     const thread = await open("workbench_open_page", "thread-profile");
     expect(global.url.origin).not.toBe(thread.url.origin);
     const project = await global.invoke<{ id: string }>("projects:create", { name: "Concurrent workbench edits" });
@@ -247,7 +250,26 @@ it("preserves the shared Board version and a conflicting draft when a Codex pane
 
     await thread.client.close();
     connections.delete(thread.client);
+    await expect(fetch(thread.url)).rejects.toThrow();
     const reopened = await open("workbench_open_page", "thread-profile");
+    const resource = await reopened.client.readResource({ uri: codexWorkbenchThreadUri });
+    const refresh = await reopened.client.callTool({
+      name: "workbench_refresh",
+      arguments: { mode: "thread" },
+    });
+    expect(refresh.isError, JSON.stringify(refresh.content)).not.toBe(true);
+    const freshUrl = new URL((refresh._meta!.showaiWorkbench as { url: string }).url);
+    expect(freshUrl.origin).toBe(reopened.url.origin);
+    expect(freshUrl.origin).not.toBe(thread.url.origin);
+    expect(freshUrl.searchParams.get("codexMode")).toBe("thread");
+    expect(resource.contents[0]).toHaveProperty(
+      "text",
+      expect.stringContaining(`const workbenchOrigin = ${JSON.stringify(freshUrl.origin)}`),
+    );
+    expect(resource.contents[0]).not.toHaveProperty(
+      "text",
+      expect.stringContaining(freshUrl.searchParams.get("codexWorkbench")!),
+    );
     const current = await reopened.invoke<SavedPage>("pages:get", scope);
     expect(current).toMatchObject({ hash: written.hash, revision: written.revision, document: { title: "Global saved" } });
     expect(await reopened.invoke("drafts:read", { id: draft.id })).toMatchObject({

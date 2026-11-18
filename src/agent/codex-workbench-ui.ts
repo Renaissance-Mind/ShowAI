@@ -1,8 +1,11 @@
 import messages from "../i18n/messages/codex-workbench";
 
-export const codexWorkbenchUri = "ui://showai/workbench.html";
+export type CodexWorkbenchMode = "global" | "thread";
+export const codexWorkbenchUri = "ui://showai/workbench-v2.html";
+export const codexWorkbenchThreadUri = "ui://showai/workbench-thread-v2.html";
 
-export const codexWorkbenchHtml = `<!doctype html>
+export function codexWorkbenchHtml(origin: string, mode?: CodexWorkbenchMode) {
+  return `<!doctype html>
 <html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <style>
 :root { color-scheme: light dark; font: 14px system-ui }
@@ -15,6 +18,8 @@ body { margin: 0 }
 <script>
 (() => {
   const translations = ${JSON.stringify(messages.catalogs)};
+  const workbenchOrigin = ${JSON.stringify(origin)};
+  let mode = ${JSON.stringify(mode) ?? "null"};
   const status = document.getElementById("showai-launch");
   const message = document.getElementById("showai-message");
   const retry = document.getElementById("showai-retry");
@@ -24,14 +29,15 @@ body { margin: 0 }
   let locale = navigator.language.startsWith("zh") ? "zh-CN" : "en";
   let context = {};
   let capabilities = {};
-  let launch, launchUrl, initialized = false, loading = false, ready = false, sequence = 0;
+  let launch, launchUrl, launchTimer, initialized = false, loading = false;
+  let ready = false, refreshing = false, sequence = 0;
   const instance = Array.from(crypto.getRandomValues(new Uint8Array(16)), byte => byte.toString(16).padStart(2, "0")).join("");
   const t = key => translations[locale][key];
 
   function show(key, details) {
     message.textContent = details ? t(key) + " · " + details : t(key);
     retry.textContent = t("retry");
-    retry.hidden = key !== "failed" || !launch || !!window.showai;
+    retry.hidden = key !== "failed" || !!window.showai || (!launch && !capabilities.serverTools);
     external.textContent = t("openInBrowser");
     external.hidden = key !== "failed" || !launchUrl;
     status.hidden = false;
@@ -182,25 +188,65 @@ body { margin: 0 }
     }
   }
 
-  retry.addEventListener("click", open);
+  retry.addEventListener("click", () => {
+    if (capabilities.serverTools) void refreshLaunch();
+    else void open();
+  });
   external.addEventListener("click", () =>
     openLink(launchUrl.href).catch(error => { message.textContent = error.message; }),
   );
 
+  function launchFrom(result) {
+    const meta = result?._meta ?? result;
+    const payload = meta?.mcp_tool_result ?? meta?.call_tool_result ?? meta;
+    const value = (payload?._meta ?? payload)?.showaiWorkbench?.url;
+    const url = typeof value === "string" ? URL.parse(value) : null;
+    const targetMode = url?.searchParams.get("codexMode");
+    if (!url || url.protocol !== "http:" || url.hostname !== "127.0.0.1" ||
+        !/^[0-9a-f]{64}$/.test(url.searchParams.get("codexWorkbench") || "") ||
+        (targetMode !== "global" && targetMode !== "thread")) return null;
+    if (mode && targetMode !== mode) return null;
+    mode ??= targetMode;
+    return url;
+  }
+
   function fromResult(result) {
-    const value = result?._meta?.showaiWorkbench?.url;
-    if (typeof value !== "string") {
-      if (result?.isError) show("failed");
+    if (ready) return;
+    const url = launchFrom(result);
+    if (url?.origin === workbenchOrigin) {
+      launch = url.href;
+      clearTimeout(launchTimer);
+      void open();
+    } else if (initialized && url && !launch) {
+      void refreshLaunch();
+    }
+  }
+
+  async function refreshLaunch() {
+    if (!initialized || refreshing || loading || ready) return;
+    clearTimeout(launchTimer);
+    const opener = context.toolInfo?.tool?.name;
+    mode ??= opener?.endsWith("workbench_open_page") ? "thread" : "global";
+    if (!capabilities.serverTools) {
+      show("failed", t("connectionExpired"));
       return;
     }
-    const url = new URL(value);
-    if (url.protocol !== "http:" || url.hostname !== "127.0.0.1" ||
-        !/^[0-9a-f]{64}$/.test(url.searchParams.get("codexWorkbench") || "")) {
-      show("failed");
-      return;
+    refreshing = true;
+    show("loading");
+    try {
+      const result = await request("tools/call", {
+        name: "workbench_refresh",
+        arguments: { mode },
+      });
+      const url = launchFrom(result);
+      if (url?.origin !== workbenchOrigin) throw new Error(t("connectionExpired"));
+      launch = url.href;
+      await open();
+    } catch (error) {
+      if (!ready) show("failed", error.message);
+    } finally {
+      refreshing = false;
     }
-    launch = value;
-    void open();
   }
 
   addEventListener("message", event => {
@@ -232,6 +278,8 @@ body { margin: 0 }
     }
   });
 
+  addEventListener("openai:set_globals", event => fromResult(event.detail?.globals?.toolResponseMetadata));
+  fromResult(window.openai?.toolResponseMetadata);
   show("loading");
   request("ui/initialize", {
     appInfo: { name: "ShowAI", version: "1.0.0" },
@@ -243,7 +291,9 @@ body { margin: 0 }
     initialized = true;
     if (!ready) show("loading");
     parent.postMessage({ jsonrpc: "2.0", method: "ui/notifications/initialized" }, "*");
-    void open();
+    if (launch) void open();
+    else launchTimer = setTimeout(refreshLaunch, 800);
   }).catch(error => show("failed", error.message));
 })();
 </script></body></html>`;
+}
