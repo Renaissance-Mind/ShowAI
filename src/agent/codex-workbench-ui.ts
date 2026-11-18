@@ -1,11 +1,13 @@
 import messages from "../i18n/messages/codex-workbench";
 import { workbenchChunkBytes } from "../host/codex-workbench-transport";
+import { codexPageReferenceMaxLength } from "./codex-page-reference";
 
 export type CodexWorkbenchMode = "global" | "thread";
 export const codexWorkbenchUri = "ui://showai/workbench-v3.html";
 export const codexWorkbenchThreadUri = "ui://showai/workbench-thread-v3.html";
+export const codexWorkbenchFileUri = "ui://showai/workbench-file-v1.html";
 
-export function codexWorkbenchHtml(mode?: CodexWorkbenchMode) {
+export function codexWorkbenchHtml(mode?: CodexWorkbenchMode, fileEntry = false) {
   return `<!doctype html>
 <html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <style>
@@ -20,6 +22,8 @@ body { margin: 0 }
 (() => {
   const translations = ${JSON.stringify(messages.catalogs)};
   const chunkBytes = ${workbenchChunkBytes};
+  const useFileEntrypoint = ${fileEntry};
+  const referenceLimit = ${codexPageReferenceMaxLength};
   let mode = ${JSON.stringify(mode) ?? "null"};
   const status = document.getElementById("showai-launch");
   const message = document.getElementById("showai-message");
@@ -32,6 +36,7 @@ body { margin: 0 }
   let capabilities = {};
   let launch, launchUrl, bundle, launchTimer, initialized = false;
   let ready = false, refreshing = false, sequence = 0;
+  let fileInput, filePage, readingFile = false;
   const urls = new Map();
   const assetDownloads = new Map();
   const waitingDownloads = [];
@@ -42,7 +47,8 @@ body { margin: 0 }
   function show(key, details) {
     message.textContent = details ? t(key) + " · " + details : t(key);
     retry.textContent = t("retry");
-    retry.hidden = key !== "failed" || !!window.showai || (!launch && !capabilities.serverTools);
+    retry.hidden = key !== "failed" || !!window.showai ||
+      (useFileEntrypoint && !fileInput) || (!launch && !capabilities.serverTools);
     external.textContent = t("openInBrowser");
     external.hidden = key !== "failed" || !launchUrl;
     status.hidden = false;
@@ -72,7 +78,10 @@ body { margin: 0 }
   function currentUrl() {
     const url = new URL(launch);
     const path = context["openai/deepLink"]?.url;
-    if (typeof path === "string" && path.startsWith("/")) {
+    if (filePage) {
+      url.searchParams.set("project", filePage.projectId);
+      url.searchParams.set("page", filePage.pageId);
+    } else if (typeof path === "string" && path.startsWith("/")) {
       const target = new URL(path, url.origin);
       if (target.origin === url.origin) {
         for (const name of ["project", "page", "folder", "blocks"]) {
@@ -244,8 +253,58 @@ body { margin: 0 }
     if (target && initialized) void refreshLaunch();
   }
 
+  function displayPage(pageId, projectId, blockId) {
+    window.dispatchEvent(new CustomEvent("showai:open-page", {
+      detail: { pageId, projectId, blockId },
+    }));
+  }
+
+  function receiveFileInput(args) {
+    if (!useFileEntrypoint) return;
+    const file = args?.file;
+    if (typeof file?.resourceUri !== "string" || !file.resourceUri ||
+        file.resourceUri === fileInput?.resourceUri) return;
+    fileInput = file;
+    if (initialized) void readReferenceFile();
+  }
+
+  async function readReferenceFile() {
+    if (!initialized || !fileInput || readingFile) return;
+    const file = fileInput;
+    clearTimeout(launchTimer);
+    readingFile = true;
+    try {
+      const response = await request("resources/read", {
+        uri: file.resourceUri,
+        _meta: { "openai/resource": { representation: "text" } },
+      });
+      const content = response?.contents?.[0];
+      let source = content?.text;
+      if (typeof source !== "string" && typeof content?.blob === "string" &&
+          content.blob.length <= Math.ceil(referenceLimit / 3) * 4) {
+        const bytes = Uint8Array.from(atob(content.blob), character => character.charCodeAt(0));
+        source = new TextDecoder("utf-8", { fatal: true }).decode(bytes);
+      }
+      if (typeof source !== "string" || !source.length || source.length > referenceLimit)
+        throw new Error(t("invalidReferenceFile"));
+      const target = await callWorkbench("workbench_resolve_reference", { source });
+      if (file !== fileInput) return;
+      filePage = target;
+      if (!ready) await refreshLaunch();
+      else {
+        status.hidden = true;
+        displayPage(target.pageId, target.projectId);
+      }
+    } catch (error) {
+      if (file === fileInput) show("failed", error.message);
+    } finally {
+      readingFile = false;
+      if (file !== fileInput) void readReferenceFile();
+    }
+  }
+
   async function refreshLaunch() {
-    if (!initialized || refreshing || ready) return;
+    if (!initialized || refreshing || ready || (useFileEntrypoint && !filePage)) return;
     clearTimeout(launchTimer);
     const opener = context.toolInfo?.tool?.name;
     mode ??= opener?.endsWith("workbench_open_page") ? "thread" : "global";
@@ -305,7 +364,10 @@ body { margin: 0 }
     }
   }
 
-  retry.addEventListener("click", refreshLaunch);
+  retry.addEventListener("click", () => {
+    if (useFileEntrypoint) void readReferenceFile();
+    else void refreshLaunch();
+  });
   external.addEventListener("click", () => {
     if (launchUrl) void openLink(launchUrl.href).catch(error => { message.textContent = error.message; });
   });
@@ -321,25 +383,28 @@ body { margin: 0 }
       else waiting.resolve(data.result);
       return;
     }
+    if (data.method === "ui/notifications/tool-input") receiveFileInput(data.params?.arguments);
     if (data.method === "ui/notifications/tool-result") fromResult(data.params);
     if (data.method === "ui/notifications/host-context-changed") {
       const previous = context["openai/deepLink"]?.url;
       configure({ ...context, ...data.params });
-      if (ready && previous !== context["openai/deepLink"]?.url) {
+      if (ready && !useFileEntrypoint && previous !== context["openai/deepLink"]?.url) {
         const target = currentUrl();
         const pageId = target.searchParams.get("page");
-        if (pageId) window.dispatchEvent(new CustomEvent("showai:open-page", {
-          detail: {
-            projectId: target.searchParams.get("project") ?? undefined,
-            pageId,
-            blockId: target.searchParams.get("blocks")?.split(",")[0],
-          },
-        }));
+        if (pageId) displayPage(
+          pageId,
+          target.searchParams.get("project") ?? undefined,
+          target.searchParams.get("blocks")?.split(",")[0],
+        );
       }
     }
   });
 
-  addEventListener("openai:set_globals", event => fromResult(event.detail?.globals?.toolResponseMetadata));
+  addEventListener("openai:set_globals", event => {
+    receiveFileInput(event.detail?.globals?.toolInput);
+    fromResult(event.detail?.globals?.toolResponseMetadata);
+  });
+  receiveFileInput(window.openai?.toolInput);
   fromResult(window.openai?.toolResponseMetadata);
   show("loading");
   request("ui/initialize", {
@@ -352,7 +417,10 @@ body { margin: 0 }
     initialized = true;
     if (!ready) show("loading");
     parent.postMessage({ jsonrpc: "2.0", method: "ui/notifications/initialized" }, "*");
-    if (mode) void refreshLaunch();
+    if (useFileEntrypoint) {
+      if (fileInput) void readReferenceFile();
+      else launchTimer = setTimeout(() => show("failed", t("missingReferenceFile")), 8000);
+    } else if (mode) void refreshLaunch();
     else launchTimer = setTimeout(refreshLaunch, 800);
   }).catch(error => show("failed", error.message));
 })();

@@ -25,6 +25,7 @@ export function createLibraryMcpServer(options: {
   root: string;
   presentationDirectory?: string;
   icons?: typeof codexWorkbenchIcons;
+  openWorkbench?: OpenCodexWorkbench;
 }) {
   const service = new AgentService({ root: options.root });
   const inherited = { ...changeContext(), readerId: randomUUID() };
@@ -157,11 +158,13 @@ export function createLibraryMcpServer(options: {
     },
     ({ name }) => call(() => service.createProject(name)),
   );
+  if (options.openWorkbench)
+    registerCodexWorkbench(server, options.openWorkbench, service, options.presentationDirectory);
   return server;
 }
 
 export async function startLibraryMcp(
-  options: Parameters<typeof createLibraryMcpServer>[0] & { openWorkbench?: OpenCodexWorkbench },
+  options: Parameters<typeof createLibraryMcpServer>[0],
 ) {
   await openLibrary(options.root);
   const transport = new StdioServerTransport(process.stdin, process.stdout, {
@@ -174,7 +177,6 @@ export async function startLibraryMcp(
     icons: options.openWorkbench ? codexWorkbenchIcons : options.icons,
   });
   if (options.openWorkbench) {
-    registerCodexWorkbench(server, options.openWorkbench);
     process.stdin.once("end", () =>
       void server.close().catch((error) => console.error("ShowAI MCP shutdown:", error)),
     );

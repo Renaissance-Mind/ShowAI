@@ -4,10 +4,19 @@ import { z } from "zod";
 import lightLogo from "../../plugins/showai/assets/logo.svg?raw";
 import darkLogo from "../../plugins/showai/assets/logo-dark.svg?raw";
 import { workbenchRoutes, type CodexWorkbenchTransport } from "../host/codex-workbench-transport";
-import { mcpFailure } from "./presentation-tools";
+import { mcpFailure, mcpSuccess } from "./presentation-tools";
+import type { AgentService } from "./service";
+import {
+  codexPageIdentity,
+  codexPageReferenceExtension,
+  codexPageReferenceMaxLength,
+  resolveCodexPageReference,
+  writeCodexPageReference,
+} from "./codex-page-reference";
 import {
   codexWorkbenchHtml,
   codexWorkbenchUri,
+  codexWorkbenchFileUri,
   codexWorkbenchThreadUri,
   type CodexWorkbenchMode,
 } from "./codex-workbench-ui";
@@ -33,7 +42,12 @@ const readOnly = { readOnlyHint: true, destructiveHint: false, openWorldHint: fa
 const appOnly = { ui: { visibility: ["app"] } };
 const clientId = z.string().regex(/^[\w-]{1,100}$/);
 
-export function registerCodexWorkbench(server: McpServer, open: OpenCodexWorkbench) {
+export function registerCodexWorkbench(
+  server: McpServer,
+  open: OpenCodexWorkbench,
+  service: AgentService,
+  presentationDirectory?: string,
+) {
   const key = randomBytes(32).toString("hex");
   let runtime: ReturnType<OpenCodexWorkbench> | undefined;
   const workbench = () => (runtime ??= open(key).catch((error) => {
@@ -54,6 +68,7 @@ export function registerCodexWorkbench(server: McpServer, open: OpenCodexWorkben
   ] as const;
   const resources = [
     ...views,
+    { mode: "thread", name: "workbench_file", uri: codexWorkbenchFileUri },
     { mode: undefined, name: "workbench_legacy", uri: legacyWorkbenchUri },
     { mode: "global", name: "workbench_global_v2", uri: "ui://showai/workbench-v2.html" },
     { mode: "thread", name: "workbench_thread_v2", uri: "ui://showai/workbench-thread-v2.html" },
@@ -65,7 +80,7 @@ export function registerCodexWorkbench(server: McpServer, open: OpenCodexWorkben
         contents: [{
           uri,
           mimeType,
-          text: codexWorkbenchHtml(mode),
+          text: codexWorkbenchHtml(mode, uri === codexWorkbenchFileUri),
           _meta: {
             ui: {
               csp: {
@@ -110,6 +125,52 @@ export function registerCodexWorkbench(server: McpServer, open: OpenCodexWorkben
       },
     }, () => launch(mode));
   }
+
+  server.registerTool("workbench_open_file", {
+    title: "ShowAI",
+    description: "Open the original Page linked by a ShowAI reference file.",
+    inputSchema: {
+      file: z.object({ name: z.string().min(1), resourceUri: z.string().min(1) }),
+    },
+    annotations: readOnly,
+    _meta: {
+      ui: { resourceUri: codexWorkbenchFileUri, visibility: ["app"] },
+      "openai/ui": {
+        entrypoints: [{ type: "file", extensions: [codexPageReferenceExtension] }],
+      },
+    },
+  }, () => launch("thread"));
+
+  server.registerTool("workbench_page_reference", {
+    title: "Create a ShowAI page reference",
+    description: "Create a local reference file that opens the saved ShowAI Page when clicked in Codex. Link the returned absolute path in the reply.",
+    inputSchema: codexPageIdentity,
+    annotations: readOnly,
+  }, async ({ projectId, pageId }) => {
+    try {
+      const { file, ...reference } = await writeCodexPageReference(
+        service, presentationDirectory, projectId, pageId,
+      );
+      const result = mcpSuccess(reference);
+      return { ...result, content: [...result.content, file] };
+    } catch (error) {
+      return mcpFailure(error);
+    }
+  });
+
+  server.registerTool("workbench_resolve_reference", {
+    description: "Verify a ShowAI reference file read through the Codex host and locate its saved Page.",
+    inputSchema: { source: z.string().min(1).max(codexPageReferenceMaxLength) },
+    annotations: readOnly,
+    _meta: appOnly,
+  }, async ({ source }) => {
+    try {
+      const page = await resolveCodexPageReference(service, source);
+      return { content: [], _meta: { showaiWorkbenchData: page } };
+    } catch (error) {
+      return mcpFailure(error);
+    }
+  });
 
   server.registerTool("workbench_open", {
     title: "ShowAI",
