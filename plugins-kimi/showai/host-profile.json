@@ -3,7 +3,7 @@
   "profile": "kimi",
   "declaredHostDisplay": "fragment-file",
   "commonVersion": "0.29.3",
-  "commonSha256": "88d7f1605eed357f04a9b0999d438c3ccd60a9810f4e4aa309e86a28e1ff46b1",
+  "commonSha256": "31cdd17cea8ac9a4749d069f4732f146f769d7dbe5448fdfa5fd8d45efb2f118",
   "commonFiles": {
     "collaborate-canvas/SKILL.md": "66c1a67e75c0a7cdaa749ad63231f933d8c406095afcda033790220a7c820eea",
     "create-component/references/component-authoring.md": "3debe9a4e5ca925c9336b9c296abd55c65bffdd38a1a7027bc99baaab7c4e037",
@@ -43,7 +43,7 @@
     "use-showai/references/shared-data.md": "21221b22ae80fd305e8a85fb186d96ff33fd366999097ae7ad2ac796579ebf51",
     "use-showai/references/tasks.md": "bf41308c2fe12f877c86b4b27e5eb891fdc55d2978aa5a24e12225bd6d816ade",
     "use-showai/references/user-references.md": "43bfa6e2e946aed17547c2910b8b0249d1aa48cafd780903039a21acff5a8ae3",
-    "use-showai/SKILL.md": "e116d4b3bb0fe8f3b76808db270e7bddaea9be060b4ebb0d26959bcedf790544"
+    "use-showai/SKILL.md": "1e0a7528f82e1cb83bf56daf976ef2a68d8a35370c325e09751e22fbd194d2be"
   },
   "adapterSha256": "c87894d505378a2b83abf34f2cd59319db3aa4b19652ee6a8dd96428ca3d831a"
 }
