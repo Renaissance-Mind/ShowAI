@@ -1,3 +1,4 @@
+import ComponentPreviewPage from "./ComponentPreviewPage";
 import { browserUrl, codexWorkbench } from "../browser/codex-workbench";
 import { useEffect, useRef, useState } from "react";
 import { ImageOff, Loader2 } from "../ui/icons";
@@ -45,27 +46,9 @@ export default function ComponentThumbnail({
   const embedding = codexWorkbench();
   const previewUrl = new URL(browserUrl("/"));
   previewUrl.searchParams.set("componentPreview", key);
-  if (embedding) previewUrl.searchParams.set("codexWorkbench", embedding.key);
   const previewAddress = previewUrl.href;
-  const [preview, setPreview] = useState({ address: "", html: "" });
   useEffect(() => {
-    if (!embedding || !visible) return;
-    const cancel = new AbortController();
-    void fetch(previewAddress, { signal: cancel.signal })
-      .then((response) => {
-        if (!response.ok) throw new Error(`ShowAI preview ${response.status}`);
-        return response.text();
-      })
-      .then((html) => {
-        if (!cancel.signal.aborted) setPreview({ address: previewAddress, html });
-      }, (failure) => {
-        if (!cancel.signal.aborted)
-          setFrameState({ key, ready: false, error: errorMessage(failure) });
-      });
-    return () => cancel.abort();
-  }, [embedding, key, previewAddress, visible]);
-  useEffect(() => {
-    if (!browser || !visible) return;
+    if (!browser || !visible || embedding) return;
     setFrameState({ key, ready: false, error: "" });
     const receive = (event: MessageEvent) => {
       if (
@@ -82,7 +65,7 @@ export default function ComponentThumbnail({
     };
     window.addEventListener("message", receive);
     return () => window.removeEventListener("message", receive);
-  }, [browser, visible, key]);
+  }, [browser, embedding, visible, key]);
   useEffect(() => {
     if (!container.current) return;
     const observer = new IntersectionObserver(
@@ -129,20 +112,33 @@ export default function ComponentThumbnail({
         <img src={image.data} alt="" draggable={false} />
       ) : visible && browser ? (
         <>
-          <iframe
-            ref={frame}
-            title={t("thumbnailTitle", { name: componentDisplayName(item) })}
-            src={embedding ? undefined : previewAddress}
-            srcDoc={embedding && preview.address === previewAddress ? preview.html : undefined}
-            tabIndex={-1}
-            style={{
-              transform: `translate(-50%, -50%) scale(${scale})`,
-              opacity:
-                frameState.key === key && frameState.ready && !frameState.error
+          {embedding ? (
+            <div
+              style={{
+                position: "absolute",
+                top: "50%",
+                left: "50%",
+                transform: `translate(-50%, -50%) scale(${scale})`,
+                pointerEvents: "none",
+                opacity: frameState.key === key && frameState.ready ? 1 : 0,
+              }}
+            >
+              <ComponentPreviewPage key={key} embeddedKey={key} onPreviewState={setFrameState} />
+            </div>
+          ) : (
+            <iframe
+              ref={frame}
+              title={t("thumbnailTitle", { name: componentDisplayName(item) })}
+              src={previewAddress}
+              tabIndex={-1}
+              style={{
+                transform: `translate(-50%, -50%) scale(${scale})`,
+                opacity: frameState.key === key && frameState.ready && !frameState.error
                   ? 1
                   : 0,
-            }}
-          />
+              }}
+            />
+          )}
           {frameState.key === key && frameState.error ? (
             <span className="component-preview-error" title={frameState.error}>
               <ImageOff size={20} />

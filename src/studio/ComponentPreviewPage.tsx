@@ -15,7 +15,15 @@ import "./component-preview.css";
 
 const t = translator(messages);
 
-export default function ComponentPreviewPage() {
+export default function ComponentPreviewPage({
+  embeddedKey,
+  onPreviewState,
+}: {
+  embeddedKey?: string;
+  onPreviewState?: (state: { key: string; ready: boolean; error: string }) => void;
+} = {}) {
+  const previewKey = embeddedKey ?? browserSearch().get("componentPreview")!;
+  const capture = !embeddedKey && browserSearch().get("thumbnailCapture") === "1";
   const [component, setComponent] = useState<
     BuiltinComponentMetadata | CompiledComponent
   >();
@@ -23,41 +31,39 @@ export default function ComponentPreviewPage() {
   const [ready, setReady] = useState(false);
   const native = useRef<HTMLDivElement>(null);
   useEffect(() => {
+    if (embeddedKey) return;
     const token = browserSearch().get("previewToken");
     if (token && (ready || error))
       window.showai?.previewReady?.(token, error || undefined);
-  }, [ready, error]);
+  }, [embeddedKey, ready, error]);
   useEffect(() => {
+    if (onPreviewState) {
+      onPreviewState({ key: previewKey, ready, error });
+      return;
+    }
     if (window.parent === window) return;
     window.parent.postMessage(
       {
         type: "showai:catalog-preview",
-        key: browserSearch().get("componentPreview"),
+        key: previewKey,
         ready,
         error,
       },
       window.origin === "null" ? "*" : window.origin,
     );
-  }, [ready, error]);
+  }, [onPreviewState, previewKey, ready, error]);
   useLayoutEffect(() => {
-    const args = JSON.parse(
-      browserSearch().get("componentPreview")!,
-    );
+    if (embeddedKey) return;
+    const args = JSON.parse(previewKey);
     document.documentElement.dataset.theme =
       args.theme === "dark" ? "dark" : "light";
-  }, []);
+  }, [embeddedKey, previewKey]);
   useEffect(() => {
     let cancelled = false;
-    const params = browserSearch();
-    const args = JSON.parse(params.get("componentPreview")!) as Record<
-      string,
-      unknown
-    >;
+    const args = JSON.parse(previewKey) as Record<string, unknown>;
     void desktop
       .invoke<BuiltinComponentMetadata | CompiledComponent>(
-        params.get("thumbnailCapture") === "1"
-          ? "components:previewData"
-          : "components:get",
+        capture ? "components:previewData" : "components:get",
         args,
       )
       .then((item) => {
@@ -69,7 +75,7 @@ export default function ComponentPreviewPage() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [capture, previewKey]);
   useEffect(() => {
     if (!component || !native.current) return;
     const element = native.current;

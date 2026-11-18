@@ -3,6 +3,7 @@ import { homedir } from "node:os";
 import { fileURLToPath } from "node:url";
 import { access } from "node:fs/promises";
 import { startBrowserServer } from "./server";
+import { workbenchAssets } from "./workbench-assets";
 import { openBrowser } from "./system";
 import { translator } from "../i18n";
 import messages from "../i18n/messages/workbench";
@@ -26,13 +27,21 @@ export async function startCodexWorkbenchBrowser(options: {
 }) {
   if (!isAbsolute(options.profile))
     throw new Error("SHOWAI_CODEX_WORKBENCH_PROFILE must be an absolute directory.");
-  return startBrowserServer({
-    ...await browserRuntime(),
+  const runtime = await browserRuntime();
+  const server = await startBrowserServer({
+    ...runtime,
     home: options.home,
     settingsPath: join(options.profile, "settings.json"),
     agentWorkspaceRoot: join(options.profile, "agent-workspaces"),
     codexWorkbench: { key: options.key },
   });
+  return {
+    ...server,
+    transport: {
+      ...server.workbench,
+      ...workbenchAssets(join(dirname(runtime.cliEntry), "codex-workbench-assets")),
+    },
+  };
 }
 
 export async function runBrowser(options: {

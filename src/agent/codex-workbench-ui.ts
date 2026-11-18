@@ -1,10 +1,11 @@
 import messages from "../i18n/messages/codex-workbench";
+import { workbenchChunkBytes } from "../host/codex-workbench-transport";
 
 export type CodexWorkbenchMode = "global" | "thread";
-export const codexWorkbenchUri = "ui://showai/workbench-v2.html";
-export const codexWorkbenchThreadUri = "ui://showai/workbench-thread-v2.html";
+export const codexWorkbenchUri = "ui://showai/workbench-v3.html";
+export const codexWorkbenchThreadUri = "ui://showai/workbench-thread-v3.html";
 
-export function codexWorkbenchHtml(origin: string, mode?: CodexWorkbenchMode) {
+export function codexWorkbenchHtml(mode?: CodexWorkbenchMode) {
   return `<!doctype html>
 <html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <style>
@@ -18,7 +19,7 @@ body { margin: 0 }
 <script>
 (() => {
   const translations = ${JSON.stringify(messages.catalogs)};
-  const workbenchOrigin = ${JSON.stringify(origin)};
+  const chunkBytes = ${workbenchChunkBytes};
   let mode = ${JSON.stringify(mode) ?? "null"};
   const status = document.getElementById("showai-launch");
   const message = document.getElementById("showai-message");
@@ -29,8 +30,12 @@ body { margin: 0 }
   let locale = navigator.language.startsWith("zh") ? "zh-CN" : "en";
   let context = {};
   let capabilities = {};
-  let launch, launchUrl, launchTimer, initialized = false, loading = false;
+  let launch, launchUrl, bundle, launchTimer, initialized = false;
   let ready = false, refreshing = false, sequence = 0;
+  const urls = new Map();
+  const assetDownloads = new Map();
+  const waitingDownloads = [];
+  let activeDownloads = 0;
   const instance = Array.from(crypto.getRandomValues(new Uint8Array(16)), byte => byte.toString(16).padStart(2, "0")).join("");
   const t = key => translations[locale][key];
 
@@ -116,34 +121,166 @@ body { margin: 0 }
     return Promise.reject(new Error(t("unavailable")));
   }
 
-  function asset(value) {
-    const url = new URL(value, launchUrl.origin);
-    if (url.origin !== launchUrl.origin || !url.pathname.startsWith("/assets/"))
-      throw new Error("Invalid ShowAI workbench asset");
-    return url.href;
+  function resultPayload(result) {
+    const envelope = result?._meta ?? result;
+    return envelope?.mcp_tool_result ?? envelope?.call_tool_result ?? result;
   }
 
-  async function open() {
-    if (!initialized || loading || ready || !launch) return;
-    launchUrl = currentUrl();
-    loading = true;
+  async function callWorkbench(name, args) {
+    const payload = resultPayload(await request("tools/call", { name, arguments: args }));
+    if (payload?.isError) {
+      const error = payload.structuredContent?.error;
+      throw new Error(error?.message ?? t("unavailable"));
+    }
+    if (!Object.hasOwn(payload?._meta ?? {}, "showaiWorkbenchData"))
+      throw new Error(t("unavailable"));
+    return payload._meta.showaiWorkbenchData;
+  }
+
+  async function fetchPart(read, offset) {
+    if (activeDownloads >= 6)
+      await new Promise(resolve => waitingDownloads.push(resolve));
+    else activeDownloads++;
+    try {
+      return await read(offset);
+    } finally {
+      const next = waitingDownloads.shift();
+      if (next) next();
+      else activeDownloads--;
+    }
+  }
+
+  async function readBytes(size, read) {
+    if (!Number.isSafeInteger(size) || size < 0) throw new Error(t("invalidBundle"));
+    const data = new Uint8Array(size);
+    let next = 0;
+    await Promise.all(Array.from({ length: Math.min(4, Math.ceil(size / chunkBytes)) }, async () => {
+      while (next < size) {
+        const offset = next;
+        next += chunkBytes;
+        const part = Uint8Array.from(atob(await fetchPart(read, offset)), character => character.charCodeAt(0));
+        if (part.length !== Math.min(chunkBytes, size - offset))
+          throw new Error(t("invalidBundle"));
+        data.set(part, offset);
+      }
+    }));
+    return data;
+  }
+
+  function downloadAsset(name) {
+    if (!assetDownloads.has(name)) {
+      const item = bundle.assets[name];
+      if (!item) throw new Error(t("invalidBundle"));
+      const download = (async () => {
+        const bytes = await readBytes(item.bytes, offset => callWorkbench("workbench_asset", { name, offset }));
+        const hash = new Uint8Array(await crypto.subtle.digest("SHA-256", bytes));
+        const hex = Array.from(hash, byte => byte.toString(16).padStart(2, "0")).join("");
+        if (hex !== item.sha256) throw new Error(t("invalidBundle"));
+        const stream = new Blob([bytes]).stream().pipeThrough(new DecompressionStream("gzip"));
+        return new Response(stream).text();
+      })().catch(error => {
+        assetDownloads.delete(name);
+        throw error;
+      });
+      assetDownloads.set(name, download);
+    }
+    return assetDownloads.get(name);
+  }
+
+  async function importAsset(entry) {
+    const dependencies = new Set();
+    function visit(name) {
+      if (urls.has(name) || dependencies.has(name)) return;
+      const item = bundle.assets[name];
+      if (!item) throw new Error(t("invalidBundle"));
+      dependencies.add(name);
+      item.imports.forEach(visit);
+    }
+    visit(entry);
+    const prepared = await Promise.all([...dependencies].map(async (name) =>
+      [name, await downloadAsset(name)],
+    ));
+    const imports = {};
+    for (const [name, source] of prepared) {
+      if (urls.has(name)) continue;
+      const url = URL.createObjectURL(new Blob([source], { type: "text/javascript" }));
+      urls.set(name, url);
+      imports["@showai/workbench/" + name] = url;
+    }
+    if (Object.keys(imports).length) {
+      const map = document.createElement("script");
+      map.type = "importmap";
+      map.textContent = JSON.stringify({ imports });
+      document.head.appendChild(map);
+    }
+    return import("@showai/workbench/" + entry);
+  }
+
+  async function readMedia(grant) {
+    const first = await callWorkbench("workbench_media", { grant, offset: 0 });
+    const bytes = await readBytes(first.size, async offset =>
+      offset === 0 ? first.base64 : (await callWorkbench("workbench_media", { grant, offset })).base64,
+    );
+    return new Blob([bytes], { type: first.mime });
+  }
+
+  function launchFrom(result) {
+    const payload = resultPayload(result);
+    const descriptor = (payload?._meta ?? payload)?.showaiWorkbench;
+    const url = typeof descriptor?.url === "string" ? URL.parse(descriptor.url) : null;
+    const targetMode = url?.searchParams.get("codexMode");
+    if (!url || url.protocol !== "http:" || url.hostname !== "127.0.0.1" ||
+        !/^[0-9a-f]{64}$/.test(url.searchParams.get("codexWorkbench") || "") ||
+        (targetMode !== "global" && targetMode !== "thread")) return null;
+    if (mode && targetMode !== mode) return null;
+    mode ??= targetMode;
+    return { url, bundle: descriptor.bundle };
+  }
+
+  function fromResult(result) {
+    if (ready) return;
+    const target = launchFrom(result);
+    if (target && !launch) launch = target.url.href;
+    if (target && initialized) void refreshLaunch();
+  }
+
+  async function refreshLaunch() {
+    if (!initialized || refreshing || ready) return;
+    clearTimeout(launchTimer);
+    const opener = context.toolInfo?.tool?.name;
+    mode ??= opener?.endsWith("workbench_open_page") ? "thread" : "global";
+    if (!capabilities.serverTools) {
+      show("failed", t("unavailable"));
+      return;
+    }
+    refreshing = true;
     show("loading");
     try {
-      const response = await fetch(launchUrl, { cache: "no-store", referrerPolicy: "no-referrer", signal: AbortSignal.timeout(12000) });
-      if (!response.ok) throw new Error("ShowAI workbench " + response.status);
-      const source = new DOMParser().parseFromString(await response.text(), "text/html");
-      const prefix = "window.__SHOWAI_LOCAL__=";
-      const bootstrap = Array.from(source.scripts, script => script.textContent).find(script => script.startsWith(prefix));
-      if (!bootstrap) throw new Error("Missing ShowAI workbench bootstrap");
-      const config = JSON.parse(bootstrap.slice(prefix.length));
-      if (!/^[0-9a-f]{64}$/.test(config.token)) throw new Error("Invalid ShowAI workbench bootstrap");
-      window.__SHOWAI_LOCAL__ = { ...config, apiOrigin: launchUrl.origin, search: launchUrl.search };
+      const result = await request("tools/call", {
+        name: "workbench_refresh",
+        arguments: { mode },
+      });
+      const target = launchFrom(result);
+      if (!target?.bundle) throw new Error(t("connectionExpired"));
+      launch = target.url.href;
+      launchUrl = currentUrl();
+      bundle = target.bundle;
+      window.__SHOWAI_LOCAL__ = {
+        token: "",
+        apiOrigin: launchUrl.origin,
+        search: launchUrl.search,
+        codexWorkbench: { key: launchUrl.searchParams.get("codexWorkbench"), mode, instance },
+      };
       window.__SHOWAI_CODEX_HOST__ = {
         attachReference,
         canReference,
         openLink,
+        importAsset,
+        readMedia,
+        workbenchRequest: (route, args, client) => callWorkbench("workbench_request", { route, args, client }),
+        workbenchChanges: (after, client) => callWorkbench("workbench_changes", { after, client }),
         updatePage: (projectId, pageId) => {
-          if (launchUrl.searchParams.get("codexMode") === "thread")
+          if (mode === "thread")
             window.openai?.setWidgetState?.({
               ...window.openai.widgetState,
               showaiWorkbench: { projectId, pageId },
@@ -155,99 +292,23 @@ body { margin: 0 }
           root.hidden = false;
         },
       };
-
-      const loads = [];
-      for (const link of source.querySelectorAll('link[rel="stylesheet"],link[rel="modulepreload"]')) {
-        const node = document.createElement("link");
-        node.rel = link.rel;
-        node.crossOrigin = "anonymous";
-        node.href = asset(link.getAttribute("href"));
-        document.head.appendChild(node);
-        loads.push(node);
-      }
-      for (const script of source.querySelectorAll('script[type="module"][src]')) {
-        const node = document.createElement("script");
-        node.type = "module";
-        node.crossOrigin = "anonymous";
-        node.src = asset(script.getAttribute("src"));
-        loads.push(node);
-        await new Promise((resolve, reject) => {
-          node.onload = resolve;
-          node.onerror = () => reject(new Error("ShowAI frontend module could not be loaded"));
-          document.head.appendChild(node);
-        }).catch(error => {
-          for (const item of loads) item.remove();
-          throw error;
-        });
-      }
-      if (!ready) throw new Error("ShowAI workbench did not initialize");
-    } catch (error) {
-      show("failed", error.message);
-    } finally {
-      loading = false;
-    }
-  }
-
-  retry.addEventListener("click", () => {
-    if (capabilities.serverTools) void refreshLaunch();
-    else void open();
-  });
-  external.addEventListener("click", () =>
-    openLink(launchUrl.href).catch(error => { message.textContent = error.message; }),
-  );
-
-  function launchFrom(result) {
-    const meta = result?._meta ?? result;
-    const payload = meta?.mcp_tool_result ?? meta?.call_tool_result ?? meta;
-    const value = (payload?._meta ?? payload)?.showaiWorkbench?.url;
-    const url = typeof value === "string" ? URL.parse(value) : null;
-    const targetMode = url?.searchParams.get("codexMode");
-    if (!url || url.protocol !== "http:" || url.hostname !== "127.0.0.1" ||
-        !/^[0-9a-f]{64}$/.test(url.searchParams.get("codexWorkbench") || "") ||
-        (targetMode !== "global" && targetMode !== "thread")) return null;
-    if (mode && targetMode !== mode) return null;
-    mode ??= targetMode;
-    return url;
-  }
-
-  function fromResult(result) {
-    if (ready) return;
-    const url = launchFrom(result);
-    if (url?.origin === workbenchOrigin) {
-      launch = url.href;
-      clearTimeout(launchTimer);
-      void open();
-    } else if (initialized && url && !launch) {
-      void refreshLaunch();
-    }
-  }
-
-  async function refreshLaunch() {
-    if (!initialized || refreshing || loading || ready) return;
-    clearTimeout(launchTimer);
-    const opener = context.toolInfo?.tool?.name;
-    mode ??= opener?.endsWith("workbench_open_page") ? "thread" : "global";
-    if (!capabilities.serverTools) {
-      show("failed", t("connectionExpired"));
-      return;
-    }
-    refreshing = true;
-    show("loading");
-    try {
-      const result = await request("tools/call", {
-        name: "workbench_refresh",
-        arguments: { mode },
-      });
-      const url = launchFrom(result);
-      if (url?.origin !== workbenchOrigin) throw new Error(t("connectionExpired"));
-      launch = url.href;
-      await open();
+      const style = document.getElementById("showai-workbench-style") ?? document.createElement("style");
+      style.id = "showai-workbench-style";
+      style.textContent = await downloadAsset(bundle.style);
+      document.head.appendChild(style);
+      await importAsset(bundle.entry);
+      if (!ready) throw new Error(t("invalidBundle"));
     } catch (error) {
       if (!ready) show("failed", error.message);
     } finally {
       refreshing = false;
     }
   }
+
+  retry.addEventListener("click", refreshLaunch);
+  external.addEventListener("click", () => {
+    if (launchUrl) void openLink(launchUrl.href).catch(error => { message.textContent = error.message; });
+  });
 
   addEventListener("message", event => {
     if (event.source !== parent || event.data?.jsonrpc !== "2.0") return;
@@ -291,7 +352,7 @@ body { margin: 0 }
     initialized = true;
     if (!ready) show("loading");
     parent.postMessage({ jsonrpc: "2.0", method: "ui/notifications/initialized" }, "*");
-    if (launch) void open();
+    if (mode) void refreshLaunch();
     else launchTimer = setTimeout(refreshLaunch, 800);
   }).catch(error => show("failed", error.message));
 })();

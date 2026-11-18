@@ -1,5 +1,7 @@
 import type { AgentComponentContext } from "../agent-host/types";
 import type { PageReference } from "../core/page-reference";
+import type { DesktopResponse } from "../host/protocol";
+import type { WorkbenchChanges, WorkbenchRoute } from "../host/codex-workbench-transport";
 import { translator } from "../i18n";
 import messages from "../i18n/messages/codex-workbench";
 
@@ -22,6 +24,9 @@ declare global {
       canReference(): boolean;
       updatePage?(projectId: string, pageId: string): void;
       createWorker?(kind: "source" | "cubic"): Worker;
+      workbenchRequest?(route: WorkbenchRoute, args: Record<string, unknown>, client: string): Promise<DesktopResponse<unknown>>;
+      workbenchChanges?(after: number, client: string): Promise<WorkbenchChanges>;
+      readMedia?(grant: string): Promise<Blob>;
     };
   }
 }

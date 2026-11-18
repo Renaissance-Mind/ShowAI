@@ -1,6 +1,7 @@
 import { randomBytes } from "node:crypto";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
+import { workbenchRoutes, type CodexWorkbenchTransport } from "../host/codex-workbench-transport";
 import { mcpFailure } from "./presentation-tools";
 import {
   codexWorkbenchHtml,
@@ -12,11 +13,14 @@ import {
 export type OpenCodexWorkbench = (key: string) => Promise<{
   url: string;
   localUrl: string;
+  transport: CodexWorkbenchTransport;
   close(): Promise<void>;
 }>;
 
 const legacyWorkbenchUri = "ui://showai/workbench.html";
 const readOnly = { readOnlyHint: true, destructiveHint: false, openWorldHint: false };
+const appOnly = { ui: { visibility: ["app"] } };
+const clientId = z.string().regex(/^[\w-]{1,100}$/);
 
 export function registerCodexWorkbench(server: McpServer, open: OpenCodexWorkbench) {
   const key = randomBytes(32).toString("hex");
@@ -40,21 +44,21 @@ export function registerCodexWorkbench(server: McpServer, open: OpenCodexWorkben
   const resources = [
     ...views,
     { mode: undefined, name: "workbench_legacy", uri: legacyWorkbenchUri },
-  ];
+    { mode: "global", name: "workbench_global_v2", uri: "ui://showai/workbench-v2.html" },
+    { mode: "thread", name: "workbench_thread_v2", uri: "ui://showai/workbench-thread-v2.html" },
+  ] as const;
   const mimeType = "text/html;profile=mcp-app";
   for (const { mode, name, uri } of resources) {
     server.registerResource(name, uri, { mimeType }, async () => {
-      const { localUrl } = await workbench();
       return {
         contents: [{
           uri,
           mimeType,
-          text: codexWorkbenchHtml(localUrl, mode),
+          text: codexWorkbenchHtml(mode),
           _meta: {
             ui: {
               csp: {
-                connectDomains: [localUrl],
-                resourceDomains: [localUrl, "blob:", "data:"],
+                resourceDomains: ["blob:", "data:"],
                 frameDomains: ["blob:", "data:"],
               },
               prefersBorder: false,
@@ -68,13 +72,13 @@ export function registerCodexWorkbench(server: McpServer, open: OpenCodexWorkben
 
   async function launch(mode: CodexWorkbenchMode) {
     try {
-      const { url } = await workbench();
+      const { url, transport } = await workbench();
       const target = new URL(url);
       target.searchParams.set("codexWorkbench", key);
       target.searchParams.set("codexMode", mode);
       return {
         content: [{ type: "text" as const, text: "ShowAI workbench" }],
-        _meta: { showaiWorkbench: { url: target.href } },
+        _meta: { showaiWorkbench: { url: target.href, bundle: await transport.bundle() } },
       };
     } catch (error) {
       return mcpFailure(error);
@@ -110,4 +114,43 @@ export function registerCodexWorkbench(server: McpServer, open: OpenCodexWorkben
     annotations: readOnly,
     _meta: { ui: { visibility: ["app"] } },
   }, ({ mode }) => launch(mode));
+
+  async function proxy<T>(run: (transport: CodexWorkbenchTransport) => T | Promise<T>) {
+    try {
+      const value = await run((await workbench()).transport);
+      return { content: [], _meta: { showaiWorkbenchData: value } };
+    } catch (error) {
+      return mcpFailure(error);
+    }
+  }
+  server.registerTool("workbench_asset", {
+    description: "Read a packaged workbench asset chunk.",
+    inputSchema: { name: z.string().min(1), offset: z.number().int().nonnegative() },
+    annotations: readOnly,
+    _meta: appOnly,
+  }, ({ name, offset }) => proxy((transport) => transport.asset(name, offset)));
+  server.registerTool("workbench_request", {
+    description: "Apply a workbench operation from the open editor.",
+    inputSchema: {
+      route: z.enum(workbenchRoutes),
+      args: z.record(z.string(), z.unknown()),
+      client: clientId,
+    },
+    _meta: appOnly,
+  }, ({ route, args, client }) => proxy((transport) => transport.request(route, args, client)));
+  server.registerTool("workbench_changes", {
+    description: "Read workbench changes after a cursor.",
+    inputSchema: { after: z.number().int().min(-1), client: clientId },
+    annotations: readOnly,
+    _meta: appOnly,
+  }, ({ after, client }) => proxy((transport) => transport.changes(after, client)));
+  server.registerTool("workbench_media", {
+    description: "Read local media from a workbench grant.",
+    inputSchema: {
+      grant: z.string().regex(/^[0-9a-f-]{36}$/),
+      offset: z.number().int().nonnegative(),
+    },
+    annotations: readOnly,
+    _meta: appOnly,
+  }, ({ grant, offset }) => proxy((transport) => transport.media(grant, offset)));
 }

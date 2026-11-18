@@ -49,7 +49,8 @@ import {
   required,
   text,
 } from "../workbench/actions";
-import type { DesktopChange, DesktopInfo } from "../host/protocol";
+import type { DesktopChange, DesktopInfo, DesktopResponse } from "../host/protocol";
+import { workbenchChunkBytes, type WorkbenchRoute } from "../host/codex-workbench-transport";
 import { openLocalPath, systemVersion } from "./system";
 import { localMediaResponse } from "../workbench/local-media";
 import { windowQuery } from "../workbench/window-target";
@@ -169,11 +170,23 @@ export async function startBrowserServer(options: BrowserServerOptions) {
       env: { SHOWAI_HOME: store.root },
     },
   });
+  type ChangeForClient = (id: string) => DesktopChange | undefined;
+  const workbenchChanges: ChangeForClient[] = [];
+  let workbenchCursor = 0;
+  function dispatchChanges(changeForClient: ChangeForClient) {
+    for (const [client, id] of clients) {
+      const update = changeForClient(id);
+      if (update) client.write(`data: ${JSON.stringify(update)}\n\n`);
+    }
+    if (embedding) {
+      workbenchChanges.push(changeForClient);
+      if (workbenchChanges.length > 160) workbenchChanges.shift();
+      workbenchCursor++;
+    }
+  }
   const notify = (type: "home" | "files", change?: DesktopChange) => {
-    for (const client of clients.keys())
-      client.write(
-        `data: ${JSON.stringify({ type, home: store.root, ...change })}\n\n`,
-      );
+    const update = { type, home: store.root, ...change } as DesktopChange;
+    dispatchChanges(() => update);
   };
   async function deliverFiles(root: string, batch: string[]) {
     if (closed) return;
@@ -183,26 +196,20 @@ export async function startBrowserServer(options: BrowserServerOptions) {
     const dependents = change.datasets?.length
       ? await datasetDependents(store, change.datasets)
       : [];
-    for (const [client, id] of clients) {
+    dispatchChanges((id) => {
       const own = id ? echoes.get(id) : undefined;
       const visible = own ? batch.filter((path) => !own.has(path)) : batch;
-      if (!visible.length && !dependents.length) continue;
+      if (!visible.length && !dependents.length) return undefined;
       const resources = changedResources(root, visible);
-      client.write(
-        `data: ${JSON.stringify({
-          ...resources,
-          ...(dependents.length
-            ? {
-                datasets: [
-                  ...new Set([...(resources.datasets ?? []), ...dependents]),
-                ],
-              }
-            : {}),
-          type: "files",
-          home: root,
-        })}\n\n`,
-      );
-    }
+      return {
+        ...resources,
+        ...(dependents.length
+          ? { datasets: [...new Set([...(resources.datasets ?? []), ...dependents])] }
+          : {}),
+        type: "files",
+        home: root,
+      };
+    });
     if (!embedding && !closed && (change.projectIds?.length || change.catalog || change.all))
       syncManager(root).wake(
         change.catalog || change.all ? undefined : change.projectIds,
@@ -854,5 +861,45 @@ export async function startBrowserServer(options: BrowserServerOptions) {
     home: store.root,
     close,
     connectedClients: () => clients.size,
+    workbench: {
+      async request(route: WorkbenchRoute, args: Record<string, unknown>, client: string) {
+        const response = await fetch(`${origin}/api/${route}`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+            "X-ShowAI-Client": client,
+          },
+          body: JSON.stringify(args),
+        });
+        if (!response.headers.get("content-type")?.includes("application/json"))
+          throw new CoreError("INVALID_DATA", `ShowAI workbench returned HTTP ${response.status}.`);
+        return await response.json() as DesktopResponse<unknown>;
+      },
+      changes(after: number, client: string) {
+        const oldest = workbenchCursor - workbenchChanges.length;
+        const changes: DesktopChange[] = after < oldest || after > workbenchCursor
+          ? [{ type: "files", home: store.root, all: true }]
+          : workbenchChanges.slice(after - oldest).flatMap((changeForClient) =>
+              changeForClient(client) ?? [],
+            );
+        return { cursor: workbenchCursor, changes };
+      },
+      async media(grant: string, offset: number) {
+        const response = await fetch(`${origin}/api/media/${grant}`, {
+          headers: { Range: `bytes=${offset}-${offset + workbenchChunkBytes - 1}` },
+        });
+        const range = /^bytes \d+-\d+\/(\d+)$/.exec(response.headers.get("content-range") ?? "");
+        if (response.status !== 206 || !range) {
+          await response.body?.cancel();
+          throw new CoreError("NOT_FOUND", "The local media chunk is unavailable.");
+        }
+        return {
+          base64: Buffer.from(await response.arrayBuffer()).toString("base64"),
+          mime: response.headers.get("content-type") ?? "application/octet-stream",
+          size: Number(range[1]),
+        };
+      },
+    },
   };
 }

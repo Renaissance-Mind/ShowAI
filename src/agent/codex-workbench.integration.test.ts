@@ -1,4 +1,7 @@
-import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { pathToFileURL } from "node:url";
+import type { WorkbenchBundle, WorkbenchChanges, WorkbenchMediaChunk } from "../host/codex-workbench-transport";
+import type { DesktopResponse } from "../host/protocol";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
@@ -8,6 +11,13 @@ import { codexWorkbenchUri, codexWorkbenchThreadUri } from "./codex-workbench-ui
 import type { ShowDocument } from "../types";
 
 type SavedPage = { document: ShowDocument; hash: string; revision?: string };
+
+async function workbenchTool<T>(client: Client, name: string, args: Record<string, unknown>) {
+  const result = await client.callTool({ name, arguments: args });
+  expect(result.isError, JSON.stringify(result.content)).not.toBe(true);
+  expect(result.content).toEqual([]);
+  return result._meta!.showaiWorkbenchData as T;
+}
 
 it("opens both Codex workbench entries and saves into the MCP library", async () => {
   const root = await mkdtemp(join(tmpdir(), "showai-codex-workbench-"));
@@ -51,11 +61,20 @@ it("opens both Codex workbench entries and saves into the MCP library", async ()
     expect(threadUrl.searchParams.get("codexMode")).toBe("thread");
     expect(resource.contents[0]._meta).toMatchObject({
       ui: { csp: {
-        connectDomains: [threadUrl.origin],
-        resourceDomains: [threadUrl.origin, "blob:", "data:"],
+        resourceDomains: ["blob:", "data:"],
         frameDomains: ["blob:", "data:"],
       } },
     });
+    expect(resource.contents[0]._meta?.ui).not.toHaveProperty("csp.connectDomains");
+    const boot = await client.callTool({ name: "workbench_refresh", arguments: { mode: "global" } });
+    expect(boot.isError).not.toBe(true);
+    const bundle = (boot._meta?.showaiWorkbench as { bundle: WorkbenchBundle }).bundle;
+    const entryPart = await workbenchTool<string>(client, "workbench_asset", {
+      name: bundle.entry, offset: 0,
+    });
+    expect(Buffer.from(entryPart, "base64").length).toBeGreaterThan(0);
+    const badAsset = await client.callTool({ name: "workbench_asset", arguments: { name: "outside", offset: 0 } });
+    expect(badAsset.isError).toBe(true);
     const denied = await fetch(threadUrl.origin);
     expect(denied.status).toBe(403);
 
@@ -111,14 +130,28 @@ it("opens both Codex workbench entries and saves into the MCP library", async ()
     const { id: projectId } = (project.structuredContent as { data: { id: string } }).data;
     const page = await invoke<SavedPage>("pages:create", { projectId, title: "Architecture" });
     const pageId = page.document.id;
-    const saved = await invoke<SavedPage>("pages:save", {
-      projectId,
-      pageId,
-      document: { ...page.document, title: "Edited in workbench" },
-      baseHash: page.hash,
-      baseRevision: page.revision,
+    const savedResult = await workbenchTool<DesktopResponse<SavedPage>>(client, "workbench_request", {
+      route: "invoke", client: "codex-workbench-test",
+      args: {
+        action: "pages:save",
+        args: {
+          projectId, pageId,
+          document: { ...page.document, title: "Edited in workbench" },
+          baseHash: page.hash,
+          baseRevision: page.revision,
+        },
+      },
     });
+    expect(savedResult.ok).toBe(true);
+    if (!savedResult.ok) throw new Error(savedResult.error.message);
+    const saved = savedResult.data;
     expect(saved.hash).not.toBe(page.hash);
+    const localMedia = join(root, "local.png");
+    const png = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jZ1sAAAAASUVORK5CYII=", "base64");
+    await writeFile(localMedia, png);
+    const grant = await invoke<{ token: string }>("media:resolve", { ref: pathToFileURL(localMedia).href, kind: "image" });
+    const media = await workbenchTool<WorkbenchMediaChunk>(client, "workbench_media", { grant: grant.token, offset: 0 });
+    expect(media).toMatchObject({ mime: "image/png", size: png.length, base64: png.toString("base64") });
     const reference = await invoke("pages:reference", {
       projectId,
       pageId,
@@ -205,6 +238,9 @@ it("preserves the shared Board version and a conflicting draft when a Codex pane
       },
     });
 
+    const { cursor: before } = await workbenchTool<WorkbenchChanges>(thread.client, "workbench_changes", {
+      after: -1, client: "thread-editor",
+    });
     const url = new URL("/api/events", thread.url);
     url.searchParams.set("token", thread.token);
     url.searchParams.set("client", "thread-editor");
@@ -238,6 +274,10 @@ it("preserves the shared Board version and a conflicting draft when a Codex pane
       });
     }
     await stream.cancel();
+    const updates = await workbenchTool<WorkbenchChanges>(thread.client, "workbench_changes", {
+      after: before, client: "thread-editor",
+    });
+    expect(updates.changes.some((change) => change.home === home && change.pageIds?.includes(pageId))).toBe(true);
 
     const stale = await thread.request("pages:save", {
       ...scope,
@@ -264,7 +304,7 @@ it("preserves the shared Board version and a conflicting draft when a Codex pane
     expect(freshUrl.searchParams.get("codexMode")).toBe("thread");
     expect(resource.contents[0]).toHaveProperty(
       "text",
-      expect.stringContaining(`const workbenchOrigin = ${JSON.stringify(freshUrl.origin)}`),
+      expect.stringContaining('name: "workbench_refresh"'),
     );
     expect(resource.contents[0]).not.toHaveProperty(
       "text",

@@ -1,6 +1,7 @@
 import { rawSourcePlugin } from "./raw-source-plugin.mjs";
 import { build } from "esbuild";
 import { mkdir } from "node:fs/promises";
+import { buildWorkbenchAssets } from "./build-workbench-assets.mjs";
 await mkdir("dist-agent", { recursive: true });
 await build({
   entryPoints: ["src/agent/cli.ts"],
@@ -27,3 +28,4 @@ await build({
     js: 'import { createRequire as __showaiCreateRequire } from "node:module"; const require = __showaiCreateRequire(import.meta.url);',
   },
 });
+await buildWorkbenchAssets("dist-agent/codex-workbench-assets");

@@ -12,6 +12,7 @@ import type {
   DesktopChange,
   DesktopResponse,
 } from "../host/protocol";
+import type { WorkbenchRoute } from "../host/codex-workbench-transport";
 import { closeReporter, type CloseListenerEntry } from "../desktop/close-report";
 import type { LoadedPage } from "../studio/usePage";
 import { translator } from "../i18n";
@@ -84,10 +85,16 @@ export function installBrowserBridge() {
     return renewing;
   }
   async function request<T>(
-    route: string,
+    route: WorkbenchRoute,
     args: Record<string, unknown>,
     renewed = false,
   ): Promise<T> {
+    const transport = window.__SHOWAI_CODEX_HOST__?.workbenchRequest;
+    if (transport) {
+      const result = await transport(route, args, client);
+      if (!result.ok) throw result.error;
+      return result.data as T;
+    }
     let response: Response;
     try {
       response = await fetch(browserUrl(`/api/${route}`), {
@@ -270,7 +277,30 @@ export function installBrowserBridge() {
     }
     return request<T>("invoke", { action, args });
   }
-  if (!browserSearch().has("componentPreview")) {
+  const changes = window.__SHOWAI_CODEX_HOST__?.workbenchChanges;
+  if (changes) {
+    let after = -1;
+    let disposed = false;
+    let scheduled: ReturnType<typeof setTimeout> | undefined;
+    const poll = async () => {
+      try {
+        const result = await changes(after, client);
+        if (disposed) return;
+        after = result.cursor;
+        announce("connected");
+        result.changes.forEach((change) => listeners.forEach((listener) => listener(change)));
+      } catch {
+        if (!disposed) announce("lost");
+      } finally {
+        if (!disposed) scheduled = setTimeout(poll, 1000);
+      }
+    };
+    scheduled = setTimeout(poll, 500);
+    window.addEventListener("pagehide", () => {
+      disposed = true;
+      clearTimeout(scheduled);
+    }, { once: true });
+  } else if (!browserSearch().has("componentPreview")) {
     const connect = () => {
       const events = new EventSource(
         browserUrl(`/api/events?token=${encodeURIComponent(config.token)}&client=${client}`),

@@ -28,7 +28,7 @@ export interface FileDialogOptions {
   extensions?: string[];
 }
 export type LocalRequest = <T>(
-  route: string,
+  route: "dialog/list" | "dialog/mkdir",
   args: Record<string, unknown>,
 ) => Promise<T>;
 

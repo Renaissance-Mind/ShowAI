@@ -106,6 +106,7 @@ async function stageWorkbenchTest(marketplaceRoot, pluginRoot, home) {
   const runtimeDigest = createHash("sha256")
     .update(await readFile(join(compiled, "scripts/cli.mjs")))
     .update(await readFile(join(compiled, "web/index.html")))
+    .update(await readFile(join(compiled, "scripts/codex-workbench-assets/index.json")))
     .digest("hex")
     .slice(0, 16);
   const runtimeRoot = join(marketplaceRoot, "runtime", runtimeDigest);
