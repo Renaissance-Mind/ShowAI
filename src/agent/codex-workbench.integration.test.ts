@@ -128,3 +128,153 @@ it("opens both Codex workbench entries and saves into the MCP library", async ()
     await rm(root, { recursive: true, force: true });
   }
 }, 30000);
+
+it("preserves the shared Board version and a conflicting draft when a Codex pane reconnects", async () => {
+  const root = await mkdtemp(join(tmpdir(), "showai-codex-workbench-recovery-"));
+  const home = join(root, "library");
+  const origin = "https://web-sandbox.oaiusercontent.com";
+  const connections = new Set<Client>();
+  const events = new AbortController();
+
+  async function open(tool: string, profile: string) {
+    const client = new Client({ name: "ShowAI workbench recovery test", version: "1" });
+    connections.add(client);
+    await client.connect(new StdioClientTransport({
+      command: process.execPath,
+      args: [join(process.cwd(), "dist-agent/cli.mjs"), "mcp", "--home", home],
+      env: { SHOWAI_CODEX_WORKBENCH_PROFILE: join(root, profile) },
+      stderr: "pipe",
+    }));
+    const launch = await client.callTool({ name: tool, arguments: {} });
+    expect(launch.isError, JSON.stringify(launch.content)).not.toBe(true);
+    const url = new URL((launch._meta!.showaiWorkbench as { url: string }).url);
+    const bootstrap = await fetch(url, { headers: { Origin: origin } });
+    expect(bootstrap.status).toBe(200);
+    const html = await bootstrap.text();
+    const { token } = JSON.parse(/window\.__SHOWAI_LOCAL__=(\{[^<]+\})<\/script>/.exec(html)![1]);
+
+    async function request(action: string, args: object) {
+      return fetch(new URL("/api/invoke", url), {
+        method: "POST",
+        headers: { Origin: origin, "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ action, args }),
+      });
+    }
+
+    async function invoke<T>(action: string, args: object) {
+      const result = await (await request(action, args)).json();
+      expect(result.ok, JSON.stringify(result.error)).toBe(true);
+      return result.data as T;
+    }
+
+    return { client, url, token, request, invoke };
+  }
+
+  try {
+    const global = await open("workbench_open", "global-profile");
+    const thread = await open("workbench_open_page", "thread-profile");
+    expect(global.url.origin).not.toBe(thread.url.origin);
+    const project = await global.invoke<{ id: string }>("projects:create", { name: "Concurrent workbench edits" });
+    const projectId = project.id;
+    const board = await global.invoke<SavedPage>("pages:create", { projectId, title: "Board baseline", kind: "board" });
+    const pageId = board.document.id;
+    const scope = { projectId, pageId };
+    expect((await thread.invoke<SavedPage>("pages:get", scope)).hash).toBe(board.hash);
+    const local = { ...board.document, title: "Thread draft" };
+    const draft = await thread.invoke<{ id: string }>("drafts:save", {
+      input: {
+        kind: "page",
+        clientId: "thread-editor",
+        projectId,
+        resourceId: pageId,
+        baseRevision: board.revision,
+        baseContent: board.document,
+        content: local,
+        sequence: 1,
+      },
+    });
+
+    const url = new URL("/api/events", thread.url);
+    url.searchParams.set("token", thread.token);
+    url.searchParams.set("client", "thread-editor");
+    const response = await fetch(url, {
+      headers: { Origin: origin },
+      signal: AbortSignal.any([events.signal, AbortSignal.timeout(7000)]),
+    });
+    expect(response.status).toBe(200);
+    const stream = response.body!.getReader();
+    const decoder = new TextDecoder();
+    let pending = decoder.decode((await stream.read()).value, { stream: true });
+    expect(pending).toContain('"type":"files"');
+
+    const written = await global.invoke<SavedPage>("pages:save", {
+      ...scope,
+      document: { ...board.document, title: "Global saved" },
+      baseHash: board.hash,
+      baseRevision: board.revision,
+    });
+    let sawBoardChange = false;
+    while (!sawBoardChange) {
+      const event = await stream.read();
+      if (event.done) throw new Error("Workbench change stream ended before the Board update.");
+      pending += decoder.decode(event.value, { stream: true });
+      const messages = pending.split("\n\n");
+      pending = messages.pop()!;
+      sawBoardChange = messages.some(message => {
+        if (!message.startsWith("data: ")) return false;
+        const update = JSON.parse(message.slice("data: ".length));
+        return update.home === home && update.pageIds?.includes(pageId);
+      });
+    }
+    await stream.cancel();
+
+    const stale = await thread.request("pages:save", {
+      ...scope,
+      document: local,
+      baseHash: board.hash,
+      baseRevision: board.revision,
+    });
+    expect(stale.status).toBe(409);
+    expect(await stale.json()).toMatchObject({ ok: false, error: { code: "CONFLICT" } });
+
+    await thread.client.close();
+    connections.delete(thread.client);
+    const reopened = await open("workbench_open_page", "thread-profile");
+    const current = await reopened.invoke<SavedPage>("pages:get", scope);
+    expect(current).toMatchObject({ hash: written.hash, revision: written.revision, document: { title: "Global saved" } });
+    expect(await reopened.invoke("drafts:read", { id: draft.id })).toMatchObject({
+      record: { projectId, resourceId: pageId, baseRevision: board.revision },
+      content: { title: "Thread draft" },
+      baseContent: { title: "Board baseline" },
+    });
+    const preview = await reopened.invoke<{
+      conflicts: unknown[];
+      document: ShowDocument;
+      currentRevision: string;
+    }>("page:mergePreview", {
+      ...scope,
+      baseRevision: board.revision,
+      document: { ...board.document, icon: "🧭" },
+    });
+    expect(preview.conflicts).toEqual([]);
+    expect(preview.document).toMatchObject({ title: "Global saved", icon: "🧭" });
+    const merged = await reopened.invoke<SavedPage>("page:mergeSave", {
+      ...scope,
+      baseRevision: board.revision,
+      currentRevision: preview.currentRevision,
+      document: preview.document,
+    });
+    const fromMcp = await global.client.callTool({
+      name: "page_read",
+      arguments: { ...scope, response: "source" },
+    });
+    expect(fromMcp.isError, JSON.stringify(fromMcp.content)).not.toBe(true);
+    expect(fromMcp.structuredContent).toMatchObject({
+      data: { hash: merged.hash, document: { id: pageId, title: "Global saved", icon: "🧭" } },
+    });
+  } finally {
+    events.abort();
+    await Promise.all([...connections].map(client => client.close()));
+    await rm(root, { recursive: true, force: true });
+  }
+}, 30000);
