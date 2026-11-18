@@ -41,11 +41,21 @@ export interface SceneContext {
   inspect(): Promise<Record<string, unknown>>;
   assert(value: unknown, message: string): void;
 }
+export interface MotionObservation {
+  events: string[];
+  widthChanges?: number;
+}
 export interface SceneStep {
   id: string;
   title: string;
   run(context: SceneContext): Promise<void>;
   capture?: UiTarget;
+  motion?: {
+    selector: string;
+    events: string[];
+    pseudo?: string;
+    stableWidth?: string;
+  };
 }
 export interface UiScene {
   id: string;
@@ -102,6 +112,7 @@ export interface FlowNode {
   when?: (state: Record<string, unknown>) => boolean;
   enter(context: SceneContext): Promise<void>;
   actions: FlowAction[];
+  checks?: SceneStep[];
 }
 export interface UiFlow {
   feature: string;

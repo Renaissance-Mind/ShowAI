@@ -1,4 +1,5 @@
 import { remoteConnectionFlow } from "./remote-flow";
+import { workbenchMotion } from "./features/workbench-motion";
 import type { Locale } from "../i18n";
 import labMessages from "../i18n/messages/uiLab";
 import flowMessages from "../i18n/messages/uiFlow";
@@ -16,6 +17,7 @@ import type {
 
 export function uiFlow(feature: string, locale: Locale = "zh-CN"): UiFlow {
   if (feature === "remote-connection") return remoteConnectionFlow(locale);
+  if (feature === "workbench-motion") return workbenchMotion(locale).flow;
   const owner = uiFeatures(locale).find((item) => item.id === feature);
   if (!owner) throw new Error(`Unknown UI flow: ${feature}`);
   const t = messages(labMessages, locale),

@@ -1,10 +1,10 @@
 import { expect, test } from "vitest";
 import { uiFlow, flowNode } from "./flow";
-import { uiScene } from "./registry";
+import { uiFeatures, uiScene } from "./registry";
 
 test("flow branches, conditions and action destinations resolve within their feature", () => {
   for (const locale of ["zh-CN", "en"] as const)
-    for (const feature of ["remote-connection", "workbench"]) {
+    for (const { id: feature } of uiFeatures(locale)) {
       const flow = uiFlow(feature, locale),
         ids = new Set(flow.nodes.map((node) => node.id));
       expect(ids.size).toBe(flow.nodes.length);

@@ -5,7 +5,16 @@ import { join, resolve } from "node:path";
 import { createHash } from "node:crypto";
 import pixelmatch from "pixelmatch";
 import { uiFeatures } from "./registry";
-import type { LabSession, SceneContext, UiDriver, UiTarget } from "./types";
+import { checkMotion } from "./check-motion";
+import motionMessages from "../i18n/messages/uiMotion";
+import { messages, motionSummary } from "./messages";
+import type {
+  LabSession,
+  MotionObservation,
+  SceneContext,
+  UiDriver,
+  UiTarget,
+} from "./types";
 import { sourceIdentity } from "./source";
 import { uiFlow } from "./flow";
 import type { UiScene } from "./types";
@@ -280,6 +289,7 @@ export async function runUiScenes(options: UiRunOptions) {
                       );
                   },
                 },
+                ...(node.checks ?? []),
               ],
             }))
         : feature.scenes
@@ -290,7 +300,17 @@ export async function runUiScenes(options: UiRunOptions) {
             !options.scenes?.length ||
             options.scenes.includes(scene.id),
         )
-        .map((scene) => ({ feature: feature.id, scene })),
+        .flatMap((scene) => {
+          const preferences: ("no-preference" | "reduce" | undefined)[] =
+            scene.steps.some((step) => step.motion)
+              ? ["no-preference", "reduce"]
+              : [undefined];
+          return preferences.map((preference) => ({
+            feature: feature.id,
+            scene,
+            preference,
+          }));
+        }),
     );
   if (!cases.length) throw new Error("No matching UI scenes.");
   const report = {
@@ -331,6 +351,9 @@ export async function runUiScenes(options: UiRunOptions) {
       : undefined;
   try {
     for (const item of cases) {
+      const prefix = [item.feature, item.scene.id, item.preference]
+        .filter(Boolean)
+        .join("--");
       const response = await fetch(options.origin + "/__ui-lab/api/sessions", {
         method: "POST",
         headers: { "content-type": "application/json" },
@@ -373,7 +396,7 @@ export async function runUiScenes(options: UiRunOptions) {
             viewport: { width, height },
             deviceScaleFactor: scale,
             locale,
-            reducedMotion: "reduce",
+            reducedMotion: item.preference ?? "reduce",
           })
         : undefined;
       const electron =
@@ -391,10 +414,7 @@ export async function runUiScenes(options: UiRunOptions) {
                   ),
                 ),
                 SHOWAI_BACKGROUND: "1",
-                SHOWAI_UI_LAB_PROFILE: join(
-                  directory,
-                  item.feature + "-" + item.scene.id + "-profile",
-                ),
+                SHOWAI_UI_LAB_PROFILE: join(directory, prefix + "-profile"),
                 SHOWAI_UI_LAB_URL: session.appUrl + "&prepare=0",
                 SHOWAI_UI_LAB_WIDTH: String(width),
                 SHOWAI_UI_LAB_HEIGHT: String(height),
@@ -416,7 +436,15 @@ export async function runUiScenes(options: UiRunOptions) {
       const result: Record<string, unknown> = {
         feature: item.feature,
         scene: item.scene.id,
-        title: item.scene.title,
+        title: item.preference
+          ? item.scene.title +
+            " · " +
+            messages(
+              motionMessages,
+              locale,
+            )(item.preference === "reduce" ? "motionOff" : "motionOn")
+          : item.scene.title,
+        ...(item.preference ? { motionPreference: item.preference } : {}),
         passed: true,
         checkpoints,
         errors,
@@ -425,6 +453,8 @@ export async function runUiScenes(options: UiRunOptions) {
       };
       report.results.push(result);
       try {
+        if (electron && item.preference)
+          await page.emulateMedia({ reducedMotion: item.preference });
         if (context) await page.goto(session.appUrl + "&prepare=0");
         await page.waitForFunction(
           () =>
@@ -459,7 +489,12 @@ export async function runUiScenes(options: UiRunOptions) {
               "No declared test action is available on this state.",
             );
         for (const step of item.scene.steps) {
-          await step.run(uiContext);
+          let motion;
+          if (step.motion && item.preference) {
+            motion = await checkMotion(page, step.motion, item.preference, () =>
+              step.run(uiContext),
+            );
+          } else await step.run(uiContext);
           await settled(page);
           const metrics = await layout(page);
           if (
@@ -487,7 +522,7 @@ export async function runUiScenes(options: UiRunOptions) {
                 `Primary action contrast is too low: ${button.text} (${button.contrast.toFixed(2)})`,
               );
           if (errors.length) throw new Error(errors.join("\n"));
-          const name = `${item.feature}--${item.scene.id}--${step.id}`,
+          const name = `${prefix}--${step.id}`,
             file = name + ".png";
           const bytes = await page.screenshot({
             animations: "disabled",
@@ -544,6 +579,7 @@ export async function runUiScenes(options: UiRunOptions) {
             baselineFile,
             differenceFile,
             metrics,
+            ...(motion ? { motion } : {}),
           });
           await writeFile(
             join(directory, name + ".dom.txt"),
@@ -593,18 +629,12 @@ export async function runUiScenes(options: UiRunOptions) {
         result.error = error instanceof Error ? error.stack : String(error);
         result.failureMetrics = await layout(page);
         await writeFile(
-          join(
-            directory,
-            item.feature + "--" + item.scene.id + "--failure.dom.txt",
-          ),
+          join(directory, prefix + "--failure.dom.txt"),
           await page.locator("body").ariaSnapshot(),
         );
         await page
           .screenshot({
-            path: join(
-              directory,
-              item.feature + "--" + item.scene.id + "--failure.png",
-            ),
+            path: join(directory, prefix + "--failure.png"),
             animations: "disabled",
           })
           .catch(() => {});
@@ -612,10 +642,7 @@ export async function runUiScenes(options: UiRunOptions) {
         try {
           const inspected = await call("inspect");
           await writeFile(
-            join(
-              directory,
-              item.feature + "--" + item.scene.id + "--trace.json",
-            ),
+            join(directory, prefix + "--trace.json"),
             JSON.stringify(inspected, null, 2),
           );
           if (electron) {
@@ -636,10 +663,7 @@ export async function runUiScenes(options: UiRunOptions) {
         } finally {
           await context?.close();
           await electron?.close();
-          if (electron)
-            await rmProfile(
-              join(directory, item.feature + "-" + item.scene.id + "-profile"),
-            );
+          if (electron) await rmProfile(join(directory, prefix + "-profile"));
           await fetch(`${options.origin}/__ui-lab/api/sessions/${session.id}`, {
             method: "DELETE",
             headers,
@@ -693,7 +717,7 @@ export async function runUiScenes(options: UiRunOptions) {
                 )
                 .join(
                   "",
-                )}</div><figcaption>${escape((point.visual as { state: string }).state)}</figcaption></figure>`,
+                )}</div><figcaption>${escape((point.visual as { state: string }).state)}${point.motion ? " · " + escape(motionSummary(point.motion as MotionObservation, locale)) : ""}</figcaption></figure>`,
           )
           .join("")}</section>`,
     )

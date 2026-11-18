@@ -24,6 +24,10 @@ npm run ui:lab -- --port 5859 --state /absolute/path/ui-lab/state --out /absolut
 
 浏览器后端提供远程设置所需的桌面渲染器能力。场景中禁用宿主安装、外部 Agent 扫描、打开系统目录及新应用窗口。复制操作只记录结果，不修改系统剪贴板；插件导出返回模拟结果。隐藏 Electron 在原生窗口中检查这份渲染器，桌面 IPC 和操作系统集成仍有各自的验收测试。
 
+在「测试功能」中选择**工作台动效**，或直接打开 `/__ui-lab/?feature=workbench-motion`。右侧的状态按钮可进入目录箭头、标签切换、导航侧栏和 Agent 面板。多选栏和顶栏搜索各有「当前」和「候选」两个场景，使用相同的示例数据和真实控件。候选样式仅在对应的 Lab 场景生效。查看导航侧栏收起效果时，先解除固定，再把指针移入正文。
+
+点击**界面检查**会在标准动效和减少动态效果两种偏好下执行该场景，先记录操作期间触发的 CSS 动画和过渡事件，再截取终态。导航侧栏和 Agent 面板还会统计正文宽度的变化次数。各步观测值显示在检查结果中。
+
 ## 截图与验证
 
 ```sh
@@ -31,6 +35,7 @@ npm run test:ui -- --flow --feature remote-connection --out /absolute/path/ui-la
 npm run test:ui -- --flow --feature remote-connection --node lan.error --node funnel.chatgpt.verify --out /absolute/path/ui-lab/results
 npm run test:ui -- --url http://127.0.0.1:5859 --feature remote-connection --scene chatgpt --scene permissions --theme dark --width 800 --height 1000 --scale 2 --out /absolute/path/ui-lab/results
 npm run test:ui -- --url http://127.0.0.1:5859 --feature workbench --out /absolute/path/ui-lab/results
+npm run test:ui -- --flow --feature workbench-motion --out /absolute/path/ui-lab/results
 npm run test:ui -- --renderer electron --feature remote-connection --scene lan --out /absolute/path/ui-lab/results
 ```
 

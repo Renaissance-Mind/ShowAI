@@ -1,0 +1,26 @@
+@media (prefers-reduced-motion: no-preference) {
+  [data-ui-lab-motion="selection-proposal"] .studio-page-selection {
+    animation: ui-lab-selection-in var(--duration-fast) var(--ease-out);
+  }
+  [data-ui-lab-motion="search-proposal"] .studio-topbar .expandable-search {
+    transition: none;
+  }
+  [data-ui-lab-motion="search-proposal"]
+    .studio-topbar
+    .expandable-search.is-expanded
+    input {
+    animation: ui-lab-search-in var(--duration-fast) var(--ease-out);
+  }
+}
+@keyframes ui-lab-selection-in {
+  from {
+    opacity: 0;
+    translate: 0 4px;
+  }
+}
+@keyframes ui-lab-search-in {
+  from {
+    opacity: 0;
+    translate: 4px 0;
+  }
+}

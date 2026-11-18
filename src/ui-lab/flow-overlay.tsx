@@ -197,7 +197,11 @@ export function mountFlowOverlay(
       };
     }, []);
     return enabled ? (
-      <div className="ui-flow-markers" aria-label={f("annotations")}>
+      <div
+        className="ui-flow-markers"
+        data-mode={config.mode}
+        aria-label={f("annotations")}
+      >
         {snapshot.actions.map(
           (action, index) =>
             action.rect.y + action.rect.height > 0 &&

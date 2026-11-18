@@ -4,6 +4,7 @@ import { uiScene } from "./registry";
 import { uiFlow, flowNode } from "./flow";
 import { mountFlowOverlay } from "./flow-overlay";
 import { setLanguagePreference } from "../i18n";
+import "./workbench-motion.css";
 
 declare global {
   interface Window {
@@ -20,6 +21,8 @@ export async function prepareUiLab() {
   )
     throw new Error("UI Lab requires its isolated development server.");
   localStorage.setItem("showai:appearance", config.theme);
+  if (config.feature === "workbench-motion")
+    document.documentElement.dataset.uiLabMotion = config.scene;
   setLanguagePreference(config.locale);
   const normal = window.showai.invoke.bind(window.showai);
   window.showai.invoke = async <T>(

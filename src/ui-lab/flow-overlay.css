@@ -30,6 +30,9 @@
 .ui-flow-target.disabled {
   border-color: #a7a2ae;
 }
+.ui-flow-markers[data-mode="test"] .ui-flow-target > button {
+  pointer-events: none;
+}
 .ui-flow-target.disabled > button {
   background: #a7a2ae;
   cursor: default;

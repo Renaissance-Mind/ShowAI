@@ -2,8 +2,8 @@ import { createRoot } from "react-dom/client";
 import { useEffect, useRef, useState } from "react";
 import labMessages from "../i18n/messages/uiLab";
 import flowMessages from "../i18n/messages/uiFlow";
-import { messages } from "./messages";
-import type { LabSession } from "./types";
+import { messages, motionSummary } from "./messages";
+import type { LabSession, MotionObservation } from "./types";
 import "./lab.css";
 const t = messages(labMessages, "zh-CN"),
   f = messages(flowMessages, "zh-CN");
@@ -34,7 +34,12 @@ type Run = {
   results: {
     title: string;
     error?: string;
-    checkpoints: { title: string; file: string; visual: { state: string } }[];
+    checkpoints: {
+      title: string;
+      file: string;
+      visual: { state: string };
+      motion?: MotionObservation;
+    }[];
   }[];
 };
 async function api(path: string, input?: unknown) {
@@ -148,7 +153,12 @@ function Lab() {
   }
   useEffect(() => {
     void api("catalog")
-      .then((value) => setFeatures(value.features))
+      .then((value: { features: Feature[] }) => {
+        const requested = new URL(location.href).searchParams.get("feature");
+        if (requested && value.features.some((item) => item.id === requested))
+          setFeatureId(requested);
+        setFeatures(value.features);
+      })
       .catch((error) => setError(String(error)));
     void refresh().catch((error) => setError(String(error)));
   }, []);
@@ -282,7 +292,13 @@ function Lab() {
           <select
             aria-label={f("feature")}
             value={featureId}
-            onChange={(event) => setFeatureId(event.target.value)}
+            onChange={(event) => {
+              const id = event.target.value;
+              const url = new URL(location.href);
+              url.searchParams.set("feature", id);
+              history.replaceState(null, "", url);
+              setFeatureId(id);
+            }}
           >
             {features.map((feature) => (
               <option key={feature.id} value={feature.id}>
@@ -496,6 +512,11 @@ function Lab() {
                                   ? t("visualPassed")
                                   : t("visualChanged")}
                             </span>
+                            {point.motion && (
+                              <span>
+                                {motionSummary(point.motion, "zh-CN")}
+                              </span>
+                            )}
                           </a>
                         ))}
                       </div>
