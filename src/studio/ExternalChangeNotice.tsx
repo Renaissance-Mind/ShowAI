@@ -8,6 +8,11 @@ import { authorName } from "./external-change";
 import "./external-change.css";
 
 let stopFlash: (() => void) | undefined;
+export function findVisibleBlock(root: HTMLElement | null, id: string) {
+  const key = CSS.escape(id);
+  return Array.from(root?.querySelectorAll<HTMLElement>(`[data-block-id="${key}"],[data-surface-id="${key}"]`) ?? [])
+    .find(element => element.getClientRects().length > 0);
+}
 export function flashBlocks(
   root: HTMLElement | null,
   blockIds: readonly string[],
@@ -28,7 +33,7 @@ export function flashBlocks(
     const bounds = root.getBoundingClientRect();
     blockIds.forEach((id, index) => {
       const box = boxes[index];
-      const target = root.querySelector(`[data-block-id="${CSS.escape(id)}"]`);
+      const target = findVisibleBlock(root, id);
       const rect = target?.getBoundingClientRect();
       const top = rect && Math.max(rect.top - 3, bounds.top);
       const bottom = rect && Math.min(rect.bottom + 3, bounds.bottom);

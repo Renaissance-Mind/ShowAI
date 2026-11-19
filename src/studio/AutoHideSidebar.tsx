@@ -53,7 +53,7 @@ export default function AutoHideSidebar({
   switchingTab: boolean;
   mobileBoardKey?: string;
   onMobileBack?: () => void;
-  compactOverlay?: boolean;
+  compactOverlay?: boolean | "always";
 }) {
   const t = useTranslator(sidebarMessages);
   const tn = useTranslator(navigationMessages);
@@ -111,8 +111,8 @@ export default function AutoHideSidebar({
     ? nativeLayout.width
     : clampWidth(preferredWidth ?? (viewportWidth <= 1100 ? 208 : 240));
   const sidebar = useRef<HTMLElement>(null);
-  const compact = compactOverlay && !nativeTouch && viewportWidth < 720;
-  const automatic = enabled && !locked && !nativeTouch;
+  const compact = !nativeTouch && (compactOverlay === "always" || (compactOverlay && viewportWidth < 720));
+  const automatic = enabled && !locked && !nativeTouch && !compact;
   const mode = nativeTouch
     ? nativeLayout.docked
       ? "docked"
@@ -175,8 +175,8 @@ export default function AutoHideSidebar({
 
   useEffect(() => {
     setPosition("docked");
-    if (nativeTouch || compact) setNativeOpen(false);
-  }, [enabled, locked, mobileBoardKey, compact]);
+    if (nativeTouch || (compact && compactOverlay !== "always")) setNativeOpen(false);
+  }, [enabled, locked, mobileBoardKey, compact, compactOverlay]);
 
   const toggleLocked = () =>
     setLocked((current) => {
@@ -463,7 +463,8 @@ export default function AutoHideSidebar({
               title={locateLabel}
               disabled={!canLocate}
               onClick={() => {
-                if (hidden) setPosition("overlay");
+                if (compact) setNativeOpen(true);
+                else if (hidden) setPosition("overlay");
                 setLocating(true);
                 onLocate();
               }}

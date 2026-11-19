@@ -7,7 +7,7 @@ import { join } from "node:path";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
 import { expect, it } from "vitest";
-import { codexWorkbenchUri, codexWorkbenchThreadUri, codexWorkbenchFileUri, codexWorkbenchCardUri } from "./codex-workbench-ui";
+import { codexWorkbenchUri, codexWorkbenchThreadUri, codexWorkbenchFileUri, codexWorkbenchCardUri, codexWorkbenchTargetUri } from "./codex-workbench-ui";
 import { codexPageReferenceExtension } from "./codex-page-reference";
 import type { ShowDocument } from "../types";
 
@@ -69,6 +69,9 @@ it("opens both Codex workbench entries and saves into the MCP library", async ()
     expect(cardResource.contents[0]).toHaveProperty(
       "text", expect.stringContaining('"ui/request-display-mode"'),
     );
+    expect(cardResource.contents[0]).not.toHaveProperty("text", expect.stringContaining("openai/files/open"));
+    const direct = await client.readResource({ uri: codexWorkbenchTargetUri });
+    expect(direct.contents[0]._meta?.["openai/ui"]).toMatchObject({ preferredDisplayMode: "fullscreen" });
     const fileResource = await client.readResource({ uri: codexWorkbenchFileUri });
     expect(fileResource.contents[0]).toMatchObject({
       mimeType: "text/html;profile=mcp-app",
@@ -222,9 +225,38 @@ it("opens both Codex workbench entries and saves into the MCP library", async ()
     expect(card.structuredContent).toEqual({
       ok: true, data: { projectId, pageId, title: data.title },
     });
-    const cardTarget = card._meta?.showaiPageCard as typeof data;
-    expect(await readFile(cardTarget.path, "utf8")).toBe(source);
+    expect(card._meta?.showaiPageCard).toEqual({ projectId, pageId, title: data.title });
     expect(card.content).toHaveLength(1);
+    const blockId = saved.document.content.attrs!.id as string;
+    const component = { projectId, pageId, blockId };
+    const anchored = await client.callTool({ name: "workbench_page_reference", arguments: component });
+    const anchoredData = anchored._meta!.showaiPageCard as { path: string };
+    const anchorFile = await readFile(anchoredData.path, "utf8");
+    expect(JSON.parse(anchorFile)).toEqual({ format: "showai-page-reference", version: 2, ...component });
+    expect(await workbenchTool(client, "workbench_resolve_reference", { source: anchorFile })).toEqual(component);
+    const show = await client.callTool({ name: "card_open", arguments: component, _meta: { threadId: "first" } });
+    expect(show._meta?.showaiPageCard).toMatchObject(component);
+    expect(show._meta?.showaiNavigationScope).toEqual(expect.any(String));
+    const lost = await client.callTool({ name: "card_present", arguments: { ...component, blockId: "deleted-block" } });
+    expect(lost.isError).toBe(true);
+    const poll = async (threadId: string, acknowledged?: string) => {
+      const result = await client.callTool({ name: "workbench_changes", _meta: { threadId }, arguments: {
+        after: -1, client: "editor-" + threadId, panel: { visible: true, acknowledged },
+      } });
+      return (result._meta!.showaiWorkbenchData as { navigation?: { id: string; target: typeof component } }).navigation;
+    };
+    const jump = (threadId: string) => client.callTool({
+      name: "card_navigate", arguments: component, _meta: { threadId },
+    });
+    await poll("first");
+    expect((await jump("second")).structuredContent).toMatchObject({ data: { status: "unavailable" } });
+    const navigating = jump("first");
+    let navigation: Awaited<ReturnType<typeof poll>>;
+    await expect.poll(async () => !!(navigation = await poll("first"))).toBe(true);
+    expect(navigation!.target).toEqual(component);
+    expect(await poll("second")).toBeUndefined();
+    await poll("first", navigation!.id);
+    expect((await navigating).structuredContent).toMatchObject({ data: { status: "accepted" } });
     const fileLaunch = await client.callTool({
       name: "workbench_open_file",
       arguments: {

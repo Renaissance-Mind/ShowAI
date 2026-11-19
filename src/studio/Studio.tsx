@@ -1,4 +1,4 @@
-import { browserSearch } from "../browser/codex-workbench";
+import { browserSearch, codexWorkbench } from "../browser/codex-workbench";
 import { useCodexReferenceLabel } from "./shell/useCodexReferenceLabel";
 import RemoteMcpApprovalDialog from "./RemoteMcpApprovalDialog";
 import { trackDesktopPreviewActivity } from "./preview-work";
@@ -473,7 +473,7 @@ export default function Studio() {
         />
         <AutoHideSidebar
           enabled={view === "page" && !!page.draft}
-          compactOverlay={view === "settings" && settingsSection === "sync"}
+          compactOverlay={codexWorkbench()?.mode === "thread" ? "always" : view === "settings" && settingsSection === "sync"}
           mobileBoardKey={
             view === "page" && page.draft?.content.attrs?.kind === "board"
               ? page.draft.id

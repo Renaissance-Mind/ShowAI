@@ -4,17 +4,19 @@ import { codexPageReferenceMaxLength } from "./codex-page-reference";
 
 export type CodexWorkbenchMode = "global" | "thread";
 export const codexWorkbenchUri = "ui://showai/workbench-v3.html";
-export const codexWorkbenchThreadUri = "ui://showai/workbench-thread-v3.html";
-export const codexWorkbenchFileUri = "ui://showai/workbench-file-v1.html";
+export const codexWorkbenchThreadUri = "ui://showai/workbench-thread-v4.html";
+export const codexWorkbenchFileUri = "ui://showai/workbench-file-v2.html";
 
-export const codexWorkbenchCardUri = "ui://showai/workbench-card-v2.html";
+export const codexWorkbenchCardUri = "ui://showai/workbench-card-v3.html";
+export const codexWorkbenchTargetUri = "ui://showai/workbench-target-v1.html";
 
 export function codexWorkbenchHtml(
   mode?: CodexWorkbenchMode,
-  entrypoint?: "file" | "card",
+  entrypoint?: "file" | "card" | "open",
   icon?: string,
 ) {
-  const card = entrypoint === "card"
+  const useCard = entrypoint === "card" || entrypoint === "open";
+  const card = useCard
     ? `<article id="showai-page-card" aria-label="ShowAI" hidden>
         <img src="${icon ?? ""}" alt="" width="34" height="34">
         <div class="showai-card-content">
@@ -54,7 +56,7 @@ ${card}
   const translations = ${JSON.stringify(messages.catalogs)};
   const chunkBytes = ${workbenchChunkBytes};
   const useFileEntrypoint = ${entrypoint === "file"};
-  const usePageCard = ${entrypoint === "card"};
+  const usePageCard = ${useCard};
   const referenceLimit = ${codexPageReferenceMaxLength};
   let mode = ${JSON.stringify(mode) ?? "null"};
   const status = document.getElementById("showai-launch");
@@ -65,6 +67,7 @@ ${card}
   const card = document.getElementById("showai-page-card");
   const openCardButton = document.getElementById("showai-card-open");
   let pageCard, openingCard = false;
+  let navigationScope, acknowledgedNavigation;
   const pending = new Map();
   let locale = navigator.language.startsWith("zh") ? "zh-CN" : "en";
   let context = {};
@@ -116,6 +119,7 @@ ${card}
     if (referencePage) {
       url.searchParams.set("project", referencePage.projectId);
       url.searchParams.set("page", referencePage.pageId);
+      if (referencePage.blockId) url.searchParams.set("block", referencePage.blockId);
     } else if (typeof path === "string" && path.startsWith("/")) {
       const target = new URL(path, url.origin);
       if (target.origin === url.origin) {
@@ -278,14 +282,15 @@ ${card}
         (targetMode !== "global" && targetMode !== "thread")) return null;
     if (mode && targetMode !== mode) return null;
     mode ??= targetMode;
+    navigationScope ??= descriptor.scope;
     return { url, bundle: descriptor.bundle };
   }
 
   function showPageCard() {
     if (!pageCard || ready || openingCard || refreshing) return;
-    document.getElementById("showai-card-title").textContent = pageCard.title;
-    document.getElementById("showai-card-kind").textContent = t("pageCardKind");
-    openCardButton.textContent = t("openOriginalPage");
+    document.getElementById("showai-card-title").textContent = pageCard.blockTitle || pageCard.title;
+    document.getElementById("showai-card-kind").textContent = pageCard.blockId ? pageCard.title : t("pageCardKind");
+    openCardButton.textContent = t(pageCard.blockId ? "locateComponent" : "openOriginalPage");
     openCardButton.disabled = !initialized;
     card.hidden = false;
   }
@@ -306,9 +311,15 @@ ${card}
     openCardButton.disabled = true;
     status.hidden = true;
     try {
-      if (pageCard.path && capabilities.experimental?.["openai/files"]) {
-        await request("openai/files/open", { path: pageCard.path });
-        return;
+      if (capabilities.serverTools) {
+        const { projectId, pageId, blockId } = pageCard;
+        const reply = resultPayload(await request("tools/call", {
+          name: "card_navigate", arguments: { projectId, pageId, ...(blockId && { blockId }) },
+          ...(navigationScope && { _meta: { "showai/navigationScope": navigationScope } }),
+        }));
+        if (reply?.isError) throw new Error(reply.structuredContent?.error?.message ?? t("unavailable"));
+        const status = reply?.structuredContent?.data?.status;
+        if (status === "accepted" || status === "superseded") return;
       }
       const modeResult = await request("ui/request-display-mode", { mode: "fullscreen" });
       if ((modeResult?.mode ?? context.displayMode) !== "fullscreen")
@@ -328,8 +339,14 @@ ${card}
     if (ready) return;
     if (usePageCard) {
       const payload = resultPayload(result);
-      const target = (payload?._meta ?? payload)?.showaiPageCard;
+      if (payload?.isError) {
+        show("failed", payload.structuredContent?.error?.message);
+        return;
+      }
+      const meta = payload?._meta ?? payload;
+      const target = meta?.showaiPageCard ?? payload?.structuredContent?.data;
       if (!target) return;
+      navigationScope ??= meta?.showaiNavigationScope;
       pageCard = target;
       status.hidden = true;
       presentPageCard();
@@ -380,7 +397,7 @@ ${card}
       if (!ready) await refreshLaunch();
       else {
         status.hidden = true;
-        displayPage(target.pageId, target.projectId);
+        displayPage(target.pageId, target.projectId, target.blockId);
       }
     } catch (error) {
       if (file === fileInput) show("failed", error.message);
@@ -425,7 +442,18 @@ ${card}
         importAsset,
         readMedia,
         workbenchRequest: (route, args, client) => callWorkbench("workbench_request", { route, args, client }),
-        workbenchChanges: (after, client) => callWorkbench("workbench_changes", { after, client }),
+        workbenchChanges: async (after, client) => {
+          const panel = ready && mode === "thread" ? {
+            scope: navigationScope, visible: document.visibilityState === "visible", acknowledged: acknowledgedNavigation,
+          } : undefined;
+          const changes = await callWorkbench("workbench_changes", { after, client, panel });
+          if (changes.navigation && panel?.visible) {
+            const { id, target } = changes.navigation;
+            displayPage(target.pageId, target.projectId, target.blockId);
+            acknowledgedNavigation = id;
+          }
+          return changes;
+        },
         updatePage: (projectId, pageId) => {
           if (mode === "thread")
             window.openai?.setWidgetState?.({
@@ -477,6 +505,7 @@ ${card}
     if (data.method === "ui/notifications/host-context-changed") {
       const previous = context["openai/deepLink"]?.url;
       configure({ ...context, ...data.params });
+      if (usePageCard && initialized && !openingCard) presentPageCard();
       if (ready && !useFileEntrypoint && !usePageCard && previous !== context["openai/deepLink"]?.url) {
         const target = currentUrl();
         const pageId = target.searchParams.get("page");

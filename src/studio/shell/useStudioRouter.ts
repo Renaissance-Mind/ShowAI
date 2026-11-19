@@ -1,4 +1,5 @@
-import { browserSearch } from "../../browser/codex-workbench";
+import { browserSearch, codexWorkbench } from "../../browser/codex-workbench";
+import { findVisibleBlock, flashBlocks } from "../ExternalChangeNotice";
 import {
   useEffect,
   useRef,
@@ -142,6 +143,8 @@ export function useStudioRouter({
 }) {
   const t = useTranslator(studioMessages);
   const tc = useTranslator(commonMessages);
+  const revealGeneration = useRef(0);
+  useEffect(() => () => { revealGeneration.current++; }, []);
   useEffect(() => {
     const host = window as Window & { showaiPendingInvite?: string };
     const receive = (event?: Event) => {
@@ -177,9 +180,7 @@ export function useStudioRouter({
         }>
       ).detail;
       if (!detail?.pageId) return;
-      void openPage(detail.pageId, detail.projectId).then((opened) => {
-        if (opened && detail.blockId) setRevealNode(detail.blockId);
-      });
+      void locateAssistantTarget(detail.pageId, detail.blockId ? [detail.blockId] : [], detail.projectId, true).catch(report);
     };
     window.addEventListener("showai:open-page", open);
     return () => window.removeEventListener("showai:open-page", open);
@@ -365,7 +366,8 @@ export function useStudioRouter({
       const projectId = params.get("project"),
         pageId = params.get("page"),
         folderId = params.get("folder"),
-        blocks = (params.get("blocks") ?? "").split(",").filter(Boolean);
+        block = params.get("block"),
+        blocks = block ? [block] : (params.get("blocks") ?? "").split(",").filter(Boolean);
       await verification;
       if (projectId) {
         selectedRef.current = projectId;
@@ -376,7 +378,7 @@ export function useStudioRouter({
           if (await page.open(projectId, pageId, workspace.activeId)) {
             setView("page");
             void loadCatalog().catch(report);
-            if (blocks.length) void locateAssistantTarget(pageId, blocks);
+            if (blocks.length) revealPageBlocks(blocks, codexWorkbench()?.mode === "thread");
           }
           const parentId =
             loaded.pages.find((item) => item.id === pageId)?.parentId ?? null;
@@ -526,44 +528,40 @@ export function useStudioRouter({
     pageId: string,
     ids: string[],
     projectId = page.projectId ?? selectedProject,
+    animate = false,
   ) {
+    const generation = ++revealGeneration.current;
     if (
-      (page.draft?.id !== pageId || page.projectId !== projectId) &&
+      (view !== "page" || page.draft?.id !== pageId || page.projectId !== projectId) &&
       !(await openPage(pageId, projectId))
     )
       return;
-    if (ids[0]) setRevealNode(ids[0]);
-    const started = Date.now();
-    const flash = () => {
-      const scope = document.querySelector(".studio-main");
-      const found = ids
-        .map((id) =>
-          scope?.querySelector(
-            `[data-surface-id="${CSS.escape(id)}"],[data-block-id="${CSS.escape(id)}"]`,
-          ),
-        )
-        .filter((element): element is Element => !!element);
-      if (!found.length && Date.now() - started < 3000) {
-        window.setTimeout(flash, 160);
+    if (generation === revealGeneration.current) revealPageBlocks(ids, animate);
+  }
+  function revealPageBlocks(ids: string[], animate: boolean) {
+    if (!ids.length) return;
+    const generation = ++revealGeneration.current;
+    const existing = findVisibleBlock(document.querySelector(".studio-main"), ids[0]);
+    if (!animate || !existing || existing.closest("[data-board-id]")) setRevealNode(ids[0]);
+    const deadline = performance.now() + 4000;
+    const reveal = () => {
+      if (generation !== revealGeneration.current) return;
+      const scope = document.querySelector<HTMLElement>(".studio-main");
+      const first = findVisibleBlock(scope, ids[0]);
+      if (!first) {
+        if (performance.now() < deadline) window.setTimeout(reveal, 80);
         return;
       }
-      if (!found[0]?.closest(".page-surface"))
-        found[0]?.scrollIntoView({ block: "center" });
-      for (const element of found) {
-        const rect = element.getBoundingClientRect();
-        const box = document.createElement("div");
-        box.className = "assistant-flash";
-        Object.assign(box.style, {
-          left: `${rect.left - 4}px`,
-          top: `${rect.top - 4}px`,
-          width: `${rect.width + 8}px`,
-          height: `${rect.height + 8}px`,
+      if (!first.closest(".page-surface")) {
+        first.scrollIntoView({
+          block: first.getBoundingClientRect().height > (scope?.clientHeight ?? innerHeight) ? "start" : "center",
+          inline: "nearest",
+          behavior: animate && !matchMedia("(prefers-reduced-motion: reduce)").matches ? "smooth" : "instant",
         });
-        document.body.append(box);
-        window.setTimeout(() => box.remove(), 1600);
       }
+      flashBlocks(scope, ids, 1600);
     };
-    window.setTimeout(flash, 240);
+    requestAnimationFrame(reveal);
   }
   async function openPageNow(
     id: string,
