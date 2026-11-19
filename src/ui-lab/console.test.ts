@@ -175,7 +175,7 @@ test("LAN controls align and permission scope has its own interactive panel", as
   await expect
     .poll(focusStyle)
     .toEqual({ focused: true, outline: "none", shadow: "none" });
-  await frame().getByRole("button", { name: "刷新地址" }).focus();
+  await frame().getByRole("button", { name: "刷新地址", exact: true }).focus();
   await page.keyboard.press("Shift+Tab");
   await expect.poll(focusStyle).toMatchObject({
     focused: true,
