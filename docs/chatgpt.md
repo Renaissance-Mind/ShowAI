@@ -24,6 +24,8 @@ For **Local network**, select the computer's network address and choose **Start 
 
 For **Tailscale private network**, join both devices to the same tailnet and enable MagicDNS and HTTPS. New connections use **Device approval**. Start the connection, select **Copy setup prompt**, and send the prompt to an agent that can configure MCP. ShowAI displays the device and owner verified by Tailscale. Select **Allow connection**. Agents on that device share the grant. You can revoke it under **Clients**. MCP requests and approval stay inside the private network.
 
+For Grok Bot, send the setup prompt to the bot. It registers a **Command / stdio** connector that runs `mcp-remote` on its Tailscale device and calls the private ShowAI HTTPS endpoint. Confirm the addition in Grok if prompted. The Mac uses the same device approval for this connection. Other clients with remote HTTP support can use the URL directly.
+
 Existing private OAuth connections keep their previous settings. Select **Device approval** under **Network → Authentication** and save to switch. Private OAuth uses Tailscale Serve and advertises its discovery URL with HTTP 401. On a trusted LAN, the setup prompt includes a single-use invitation valid for ten minutes. An agent with local credential storage and configurable request headers can enroll itself and request approval in ShowAI.
 
 For **Public access**, choose a tunnel. **Cloudflare temporary connection** downloads and verifies the official connector if needed, reserves a local port and starts the tunnel. Its URL changes on reconnect. Quick Tunnel has no availability guarantee; MCP uses JSON responses without depending on SSE.

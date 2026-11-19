@@ -23,10 +23,19 @@ test("new private connections select device approval and existing OAuth connecti
   expect(validateRemoteMcpConfig(config).privateAuth).toBe("device");
   const legacy = validateRemoteMcpConfig({ ...config, privateAuth: undefined });
   expect(legacy.privateAuth).toBeUndefined();
-  const prompt = agentSetupPrompt(endpoint, config, "zh-CN");
-  expect(prompt).toContain(endpoint);
-  expect(prompt).toContain("projects_list");
-  expect(prompt).not.toMatch(/mcp-remote|Bearer|OAuth|client_secret/);
+  for (const locale of ["zh-CN", "en"] as const) {
+    const prompt = agentSetupPrompt(endpoint, config, locale);
+    expect(prompt).toContain("Grok Bot");
+    expect(prompt).toContain("Command / stdio");
+    expect(prompt).toContain(
+      `npx --prefer-offline -y mcp-remote@0.16.6 ${endpoint} --transport http-only`,
+    );
+    expect(prompt).toContain("Streamable HTTP");
+    expect(prompt).toContain("projects_list");
+    expect(prompt).not.toMatch(
+      /Bearer|OAuth|client_secret|--resource|--auth-timeout/i,
+    );
+  }
   expect(agentSetupPrompt(endpoint, legacy, "en")).toContain("loopback");
   expect(() =>
     validateRemoteMcpConfig({ ...config, provider: "tailscale" }),

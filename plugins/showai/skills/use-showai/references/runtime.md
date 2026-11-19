@@ -93,7 +93,7 @@ ShowAI 内置 Agent由宿主提供项目绑定 MCP；它安装的私有 Skill �
 
 桌面 App 的「设置 → 远程连接」按“选择方式 → 建立连接 → 连接客户端”先选择局域网直连、Tailscale 私网或公网访问。局域网只监听所选网卡，以 HTTP 和访问密钥连接；Tailscale 私网使用该设备的 HTTPS 地址，首次接入可在 ShowAI 直接批准设备，已有 OAuth 模式继续使用 Serve；公网访问使用 Cloudflare 临时/固定隧道或 Tailscale Funnel，并通过 HTTPS 与 OAuth 连接。此模式由 `showai_capabilities.projects.storage:"local"` 标识。新连接默认完整授权当前及以后新增的全部项目，支持读取、编辑、侧栏组织和 `project_create`。项目创建需要工具确实可用、完整内容库授权和 projects.create scope；保留返回的 project.id，后续操作显式使用它。同一次创建重试沿用同一个 operationId 和名称。受限连接仍只返回配置及授权同时允许的项目，不能从另一个连接照搬 ID。用户可以在「访问规则」中选择指定项目与只读权限；显式指定的访问规则保留；旧版没有 access 模式字段的配置采用全部内容库默认值，但原有受限 OAuth 授权会在启用前撤销，客户端必须重新配对确认新范围。将仅授权指定项目的客户端改为全部内容库授权时，设备和 OAuth 客户端需要重新获得批准。局域网客户端可以使用新的接入邀请或访问密钥。
 
-能够配置 MCP 的 Agent 可以使用「设置 → 远程连接」为当前连接生成的「复制接入提示词」。Tailscale 私网的「设备授权」模式要求 Agent 所在设备能访问对应的 tailnet。使用提示词中的私网 HTTPS 地址注册 Streamable HTTP，认证字段留空。ShowAI 向用户显示由 Tailscale 核实的设备和所属账号，用户在 App 允许一次，同一设备上的 Agent 共用所选项目权限。「客户端」可撤销整台设备的权限。Agent 等待批准后使用同一连接实际调用 projects_list。
+能够配置 MCP 的 Agent 可以使用「设置 → 远程连接」为当前连接生成的「复制接入提示词」。Tailscale 私网的「设备授权」模式要求 Agent 所在设备能访问对应的 tailnet。Grok Bot 按提示词添加 Command / stdio 连接「ShowAI 私网直连」，在 Grok 的 Tailscale 设备上运行其中的 mcp-remote 命令，访问同一个私网 HTTPS 地址。核对已有连接时同时匹配地址与传输方式。其他支持远程 HTTP 的客户端直接注册 Streamable HTTP，认证字段留空。ShowAI 向用户显示由 Tailscale 核实的设备和所属账号，用户在 App 允许一次，同一设备上的 Agent 共用所选项目权限。「客户端」可撤销整台设备的权限。Agent 等待批准后使用同一连接实际调用 projects_list。
 
 可信局域网的接入提示词包含一个十分钟内有效的一次性邀请。支持设置请求头和本地凭据存储的 Agent 按提示申请接入，用户在 ShowAI 批准。手动设置局域网客户端时，用户也可以在 App 中填写名称并创建访问密钥，再将其填入客户端的 Bearer Token 字段或 Authorization 请求头。密钥只显示一次，保存为摘要，90 天后到期，可单独撤销；模型不索取、读取或转述访问密钥。HTTP 只用于可信局域网，要求 HTTPS/OAuth 的客户端应选择 Tailscale 私网或公网方式。服务自检只证明本机访问，其他设备是否连通以真实调用为准。Tailscale 私网需要两端加入同一 tailnet 并启用 MagicDNS/HTTPS，不需要 Funnel。Serve 与 Funnel 使用未占用的 443、8443 或 10000，保留其他服务路由，断开只停止本次连接器。
 

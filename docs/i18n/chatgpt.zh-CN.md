@@ -24,6 +24,8 @@ ChatGPT 网页从云端发起请求，需要公网地址。其他设备上运行
 
 在「Tailscale 私网」中，两端加入同一 tailnet，开启 MagicDNS 和 HTTPS。新连接默认使用「设备授权」。打开连接后点击「复制接入提示词」，将整段发给能配置 MCP 的 Agent。Agent 用私网 HTTPS 连接，ShowAI 显示 Tailscale 核实的设备和所属账号。点击「允许连接」，Agent 就能调用获准的工具。同一设备上的 Agent 共用授权，可在「客户端」里撤销。MCP 和批准都在私网内完成。
 
+给 Grok Bot 发送接入提示词后，它会添加「ShowAI 私网直连」。Grok 使用 Command / stdio 在自己的 Tailscale 设备上运行 `mcp-remote`，由它访问 ShowAI 私网 HTTPS 地址。Grok 提示确认添加时点确认。Mac 会复用对这台设备的授权。其他支持远程 HTTP 的客户端可以直接填写地址。
+
 已有的 OAuth 连接保留原方式。可以在「网络 → 身份验证」选择设备授权并保存，也可以保留 OAuth。OAuth 模式使用 Tailscale Serve，客户端根据 HTTP 401 返回的地址发现授权服务。对于可信局域网，复制接入提示词会生成十分钟内有效的一次性邀请，支持设置请求头和本地凭据的 Agent 可自行配置，再由用户在 ShowAI 允许。
 
 「公网访问」中先选择隧道。「Cloudflare 临时连接」会按需下载并校验官方连接工具，绑定可用端口并创建隧道。地址重新连接后变化，没有可用性保证；MCP 使用 JSON 响应，不依赖 SSE。
