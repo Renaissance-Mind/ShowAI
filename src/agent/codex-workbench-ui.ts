@@ -7,7 +7,7 @@ export const codexWorkbenchUri = "ui://showai/workbench-v3.html";
 export const codexWorkbenchThreadUri = "ui://showai/workbench-thread-v5.html";
 export const codexWorkbenchFileUri = "ui://showai/workbench-file-v3.html";
 
-export const codexWorkbenchCardUri = "ui://showai/workbench-card-v4.html";
+export const codexWorkbenchCardUri = "ui://showai/workbench-card-v5.html";
 export const codexWorkbenchTargetUri = "ui://showai/workbench-target-v2.html";
 
 export function codexWorkbenchHtml(
@@ -18,34 +18,36 @@ export function codexWorkbenchHtml(
 ) {
   const useCard = entrypoint === "card" || entrypoint === "open";
   const card = useCard
-    ? `<article id="showai-page-card" aria-label="ShowAI" hidden>
+    ? `<section id="showai-page-card" aria-label="ShowAI" hidden></section>
+      <template id="showai-card-template"><article class="showai-card">
         <img src="${icon ?? ""}" alt="" width="34" height="34">
         <div class="showai-card-content">
-          <strong id="showai-card-title"></strong>
-          <div id="showai-card-kind"></div>
+          <strong></strong>
+          <div class="showai-card-kind"></div>
         </div>
-        <button type="button" id="showai-card-open" disabled></button>
-      </article>`
+        <button type="button" disabled></button>
+      </article></template>`
     : "";
   return `<!doctype html>
 <html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <style>
 :root { color-scheme: light dark; font: 14px system-ui }
 body { margin: 0 }
-#showai-page-card {
+#showai-page-card { display: grid; gap: 8px; padding: 8px 0 }
+.showai-card {
   display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center;
-  gap: 14px; margin: 8px 0; padding: 14px 16px;
+  gap: 14px; padding: 14px 16px;
   border: 1px solid color-mix(in srgb, CanvasText 16%, Canvas);
   border-left: 3px solid color-mix(in srgb, CanvasText 58%, Canvas); border-radius: 10px;
 }
-#showai-page-card[hidden] { display: none }
+#showai-page-card[hidden], #root[hidden] { display: none }
 #showai-page-card img { background: white; padding: 3px; border-radius: 6px; box-sizing: border-box }
 .showai-card-content { min-width: 0; overflow-wrap: anywhere }
-#showai-card-kind { margin-top: 3px; opacity: 0.7 }
-#showai-card-open { padding: 7px 12px; border: 1px solid color-mix(in srgb, CanvasText 20%, Canvas);
+.showai-card-kind { margin-top: 3px; opacity: 0.7 }
+.showai-card button { padding: 7px 12px; border: 1px solid color-mix(in srgb, CanvasText 20%, Canvas);
   border-radius: 6px; background: Canvas; color: CanvasText; font: inherit; cursor: pointer }
-#showai-card-open:disabled { opacity: 0.6; cursor: default }
-#showai-card-open:focus-visible { outline: 2px solid Highlight; outline-offset: 2px }
+.showai-card button:disabled { opacity: 0.6; cursor: default }
+.showai-card button:focus-visible { outline: 2px solid Highlight; outline-offset: 2px }
 #showai-launch { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 16px }
 #showai-launch[hidden], #showai-launch button[hidden] { display: none }
 </style></head><body>
@@ -67,8 +69,8 @@ ${card}
   const external = document.getElementById("showai-external");
   const root = document.getElementById("root");
   const card = document.getElementById("showai-page-card");
-  const openCardButton = document.getElementById("showai-card-open");
-  let pageCard, openingCard = false;
+  const cardTemplate = document.getElementById("showai-card-template");
+  let pageCards = [], cardGroup, selectedIndex, restoringChoice = false, openingCard = false;
   let navigationScope, activePage, acknowledgedNavigation;
   const pending = new Map();
   let locale = navigator.language.startsWith("zh") ? "zh-CN" : "en";
@@ -309,28 +311,70 @@ ${card}
   }
 
   function showPageCard() {
-    if (!pageCard || ready || openingCard || refreshing) return;
-    document.getElementById("showai-card-title").textContent = pageCard.blockTitle || pageCard.title;
-    document.getElementById("showai-card-kind").textContent = pageCard.blockId ? pageCard.title : t("pageCardKind");
-    openCardButton.textContent = t(pageCard.blockId ? "locateComponent" : "openOriginalPage");
-    openCardButton.disabled = !initialized;
+    if (!pageCards.length || (ready && !root.hidden) || refreshing) return;
+    for (let i = 0; i < pageCards.length; i++) {
+      const target = pageCards[i];
+      const row = card.children[i];
+      row.querySelector(".showai-card-kind").textContent = target.blockId ? target.title : t("pageCardKind");
+      const button = row.querySelector("button");
+      button.textContent = t(target.blockId ? "locateComponent" : "openOriginalPage");
+      button.disabled = !initialized || openingCard;
+    }
     card.hidden = false;
   }
 
-  function presentPageCard() {
-    if (initialized && context.displayMode === "fullscreen" && !referencePage && pageCard) {
-      referencePage = pageCard;
-      card.hidden = true;
-      void refreshLaunch().then(showPageCard);
+  async function showCardEditor(target) {
+    if (ready && activePage && (activePage.projectId !== target.projectId || activePage.pageId !== target.pageId)) {
+      await openPageTab(target);
       return;
     }
-    showPageCard();
+    referencePage = target;
+    card.hidden = true;
+    if (ready) {
+      root.hidden = false;
+      displayPage(target.pageId, target.projectId, target.blockId);
+    } else {
+      await refreshLaunch();
+      if (!ready) showPageCard();
+    }
   }
 
-  async function openPageCard() {
+  async function presentPageCard() {
+    if (!initialized || openingCard || restoringChoice || !pageCards.length) return;
+    if (context.displayMode !== "fullscreen") {
+      if (ready && context.displayMode === "inline") {
+        root.hidden = true;
+        referencePage = undefined;
+      }
+      showPageCard();
+      return;
+    }
+    if (referencePage) return;
+    restoringChoice = true;
+    try {
+      const group = cardGroup;
+      let index = group ? selectedIndex : 0;
+      if (group && index === undefined) {
+        const saved = window.openai?.widgetState?.showaiCardChoice;
+        if (capabilities.serverTools) index = await callWorkbench("workbench_card_choice", { groupId: group });
+        index ??= saved?.group === group ? saved.index : undefined;
+      }
+      if (group !== cardGroup || context.displayMode !== "fullscreen" || openingCard || referencePage) return;
+      if (Number.isInteger(index) && pageCards[index]) await showCardEditor(pageCards[index]);
+      else showPageCard();
+    } catch (error) {
+      show("failed", error.message);
+      showPageCard();
+    } finally {
+      restoringChoice = false;
+    }
+  }
+
+  async function openPageCard(index) {
+    const pageCard = pageCards[index];
     if (!initialized || !pageCard || openingCard) return;
     openingCard = true;
-    openCardButton.disabled = true;
+    showPageCard();
     status.hidden = true;
     try {
       if (capabilities.serverTools) {
@@ -343,12 +387,19 @@ ${card}
         const status = reply?.structuredContent?.data?.status;
         if (status === "accepted" || status === "superseded") return;
       }
-      const modeResult = await request("ui/request-display-mode", { mode: "fullscreen" });
-      if ((modeResult?.mode ?? context.displayMode) !== "fullscreen")
-        throw new Error(t("cannotExpandCard"));
-      referencePage = pageCard;
-      card.hidden = true;
-      await refreshLaunch();
+      selectedIndex = index;
+      if (context.displayMode !== "fullscreen") {
+        if (cardGroup) {
+          if (capabilities.serverTools) await callWorkbench("workbench_card_choice", { groupId: cardGroup, index });
+          window.openai?.setWidgetState?.({ ...window.openai.widgetState, showaiCardChoice: { group: cardGroup, index } });
+        }
+        const modeResult = await request("ui/request-display-mode", { mode: "fullscreen" });
+        if ((modeResult?.mode ?? context.displayMode) !== "fullscreen")
+          throw new Error(t("cannotExpandCard"));
+        // A separately mounted editor receives the selection. Keep its originating group clickable.
+        if (cardGroup && context.displayMode !== "fullscreen") return;
+      }
+      await showCardEditor(pageCard);
     } catch (error) {
       show("failed", error.message);
     } finally {
@@ -366,12 +417,30 @@ ${card}
         return;
       }
       const meta = payload?._meta ?? payload;
-      const target = meta?.showaiPageCard ?? payload?.structuredContent?.data;
-      if (!target) return;
+      const data = payload?.structuredContent?.data;
+      const group = meta?.showaiCardGroup ?? (Array.isArray(data?.cards) ? data : undefined);
+      const target = meta?.showaiPageCard ?? data;
+      const targets = group?.cards ?? (target?.pageId ? [target] : undefined);
+      if (!targets?.length) return;
       navigationScope ??= meta?.showaiNavigationScope;
-      pageCard = target;
+      const singleChanged = !group && ["projectId", "pageId", "blockId", "title", "blockTitle"]
+        .some(key => pageCards[0]?.[key] !== target?.[key]);
+      if (!pageCards.length || group?.id !== cardGroup || singleChanged) {
+        cardGroup = group?.id;
+        selectedIndex = undefined;
+        pageCards = targets;
+        card.replaceChildren(...targets.map((item, index) => {
+          const row = cardTemplate.content.firstElementChild.cloneNode(true);
+          const title = item.blockTitle || item.title;
+          row.setAttribute("aria-label", title);
+          row.querySelector("strong").textContent = title;
+          row.querySelector("button").addEventListener("click", () => openPageCard(index));
+          return row;
+        }));
+      }
       status.hidden = true;
-      presentPageCard();
+      showPageCard();
+      void presentPageCard();
       return;
     }
     const target = launchFrom(result);
@@ -468,11 +537,11 @@ ${card}
         workbenchRequest: (route, args, client) => callWorkbench("workbench_request", { route, args, client }),
         workbenchChanges: async (after, client) => {
           const panel = ready && mode === "thread" ? {
-            scope: navigationScope, visible: document.visibilityState === "visible",
+            scope: navigationScope, visible: !root.hidden && document.visibilityState === "visible",
             page: activePage, acknowledged: acknowledgedNavigation,
           } : undefined;
           const changes = await callWorkbench("workbench_changes", { after, client, panel });
-          if (changes.navigation && document.visibilityState === "visible") {
+          if (changes.navigation && !root.hidden && document.visibilityState === "visible") {
             const { id, target } = changes.navigation;
             if (activePage?.projectId === target.projectId && activePage?.pageId === target.pageId) {
               displayPage(target.pageId, target.projectId, target.blockId);
@@ -509,7 +578,20 @@ ${card}
     }
   }
 
-  openCardButton?.addEventListener("click", openPageCard);
+  if (card) {
+    let reportedHeight;
+    const observer = new ResizeObserver(() => {
+      if (!initialized || card.hidden || context.displayMode === "fullscreen") return;
+      const height = Math.ceil(card.getBoundingClientRect().height + status.getBoundingClientRect().height);
+      if (height === reportedHeight) return;
+      reportedHeight = height;
+      parent.postMessage({ jsonrpc: "2.0", method: "ui/notifications/size-changed", params: {
+        height,
+      } }, "*");
+    });
+    observer.observe(card);
+    observer.observe(status);
+  }
   retry.addEventListener("click", () => {
     if (useFileEntrypoint) void readReferenceFile();
     else void refreshLaunch();
@@ -562,7 +644,7 @@ ${card}
     capabilities = result?.hostCapabilities || {};
     configure(result?.hostContext);
     initialized = true;
-    if (!ready && !pageCard) show("loading");
+    if (!ready && !pageCards.length) show("loading");
     parent.postMessage({ jsonrpc: "2.0", method: "ui/notifications/initialized" }, "*");
     if (usePageCard) presentPageCard();
     else if (useFileEntrypoint) {

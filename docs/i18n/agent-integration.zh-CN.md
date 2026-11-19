@@ -88,7 +88,7 @@ npm run package:plugin -- --mcp-url https://agent.example.com/mcp --out /absolut
 
 ## 已保存页面的展示约定
 
-从 ShowAI「设置 → 插件」安装或更新 Codex 插件。`card_present` 使用已保存页面的 `projectId` 和 `pageId` 生成卡片，附上大纲中的 `blockId` 即可定位组件。卡片复用当前对话中已显示同一原页的编辑器。打开另一页时，Codex 展开一个独立的右侧标签。点击页面图标旁的 ShowAI 图标，在完整的 Workbench 中打开当前页。需要直接跳转时，先调用 `card_navigate`，返回 `unavailable` 时再调用 `card_open`。要交付本机引用文件时使用 `workbench_page_reference`。
+从 ShowAI「设置 → 插件」安装或更新 Codex 插件。`card_present` 使用已保存页面的 `projectId` 和 `pageId` 生成卡片，附上大纲中的 `blockId` 即可定位组件。一次发多张时，首张照常传参，其余目标依次放入同一次调用的 `additionalTargets` 数组，每张卡片都可独立打开。卡片复用当前对话中已显示同一原页的编辑器。打开另一页时，Codex 展开一个独立的右侧标签。点击页面图标旁的 ShowAI 图标，在完整的 Workbench 中打开当前页。需要直接跳转时，先调用 `card_navigate`，返回 `unavailable` 时再调用 `card_open`。要交付本机引用文件时使用 `workbench_page_reference`。
 
 `page_present({projectId,pageId,blockIds?})` 捕获一个源版本，返回身份/hash/revision，不修改 Page。HTML/source 始终完整；blockIds 只选择 inline 预览。临时构建失败会清理中间目录。
 

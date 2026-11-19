@@ -1,4 +1,4 @@
-import { randomBytes } from "node:crypto";
+import { randomBytes, randomUUID } from "node:crypto";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import lightLogo from "../../plugins/showai/assets/logo.svg?raw";
@@ -13,6 +13,7 @@ import {
   codexPageReferenceExtension,
   codexPageReferenceMaxLength,
   resolveCodexPageReference,
+  readCodexPageCards,
   readCodexPageTarget,
   writeCodexPageReference,
 } from "./codex-page-reference";
@@ -73,6 +74,8 @@ function registerCodexWorkbench(
 ) {
   const key = randomBytes(32).toString("hex");
   const navigation = new CodexWorkbenchNavigation(key);
+  // A host can remount an inline view in a different frame when it expands.
+  const cardChoices = new Map<string, { index: number; expires: number }>();
   const plugin = /^([\w-]+)@([\w-]+)$/.exec(process.env.SHOWAI_CODEX_PLUGIN_ID ?? "");
   const globalEntrypoint = plugin
     ? `codex://plugins/${encodeURIComponent(plugin[1])}@${encodeURIComponent(plugin[2])}/app/${globalWorkbenchTool}`
@@ -98,6 +101,7 @@ function registerCodexWorkbench(
     ...views,
     { mode: "thread", name: "workbench_file", uri: codexWorkbenchFileUri, entrypoint: "file" },
     { mode: "thread", name: "workbench_page_card", uri: codexWorkbenchCardUri, entrypoint: "card" },
+    { mode: "thread", name: "workbench_page_card_v4", uri: "ui://showai/workbench-card-v4.html", entrypoint: "card" },
     { mode: "thread", name: "workbench_page_target", uri: codexWorkbenchTargetUri, entrypoint: "open" },
     { mode: "thread", name: "workbench_page_target_v1", uri: "ui://showai/workbench-target-v1.html", entrypoint: "open" },
     { mode: "thread", name: "workbench_page_card_v3", uri: "ui://showai/workbench-card-v3.html", entrypoint: "card" },
@@ -205,9 +209,40 @@ function registerCodexWorkbench(
   }
   server.registerTool("card_present", {
     ...cardTool,
-    title: "Show a saved ShowAI page card",
-    description: "Show a clickable saved Page or component card in chat. Supply its blockId from the page_read outline to locate a component.",
-  }, (target, extra) => presentPageCard(target, extra._meta));
+    title: "Show saved ShowAI cards",
+    description: "Show a clickable card for the saved Page or its blockId from page_read. To show several cards together in chat, pass the remaining targets in additionalTargets in this same call.",
+    inputSchema: {
+      ...codexPageTarget,
+      additionalTargets: z.array(z.object(codexPageTarget)).optional(),
+    },
+  }, async ({ additionalTargets, ...first }, extra) => {
+    if (!additionalTargets?.length) return presentPageCard(first, extra._meta);
+    try {
+      const cards = await readCodexPageCards(service, [first, ...additionalTargets]);
+      const group = { id: randomUUID(), cards };
+      return {
+        ...mcpSuccess(group),
+        _meta: {
+          showaiCardGroup: group,
+          showaiNavigationScope: navigation.scope(extra._meta),
+        },
+      };
+    } catch (error) {
+      return mcpFailure(error);
+    }
+  });
+  server.registerTool("workbench_card_choice", {
+    description: "Carry a clicked card's position from an inline group to its expanded editor.",
+    inputSchema: { groupId: z.string().uuid(), index: z.number().int().nonnegative().optional() },
+    _meta: appOnly,
+  }, ({ groupId, index }) => {
+    const now = Date.now();
+    for (const [id, choice] of cardChoices) {
+      if (choice.expires <= now) cardChoices.delete(id);
+    }
+    if (index !== undefined) cardChoices.set(groupId, { index, expires: now + 120_000 });
+    return { content: [], _meta: { showaiWorkbenchData: cardChoices.get(groupId)?.index ?? null } };
+  });
   server.registerTool("card_open", {
     ...cardTool,
     title: "Open a ShowAI editor",

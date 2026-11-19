@@ -247,6 +247,26 @@ it("opens both Codex workbench entries and saves into the MCP library", async ()
     expect(lost.isError).toBe(true);
     const other = await invoke<SavedPage>("pages:create", { projectId, title: "A separate Codex tab" });
     const otherPage = { projectId, pageId: other.document.id };
+    const grouped = await client.callTool({
+      name: "card_present",
+      arguments: { projectId, pageId, additionalTargets: [component, otherPage] },
+    });
+    expect(grouped.isError).not.toBe(true);
+    const group = grouped._meta!.showaiCardGroup as { id: string; cards: CodexPageTarget[] };
+    expect(grouped.structuredContent).toEqual({ ok: true, data: group });
+    expect(group.cards).toHaveLength(3);
+    expect(group.cards).toMatchObject([{ projectId, pageId }, component, otherPage]);
+    expect(group.cards[0]).not.toHaveProperty("blockId");
+    const choice = { groupId: group.id };
+    expect(await workbenchTool(client, "workbench_card_choice", choice)).toBeNull();
+    await workbenchTool(client, "workbench_card_choice", { ...choice, index: 2 });
+    expect(await workbenchTool(client, "workbench_card_choice", choice)).toBe(2);
+    const incomplete = await client.callTool({
+      name: "card_present",
+      arguments: { projectId, pageId, additionalTargets: [{ ...component, blockId: "missing-block" }] },
+    });
+    expect(incomplete.isError).toBe(true);
+    expect(incomplete._meta?.showaiCardGroup).toBeUndefined();
     const poll = async (threadId: string, opened: CodexPageTarget, acknowledged?: string, visible = true) => {
       const result = await client.callTool({ name: "workbench_changes", _meta: { threadId }, arguments: {
         after: -1, client: "editor-" + opened.pageId, panel: {

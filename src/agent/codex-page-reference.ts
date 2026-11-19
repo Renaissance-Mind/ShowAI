@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 import { z } from "zod";
 import type { AgentService } from "./service";
+import type { ShowDocument } from "../types";
 import { structuredContent } from "./page-structured";
 
 export const codexPageReferenceExtension = ".showai-ref";
@@ -23,12 +24,34 @@ const referenceFile = z.discriminatedUnion("version", [
   pageReference.extend({ version: z.literal(2), blockId: codexPageTarget.blockId.unwrap() }),
 ]);
 
+type PageCard = CodexPageTarget & { title: string; blockTitle?: string };
+
+export async function readCodexPageCards(service: AgentService, targets: CodexPageTarget[]): Promise<PageCard[]> {
+  const pages = new Map<string, { document: ShowDocument; outline?: ReturnType<typeof structuredContent>["outline"] }>();
+  const cards: PageCard[] = [];
+  for (const target of targets) {
+    const key = JSON.stringify([target.projectId, target.pageId]);
+    let page = pages.get(key);
+    if (!page) {
+      const { document } = await service.store.readPage(target.projectId, target.pageId);
+      page = { document };
+      pages.set(key, page);
+    }
+    const card: PageCard = { ...target, title: page.document.title };
+    if (target.blockId) {
+      page.outline ??= structuredContent(page.document).outline;
+      const block = page.outline.find(item => item.id === target.blockId);
+      if (!block) throw new Error("This block is no longer in the saved ShowAI Page: " + target.blockId);
+      card.blockTitle = block.title.slice(0, 120) || block.kind || block.type;
+    }
+    cards.push(card);
+  }
+  return cards;
+}
+
 export async function readCodexPageTarget(service: AgentService, target: CodexPageTarget) {
-  const { document } = await service.store.readPage(target.projectId, target.pageId);
-  if (!target.blockId) return { projectId: target.projectId, pageId: target.pageId, title: document.title };
-  const block = structuredContent(document).outline.find(item => item.id === target.blockId);
-  if (!block) throw new Error("This block is no longer in the saved ShowAI Page: " + target.blockId);
-  return { ...target, title: document.title, blockTitle: block.title.slice(0, 120) || block.kind || block.type };
+  const [card] = await readCodexPageCards(service, [target]);
+  return card;
 }
 
 export async function resolveCodexPageReference(
