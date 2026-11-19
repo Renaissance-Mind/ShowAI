@@ -86,6 +86,48 @@ button:disabled {
   border-radius: 6px;
   padding: 5px 9px;
 }
+.rv-info {
+  position: relative;
+}
+.rv-info summary,
+.rv-motion summary {
+  cursor: pointer;
+  list-style: none;
+}
+.rv-info summary {
+  padding: 5px 9px;
+  border: 1px solid var(--rv-line);
+  border-radius: 6px;
+  background: var(--rv-paper);
+}
+.rv-info[open] summary {
+  border-color: #c5b4e5;
+  color: var(--rv-accent);
+}
+.rv-info-body {
+  position: absolute;
+  z-index: 10;
+  right: 0;
+  width: 300px;
+  max-width: calc(100vw - 24px);
+  margin: 5px 0 0;
+  padding: 12px;
+  border: 1px solid var(--rv-line);
+  border-radius: 8px;
+  background: var(--rv-paper);
+  box-shadow: 0 8px 24px #0002;
+}
+.rv-info-body dt {
+  color: var(--rv-muted);
+  font-size: 12px;
+}
+.rv-info-body dd {
+  margin: 2px 0 9px;
+  overflow-wrap: anywhere;
+}
+.rv-info-body dd:last-child {
+  margin-bottom: 0;
+}
 .rv-tools button[aria-expanded="true"],
 .rv-states button[aria-pressed="true"] {
   border-color: #c5b4e5;
@@ -136,6 +178,107 @@ button:disabled {
   font-weight: 650;
   margin: 0 0 9px;
 }
+.rv-motion {
+  flex: none;
+  border-top: 1px solid var(--rv-line);
+  margin-top: 14px;
+  padding-top: 12px;
+}
+.rv-motion summary {
+  font-weight: 650;
+}
+.rv-motion summary::before {
+  content: "▸ ";
+  color: var(--rv-muted);
+}
+.rv-motion[open] summary::before {
+  content: "▾ ";
+}
+.rv-motion-preference {
+  margin: 8px 0;
+  color: var(--rv-muted);
+  font-size: 12px;
+}
+.rv-motion button,
+.rv-check-dialog button {
+  border: 1px solid var(--rv-line);
+  border-radius: 6px;
+  padding: 5px 9px;
+  background: var(--rv-paper);
+}
+.rv-motion-output {
+  display: block;
+  margin-top: 8px;
+  color: var(--rv-muted);
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+.rv-motion-output:empty {
+  display: none;
+}
+.rv-check-frame {
+  opacity: 0;
+  pointer-events: none;
+  z-index: -1;
+}
+.rv-check-dialog {
+  width: min(620px, calc(100vw - 32px));
+  max-height: min(80vh, 760px);
+  border: 1px solid var(--rv-line);
+  border-radius: 10px;
+  padding: 18px;
+  color: var(--rv-text);
+  background: var(--rv-paper);
+  box-shadow: 0 16px 48px #0003;
+}
+.rv-check-dialog::backdrop {
+  background: #16141b77;
+}
+.rv-check-dialog[open] {
+  display: flex;
+  flex-direction: column;
+}
+.rv-check-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.rv-check-head h2 {
+  margin: 0;
+  font-size: 16px;
+}
+.rv-check-status {
+  color: var(--rv-muted);
+}
+.rv-check-results {
+  display: grid;
+  min-height: 0;
+  overflow: auto;
+  scrollbar-width: thin;
+  scrollbar-color: #c7c2b8 transparent;
+  gap: 7px;
+  padding-left: 24px;
+}
+.rv-check-row {
+  padding: 6px 8px;
+  border-left: 3px solid var(--rv-line);
+}
+.rv-check-row[data-result="pass"] {
+  border-color: #45856a;
+}
+.rv-check-row[data-result="fail"] {
+  border-color: #b4493e;
+}
+.rv-check-row span,
+.rv-check-row small {
+  display: block;
+  margin-top: 4px;
+  overflow-wrap: anywhere;
+}
+.rv-check-row small {
+  color: var(--rv-muted);
+}
 .rv-states {
   display: flex;
   flex-wrap: wrap;
@@ -148,6 +291,12 @@ button:disabled {
   margin: 0 0 7px;
   color: var(--rv-muted);
   font-size: 12px;
+}
+.rv-preparation {
+  margin: 0 0 8px;
+  color: var(--rv-muted);
+  font-size: 12px;
+  overflow-wrap: anywhere;
 }
 .rv-action-list {
   display: grid;
@@ -204,6 +353,8 @@ button:disabled {
     min-height: 65px;
     max-height: 40%;
     overflow: auto;
+    scrollbar-width: thin;
+    scrollbar-color: #c7c2b8 transparent;
   }
   .rv-tree-section {
     display: flex;

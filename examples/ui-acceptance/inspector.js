@@ -19,6 +19,32 @@
         branch: "切换分支",
         action: "操作",
         error: "无法准备状态",
+        info: "预览信息",
+        source: "代码来源",
+        previewSource: "验收页来源",
+        build: "构建时间",
+        content: "内容指纹",
+        data: "数据来源",
+        unknown: "未记录",
+        dirty: "含未提交改动",
+        clean: "工作区干净",
+        checks: "检查流程",
+        close: "关闭",
+        checking: "正在检查",
+        checked: "检查完成",
+        stopped: "检查已停止",
+        stop: "停止检查",
+        unavailable: "未出现",
+        missing: "没有可用控件",
+        motion: "动效观察",
+        motionStart: "开始记录",
+        motionStop: "停止记录",
+        motionRunning: "正在记录，请操作界面",
+        motionFull: "系统动态效果：完整",
+        motionReduced: "系统动态效果：减少",
+        motionEvents: "动画事件",
+        motionFrames: "帧间隔",
+        motionNoFrames: "当前窗口没有可用帧样本",
       }
     : {
         title: "Independent UI review",
@@ -37,6 +63,32 @@
         branch: "Toggle branch",
         action: "Action",
         error: "Could not prepare state",
+        info: "Preview information",
+        source: "Source",
+        previewSource: "Preview source",
+        build: "Built",
+        content: "Content fingerprint",
+        data: "Data",
+        unknown: "Not recorded",
+        dirty: "Uncommitted changes",
+        clean: "Clean working tree",
+        checks: "Check flow",
+        close: "Close",
+        checking: "Checking",
+        checked: "Checks complete",
+        stopped: "Checks stopped",
+        stop: "Stop checks",
+        unavailable: "Unavailable",
+        missing: "No controls found",
+        motion: "Motion observation",
+        motionStart: "Start recording",
+        motionStop: "Stop recording",
+        motionRunning: "Recording. Interact with the preview.",
+        motionFull: "System motion: full",
+        motionReduced: "System motion: reduced",
+        motionEvents: "Animation events",
+        motionFrames: "Frame intervals",
+        motionNoFrames: "No visible frame samples",
       };
   document.documentElement.lang = zh ? "zh-CN" : "en";
   document.title =
@@ -80,8 +132,10 @@
   };
   const stateSection = section(t.states),
     activeName = el("p", "rv-current"),
+    preparation = el("p", "rv-preparation"),
     variants = el("div", "rv-states");
-  stateSection.append(activeName, variants);
+  preparation.hidden = true;
+  stateSection.append(activeName, preparation, variants);
   const actionSection = section(t.actions),
     actionList = el("div", "rv-action-list");
   actionSection.append(actionList);
@@ -106,12 +160,64 @@
   reset.hidden = true;
   const home = button(t.home, () => load(scenario.entry), "rv-home");
   home.disabled = true;
-  tools.append(marksLabel, treeToggle, reset);
+  const info = el("details", "rv-info");
+  info.append(el("summary", "", t.info));
+  const infoBody = el("dl", "rv-info-body");
+  info.append(infoBody);
+  const source = config.metadata || {};
+  function infoLine(label, value) {
+    infoBody.append(el("dt", "", label), el("dd", "", value || t.unknown));
+  }
+  function describeSource(value) {
+    return [
+      value.checkout,
+      value.branch,
+      value.revision?.slice(0, 12),
+      typeof value.dirty === "boolean" ? (value.dirty ? t.dirty : t.clean) : "",
+    ]
+      .filter(Boolean)
+      .join(" · ");
+  }
+  infoLine(t.source, describeSource(source));
+  if (source.previewSource)
+    infoLine(t.previewSource, describeSource(source.previewSource));
+  infoLine(
+    t.build,
+    source.generatedAt && new Date(source.generatedAt).toLocaleString(),
+  );
+  infoLine(t.content, source.contentHash?.slice(0, 16));
+  infoLine(t.data, source.dataSource);
+  const dataLine = infoBody.lastElementChild;
+  const checksButton = button(t.checks, openChecks);
+  checksButton.hidden = true;
+  tools.append(marksLabel, treeToggle, checksButton, reset, info);
   header.append(el("h1", "", document.title), tools);
   panel.append(stateSection, actionSection, treeSection, error, home);
   stage.append(marks, loading);
   body.append(stage, panel);
   root.append(header, body);
+
+  const checksDialog = el("dialog", "rv-check-dialog");
+  const checksHead = el("div", "rv-check-head");
+  checksHead.append(
+    el("h2", "", t.checks),
+    button(t.close, () => checksDialog.close()),
+  );
+  const checksStatus = el("p", "rv-check-status");
+  checksStatus.setAttribute("role", "status");
+  const checksList = el("ol", "rv-check-results");
+  const stopChecks = button(t.stop, () => checkController?.abort());
+  checksDialog.append(checksHead, checksStatus, checksList, stopChecks);
+  root.append(checksDialog);
+
+  const motion = el("details", "rv-motion");
+  motion.append(el("summary", "", t.motion));
+  const motionPreference = el("p", "rv-motion-preference");
+  const motionOutput = el("output", "rv-motion-output");
+  motionOutput.setAttribute("aria-live", "polite");
+  const motionButton = button(t.motionStart, toggleMotion);
+  motion.append(motionPreference, motionButton, motionOutput);
+  panel.insertBefore(motion, treeSection);
 
   let frame,
     scenario,
@@ -120,7 +226,9 @@
     scheduled = 0,
     lastActions = "",
     treeShape = "",
-    busy = true;
+    busy = true,
+    checkController,
+    motionRecording;
   const jumpButtons = new Map(),
     branches = new Map(),
     watched = new Set();
@@ -132,31 +240,35 @@
     error.textContent = t.error + " · " + (reason.message || String(reason));
     error.hidden = false;
   }
-  function visible(element) {
+  function visible(element, doc = frame?.contentDocument) {
     return (
       !!element?.isConnected &&
-      element.ownerDocument === frame?.contentDocument &&
-      !element.closest("[hidden],[inert],[data-exit-ghost]") &&
+      element.ownerDocument === doc &&
+      !element.closest(
+        "[hidden],[inert],[aria-hidden=true],[data-exit-ghost]",
+      ) &&
       element.getClientRects().length > 0 &&
       (element.checkVisibility?.({ visibilityProperty: true }) ?? true)
     );
   }
   function disabled(element) {
-    return element.matches(":disabled,[aria-disabled=true]");
+    return (
+      element.matches(":disabled") || !!element.closest("[aria-disabled=true]")
+    );
   }
-  function target(value) {
+  function target(value, doc = frame.contentDocument) {
     const found =
-      typeof value === "function"
-        ? value()
-        : frame.contentDocument.querySelector(value);
-    return visible(found) ? found : null;
+      typeof value === "function" ? value() : doc.querySelector(value);
+    return visible(found, doc) ? found : null;
   }
-  function activate(element) {
-    if (!visible(element) || disabled(element)) return;
-    element.scrollIntoView({ block: "nearest", inline: "nearest" });
-    element.focus({ preventScroll: true });
+  function activate(element, doc = frame.contentDocument) {
+    if (!visible(element, doc) || disabled(element)) return;
+    if (doc === frame?.contentDocument) {
+      element.scrollIntoView({ block: "nearest", inline: "nearest" });
+      element.focus({ preventScroll: true });
+    }
     element.click();
-    schedule();
+    if (doc === frame?.contentDocument) schedule();
   }
   function makeDriver(doc, signal) {
     const win = doc.defaultView;
@@ -167,27 +279,32 @@
           return;
         }
         const observer = new win.MutationObserver(check);
+        const events = [
+          "input",
+          "change",
+          "transitionend",
+          "animationend",
+          "review-change",
+        ];
+        let settled = false;
         const timer = setTimeout(
           () => finish(reject, new Error(description)),
           6000,
         );
         function finish(callback, value) {
+          if (settled) return;
+          settled = true;
           observer.disconnect();
           clearTimeout(timer);
           signal.removeEventListener("abort", abort);
-          for (const type of [
-            "input",
-            "change",
-            "transitionend",
-            "animationend",
-          ])
-            doc.removeEventListener(type, check, true);
+          for (const type of events) doc.removeEventListener(type, check, true);
           callback(value);
         }
         function abort() {
           finish(reject, signal.reason);
         }
         function check() {
+          if (settled) return;
           try {
             const value = read();
             if (value) finish(resolve, value);
@@ -202,14 +319,14 @@
           characterData: true,
           attributes: true,
         });
-        for (const type of ["input", "change", "transitionend", "animationend"])
-          doc.addEventListener(type, check, true);
+        for (const type of events) doc.addEventListener(type, check, true);
+        doc.fonts?.ready.then(check);
         check();
       });
     }
     async function control(value, label) {
       const element = await wait(() => {
-        const node = target(value);
+        const node = target(value, doc);
         return node && !disabled(node) && node;
       }, label);
       signal.throwIfAborted();
@@ -219,7 +336,7 @@
       wait,
       signal,
       async click(value, label) {
-        activate(await control(value, label || String(value)));
+        activate(await control(value, label || String(value)), doc);
       },
       async fill(value, text, label) {
         const field = await control(value, label || String(value));
@@ -312,12 +429,12 @@
       tree.append(details);
     }
   }
-  function rank(state) {
+  function rank(state, definition = scenario) {
     let depth = 0,
       parent = state.parent;
     while (parent) {
       depth++;
-      parent = scenario.states.find((s) => s.id === parent).parent;
+      parent = definition.states.find((s) => s.id === parent).parent;
     }
     return depth;
   }
@@ -327,6 +444,11 @@
   function drawState(state) {
     selected = state?.id || "";
     panel.dataset.state = selected;
+    if (selected) {
+      const params = new URLSearchParams(location.hash.slice(1));
+      params.set("state", selected);
+      history.replaceState(history.state, "", "#" + params.toString());
+    }
     activeName.textContent = state?.title || t.outside;
     variants.replaceChildren();
     const visibleStates = state?.variants
@@ -359,6 +481,9 @@
     }
     const group = jumpButtons.get(selected)?.closest("details");
     if (group) group.open = true;
+    jumpButtons
+      .get(selected)
+      ?.scrollIntoView({ block: "nearest", inline: "nearest" });
   }
   function runAction(index) {
     if (busy || !scenario) return;
@@ -373,8 +498,59 @@
       if (node) activate(node);
     }
   }
+  function actionName(node) {
+    const labelled = node.getAttribute("aria-labelledby");
+    const references = labelled
+      ?.split(/\s+/)
+      .map((id) => node.ownerDocument.getElementById(id)?.textContent?.trim())
+      .filter(Boolean)
+      .join(" ");
+    return (
+      node.getAttribute("aria-label") ||
+      references ||
+      node.labels?.[0]?.textContent?.trim() ||
+      node.getAttribute("placeholder") ||
+      node.getAttribute("title") ||
+      (node.matches("input,textarea,select") ? "" : node.textContent.trim()) ||
+      (node.matches(
+        'input[type="button"],input[type="submit"],input[type="reset"]',
+      )
+        ? node.value
+        : "") ||
+      ""
+    ).trim();
+  }
+  function discoverActions(doc, items, filter) {
+    const dialogs = [
+      ...doc.querySelectorAll('[role="dialog"],[role="menu"]'),
+    ].filter((node) => visible(node, doc));
+    const area = dialogs.at(-1) || doc.body;
+    const selector = [
+      "button",
+      "input:not([type=hidden])",
+      "select",
+      "textarea",
+      "a[href]",
+      '[role="button"]',
+      '[role="menuitem"]',
+      '[role="checkbox"]',
+      '[role="combobox"]',
+      '[role="tab"]',
+    ].join(",");
+    const nodes = [...area.querySelectorAll(selector)];
+    for (const node of nodes) {
+      if (!visible(node, doc) || node.closest("[data-review-ignore]")) continue;
+      if (typeof filter === "function" && !filter(node)) continue;
+      if (items.some((item) => item.node === node || item.node.contains(node)))
+        continue;
+      const title = actionName(node);
+      if (title) items.push({ action: { title, target: () => node }, node });
+    }
+  }
   function drawActions(items) {
     currentActions = items;
+    actionSection.firstElementChild.textContent =
+      t.actions + " · " + items.length;
     const key = JSON.stringify([
       selected,
       items.map((i) => [i.action.title, disabled(i.node)]),
@@ -459,6 +635,8 @@
     const items = actions
       .map((action) => ({ action, node: target(action.target) }))
       .filter((item) => item.node);
+    const discovery = state?.discoverActions ?? scenario.discoverActions;
+    if (discovery) discoverActions(frame.contentDocument, items, discovery);
     drawActions(items);
     align(items);
     const next = new Set(items.map((i) => i.node));
@@ -494,7 +672,22 @@
   marksToggle.addEventListener("change", schedule);
   window.addEventListener("resize", schedule);
   function watch(doc, signal) {
-    const observer = new MutationObserver(schedule);
+    let mutationRefresh = 0;
+    const observer = new MutationObserver((changes) => {
+      if (
+        marksToggle.checked &&
+        changes.every(
+          (change) =>
+            change.type === "attributes" && change.attributeName === "style",
+        )
+      )
+        scheduleLayout();
+      if (!mutationRefresh)
+        mutationRefresh = setTimeout(() => {
+          mutationRefresh = 0;
+          schedule();
+        }, 60);
+    });
     observer.observe(doc, {
       subtree: true,
       childList: true,
@@ -510,6 +703,18 @@
     ])
       doc.addEventListener(type, schedule, { capture: true, signal });
     doc.addEventListener("scroll", scheduleLayout, { capture: true, signal });
+    const motionQuery = doc.defaultView.matchMedia(
+      "(prefers-reduced-motion: reduce)",
+    );
+    motionQuery.addEventListener(
+      "change",
+      () => {
+        motionPreference.textContent = motionQuery.matches
+          ? t.motionReduced
+          : t.motionFull;
+      },
+      { signal },
+    );
     tracker = new ResizeObserver(scheduleLayout);
     tracker.observe(frame);
     if (doc.fonts)
@@ -521,12 +726,14 @@
       () => {
         observer.disconnect();
         tracker.disconnect();
+        clearTimeout(mutationRefresh);
         watched.clear();
       },
       { once: true },
     );
   }
   function load(id) {
+    if (motionRecording) finishMotion();
     controller?.abort();
     const next = new AbortController();
     controller = next;
@@ -541,8 +748,10 @@
     error.hidden = true;
     home.disabled = true;
     reset.disabled = true;
+    checksButton.hidden = true;
     panel.setAttribute("aria-busy", "true");
     activeName.textContent = t.loading;
+    preparation.hidden = true;
     variants.replaceChildren();
     actionList.replaceChildren();
     const nextFrame = el("iframe");
@@ -564,6 +773,20 @@
           );
           buildTree();
           reset.hidden = typeof scenario.reset !== "function";
+          checksButton.hidden = scenario.checkIsolation !== true;
+          dataLine.textContent =
+            [
+              ...new Set(
+                [source.dataSource, scenario.dataSource].filter(Boolean),
+              ),
+            ].join(" · ") || t.unknown;
+          preparation.textContent = scenario.preparation || "";
+          preparation.hidden = !scenario.preparation;
+          motionPreference.textContent = nextFrame.contentWindow.matchMedia(
+            "(prefers-reduced-motion: reduce)",
+          ).matches
+            ? t.motionReduced
+            : t.motionFull;
           const ui = makeDriver(doc, next.signal);
           const requested = id && scenario.states.find((s) => s.id === id);
           if (id && !requested) throw Error("Unknown state " + id);
@@ -596,5 +819,224 @@
     else stage.prepend(nextFrame);
     frame = nextFrame;
   }
-  load("");
+  function toggleMotion() {
+    if (motionRecording) {
+      finishMotion();
+      return;
+    }
+    const doc = frame.contentDocument;
+    const controller = new AbortController();
+    const events = new Map();
+    const intervals = [];
+    const recording = {
+      controller,
+      events,
+      intervals,
+      reduced: frame.contentWindow.matchMedia(
+        "(prefers-reduced-motion: reduce)",
+      ).matches,
+      previous: null,
+      frameId: 0,
+      timer: 0,
+    };
+    for (const type of [
+      "transitionrun",
+      "transitionend",
+      "transitioncancel",
+      "animationstart",
+      "animationend",
+      "animationcancel",
+    ]) {
+      doc.addEventListener(
+        type,
+        (event) => {
+          const name = event.propertyName || event.animationName || "";
+          const key = name ? type + " · " + name : type;
+          events.set(key, (events.get(key) || 0) + 1);
+        },
+        { capture: true, signal: controller.signal },
+      );
+    }
+    function sample(now) {
+      if (document.visibilityState === "visible") {
+        if (recording.previous !== null)
+          intervals.push(now - recording.previous);
+        recording.previous = now;
+      } else recording.previous = null;
+      recording.frameId = requestAnimationFrame(sample);
+    }
+    recording.frameId = requestAnimationFrame(sample);
+    recording.timer = setTimeout(finishMotion, 5000);
+    motionRecording = recording;
+    motionButton.textContent = t.motionStop;
+    motionOutput.textContent = t.motionRunning;
+  }
+  function finishMotion() {
+    const recording = motionRecording;
+    if (!recording) return;
+    motionRecording = undefined;
+    recording.controller.abort();
+    clearTimeout(recording.timer);
+    cancelAnimationFrame(recording.frameId);
+    motionButton.textContent = t.motionStart;
+    const preference = recording.reduced ? t.motionReduced : t.motionFull;
+    const eventText =
+      [...recording.events]
+        .map(([name, count]) => name + " × " + count)
+        .join(", ") || "0";
+    const frames = recording.intervals.length
+      ? recording.intervals.length +
+        (zh ? " 帧，最大 " : " frames, max ") +
+        Math.max(...recording.intervals).toFixed(1) +
+        " ms"
+      : t.motionNoFrames;
+    motionOutput.textContent =
+      preference +
+      " · " +
+      t.motionEvents +
+      ": " +
+      eventText +
+      " · " +
+      t.motionFrames +
+      ": " +
+      frames;
+  }
+  async function checkState(state, signal) {
+    const probe = el("iframe", "rv-check-frame");
+    probe.title = t.checks + " · " + state.title;
+    probe.name = "ui-review-check/" + state.id;
+    probe.srcdoc = config.appHtml;
+    const abort = () => probe.remove();
+    signal.addEventListener("abort", abort, { once: true });
+    try {
+      await new Promise((resolve, reject) => {
+        const timer = setTimeout(() => finish(reject, Error(t.loading)), 6000);
+        function finish(callback, value) {
+          clearTimeout(timer);
+          signal.removeEventListener("abort", cancelled);
+          callback(value);
+        }
+        function cancelled() {
+          finish(reject, signal.reason);
+        }
+        signal.addEventListener("abort", cancelled, { once: true });
+        probe.addEventListener("load", () => finish(resolve), { once: true });
+        stage.append(probe);
+      });
+      signal.throwIfAborted();
+      const doc = probe.contentDocument;
+      const definition = probe.contentWindow.reviewScenario;
+      validate(definition);
+      if (definition.checkIsolation !== true) throw Error(t.missing);
+      const requested = definition.states.find((item) => item.id === state.id);
+      if (!requested) throw Error("Unknown state " + state.id);
+      const ordered = [...definition.states].sort(
+        (a, b) =>
+          (b.priority || 0) - (a.priority || 0) ||
+          rank(b, definition) - rank(a, definition),
+      );
+      const ui = makeDriver(doc, signal);
+      await requested.enter?.(ui);
+      await ui.wait(
+        () => ordered.find((item) => item.match())?.id === state.id,
+        requested.title,
+      );
+      const actions =
+        typeof requested.actions === "function"
+          ? requested.actions()
+          : requested.actions || [];
+      function inspectActions() {
+        const items = [];
+        const absent = [];
+        const required = [];
+        for (const action of actions) {
+          const node = target(action.target, doc);
+          if (node) items.push({ action, node });
+          else {
+            absent.push(action.title);
+            if (!action.optional) required.push(action.title);
+          }
+        }
+        const discovery =
+          requested.discoverActions ?? definition.discoverActions;
+        if (discovery) discoverActions(doc, items, discovery);
+        const present = items.map(
+          ({ action, node }) =>
+            action.title +
+            (disabled(node) ? (zh ? "（禁用）" : " (disabled)") : ""),
+        );
+        return { present, absent, required };
+      }
+      let result = inspectActions();
+      try {
+        await ui.wait(() => {
+          result = inspectActions();
+          return result.present.length && !result.required.length;
+        }, t.missing);
+      } catch (error) {
+        if (signal.aborted) throw error;
+        throw Error(
+          t.missing + ": " + (result.required.join(" · ") || requested.title),
+        );
+      }
+      return result;
+    } finally {
+      signal.removeEventListener("abort", abort);
+      probe.remove();
+    }
+  }
+  async function openChecks() {
+    if (!scenario?.checkIsolation || checkController) return;
+    const states = scenario.states.map(({ id, title }) => ({ id, title }));
+    const controller = new AbortController();
+    checkController = controller;
+    checksList.replaceChildren();
+    checksStatus.textContent = t.checking + " 0 / " + states.length;
+    stopChecks.hidden = false;
+    checksDialog.showModal();
+    let failures = 0;
+    for (const [index, state] of states.entries()) {
+      if (controller.signal.aborted) break;
+      const row = el("li", "rv-check-row");
+      row.append(el("strong", "", state.title));
+      checksList.append(row);
+      try {
+        const result = await checkState(state, controller.signal);
+        row.append(el("span", "", result.present.join(" · ")));
+        if (result.absent.length)
+          row.append(
+            el("small", "", t.unavailable + ": " + result.absent.join(" · ")),
+          );
+        row.dataset.result = "pass";
+      } catch (reason) {
+        if (controller.signal.aborted) break;
+        failures++;
+        row.dataset.result = "fail";
+        row.append(el("span", "", reason.message || String(reason)));
+      }
+      checksStatus.textContent =
+        t.checking +
+        " " +
+        (index + 1) +
+        " / " +
+        states.length +
+        (failures ? " · " + failures + (zh ? " 项失败" : " failed") : "");
+    }
+    checksStatus.textContent = controller.signal.aborted
+      ? t.stopped
+      : t.checked +
+        " · " +
+        (states.length - failures) +
+        " / " +
+        states.length +
+        (failures ? " · " + failures + (zh ? " 项失败" : " failed") : "");
+    stopChecks.hidden = true;
+    checkController = undefined;
+  }
+  checksDialog.addEventListener("close", () => checkController?.abort());
+  window.addEventListener("hashchange", () => {
+    const state = new URLSearchParams(location.hash.slice(1)).get("state");
+    if (state && state !== selected) load(state);
+  });
+  load(new URLSearchParams(location.hash.slice(1)).get("state") || "");
 })();

@@ -59,6 +59,24 @@
       output {
         overflow-wrap: anywhere;
       }
+      #empty:not([hidden]) {
+        animation: show-empty 140ms ease-out;
+      }
+      @keyframes show-empty {
+        from {
+          opacity: 0;
+          transform: translateY(3px);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        #empty:not([hidden]) {
+          animation: none;
+        }
+      }
     </style>
   </head>
   <body>
@@ -194,6 +212,8 @@
             : "empty";
       window.reviewScenario = {
         entry: "all",
+        checkIsolation: true,
+        dataSource: chinese ? "静态示例页面" : "Static example pages",
         states: stateIds.map((id, i) => ({
           id,
           title: titles[i],
