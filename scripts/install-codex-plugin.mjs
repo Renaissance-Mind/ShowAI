@@ -149,6 +149,26 @@ async function checkTestServer(binding) {
     throw new Error(`MCP server ${workbenchTestServer} belongs to another installation. Use a separate --workbench-channel.`);
 }
 
+async function writeWorkbenchTestLauncher(pluginRoot) {
+  const directory = join(pluginRoot, "mcp");
+  if (process.platform === "win32") {
+    const command = process.execPath.replaceAll("%", "%%");
+    await writeFile(
+      join(directory, "showai-mcp.cmd"),
+      '@echo off\r\nsetlocal DisableDelayedExpansion\r\n"' + command +
+        '" "%~dp0launch.mjs" %*\r\n',
+    );
+    return "./mcp/showai-mcp.cmd";
+  }
+  const command = "'" + process.execPath.replaceAll("'", "'\\''") + "'";
+  await writeFile(
+    join(directory, "showai-mcp"),
+    "#!/bin/sh\nexec " + command + ' "$(dirname "$0")/launch.mjs" "$@"\n',
+    { mode: 0o755 },
+  );
+  return "./mcp/showai-mcp";
+}
+
 async function stageWorkbenchTest(marketplaceRoot, pluginRoot, home) {
   const compiled = join(root, "dist-runtime");
   const runtimeDigest = createHash("sha256")
@@ -194,7 +214,8 @@ async function stageWorkbenchTest(marketplaceRoot, pluginRoot, home) {
     const mcpPath = join(staging, "mcp.json");
     const mcp = JSON.parse(await readFile(mcpPath, "utf8"));
     const server = mcp.mcpServers.showai;
-    server.command = process.execPath;
+    server.command = await writeWorkbenchTestLauncher(staging);
+    server.args = [];
     Object.assign(server.env, env, { SHOWAI_RUNTIME_CONFIG: binding });
     mcp.mcpServers = { [workbenchTestServer]: server };
     await writeFile(mcpPath, JSON.stringify(mcp, null, 2) + "\n");
@@ -234,23 +255,50 @@ async function stageWorkbenchTest(marketplaceRoot, pluginRoot, home) {
   return { runtime: cli, home: library };
 }
 
-async function registerWorkbenchTestServer(installedPath) {
+async function verifyWorkbenchTestServer(installedPath) {
   const manifest = JSON.parse(await readFile(join(installedPath, "mcp.json"), "utf8"));
   const server = manifest.mcpServers[workbenchTestServer];
-  await checkTestServer(server.env.SHOWAI_RUNTIME_CONFIG);
-  await command("codex", [
-    "mcp", "add", workbenchTestServer,
-    ...Object.entries(server.env).flatMap(([key, value]) => ["--env", `${key}=${value}`]),
-    "--", server.command, join(installedPath, "mcp/launch.mjs"),
-  ]);
-  const verification = JSON.parse((await command(
-    "codex", ["mcp", "get", workbenchTestServer, "--json"],
-  )).stdout);
-  if (!verification.enabled ||
-      verification.transport?.args?.[0] !== join(installedPath, "mcp/launch.mjs") ||
-      verification.transport?.env?.SHOWAI_HOME !== server.env.SHOWAI_HOME)
-    throw new Error("Codex did not load the test workbench MCP connection.");
-  return workbenchTestServer;
+  const bundledCommand = join(installedPath, server.command);
+  async function configuredServer() {
+    const configured = JSON.parse((await command("codex", ["mcp", "list", "--json"])).stdout);
+    return configured.find((item) => item.name === workbenchTestServer);
+  }
+  const bundled = (entry) =>
+    entry?.transport?.command === bundledCommand &&
+    entry.transport.env?.SHOWAI_RUNTIME_CONFIG === server.env.SHOWAI_RUNTIME_CONFIG &&
+    entry.transport.env?.SHOWAI_HOME === server.env.SHOWAI_HOME;
+
+  const existing = await configuredServer();
+  if (bundled(existing)) {
+    if (!existing.enabled)
+      throw new Error("Codex has disabled the MCP server bundled with the test plugin.");
+    return workbenchTestServer;
+  }
+  const legacy = existing?.transport;
+  const legacyLauncher = legacy?.args?.[0]?.replaceAll("\\", "/") ?? "";
+  if (existing &&
+      (legacy?.env?.SHOWAI_RUNTIME_CONFIG !== server.env.SHOWAI_RUNTIME_CONFIG ||
+       legacy?.args?.length !== 1 ||
+       !legacyLauncher.includes("/" + workbenchTestName + "/" + workbenchTestName + "/") ||
+       !legacyLauncher.endsWith("/mcp/launch.mjs")))
+    throw new Error("MCP server " + workbenchTestServer + " belongs to another installation.");
+
+  if (legacy) await command("codex", ["mcp", "remove", workbenchTestServer]);
+  try {
+    const loaded = await configuredServer();
+    if (!bundled(loaded) || !loaded.enabled)
+      throw new Error("Codex did not load the test MCP from its installed plugin.");
+    return workbenchTestServer;
+  } catch (error) {
+    if (legacy) {
+      await command("codex", [
+        "mcp", "add", workbenchTestServer,
+        ...Object.entries(legacy.env).flatMap(([key, value]) => ["--env", key + "=" + value]),
+        "--", legacy.command, ...legacy.args,
+      ]);
+    }
+    throw error;
+  }
 }
 
 async function install() {
@@ -434,7 +482,7 @@ async function install() {
     throw new Error(
       `Installed version ${installed.version} differs from the bundle version ${manifest.version}.`,
     );
-  const registeredMcp = workbenchTest ? await registerWorkbenchTestServer(installedPath) : undefined;
+  const registeredMcp = workbenchTest ? await verifyWorkbenchTestServer(installedPath) : undefined;
   const receiptPath = remoteUrl || workbenchTest
     ? join(marketplaceRoot, "codex-plugin-install.json")
     : join(root, "artifacts/codex-plugin-install.json");

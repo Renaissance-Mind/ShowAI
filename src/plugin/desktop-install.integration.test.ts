@@ -89,6 +89,13 @@ async function codexServerTools(root: string, installedPath: string) {
         "openai/ui": { entrypoints: [{ type }] },
       });
     }
+    expect(tools.find(({ name }) => name === "workbench_open_file")?._meta).toMatchObject({
+      "openai/ui": { entrypoints: [{ type: "file", extensions: [".showai-ref"] }] },
+    });
+    expect(tools.find(({ name }) => name === "card_present")?._meta?.ui).toMatchObject({
+      resourceUri: expect.stringMatching(/^ui:\/\/showai\/workbench-card-/),
+      visibility: ["model", "app"],
+    });
     return tools.length;
   } finally {
     child.kill();

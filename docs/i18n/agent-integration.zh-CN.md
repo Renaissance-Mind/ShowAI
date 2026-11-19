@@ -88,6 +88,8 @@ npm run package:plugin -- --mcp-url https://agent.example.com/mcp --out /absolut
 
 ## 已保存页面的展示约定
 
+从 ShowAI「设置 → 插件」安装或更新 Codex 插件。要在对话中发一张已保存页面的卡片，调用 `card_present({projectId,pageId})`。点击「打开原页」后，Codex 打开本机的 `.showai-ref` 引用文件，ShowAI 文件查看器从当前内容库读取原页。宿主未提供本机文件打开能力时，卡片可以展开为编辑器。
+
 `page_present({projectId,pageId,blockIds?})` 捕获一个源版本，返回身份/hash/revision，不修改 Page。HTML/source 始终完整；blockIds 只选择 inline 预览。临时构建失败会清理中间目录。
 
 本机输出使用 SHOWAI_PRESENTATION_DIR 或预览目录；HTTP 返回过期下载链接。匿名 presentation_source 无法读取私有源。本机呈现 synchronization.state:not_checked，不主动同步；HTTP 返回实际同步回执。page_export 的局部导出则连同源 JSON 都是局部内容。

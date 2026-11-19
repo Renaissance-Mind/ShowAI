@@ -7,7 +7,8 @@ import { join } from "node:path";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
 import { expect, it } from "vitest";
-import { codexWorkbenchUri, codexWorkbenchThreadUri } from "./codex-workbench-ui";
+import { codexWorkbenchUri, codexWorkbenchThreadUri, codexWorkbenchFileUri, codexWorkbenchCardUri } from "./codex-workbench-ui";
+import { codexPageReferenceExtension } from "./codex-page-reference";
 import type { ShowDocument } from "../types";
 
 type SavedPage = { document: ShowDocument; hash: string; revision?: string };
@@ -50,6 +51,28 @@ it("opens both Codex workbench entries and saves into the MCP library", async ()
     expect(tools.find((tool) => tool.name === "workbench_open_page")?._meta).toMatchObject({
       ui: { resourceUri: codexWorkbenchThreadUri, visibility: ["app"] },
       "openai/ui": { entrypoints: [{ type: "thread" }] },
+    });
+    expect(tools.find((tool) => tool.name === "workbench_open_file")?._meta).toMatchObject({
+      ui: { resourceUri: codexWorkbenchFileUri, visibility: ["app"] },
+      "openai/ui": { entrypoints: [{ type: "file", extensions: [codexPageReferenceExtension] }] },
+    });
+    for (const name of ["card_present", "workbench_page_reference"]) {
+      expect(tools.find((tool) => tool.name === name)?._meta?.ui)
+        .toEqual({ resourceUri: codexWorkbenchCardUri, visibility: ["model", "app"] });
+    }
+    const cardResource = await client.readResource({ uri: codexWorkbenchCardUri });
+    expect(cardResource.contents[0]).toMatchObject({
+      mimeType: "text/html;profile=mcp-app",
+      text: expect.stringContaining('id="showai-page-card"'),
+      _meta: { "openai/ui": { availableDisplayModes: ["inline", "fullscreen"], preferredDisplayMode: "inline" } },
+    });
+    expect(cardResource.contents[0]).toHaveProperty(
+      "text", expect.stringContaining('"ui/request-display-mode"'),
+    );
+    const fileResource = await client.readResource({ uri: codexWorkbenchFileUri });
+    expect(fileResource.contents[0]).toMatchObject({
+      mimeType: "text/html;profile=mcp-app",
+      text: expect.stringContaining("const useFileEntrypoint = true"),
     });
     expect(tools.find((tool) => tool.name === "show_component")?._meta?.ui)
       .toEqual({ resourceUri: "ui://showai/component-v2.html" });
@@ -175,6 +198,56 @@ it("opens both Codex workbench entries and saves into the MCP library", async ()
     expect(fromMcp.structuredContent).toMatchObject({
       data: { document: { id: pageId, title: "Edited in workbench" }, hash: saved.hash },
     });
+    const referenceFile = await client.callTool({
+      name: "workbench_page_reference",
+      arguments: { projectId, pageId },
+    });
+    expect(referenceFile.isError, JSON.stringify(referenceFile.content)).not.toBe(true);
+    const data = (referenceFile.structuredContent as {
+      data: { path: string; title: string; projectId: string; pageId: string };
+    }).data;
+    expect(data).toMatchObject({ title: "Edited in workbench", projectId, pageId });
+    expect(referenceFile._meta?.showaiPageCard)
+      .toEqual(data);
+    expect(data.path.endsWith(codexPageReferenceExtension)).toBe(true);
+    expect(referenceFile.content).toEqual(expect.arrayContaining([
+      expect.objectContaining({ type: "resource_link", uri: pathToFileURL(data.path).href }),
+    ]));
+    const source = await readFile(data.path, "utf8");
+    expect(JSON.parse(source)).toEqual({
+      format: "showai-page-reference", version: 1, projectId, pageId,
+    });
+    const card = await client.callTool({ name: "card_present", arguments: { projectId, pageId } });
+    expect(card.isError).not.toBe(true);
+    expect(card.structuredContent).toEqual({
+      ok: true, data: { projectId, pageId, title: data.title },
+    });
+    const cardTarget = card._meta?.showaiPageCard as typeof data;
+    expect(await readFile(cardTarget.path, "utf8")).toBe(source);
+    expect(card.content).toHaveLength(1);
+    const fileLaunch = await client.callTool({
+      name: "workbench_open_file",
+      arguments: {
+        file: { name: "ShowAI - Edited in workbench.showai-ref", resourceUri: "host-resource://reference-file" },
+      },
+    });
+    expect(fileLaunch.isError, JSON.stringify(fileLaunch.content)).not.toBe(true);
+    const fileUrl = new URL((fileLaunch._meta!.showaiWorkbench as { url: string }).url);
+    expect(fileUrl.searchParams.get("codexMode")).toBe("thread");
+    expect(fileUrl.origin).toBe(threadUrl.origin);
+    expect(await workbenchTool(client, "workbench_resolve_reference", { source }))
+      .toEqual({ projectId, pageId });
+    for (const invalid of [
+      "{",
+      JSON.stringify({ ...JSON.parse(source), version: 2 }),
+      JSON.stringify({ ...JSON.parse(source), pageId: "not-a-saved-page" }),
+      JSON.stringify({ ...JSON.parse(source), projectId: "../another-library" }),
+    ]) {
+      const rejected = await client.callTool({
+        name: "workbench_resolve_reference", arguments: { source: invalid },
+      });
+      expect(rejected.isError).toBe(true);
+    }
   } finally {
     await client.close();
     await rm(root, { recursive: true, force: true });

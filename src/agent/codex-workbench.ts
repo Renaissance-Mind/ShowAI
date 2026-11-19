@@ -4,10 +4,20 @@ import { z } from "zod";
 import lightLogo from "../../plugins/showai/assets/logo.svg?raw";
 import darkLogo from "../../plugins/showai/assets/logo-dark.svg?raw";
 import { workbenchRoutes, type CodexWorkbenchTransport } from "../host/codex-workbench-transport";
-import { mcpFailure } from "./presentation-tools";
+import { mcpFailure, mcpSuccess } from "./presentation-tools";
+import type { AgentService } from "./service";
+import {
+  codexPageIdentity,
+  codexPageReferenceExtension,
+  codexPageReferenceMaxLength,
+  resolveCodexPageReference,
+  writeCodexPageReference,
+} from "./codex-page-reference";
 import {
   codexWorkbenchHtml,
   codexWorkbenchUri,
+  codexWorkbenchFileUri,
+  codexWorkbenchCardUri,
   codexWorkbenchThreadUri,
   type CodexWorkbenchMode,
 } from "./codex-workbench-ui";
@@ -33,11 +43,15 @@ const readOnly = { readOnlyHint: true, destructiveHint: false, openWorldHint: fa
 const appOnly = { ui: { visibility: ["app"] } };
 const clientId = z.string().regex(/^[\w-]{1,100}$/);
 
-export function codexWorkbenchConnection(open: OpenCodexWorkbench) {
+export function codexWorkbenchConnection(
+  open: OpenCodexWorkbench,
+  service: AgentService,
+  presentationDirectory?: string,
+) {
   return {
     icons: codexWorkbenchIcons,
     configure(server: McpServer) {
-      registerCodexWorkbench(server, open);
+      registerCodexWorkbench(server, open, service, presentationDirectory);
       process.stdin.once("end", () =>
         void server.close().catch((error) => console.error("ShowAI MCP shutdown:", error)),
       );
@@ -45,7 +59,12 @@ export function codexWorkbenchConnection(open: OpenCodexWorkbench) {
   };
 }
 
-function registerCodexWorkbench(server: McpServer, open: OpenCodexWorkbench) {
+function registerCodexWorkbench(
+  server: McpServer,
+  open: OpenCodexWorkbench,
+  service: AgentService,
+  presentationDirectory?: string,
+) {
   const key = randomBytes(32).toString("hex");
   let runtime: ReturnType<OpenCodexWorkbench> | undefined;
   const workbench = () => (runtime ??= open(key).catch((error) => {
@@ -66,18 +85,23 @@ function registerCodexWorkbench(server: McpServer, open: OpenCodexWorkbench) {
   ] as const;
   const resources = [
     ...views,
+    { mode: "thread", name: "workbench_file", uri: codexWorkbenchFileUri, entrypoint: "file" },
+    { mode: "thread", name: "workbench_page_card", uri: codexWorkbenchCardUri, entrypoint: "card" },
+    { mode: "thread", name: "workbench_page_card_v1", uri: "ui://showai/workbench-card-v1.html", entrypoint: "card" },
     { mode: undefined, name: "workbench_legacy", uri: legacyWorkbenchUri },
     { mode: "global", name: "workbench_global_v2", uri: "ui://showai/workbench-v2.html" },
     { mode: "thread", name: "workbench_thread_v2", uri: "ui://showai/workbench-thread-v2.html" },
   ] as const;
   const mimeType = "text/html;profile=mcp-app";
-  for (const { mode, name, uri } of resources) {
+  for (const resource of resources) {
+    const { mode, name, uri } = resource;
+    const entrypoint = "entrypoint" in resource ? resource.entrypoint : undefined;
     server.registerResource(name, uri, { mimeType }, async () => {
       return {
         contents: [{
           uri,
           mimeType,
-          text: codexWorkbenchHtml(mode),
+          text: codexWorkbenchHtml(mode, entrypoint, codexWorkbenchIcons[0].src),
           _meta: {
             ui: {
               csp: {
@@ -87,6 +111,9 @@ function registerCodexWorkbench(server: McpServer, open: OpenCodexWorkbench) {
               prefersBorder: false,
               permissions: { clipboardWrite: {} },
             },
+            ...(entrypoint === "card" ? {
+              "openai/ui": { availableDisplayModes: ["inline", "fullscreen"], preferredDisplayMode: "inline" },
+            } : {}),
           },
         }],
       };
@@ -122,6 +149,70 @@ function registerCodexWorkbench(server: McpServer, open: OpenCodexWorkbench) {
       },
     }, () => launch(mode));
   }
+
+  server.registerTool("workbench_open_file", {
+    title: "ShowAI",
+    description: "Open the original Page linked by a ShowAI reference file.",
+    inputSchema: {
+      file: z.object({ name: z.string().min(1), resourceUri: z.string().min(1) }),
+    },
+    annotations: readOnly,
+    _meta: {
+      ui: { resourceUri: codexWorkbenchFileUri, visibility: ["app"] },
+      "openai/ui": {
+        entrypoints: [{ type: "file", extensions: [codexPageReferenceExtension] }],
+      },
+    },
+  }, () => launch("thread"));
+
+  const cardTool = {
+    inputSchema: codexPageIdentity,
+    annotations: readOnly,
+    _meta: { ui: { resourceUri: codexWorkbenchCardUri, visibility: ["model", "app"] } },
+  };
+  async function presentPageCard(
+    { projectId, pageId }: { projectId: string; pageId: string },
+    includeFile: boolean,
+  ) {
+    try {
+      const { file, ...reference } = await writeCodexPageReference(
+        service, presentationDirectory, projectId, pageId,
+      );
+      const identity = { projectId, pageId, title: reference.title };
+      const result = mcpSuccess(includeFile ? reference : identity);
+      return {
+        ...result,
+        content: includeFile ? [...result.content, file] : result.content,
+        _meta: { showaiPageCard: reference },
+      };
+    } catch (error) {
+      return mcpFailure(error);
+    }
+  }
+  server.registerTool("card_present", {
+    ...cardTool,
+    title: "Show a saved ShowAI page card",
+    description: "Display a clickable card for an existing ShowAI Page in this conversation. Its Open original page button opens the saved Page in Codex.",
+  }, (identity) => presentPageCard(identity, false));
+  server.registerTool("workbench_page_reference", {
+    ...cardTool,
+    title: "Create a ShowAI page reference file",
+    description: "Return the local .showai-ref file for a saved Page. Use card_present when the user asks for an interactive card.",
+  }, (identity) => presentPageCard(identity, true));
+
+  server.registerTool("workbench_resolve_reference", {
+    description: "Verify a ShowAI reference file read through the Codex host and locate its saved Page.",
+    inputSchema: { source: z.string().min(1).max(codexPageReferenceMaxLength) },
+    annotations: readOnly,
+    _meta: appOnly,
+  }, async ({ source }) => {
+    try {
+      const page = await resolveCodexPageReference(service, source);
+      return { content: [], _meta: { showaiWorkbenchData: page } };
+    } catch (error) {
+      return mcpFailure(error);
+    }
+  });
 
   server.registerTool("workbench_open", {
     title: "ShowAI",

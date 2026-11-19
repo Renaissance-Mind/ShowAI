@@ -102,6 +102,8 @@ The output creates a `showai-cloud` package from the same Skills/assets, with HT
 
 ## Saved-page presentation contract
 
+Install or update the Codex plugin from ShowAI **Settings → Plugins**. To put a saved Page in a conversation as a card, call `card_present({projectId,pageId})`. The **Open original page** button asks Codex to open a local `.showai-ref` file. The registered ShowAI file viewer reads the original Page from the connected library. Hosts without local file opening can expand the card into the editor.
+
 Local and HTTP MCP share `page_present({projectId,pageId,blockIds?})`. It captures **one source revision**, returns identity/hash/revision, and **leaves the Page unchanged**. **Complete HTML/source contain the whole Page**; blockIds only selects the inline preview. Source and build intermediates use one snapshot, and temporary build directories are cleaned on failure.
 
 Local delivery uses the host-configured `SHOWAI_PRESENTATION_DIR` or the runtime preview directory; HTTP delivery uses expiring artifact URLs.

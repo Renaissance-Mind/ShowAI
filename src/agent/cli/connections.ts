@@ -102,8 +102,10 @@ export const connectionCommands: CommandDeclaration[] = [
         const profile = process.env.SHOWAI_CODEX_WORKBENCH_PROFILE;
         const home = service.store.root;
         const workbench = profile
-          ? (await import("../codex-workbench")).codexWorkbenchConnection(async (key) =>
-              (await loadBrowser()).startCodexWorkbenchBrowser({ home, profile, key }),
+          ? (await import("../codex-workbench")).codexWorkbenchConnection(
+              async (key) => (await loadBrowser()).startCodexWorkbenchBrowser({ home, profile, key }),
+              service,
+              presentationDirectory,
             )
           : undefined;
         await startLibraryMcp({ root: home, presentationDirectory, ...workbench });
