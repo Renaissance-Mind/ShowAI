@@ -186,7 +186,7 @@
     right calc(var(--arrow-edge) + var(--arrow-arm)) center,
     right var(--arrow-edge) center !important;
   padding-inline-end: calc(
-    var(--arrow-edge) + var(--select-arrow-size, 12px) + 7px
+    var(--arrow-edge) + var(--select-arrow-size, 12px) + 8px
   ) !important;
   text-overflow: ellipsis;
 }

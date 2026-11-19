@@ -144,27 +144,44 @@ test("LAN controls align and permission scope has its own interactive panel", as
     .getByRole("button", { name: "配置局域网", exact: true })
     .click();
   await state("lan.setup");
-  const layout = await frame()
-    .locator("#remote-bind-address")
-    .evaluate((select) => {
-      const label = document.querySelector('label[for="remote-bind-address"]')!,
-        refresh = document.querySelector<HTMLButtonElement>(
-          'button[aria-label="刷新地址"]',
-        )!,
-        box = select.getBoundingClientRect(),
-        l = label.getBoundingClientRect(),
-        r = refresh.getBoundingClientRect();
-      return {
-        gap: box.top - l.bottom,
-        arrowSpace: parseFloat(getComputedStyle(select).paddingRight),
-        refreshGap: r.left - box.right,
-        verticalOffset: Math.abs(r.top - box.top),
-      };
-    });
+  const address = frame().locator("#remote-bind-address");
+  const layout = await address.evaluate((select) => {
+    const label = document.querySelector('label[for="remote-bind-address"]')!,
+      refresh = document.querySelector<HTMLButtonElement>(
+        'button[aria-label="刷新地址"]',
+      )!,
+      box = select.getBoundingClientRect(),
+      l = label.getBoundingClientRect(),
+      r = refresh.getBoundingClientRect();
+    return {
+      gap: box.top - l.bottom,
+      arrowSpace: parseFloat(getComputedStyle(select).paddingRight),
+      refreshGap: r.left - box.right,
+      verticalOffset: Math.abs(r.top - box.top),
+    };
+  });
   expect(layout.gap).toBeGreaterThanOrEqual(8);
   expect(layout.arrowSpace).toBeGreaterThanOrEqual(32);
   expect(layout.refreshGap).toBeGreaterThanOrEqual(8);
   expect(layout.verticalOffset).toBeLessThan(1);
+  await address.click();
+  await page.keyboard.press("Escape");
+  const focusStyle = () =>
+    address.evaluate((el) => ({
+      focused: el.matches(":focus"),
+      outline: getComputedStyle(el).outlineStyle,
+      shadow: getComputedStyle(el).boxShadow,
+    }));
+  await expect
+    .poll(focusStyle)
+    .toEqual({ focused: true, outline: "none", shadow: "none" });
+  await frame().getByRole("button", { name: "刷新地址" }).focus();
+  await page.keyboard.press("Shift+Tab");
+  await expect.poll(focusStyle).toMatchObject({
+    focused: true,
+    outline: "none",
+    shadow: expect.stringContaining("inset"),
+  });
   await shot("lan-controls");
   await frame().getByRole("tab", { name: "内容权限", exact: true }).click();
   await state("lan.permissions");
