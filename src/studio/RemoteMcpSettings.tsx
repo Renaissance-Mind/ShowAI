@@ -710,6 +710,7 @@ export default function RemoteMcpSettings({ home }: { home?: string }) {
                                 {t("hostname")}
                               </label>
                               <input
+                                className="showai-input"
                                 id="remote-hostname"
                                 type="url"
                                 value={config.publicUrl}
@@ -724,6 +725,7 @@ export default function RemoteMcpSettings({ home }: { home?: string }) {
                                 {t("tunnelToken")}
                               </label>
                               <input
+                                className="showai-input"
                                 id="remote-tunnel-token"
                                 type="password"
                                 autoComplete="off"
@@ -854,6 +856,7 @@ export default function RemoteMcpSettings({ home }: { home?: string }) {
                         <div className="rm-field rm-short-field">
                           <label htmlFor="remote-local-port">{t("port")}</label>
                           <input
+                            className="showai-input"
                             id="remote-local-port"
                             type="number"
                             min={1024}
@@ -885,6 +888,7 @@ export default function RemoteMcpSettings({ home }: { home?: string }) {
                           <label htmlFor="remote-tool-path">{t("tool")}</label>
                           <div className="rm-input-action">
                             <input
+                              className="showai-input"
                               id="remote-tool-path"
                               value={config.executable}
                               placeholder={
@@ -1179,6 +1183,7 @@ export default function RemoteMcpSettings({ home }: { home?: string }) {
             <div className="rm-field">
               <label htmlFor="remote-plugin-link">{t("binding")}</label>
               <input
+                className="showai-input"
                 id="remote-plugin-link"
                 value={pluginLink}
                 onChange={(event) => setPluginLink(event.target.value)}

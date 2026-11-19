@@ -151,6 +151,7 @@ export function ResourceEditor({
         </div>
         <Field label={t("onlineUrl")}>
           <input
+            className="showai-input"
             type="url"
             placeholder="https://…"
             value={
@@ -169,12 +170,14 @@ export function ResourceEditor({
         </Field>
         <Field label={t("title")}>
           <input
+            className="showai-input"
             value={text(draft.title)}
             onChange={(event) => set("title", event.target.value)}
           />
         </Field>
         <Field label={t("caption")}>
           <textarea
+            className="showai-textarea"
             rows={2}
             value={text(draft.caption)}
             onChange={(event) => set("caption", event.target.value)}
@@ -184,6 +187,7 @@ export function ResourceEditor({
           <>
             <Field label={t("aspectRatio")}>
               <select
+                className="showai-select"
                 value={text(draft.aspectRatio, "16:9")}
                 onChange={(event) => set("aspectRatio", event.target.value)}
               >
@@ -194,6 +198,7 @@ export function ResourceEditor({
             </Field>
             <Field label={t("poster")}>
               <input
+                className="showai-input"
                 value={text(draft.poster)}
                 onChange={(event) => set("poster", event.target.value)}
               />
@@ -204,6 +209,7 @@ export function ResourceEditor({
           <div className="sb-resource-fields">
             <Field label={t("initialPage")}>
               <input
+                className="showai-input"
                 type="number"
                 min={1}
                 value={Number(draft.page ?? 1)}
@@ -212,6 +218,7 @@ export function ResourceEditor({
             </Field>
             <Field label={t("readerHeight")}>
               <input
+                className="showai-input"
                 type="number"
                 min={240}
                 max={1200}

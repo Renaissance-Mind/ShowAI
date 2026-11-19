@@ -140,6 +140,7 @@ export function PackagingDialog({
                         )}
                       </div>
                       <select
+                        className="showai-select"
                         ref={item.id === focus ? focused : undefined}
                         aria-label={t("choiceFor", { name: item.name })}
                         value={choice}

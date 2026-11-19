@@ -134,6 +134,7 @@ export default function ServerResources({
           <label>
             {t("resources.saveTo")}
             <select
+              className="showai-select"
               aria-label={t("resources.saveServer")}
               value={target}
               disabled={disabled || busy}

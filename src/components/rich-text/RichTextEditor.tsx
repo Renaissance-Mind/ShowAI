@@ -2590,6 +2590,7 @@ export default function RichTextEditor({
                       : tn("dialog.noteText")}
                   </span>
                   <textarea
+                    className="showai-textarea"
                     autoFocus
                     rows={4}
                     maxLength={NOTE_MAX}
@@ -2620,6 +2621,7 @@ export default function RichTextEditor({
                       : t("dialog.linkUrl")}
                   </span>
                   <input
+                    className="showai-input"
                     autoFocus
                     type="text"
                     placeholder={
@@ -2690,6 +2692,7 @@ export default function RichTextEditor({
                     {t("dialog.imageAlt")} <small>{t("dialog.optional")}</small>
                   </span>
                   <input
+                    className="showai-input"
                     placeholder={t("dialog.imageAltPlaceholder")}
                     value={dialog.alt}
                     onChange={(event) =>

@@ -128,6 +128,7 @@ export default function AccountLogin({
             )}
           </span>
           <input
+            className="showai-input"
             type="url"
             aria-label={t("serverUrl")}
             value={url}
@@ -253,6 +254,7 @@ export default function AccountLogin({
               <label className="sync-field">
                 <span>{t("account")}</span>
                 <input
+                  className="showai-input"
                   required
                   autoComplete="username"
                   value={account}
@@ -264,6 +266,7 @@ export default function AccountLogin({
             <label className="sync-field">
               <span>{method === "token" ? t("token") : t("password")}</span>
               <input
+                className="showai-input"
                 required
                 type="password"
                 ref={credential}
@@ -285,6 +288,7 @@ export default function AccountLogin({
               <label className="sync-field">
                 <span>{t("registrationKey")}</span>
                 <input
+                  className="showai-input"
                   required
                   type="password"
                   value={registrationKey}

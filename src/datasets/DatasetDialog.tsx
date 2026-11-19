@@ -154,6 +154,7 @@ function SyncCopy({
     >
       <label>
         <input
+          className="showai-checkbox"
           ref={input}
           type="checkbox"
           checked={on}
@@ -486,6 +487,7 @@ function BindingEditor({
       <label>
         {t("bindingJson")}
         <textarea
+          className="showai-textarea"
           value={text}
           spellCheck={false}
           rows={Math.min(24, Math.max(8, text.split("\n").length))}
@@ -557,6 +559,7 @@ function BoundSettings({
           <label>
             {t("name")}
             <input
+              className="showai-input"
               value={name}
               onChange={(event) => setName(event.target.value)}
               disabled={scope.readOnly}
@@ -719,6 +722,7 @@ function BindChoices({
       {keys.map((key) => (
         <label key={key}>
           <input
+            className="showai-checkbox"
             type="checkbox"
             checked={local.includes(key)}
             onChange={() => toggle(key)}
@@ -834,6 +838,7 @@ function BindChoices({
         <label>
           {t("name")}
           <input
+            className="showai-input"
             value={name}
             onChange={(event) => setName(event.target.value)}
           />
@@ -868,6 +873,7 @@ function BindChoices({
               <li key={summary.id}>
                 <label>
                   <input
+                    className="showai-radio"
                     type="radio"
                     name="dataset"
                     checked={chosen === summary.id}
@@ -911,6 +917,7 @@ function BindChoices({
             <div className="dataset-modes" role="radiogroup">
               <label>
                 <input
+                  className="showai-radio"
                   type="radio"
                   checked={mode === "props"}
                   onChange={() => setMode("props")}
@@ -920,6 +927,7 @@ function BindChoices({
               {request.kind === "database" && (
                 <label>
                   <input
+                    className="showai-radio"
                     type="radio"
                     checked={mode === "rows"}
                     onChange={() => setMode("rows")}
@@ -929,6 +937,7 @@ function BindChoices({
               )}
               <label>
                 <input
+                  className="showai-radio"
                   type="radio"
                   checked={mode === "advanced"}
                   onChange={() => setMode("advanced")}

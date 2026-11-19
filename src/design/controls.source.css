@@ -1,0 +1,385 @@
+@plugin "daisyui" {
+  include: button, input, textarea, select, checkbox, radio, range;
+  themes: false;
+  prefix: "sac-";
+  logs: false;
+}
+
+@layer showai-reset, showai-controls;
+
+/* Let host layouts choose widths, densities and action variants. */
+@layer showai-controls {
+  :is(.showai-button, .studio-button, .settings-button, .rm-button) {
+    @apply sac-btn;
+  }
+  .showai-select {
+    @apply sac-select;
+  }
+  .showai-input {
+    @apply sac-input;
+  }
+  .showai-textarea {
+    @apply sac-textarea;
+  }
+  .showai-checkbox {
+    @apply sac-checkbox;
+  }
+  .showai-radio {
+    @apply sac-radio;
+  }
+  .showai-range {
+    @apply sac-range;
+  }
+
+  :is(
+    .showai-button,
+    .studio-button,
+    .settings-button,
+    .rm-button,
+    .showai-select,
+    .showai-input,
+    .showai-textarea,
+    .showai-checkbox,
+    .showai-radio,
+    .showai-range
+  ) {
+    --color-base-100: var(--paper, white);
+    --color-base-200: var(--hover, #f5f5f5);
+    --color-base-300: var(--line, #ddd);
+    --color-base-content: var(--text, #222);
+    --color-neutral: var(--text, #222);
+    --color-neutral-content: var(--paper, white);
+    --control-border-width: 1px;
+    --depth: 0;
+    --noise: 0;
+    --sac-fx-noise: none;
+    --radius-field: var(--radius-control, 8px);
+    --radius-selector: 5px;
+    --radius-box: 8px;
+    --size-field: 3.6px;
+    --size-selector: 3px;
+    box-sizing: border-box;
+    max-width: 100%;
+    font-family: inherit;
+    color: var(--text, #222);
+  }
+  :is(.showai-input, .showai-select, .showai-textarea) {
+    width: auto;
+    min-width: 0;
+    font-size: inherit;
+    border-color: color-mix(
+      in srgb,
+      var(--text, #222) 24%,
+      var(--paper, white)
+    );
+    box-shadow: none;
+  }
+  .showai-textarea {
+    min-height: 5em;
+    height: auto;
+  }
+  .showai-select {
+    display: inline-block;
+    cursor: pointer;
+  }
+  :is(.showai-button, .studio-button, .settings-button, .rm-button) {
+    height: auto;
+    min-height: 34px;
+    padding: 6px 12px;
+    gap: 7px;
+    border: 1px solid var(--line, #ddd);
+    background: var(--paper, white);
+    color: var(--text, #222);
+    font-size: 13px;
+    line-height: 1.4;
+    font-weight: 550;
+    box-shadow: none;
+    text-shadow: none;
+    transform: none;
+    /* Keep disabled controls available to pointer hit-testing and tooltips. */
+    pointer-events: auto;
+  }
+  :is(
+      .showai-button,
+      .studio-button,
+      .settings-button,
+      .rm-button
+    ):hover:enabled {
+    background-color: var(--hover, #f5f5f5);
+  }
+  .showai-button.primary {
+    background-color: var(--action, #120a8f);
+    border-color: transparent;
+    color: white;
+  }
+  .showai-button.primary:hover:enabled {
+    background-color: var(--action-hover, #0d076b);
+  }
+  :is(.showai-radio, .showai-checkbox) {
+    width: 17px;
+    height: 17px;
+    padding: 2px;
+    border-color: color-mix(
+      in srgb,
+      var(--text, #222) 44%,
+      var(--paper, white)
+    );
+    background-color: var(--paper, white);
+    box-shadow: none;
+  }
+  .showai-checkbox:checked,
+  .showai-checkbox:indeterminate {
+    background: var(--dialog-accent, #120a8f);
+    border-color: transparent;
+    color: var(--paper, white);
+  }
+  .showai-radio:checked {
+    --sac-input-color: var(--dialog-accent, #120a8f);
+    color: var(--dialog-accent, #120a8f);
+    border-color: currentColor;
+  }
+  .showai-radio:checked {
+    animation: none;
+  }
+  .showai-checkbox::before {
+    transition: opacity 100ms ease-out;
+  }
+  .showai-range {
+    width: 100%;
+    color: var(--dialog-accent, #120a8f);
+    --sac-range-thumb: var(--paper, white);
+    --sac-range-bg: var(--line, #ddd);
+    --sac-range-fill: 0;
+    --sac-range-p: 3px;
+    --sac-range-thumb-size: 16px;
+  }
+  .showai-range::-webkit-slider-runnable-track {
+    height: 4px;
+  }
+  .showai-range::-moz-range-track {
+    height: 4px;
+  }
+}
+
+/* Keep one arrow even where a compact layout supplies its own padding or background. */
+.showai-select:not([multiple]):is(:not([size]), [size="0"], [size="1"]) {
+  --arrow-arm: calc(var(--select-arrow-size, 12px) / 2);
+  --arrow-edge: var(--select-arrow-inset, 12px);
+  --arrow-ink: var(--muted, #646a75);
+  appearance: none !important;
+  background-image:
+    linear-gradient(
+      45deg,
+      transparent 38%,
+      var(--arrow-ink) 42% 58%,
+      transparent 62%
+    ),
+    linear-gradient(
+      135deg,
+      transparent 38%,
+      var(--arrow-ink) 42% 58%,
+      transparent 62%
+    ) !important;
+  background-size: var(--arrow-arm) var(--arrow-arm) !important;
+  background-repeat: no-repeat !important;
+  background-position:
+    right calc(var(--arrow-edge) + var(--arrow-arm)) center,
+    right var(--arrow-edge) center !important;
+  padding-inline-end: calc(
+    var(--arrow-edge) + var(--select-arrow-size, 12px) + 7px
+  ) !important;
+  text-overflow: ellipsis;
+}
+.showai-select:dir(rtl):not([multiple]):is(
+    :not([size]),
+    [size="0"],
+    [size="1"]
+  ) {
+  background-position:
+    left var(--arrow-edge) center,
+    left calc(var(--arrow-edge) + var(--arrow-arm)) center !important;
+}
+.showai-select:is([multiple], [size]:not([size="0"], [size="1"])) {
+  appearance: auto;
+  height: auto;
+  padding-inline-end: 8px;
+  background-image: none;
+}
+.showai-select::picker(select) {
+  appearance: auto;
+}
+:where(
+  .rich-format-select,
+  .board-label-size,
+  .sb-cell-select,
+  .sb-field,
+  .editor-toolbar,
+  .sync-members-table
+) {
+  --select-arrow-size: 10px;
+  --select-arrow-inset: 8px;
+}
+
+/* Pointer focus uses the resting surface. Keyboard focus leaves a line inside it. */
+:is(
+  .showai-select,
+  .showai-button,
+  .studio-button,
+  .settings-button,
+  .rm-button,
+  .showai-checkbox,
+  .showai-radio,
+  .showai-range,
+  .studio-icon,
+  .settings-icon-button,
+  .rm-icon-button,
+  .rm-switch,
+  .editor-tool,
+  .canvas-icon-button,
+  .studio-dialog-actions button,
+  .sync-flat-tabs button,
+  .rm-segmented button,
+  .settings-nav button,
+  .studio-main-nav button,
+  .studio [role="tab"]
+):focus {
+  outline: none !important;
+  box-shadow: none !important;
+  &:focus-visible {
+    box-shadow: var(
+      --control-keyboard-line,
+      inset 0 -2px var(--dialog-accent, #120a8f)
+    ) !important;
+    :root[data-showai-focus-managed]:not([data-keyboard-focus]) & {
+      box-shadow: none !important;
+    }
+    @media (forced-colors: active) {
+      outline: 2px solid Highlight !important;
+      outline-offset: -2px;
+    }
+  }
+}
+.showai-select:open:not(:focus-visible) {
+  outline: none !important;
+  box-shadow: none !important;
+}
+:is(
+  .showai-button,
+  .studio-button,
+  .settings-button,
+  .rm-button,
+  .studio-dialog-actions button
+):is(.primary, .sync-primary, .danger) {
+  --control-keyboard-line: inset 0 -2px currentColor;
+}
+:is(.showai-checkbox, .showai-radio, .showai-range, .rm-switch) {
+  --control-keyboard-line: 0 3px 0 -1px var(--dialog-accent, #120a8f);
+}
+:is(.showai-input, .showai-textarea):focus:not(:read-only) {
+  outline: none !important;
+  border-color: var(--dialog-accent, #120a8f);
+  box-shadow: 0 0 0 3px
+    color-mix(in srgb, var(--dialog-accent, #120a8f) 14%, transparent);
+}
+:is(
+  .showai-select,
+  .showai-input,
+  .showai-textarea,
+  .showai-checkbox,
+  .showai-radio,
+  .showai-range,
+  .showai-button,
+  .studio-button,
+  .settings-button,
+  .rm-button
+):is(:disabled, [aria-disabled="true"]) {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+@media (prefers-reduced-motion: no-preference) {
+  :is(
+    .showai-select,
+    .showai-input,
+    .showai-textarea,
+    .showai-checkbox,
+    .showai-radio,
+    .showai-button,
+    .studio-button,
+    .settings-button,
+    .rm-button,
+    .editor-tool,
+    .rm-switch
+  ) {
+    transition-property:
+      color, background-color, border-color, box-shadow, transform;
+    transition-duration: var(--duration-fast, 140ms);
+    transition-timing-function: var(--ease-out, ease-out);
+  }
+  :is(
+      .showai-button,
+      .studio-button,
+      .settings-button,
+      .rm-button,
+      .editor-tool
+    ):active:enabled:not([aria-disabled="true"]) {
+    transform: translateY(1px);
+  }
+}
+@media (hover: hover) {
+  :is(.showai-select, .showai-input, .showai-textarea):hover:enabled:not(
+      :focus
+    ) {
+    border-color: color-mix(
+      in srgb,
+      var(--text, #222) 38%,
+      var(--paper, white)
+    );
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  :is(
+    .showai-select,
+    .showai-input,
+    .showai-textarea,
+    .showai-checkbox,
+    .showai-radio,
+    .showai-range,
+    .showai-button,
+    .studio-button,
+    .settings-button,
+    .rm-button,
+    .rm-switch,
+    .editor-tool
+  ),
+  :is(.showai-checkbox, .showai-radio, .rm-switch)::before,
+  .rm-switch > span {
+    transition: none !important;
+    animation: none !important;
+  }
+  :is(
+    .showai-button,
+    .studio-button,
+    .settings-button,
+    .rm-button,
+    .editor-tool
+  ):active {
+    transform: none !important;
+  }
+}
+@media (forced-colors: active) {
+  .showai-select:not([multiple]):is(:not([size]), [size="0"], [size="1"]) {
+    appearance: auto !important;
+    background-image: none !important;
+    padding-inline-end: 6px !important;
+  }
+  :is(.showai-radio, .showai-checkbox, .showai-range) {
+    appearance: auto;
+  }
+  :is(.showai-radio, .showai-checkbox)::before {
+    display: none;
+  }
+  :is(.showai-input, .showai-textarea):focus-visible {
+    outline: 2px solid Highlight !important;
+    outline-offset: -2px;
+  }
+}

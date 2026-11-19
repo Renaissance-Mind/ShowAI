@@ -198,6 +198,7 @@ function ColumnSettings({
   return (
     <>
       <select
+        className="showai-select"
         aria-label={t("propertyType", { name: column.name || t("property") })}
         value={key}
         onChange={(event) =>
@@ -271,6 +272,7 @@ function AddProperty({
     >
       <Plus size={13} aria-hidden="true" />
       <input
+        className="showai-input"
         aria-label={t("propertyName")}
         placeholder={t("propertyName")}
         value={draft.name}
@@ -1113,6 +1115,7 @@ export function DatabaseBlock({ data, onChange, readOnly }: BlockProps) {
                 <div className="sb-board-grouping sb-view-settings">
                   {views.length > 1 && (
                     <input
+                      className="showai-input"
                       aria-label={t("viewName")}
                       value={draftViewName ?? savedView.name}
                       maxLength={200}
@@ -1147,6 +1150,7 @@ export function DatabaseBlock({ data, onChange, readOnly }: BlockProps) {
                 <div className="sb-board-grouping">
                   <span>{t("groupBy")}</span>
                   <select
+                    className="showai-select"
                     aria-label={t("boardGroupProperty")}
                     value={groupColumn?.id ?? ""}
                     onChange={(event) =>
@@ -1198,6 +1202,7 @@ export function DatabaseBlock({ data, onChange, readOnly }: BlockProps) {
                       <label key={key}>
                         <span>{t(label)}</span>
                         <select
+                          className="showai-select"
                           value={calendar[key]?.id ?? ""}
                           onChange={(event) =>
                             setCalendarChoice((current) => ({
@@ -1292,6 +1297,7 @@ export function DatabaseBlock({ data, onChange, readOnly }: BlockProps) {
             <div className="sb-editor-panel">
               <Field label={t("databaseName")}>
                 <input
+                  className="showai-input"
                   value={draftTitle}
                   onChange={(event) => setDraftTitle(event.target.value)}
                 />
@@ -1318,6 +1324,7 @@ export function DatabaseBlock({ data, onChange, readOnly }: BlockProps) {
                       <GripVertical size={14} />
                     </button>
                     <input
+                      className="showai-input"
                       aria-label={t("propertyName")}
                       value={column.name}
                       onChange={(event) =>

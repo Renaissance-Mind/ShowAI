@@ -182,6 +182,7 @@ export default function SyncDashboard({
         </div>
         {managed.length > 5 && (
           <input
+            className="showai-input"
             aria-label={t("searchManagedProjects")}
             placeholder={t("searchProjects")}
             value={query}
@@ -189,7 +190,7 @@ export default function SyncDashboard({
           />
         )}
         <select
-          className="sync-mobile-project-select"
+          className="showai-select sync-mobile-project-select"
           aria-label={t("switchManagedProject")}
           disabled={busy || !managed.length}
           value={selectedId}
@@ -263,6 +264,7 @@ export default function SyncDashboard({
                 </button>
               </div>
               <input
+                className="showai-input"
                 ref={nameInput}
                 id="sync-new-project"
                 aria-label={t("newProjectName")}
@@ -355,6 +357,7 @@ export default function SyncDashboard({
                         </td>
                         <td>
                           <select
+                            className="showai-select"
                             aria-label={t("memberRoleFor", {
                               name: member.name,
                             })}
@@ -456,6 +459,7 @@ export default function SyncDashboard({
                 <label>
                   <span>{t("roleAfterJoin")}</span>
                   <select
+                    className="showai-select"
                     aria-label={t("inviteRole")}
                     value={inviteRole}
                     disabled={busy}
@@ -469,6 +473,7 @@ export default function SyncDashboard({
                 <label className="sync-field">
                   <span>{f("days")}</span>
                   <select
+                    className="showai-select"
                     aria-label={f("days")}
                     value={days}
                     disabled={busy}
@@ -486,6 +491,7 @@ export default function SyncDashboard({
                     <label>
                       <span>{t("inviteUses")}</span>
                       <select
+                        className="showai-select"
                         aria-label={t("inviteUsesLimit")}
                         value={inviteUses}
                         disabled={busy}
@@ -504,6 +510,7 @@ export default function SyncDashboard({
                     <label>
                       <span>{t("targetAccount")}</span>
                       <input
+                        className="showai-input"
                         aria-label={t("targetAccountLabel")}
                         placeholder={t("targetAccountPlaceholder")}
                         maxLength={100}
@@ -543,6 +550,7 @@ export default function SyncDashboard({
                   <label htmlFor="sync-generated-link">{t("inviteLink")}</label>
                   <div>
                     <input
+                      className="showai-input"
                       id="sync-generated-link"
                       aria-label={t("generatedInviteLink")}
                       readOnly

@@ -86,6 +86,7 @@ export function ManualOutlineEditor({
         <li key={entry.id}>
           <div className="outline-manual-row">
             <input
+              className="showai-input"
               aria-label={t("entryTitle")}
               value={entry.title ?? ""}
               placeholder={
@@ -97,6 +98,7 @@ export function ManualOutlineEditor({
               }
             />
             <select
+              className="showai-select"
               aria-label={t("entryTarget")}
               value={entry.nodeId ?? ""}
               onChange={(event) =>

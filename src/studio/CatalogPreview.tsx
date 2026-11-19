@@ -194,6 +194,7 @@ export default function CatalogPreview({
             {zoomOpen && (
               <div className="catalog-zoom-popover">
                 <input
+                  className="showai-range"
                   type="range"
                   min="5"
                   max="300"

@@ -108,6 +108,7 @@ function StepView({
                 {togglePart && onHide && (
                   <label className="wk-switch">
                     <input
+                      className="showai-checkbox"
                       type="checkbox"
                       checked={hidden}
                       onChange={(event) => onHide(event.target.checked)}

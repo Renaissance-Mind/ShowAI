@@ -2,7 +2,6 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import {
   Bot,
   Check,
-  ChevronDown,
   Download,
   Loader2,
   Plus,
@@ -506,6 +505,7 @@ export default function AgentSettings({
                       <span className="agent-current">{t("current")}</span>
                     )}
                     <input
+                      className="showai-radio"
                       type="radio"
                       name="local-agent"
                       aria-label={agent.name}
@@ -719,6 +719,7 @@ export default function AgentSettings({
                 )}
                 <div className="settings-select">
                   <select
+                    className="showai-select"
                     aria-label={t("currentSourceLabel")}
                     value={status.settings.sourceId}
                     disabled={busy}
@@ -744,7 +745,6 @@ export default function AgentSettings({
                         </option>
                       ))}
                   </select>
-                  <ChevronDown size={14} />
                 </div>
               </div>
             )}
@@ -855,6 +855,7 @@ export default function AgentSettings({
                 <label>
                   {t("name")}
                   <input
+                    className="showai-input"
                     required
                     value={editing.name}
                     onChange={(event) =>
@@ -867,6 +868,7 @@ export default function AgentSettings({
                     <label>
                       {t("apiUrl")}
                       <input
+                        className="showai-input"
                         type="url"
                         required
                         value={editing.baseUrl}
@@ -883,6 +885,7 @@ export default function AgentSettings({
                       <label>
                         {t("protocol")}
                         <select
+                          className="showai-select"
                           value={editing.protocol}
                           onChange={(event) =>
                             setEditing({
@@ -900,6 +903,7 @@ export default function AgentSettings({
                     <label>
                       {t("apiKey")}
                       <input
+                        className="showai-input"
                         type="password"
                         autoComplete="new-password"
                         value={key}
@@ -916,6 +920,7 @@ export default function AgentSettings({
                 <label>
                   {t("modelName")}
                   <input
+                    className="showai-input"
                     list="agent-model-options"
                     value={editing.model}
                     onChange={(event) =>

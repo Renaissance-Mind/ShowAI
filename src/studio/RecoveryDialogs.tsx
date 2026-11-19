@@ -366,6 +366,7 @@ export function LibrarySearchResults({
     <section aria-label={t("searchResults")}>
       <div className="history-toolbar">
         <select
+          className="showai-select"
           aria-label={t("searchKind")}
           value={kind}
           onChange={(event) => setKind(event.target.value)}
@@ -623,7 +624,7 @@ export function ExternalConflictDialog({
             ) : (
               <textarea
                 aria-label={t("externalMergeResult")}
-                className="history-resolution"
+                className="showai-textarea history-resolution"
                 value={resolved}
                 onChange={(event) => setResolved(event.target.value)}
                 spellCheck={false}

@@ -382,12 +382,14 @@ export function GalleryBlock({ data, onChange, readOnly }: BlockProps) {
             <div className="sb-form-row">
               <Field label={t("title")}>
                 <input
+                  className="showai-input"
                   value={draftTitle}
                   onChange={(event) => setDraftTitle(event.target.value)}
                 />
               </Field>
               <Field label={t("arrangement")}>
                 <select
+                  className="showai-select"
                   value={draftColumns}
                   onChange={(event) =>
                     setDraftColumns(Number(event.target.value))
@@ -415,6 +417,7 @@ export function GalleryBlock({ data, onChange, readOnly }: BlockProps) {
                 <div className="sb-gallery-editor-fields">
                   <Field label={t("imageAddress", { index: index + 1 })}>
                     <input
+                      className="showai-input"
                       value={
                         item.src.startsWith("data:")
                           ? t("embeddedImage")
@@ -434,6 +437,7 @@ export function GalleryBlock({ data, onChange, readOnly }: BlockProps) {
                   </Field>
                   <Field label={t("altText")}>
                     <input
+                      className="showai-input"
                       value={item.alt}
                       onChange={(event) =>
                         updateImage(index, { alt: event.target.value })
@@ -442,6 +446,7 @@ export function GalleryBlock({ data, onChange, readOnly }: BlockProps) {
                   </Field>
                   <Field label={t("caption")}>
                     <input
+                      className="showai-input"
                       value={item.caption}
                       onChange={(event) =>
                         updateImage(index, { caption: event.target.value })

@@ -174,6 +174,7 @@ export function OutlineSettings({
       <div className="page-outline-settings-body">
         <label className="page-outline-enable">
           <input
+            className="showai-checkbox"
             type="checkbox"
             checked={draft.enabled}
             onChange={(event) =>
@@ -185,6 +186,7 @@ export function OutlineSettings({
         <label>
           {t("renderer")}
           <select
+            className="showai-select"
             aria-label={t("renderer")}
             value={selected}
             disabled={busy}
@@ -213,6 +215,7 @@ export function OutlineSettings({
           <label>
             {t("props")}
             <textarea
+              className="showai-textarea"
               aria-label={t("props")}
               rows={5}
               spellCheck={false}
@@ -225,6 +228,7 @@ export function OutlineSettings({
           <label>
             {t("source")}
             <select
+              className="showai-select"
               aria-label={t("source")}
               value={draft.source.mode}
               onChange={(event) => mode(event.target.value)}
@@ -237,6 +241,7 @@ export function OutlineSettings({
             <label>
               {t("depth")}
               <select
+                className="showai-select"
                 aria-label={t("depth")}
                 value={draft.source.maxLevel}
                 onChange={(event) =>
@@ -277,6 +282,7 @@ export function OutlineSettings({
             )}
           </p>
           <textarea
+            className="showai-textarea"
             aria-label={t("config")}
             rows={8}
             spellCheck={false}
@@ -289,6 +295,7 @@ export function OutlineSettings({
           <label>
             {t("initial")}
             <select
+              className="showai-select"
               value={draft.initialState}
               onChange={(event) =>
                 setDraft({
@@ -308,6 +315,7 @@ export function OutlineSettings({
           <label>
             {t("placement")}
             <select
+              className="showai-select"
               value={draft.placement}
               onChange={(event) =>
                 setDraft({
@@ -328,6 +336,7 @@ export function OutlineSettings({
         <label>
           {t("width")}
           <input
+            className="showai-input"
             type="number"
             min={180}
             max={480}

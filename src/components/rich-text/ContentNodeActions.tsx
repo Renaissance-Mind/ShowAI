@@ -45,6 +45,7 @@ export function ContentNodeActions({
     <label key={key}>
       {label}
       <input
+        className="showai-input"
         value={node.attrs[key] ?? ""}
         onChange={(event) => update(key, event.target.value)}
       />
@@ -113,6 +114,7 @@ export function ContentNodeActions({
             <label key={key}>
               {t(key)}
               <input
+                className="showai-input"
                 inputMode="decimal"
                 value={node.attrs[key] ?? ""}
                 onChange={(event) => {
@@ -138,6 +140,7 @@ export function ContentNodeActions({
           <label>
             {t("fit")}
             <select
+              className="showai-select"
               value={node.attrs.fit ?? "contain"}
               onChange={(event) => update("fit", event.target.value)}
             >
@@ -154,6 +157,7 @@ export function ContentNodeActions({
           <label>
             {t("language")}
             <select
+              className="showai-select"
               value={normalizeCodeLanguage(node.attrs.language)}
               onChange={(event) => update("language", event.target.value)}
             >
@@ -197,6 +201,7 @@ export function ContentNodeActions({
             <label key={key}>
               {t(key)}
               <input
+                className="showai-input"
                 value={style[key] ?? ""}
                 onChange={(event) =>
                   updateStyle(key, event.target.value || undefined)
@@ -208,6 +213,7 @@ export function ContentNodeActions({
             <label key={key}>
               {t(key)}
               <input
+                className="showai-input"
                 type="number"
                 min={key === "fontSize" ? 8 : 0}
                 max="200"

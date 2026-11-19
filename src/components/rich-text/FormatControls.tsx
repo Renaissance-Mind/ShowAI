@@ -124,7 +124,9 @@ export function FormatControls({
   const select = (label: string, children: ReactNode, className = "") => (
     <label className={`rich-format-select ${className}`} title={label}>
       {children}
-      <ChevronDown size={11} aria-hidden="true" />
+      {className === "rich-format-alignment" && (
+        <ChevronDown size={11} aria-hidden="true" />
+      )}
     </label>
   );
 
@@ -160,6 +162,7 @@ export function FormatControls({
         {select(
           t("format.textStyle"),
           <select
+            className="showai-select"
             aria-label={t("format.textStyle")}
             value={
               editor.isActive("heading")
@@ -191,6 +194,7 @@ export function FormatControls({
         {select(
           t("format.font"),
           <select
+            className="showai-select"
             aria-label={t("format.font")}
             value={editor.getAttributes("textStyle").fontFamily ?? ""}
             onChange={(event) =>
@@ -213,6 +217,7 @@ export function FormatControls({
         {select(
           t("format.fontSize"),
           <select
+            className="showai-select"
             aria-label={t("format.fontSize")}
             value={editor.getAttributes("textStyle").fontSize ?? ""}
             onChange={(event) =>
@@ -326,6 +331,7 @@ export function FormatControls({
           <>
             <AlignmentIcon size={16} aria-hidden="true" />
             <select
+              className="showai-select"
               aria-label={t("format.alignment")}
               value={alignment}
               onChange={(event) =>

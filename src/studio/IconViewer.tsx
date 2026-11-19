@@ -263,6 +263,7 @@ export default function IconViewer() {
               <label>
                 {t("size")} <output>{preview.size} px</output>
                 <input
+                  className="showai-range"
                   aria-label={t("sizeLabel")}
                   type="range"
                   min={12}
@@ -277,6 +278,7 @@ export default function IconViewer() {
               <label>
                 {t("stroke")} <output>{preview.stroke}</output>
                 <input
+                  className="showai-range"
                   aria-label={t("strokeLabel")}
                   type="range"
                   min={1}

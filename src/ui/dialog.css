@@ -168,7 +168,7 @@
 .studio-modal
   :is(.studio-dialog-form, .studio-form)
   > label
-  > :is(input, select, textarea):focus {
+  > :is(.showai-input, .showai-textarea):focus:not(:read-only) {
   border-color: var(--dialog-ink);
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--dialog-ink) 12%, transparent);
 }

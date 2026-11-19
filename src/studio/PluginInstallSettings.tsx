@@ -409,7 +409,7 @@ function ManualPath({
         <label className="plugin-manual-label">
           <span>{t("manualPath")}</span>
           <input
-            className="settings-input"
+            className="showai-input settings-input"
             value={path}
             spellCheck={false}
             placeholder={`/…/${command}`}

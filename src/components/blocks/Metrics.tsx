@@ -127,6 +127,7 @@ export function MetricsBlock({ data, onChange, readOnly }: BlockProps) {
           <div className="sb-editor-panel">
             <Field label={t("title")}>
               <input
+                className="showai-input"
                 value={draftTitle}
                 onChange={(event) => setDraftTitle(event.target.value)}
               />
@@ -137,6 +138,7 @@ export function MetricsBlock({ data, onChange, readOnly }: BlockProps) {
                   <div className="sb-form-row">
                     <Field label={t("name")}>
                       <input
+                        className="showai-input"
                         value={item.label}
                         onChange={(event) =>
                           updateItem(index, { label: event.target.value })
@@ -145,6 +147,7 @@ export function MetricsBlock({ data, onChange, readOnly }: BlockProps) {
                     </Field>
                     <Field label={t("value")}>
                       <input
+                        className="showai-input"
                         value={item.value}
                         onChange={(event) =>
                           updateItem(index, { value: event.target.value })
@@ -153,6 +156,7 @@ export function MetricsBlock({ data, onChange, readOnly }: BlockProps) {
                     </Field>
                     <Field label={t("unit")}>
                       <input
+                        className="showai-input"
                         value={item.unit ?? ""}
                         onChange={(event) =>
                           updateItem(index, { unit: event.target.value })
@@ -163,6 +167,7 @@ export function MetricsBlock({ data, onChange, readOnly }: BlockProps) {
                   <div className="sb-form-row">
                     <Field label={t("detail")}>
                       <input
+                        className="showai-input"
                         value={item.detail ?? ""}
                         onChange={(event) =>
                           updateItem(index, { detail: event.target.value })
@@ -171,6 +176,7 @@ export function MetricsBlock({ data, onChange, readOnly }: BlockProps) {
                     </Field>
                     <Field label={t("trend")}>
                       <input
+                        className="showai-input"
                         type="number"
                         value={item.trend ?? ""}
                         onChange={(event) =>

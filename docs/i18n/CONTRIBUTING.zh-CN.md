@@ -49,6 +49,8 @@ npm test        # Vitest 单元与集成测试
 
 已保存的页面、内容库和导出页面的寿命比写入它们的代码更长。修改数据格式、CLI 命令或 MCP 工具时，必须继续读取旧版本写入的内容；检查现有调用方，并在拉取请求中说明兼容方式。在程序的输入边界（I/O、进程、用户输入）处理错误并暴露原因，不要吞掉失败后报告成功。
 
+常规控件使用原生元素和 `showai-select`、`showai-input`、`showai-textarea`、`showai-checkbox`、`showai-radio`、`showai-range` 或 `showai-button` 类。桌面、阅读器和嵌入组件共用这套 daisyUI 样式。调整 `src/design/controls.source.css` 后运行 `npm run controls:generate`。紧凑下拉框可设置 `--select-arrow-inset` 和 `--select-arrow-size`。
+
 各任务可复制[独立界面验收模板](../../examples/ui-acceptance/README.zh-CN.md)，在自己的预览中提供控件编号、可点操作与能直接进入实际状态的流程树。需要在 ShowAI 工作台长期复用的场景见 [UI Lab 手册](ui-lab.zh-CN.md)。
 
 按改动范围运行相关测试：

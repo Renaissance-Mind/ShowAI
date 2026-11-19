@@ -261,12 +261,14 @@ export function ChartBlock({ data, onChange, readOnly }: BlockProps) {
             <div className="sb-form-row">
               <Field label={t("title")}>
                 <input
+                  className="showai-input"
                   value={draftTitle}
                   onChange={(event) => setDraftTitle(event.target.value)}
                 />
               </Field>
               <Field label={t("unit")}>
                 <input
+                  className="showai-input"
                   placeholder={t("unitPlaceholder")}
                   value={draftUnit}
                   onChange={(event) => setDraftUnit(event.target.value)}
@@ -275,7 +277,7 @@ export function ChartBlock({ data, onChange, readOnly }: BlockProps) {
             </div>
             <Field label={t("dataField")}>
               <textarea
-                className="sb-code-input"
+                className="showai-textarea sb-code-input"
                 rows={10}
                 spellCheck={false}
                 value={draft}

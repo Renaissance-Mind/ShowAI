@@ -73,6 +73,7 @@ export function ReferencesBlock({ data, onChange, readOnly }: BlockProps) {
           >
             <Field label={t("title")}>
               <input
+                className="showai-input"
                 value={text(draft.title)}
                 onChange={(event) =>
                   setDraft((current) => ({
@@ -87,6 +88,7 @@ export function ReferencesBlock({ data, onChange, readOnly }: BlockProps) {
                 <legend>{t("entry", { index: index + 1 })}</legend>
                 <Field label={t("entryTitle")}>
                   <input
+                    className="showai-input"
                     value={item.title}
                     onChange={(event) =>
                       change(item.id, "title", event.target.value)
@@ -95,6 +97,7 @@ export function ReferencesBlock({ data, onChange, readOnly }: BlockProps) {
                 </Field>
                 <Field label={t("authors")}>
                   <input
+                    className="showai-input"
                     placeholder={t("authorsPlaceholder")}
                     value={item.authors ?? ""}
                     onChange={(event) =>
@@ -105,6 +108,7 @@ export function ReferencesBlock({ data, onChange, readOnly }: BlockProps) {
                 <div className="sb-resource-fields">
                   <Field label={t("year")}>
                     <input
+                      className="showai-input"
                       value={item.year ?? ""}
                       onChange={(event) =>
                         change(item.id, "year", event.target.value)
@@ -113,6 +117,7 @@ export function ReferencesBlock({ data, onChange, readOnly }: BlockProps) {
                   </Field>
                   <Field label={t("venue")}>
                     <input
+                      className="showai-input"
                       value={item.venue ?? ""}
                       onChange={(event) =>
                         change(item.id, "venue", event.target.value)
@@ -122,6 +127,7 @@ export function ReferencesBlock({ data, onChange, readOnly }: BlockProps) {
                 </div>
                 <Field label="DOI">
                   <input
+                    className="showai-input"
                     placeholder="10.xxxx/…"
                     value={item.doi ?? ""}
                     onChange={(event) =>
@@ -131,6 +137,7 @@ export function ReferencesBlock({ data, onChange, readOnly }: BlockProps) {
                 </Field>
                 <Field label={t("url")}>
                   <input
+                    className="showai-input"
                     type="url"
                     value={item.url ?? ""}
                     onChange={(event) =>
@@ -140,6 +147,7 @@ export function ReferencesBlock({ data, onChange, readOnly }: BlockProps) {
                 </Field>
                 <Field label={t("note")}>
                   <textarea
+                    className="showai-textarea"
                     rows={2}
                     value={item.note ?? ""}
                     onChange={(event) =>

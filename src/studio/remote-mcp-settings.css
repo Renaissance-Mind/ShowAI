@@ -223,21 +223,13 @@
   min-width: 0;
   width: 100%;
   min-height: 38px;
-  padding: 9px 38px 9px 12px;
+  padding: 9px 12px;
   border: 1px solid var(--line);
   border-radius: 6px;
   background: var(--paper);
   color: var(--text);
   font: inherit;
   cursor: pointer;
-}
-.rm-select > svg {
-  position: absolute;
-  right: 13px;
-  top: 50%;
-  transform: translateY(-50%);
-  pointer-events: none;
-  color: var(--muted);
 }
 .rm-short-field {
   max-width: 210px;
@@ -274,20 +266,7 @@
   height: 38px;
 }
 .rm-button {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 7px;
-  min-height: 34px;
-  border: 1px solid var(--line);
-  padding: 7px 12px;
-  border-radius: 6px;
-  font-size: 12px;
-  line-height: 1.5;
-  color: var(--text);
-  background: var(--paper);
   text-decoration: none;
-  white-space: nowrap;
 }
 .rm-button:hover {
   background: var(--surface);

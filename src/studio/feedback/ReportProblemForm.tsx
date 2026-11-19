@@ -179,6 +179,7 @@ export function ReportProblemForm({
         {(["problem", "suggestion", "docs"] as const).map((item) => (
           <label key={item} className={kind === item ? "selected" : undefined}>
             <input
+              className="showai-radio"
               type="radio"
               name={`${id}-kind`}
               value={item}
@@ -194,7 +195,7 @@ export function ReportProblemForm({
       </label>
       <textarea
         id={`${id}-summary`}
-        className="feedback-input"
+        className="showai-textarea feedback-input"
         rows={4}
         placeholder={t("report.summaryHint")}
         value={summary}
@@ -205,7 +206,7 @@ export function ReportProblemForm({
       </label>
       <textarea
         id={`${id}-steps`}
-        className="feedback-input"
+        className="showai-textarea feedback-input"
         rows={3}
         placeholder={t("report.stepsHint")}
         value={steps}

@@ -229,6 +229,7 @@ export function G2ChartBlock({
           <label>
             {t("theme")}{" "}
             <select
+              className="showai-select"
               aria-label={t("chartTheme")}
               value={theme}
               disabled={editing}
@@ -250,6 +251,7 @@ export function G2ChartBlock({
                 <div className="sb-g2-settings">
                   <Field label={t("title")}>
                     <input
+                      className="showai-input"
                       aria-label={t("chartTitle")}
                       value={draftValue.title ?? ""}
                       onChange={(e) => updateDraft({ title: e.target.value })}
@@ -257,6 +259,7 @@ export function G2ChartBlock({
                   </Field>
                   <Field label={t("height")}>
                     <input
+                      className="showai-input"
                       aria-label={t("chartHeight")}
                       type="number"
                       min={200}
@@ -269,6 +272,7 @@ export function G2ChartBlock({
                   </Field>
                   <Field label={t("fontSize")}>
                     <input
+                      className="showai-input"
                       aria-label={t("chartFontSize")}
                       type="number"
                       min={8}
@@ -286,6 +290,7 @@ export function G2ChartBlock({
                   </Field>
                   <Field label={t("lineWidth")}>
                     <input
+                      className="showai-input"
                       aria-label={t("chartLineWidth")}
                       type="number"
                       min={0}
@@ -324,6 +329,7 @@ export function G2ChartBlock({
                 <div className="sb-g2-toggles">
                   <label>
                     <input
+                      className="showai-checkbox"
                       type="checkbox"
                       checked={draftValue.legend !== false}
                       onChange={(e) =>
@@ -334,6 +340,7 @@ export function G2ChartBlock({
                   </label>
                   <label>
                     <input
+                      className="showai-checkbox"
                       type="checkbox"
                       checked={Boolean(draftValue.animation)}
                       onChange={(e) =>
@@ -345,6 +352,7 @@ export function G2ChartBlock({
                   {interactions.map(([key, label]) => (
                     <label key={key}>
                       <input
+                        className="showai-checkbox"
                         type="checkbox"
                         checked={
                           draftValue.interaction?.[key] ??
@@ -369,6 +377,7 @@ export function G2ChartBlock({
               <summary>{t("dataAndAdvanced")}</summary>
               <Field label={t("dataFieldsStyle")}>
                 <textarea
+                  className="showai-textarea"
                   aria-label={t("parametersJson")}
                   value={draft}
                   onChange={(e) => setDraft(e.target.value)}

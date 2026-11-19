@@ -1,3 +1,5 @@
+@layer showai-reset, showai-controls;
+
 :root {
   font-family: "Avenir Next", "PingFang SC", "Microsoft YaHei", sans-serif;
   color: #343a35;
@@ -35,66 +37,69 @@
 body {
   margin: 0;
 }
-button,
-input,
-textarea,
-select {
-  font: inherit;
-  color: inherit;
-}
-button {
-  border: 0;
-  background: none;
-  cursor: pointer;
-  transition:
-    background var(--duration-fast) var(--ease-out),
-    color var(--duration-fast) var(--ease-out);
-}
-@media (hover: hover) {
-  button:hover {
+@layer showai-reset {
+  button,
+  input,
+  textarea,
+  select {
+    font: inherit;
+    color: inherit;
+  }
+  button {
+    border: 0;
+    background: none;
+    cursor: pointer;
+    transition:
+      background var(--duration-fast) var(--ease-out),
+      color var(--duration-fast) var(--ease-out);
+  }
+  @media (hover: hover) {
+    button:hover {
+      background: var(--hover);
+    }
+  }
+  button:active:not(:disabled) {
     background: var(--hover);
   }
+  button:disabled {
+    opacity: 0.45;
+    cursor: default;
+  }
+  button:focus-visible,
+  a:focus-visible,
+  summary:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 3px;
+  }
+  input:is(
+      [type="checkbox"],
+      [type="radio"],
+      [type="range"],
+      [type="color"],
+      [type="file"],
+      [type="button"],
+      [type="submit"],
+      [type="reset"]
+    ):focus-visible,
+  select:focus-visible {
+    outline: 2px solid color-mix(in srgb, var(--accent) 40%, transparent);
+    outline-offset: 2px;
+  }
+  input:not(
+      [type="checkbox"],
+      [type="radio"],
+      [type="range"],
+      [type="color"],
+      [type="file"],
+      [type="button"],
+      [type="submit"],
+      [type="reset"]
+    ):focus,
+  textarea:focus {
+    outline: none;
+  }
 }
-button:active:not(:disabled) {
-  background: var(--hover);
-}
-button:disabled {
-  opacity: 0.45;
-  cursor: default;
-}
-button:focus-visible,
-a:focus-visible,
-summary:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 3px;
-}
-input:is(
-    [type="checkbox"],
-    [type="radio"],
-    [type="range"],
-    [type="color"],
-    [type="file"],
-    [type="button"],
-    [type="submit"],
-    [type="reset"]
-  ):focus-visible,
-select:focus-visible {
-  outline: 2px solid color-mix(in srgb, var(--accent) 40%, transparent);
-  outline-offset: 2px;
-}
-input:not(
-    [type="checkbox"],
-    [type="radio"],
-    [type="range"],
-    [type="color"],
-    [type="file"],
-    [type="button"],
-    [type="submit"],
-    [type="reset"]
-  ):focus,
-textarea:focus {
-  outline: none;
-}
+
 a {
   color: var(--accent);
 }

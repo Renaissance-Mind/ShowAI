@@ -93,6 +93,7 @@ export function AgentExecutionPicker({
             <Globe size={17} />
           )}
           <select
+            className="showai-select"
             aria-label={t("runAgentOn")}
             disabled={disabled || selecting || !context}
             value={context?.destinationId ?? "cloud"}
@@ -263,6 +264,7 @@ export function RemoteDeviceSettings({
         <label className="settings-row">
           {t("deviceName")}
           <input
+            className="showai-input"
             value={state.settings.name}
             onChange={(e) => change({ name: e.target.value })}
           />
@@ -270,6 +272,7 @@ export function RemoteDeviceSettings({
         <label className="settings-row">
           {t("serverAccount")}
           <select
+            className="showai-select"
             value={state.settings.connectionId}
             onChange={(e) =>
               change({ connectionId: e.target.value, projectIds: [] })
@@ -326,6 +329,7 @@ export function RemoteDeviceSettings({
             </div>
           ))}
           <select
+            className="showai-select"
             aria-label={t("addProject")}
             value=""
             disabled={busy || !state.settings.connectionId}

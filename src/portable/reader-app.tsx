@@ -38,6 +38,7 @@ import common from "../i18n/messages/common";
 import "./portable.css";
 import "../design/tokens.css";
 import "../design/content.css";
+import "../design/controls.css";
 
 export interface ReaderHost {
   inlineHost: HTMLElement | null;

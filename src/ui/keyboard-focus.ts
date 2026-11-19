@@ -3,6 +3,7 @@ const navigationKeys =
 
 export function installKeyboardFocus(doc: Document) {
   const root = doc.documentElement;
+  root.dataset.showaiFocusManaged = "";
   const key = (event: KeyboardEvent) => {
     if (!navigationKeys.test(event.key)) return;
     const target = event.composedPath()[0];
@@ -22,6 +23,7 @@ export function installKeyboardFocus(doc: Document) {
   return () => {
     doc.removeEventListener("keydown", key, true);
     doc.removeEventListener("pointerdown", pointer, true);
+    delete root.dataset.showaiFocusManaged;
     pointer();
   };
 }

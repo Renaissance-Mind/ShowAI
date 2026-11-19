@@ -1,3 +1,5 @@
+@layer showai-reset, showai-controls;
+
 :root,
 .studio,
 .studio.settings-view,
@@ -125,52 +127,54 @@
   background-clip: text;
   animation: showai-shimmer 2s linear infinite;
 }
-button,
-input,
-textarea,
-select {
-  font-family: inherit;
-}
-button {
-  transition: var(--duration-fast) var(--ease-out);
-  transition-property: background-color, color, border-color, transform;
-}
-button:focus-visible,
-a:focus-visible,
-summary:focus-visible {
-  outline: 2px solid var(--text);
-  outline-offset: 3px;
-}
-input:is(
-    [type="checkbox"],
-    [type="radio"],
-    [type="range"],
-    [type="color"],
-    [type="file"],
-    [type="button"],
-    [type="submit"],
-    [type="reset"]
-  ):focus-visible,
-select:focus-visible {
-  outline: 2px solid var(--text);
-  outline-offset: 2px;
-}
-input:not(
-    [type="checkbox"],
-    [type="radio"],
-    [type="range"],
-    [type="color"],
-    [type="file"],
-    [type="button"],
-    [type="submit"],
-    [type="reset"]
-  ):focus,
-textarea:focus {
-  outline: none;
-}
-input::placeholder,
-textarea::placeholder {
-  color: var(--subtle);
+@layer showai-reset {
+  button,
+  input,
+  textarea,
+  select {
+    font-family: inherit;
+  }
+  button {
+    transition: var(--duration-fast) var(--ease-out);
+    transition-property: background-color, color, border-color, transform;
+  }
+  button:focus-visible,
+  a:focus-visible,
+  summary:focus-visible {
+    outline: 2px solid var(--text);
+    outline-offset: 3px;
+  }
+  input:is(
+      [type="checkbox"],
+      [type="radio"],
+      [type="range"],
+      [type="color"],
+      [type="file"],
+      [type="button"],
+      [type="submit"],
+      [type="reset"]
+    ):focus-visible,
+  select:focus-visible {
+    outline: 2px solid var(--text);
+    outline-offset: 2px;
+  }
+  input:not(
+      [type="checkbox"],
+      [type="radio"],
+      [type="range"],
+      [type="color"],
+      [type="file"],
+      [type="button"],
+      [type="submit"],
+      [type="reset"]
+    ):focus,
+  textarea:focus {
+    outline: none;
+  }
+  input::placeholder,
+  textarea::placeholder {
+    color: var(--subtle);
+  }
 }
 ::selection {
   background: var(--accent-soft);

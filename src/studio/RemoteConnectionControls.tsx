@@ -1,5 +1,5 @@
 import { useEffect, useState, type SelectHTMLAttributes } from "react";
-import { Check, ChevronDown, Copy, Network } from "../ui/icons";
+import { Check, Copy, Network } from "../ui/icons";
 import { useTranslator } from "../i18n/react";
 import messages from "../i18n/messages/remoteConnections";
 import type { RemoteMcpProvider } from "../remote-mcp/types";
@@ -30,11 +30,13 @@ export function RemoteBrand({ provider }: { provider: RemoteMcpProvider }) {
     </span>
   );
 }
-export function RemoteSelect(props: SelectHTMLAttributes<HTMLSelectElement>) {
+export function RemoteSelect({
+  className = "",
+  ...props
+}: SelectHTMLAttributes<HTMLSelectElement>) {
   return (
     <span className="rm-select">
-      <select {...props} />
-      <ChevronDown size={15} aria-hidden="true" />
+      <select {...props} className={`showai-select ${className}`} />
     </span>
   );
 }

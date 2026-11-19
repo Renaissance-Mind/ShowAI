@@ -349,6 +349,7 @@ export default function RemoteMcpClientSetup({
                             </label>
                             <div className="rm-input-action">
                               <input
+                                className="showai-input"
                                 id="remote-client-name"
                                 value={name}
                                 maxLength={100}
@@ -373,6 +374,7 @@ export default function RemoteMcpClientSetup({
                           <label htmlFor="remote-access-key">{t("key")}</label>
                           <div className="rm-secret-field">
                             <input
+                              className="showai-input"
                               id="remote-access-key"
                               type={showKey ? "text" : "password"}
                               readOnly

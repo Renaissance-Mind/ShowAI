@@ -137,6 +137,7 @@ export default function PageIconDialog({
         <label>
           {t("icon.text")}
           <input
+            className="showai-input"
             aria-label={t("icon.text")}
             value={text}
             maxLength={64}
@@ -189,6 +190,7 @@ export default function PageIconDialog({
         <label>
           {t("icon.url")}
           <input
+            className="showai-input"
             inputMode="url"
             aria-label={t("icon.urlAria")}
             placeholder="https://…"

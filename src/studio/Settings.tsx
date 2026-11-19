@@ -4,7 +4,6 @@ import { pluginNeedsUpdate, usePluginHosts } from "./usePluginHosts";
 import {
   Bot,
   Puzzle,
-  ChevronDown,
   ChevronRight,
   Copy,
   Folder,
@@ -466,6 +465,7 @@ export function SettingsPanel({
             </div>
             <div className="settings-select">
               <select
+                className="showai-select"
                 id="settings-language"
                 value={language}
                 onChange={(event) => {
@@ -480,7 +480,6 @@ export function SettingsPanel({
                   </option>
                 ))}
               </select>
-              <ChevronDown size={14} aria-hidden="true" />
             </div>
           </div>
         </section>

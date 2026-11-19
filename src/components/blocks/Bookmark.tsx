@@ -71,6 +71,7 @@ export function BookmarkBlock({ data, onChange, readOnly }: BlockProps) {
           <div className="sb-editor-panel">
             <Field label={t("bookmark.url")}>
               <input
+                className="showai-input"
                 type="url"
                 placeholder="https://…"
                 value={draft.url}
@@ -84,6 +85,7 @@ export function BookmarkBlock({ data, onChange, readOnly }: BlockProps) {
             </Field>
             <Field label={t("bookmark.title")}>
               <input
+                className="showai-input"
                 placeholder={t("bookmark.titlePlaceholder")}
                 value={draft.title}
                 onChange={(event) =>
@@ -96,6 +98,7 @@ export function BookmarkBlock({ data, onChange, readOnly }: BlockProps) {
             </Field>
             <Field label={t("bookmark.summary")}>
               <textarea
+                className="showai-textarea"
                 rows={3}
                 value={draft.description}
                 onChange={(event) =>
@@ -108,6 +111,7 @@ export function BookmarkBlock({ data, onChange, readOnly }: BlockProps) {
             </Field>
             <Field label={t("bookmark.image")}>
               <input
+                className="showai-input"
                 type="url"
                 value={draft.image}
                 onChange={(event) =>

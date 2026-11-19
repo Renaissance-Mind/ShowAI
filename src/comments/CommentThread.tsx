@@ -54,6 +54,7 @@ export function CommentInput({
   return (
     <div className="comment-input">
       <textarea
+        className="showai-textarea"
         ref={input}
         value={text}
         rows={Math.min(6, Math.max(1, text.split("\n").length))}

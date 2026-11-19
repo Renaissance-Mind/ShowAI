@@ -164,6 +164,7 @@ function FileDialog({
             <ArrowUp size={16} />
           </button>
           <input
+            className="showai-input"
             aria-label={t("directoryPath")}
             disabled={loading}
             value={pathInput}
@@ -215,6 +216,7 @@ function FileDialog({
             }}
           >
             <input
+              className="showai-input"
               aria-label={t("newFolderName")}
               autoFocus
               value={newFolder}
@@ -279,6 +281,7 @@ function FileDialog({
           <label className="local-file-name">
             {t("fileName")}
             <input
+              className="showai-input"
               aria-label={t("exportFileName")}
               value={name}
               onChange={(event) => {

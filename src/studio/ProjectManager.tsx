@@ -400,6 +400,7 @@ export default function ProjectManager({
         <label className="sync-source-filter">
           <span>{f("projects.source")}</span>
           <select
+            className="showai-select"
             aria-label={f("projects.location")}
             value={filter}
             onChange={(e) => onFilter(e.target.value)}
@@ -820,6 +821,7 @@ export default function ProjectManager({
                 <label className="sync-field">
                   <span>{f("projects.name")}</span>
                   <input
+                    className="showai-input"
                     required
                     value={name}
                     onChange={(e) => setName(e.target.value)}
@@ -829,6 +831,7 @@ export default function ProjectManager({
                   <label className="sync-field">
                     <span>{f("projects.saveTo")}</span>
                     <select
+                      className="showai-select"
                       value={location}
                       onChange={(e) => setLocation(e.target.value)}
                     >

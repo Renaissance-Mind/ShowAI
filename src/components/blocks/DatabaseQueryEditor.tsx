@@ -88,6 +88,7 @@ function Operand({
   ) =>
     kind === "date" || operand === "date" ? (
       <input
+        className="showai-input"
         type="date"
         aria-label={label}
         value={String(current ?? "")}
@@ -95,6 +96,7 @@ function Operand({
       />
     ) : kind === "number" || operand === "number" ? (
       <input
+        className="showai-input"
         type="number"
         aria-label={label}
         value={typeof current === "number" ? current : ""}
@@ -104,6 +106,7 @@ function Operand({
       />
     ) : kind === "option" ? (
       <select
+        className="showai-select"
         aria-label={label}
         value={String(current ?? "")}
         onChange={(event) => set(event.target.value)}
@@ -118,6 +121,7 @@ function Operand({
       </select>
     ) : (
       <input
+        className="showai-input"
         aria-label={label}
         value={String(current ?? "")}
         onChange={(event) => set(event.target.value)}
@@ -145,6 +149,7 @@ function Operand({
     return (
       <>
         <select
+          className="showai-select"
           aria-label={tf("conditionValue")}
           value={relative.direction}
           onChange={(event) =>
@@ -155,6 +160,7 @@ function Operand({
           <option value="next">{tf("within.next")}</option>
         </select>
         <input
+          className="showai-input"
           type="number"
           min={0}
           max={3660}
@@ -184,6 +190,7 @@ function Operand({
         {choices(column).map((choice) => (
           <label key={choice.id}>
             <input
+              className="showai-checkbox"
               type="checkbox"
               checked={selected.includes(choice.id)}
               onChange={() =>
@@ -224,6 +231,7 @@ function ConditionRow({
   return (
     <div className="sb-query-condition">
       <select
+        className="showai-select"
         aria-label={tf("conditionProperty")}
         value={condition.column}
         onChange={(event) => {
@@ -248,6 +256,7 @@ function ConditionRow({
         ))}
       </select>
       <select
+        className="showai-select"
         aria-label={tf("conditionOperator")}
         value={condition.operator}
         onChange={(event) => {
@@ -340,6 +349,7 @@ function GroupEditor({
     <div className={nested ? "sb-query-group is-nested" : "sb-query-group"}>
       <div className="sb-query-group-head">
         <select
+          className="showai-select"
           aria-label={tf("filterJoin")}
           value={group.join}
           onChange={(event) =>
@@ -474,6 +484,7 @@ export function DatabaseQueryEditor({
               <ArrowDown size={12} aria-hidden="true" />
             )}
             <select
+              className="showai-select"
               aria-label={tf("sortProperty")}
               value={sort.column}
               onChange={(event) =>
@@ -499,6 +510,7 @@ export function DatabaseQueryEditor({
                 ))}
             </select>
             <select
+              className="showai-select"
               aria-label={tf("sortDirection")}
               value={sort.direction}
               onChange={(event) =>

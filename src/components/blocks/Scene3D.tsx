@@ -772,6 +772,7 @@ export function Scene3DBlock({ data: raw }: BlockProps) {
                   )}
                 </div>
                 <input
+                  className="showai-range"
                   id={inputId}
                   type="range"
                   min={parameter.min}

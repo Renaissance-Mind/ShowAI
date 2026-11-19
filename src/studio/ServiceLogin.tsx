@@ -243,6 +243,7 @@ export default function ServiceLogin({
           <label className="sync-field">
             <span>{t("login.completionCode")}</span>
             <input
+              className="showai-input"
               ref={codeRef}
               aria-invalid={!!error}
               autoComplete="one-time-code"
@@ -278,6 +279,7 @@ export default function ServiceLogin({
             <label className="sync-field">
               <span>{t("login.email")}</span>
               <input
+                className="showai-input"
                 type="email"
                 value={email}
                 onChange={(event) => setEmail(event.target.value)}
@@ -299,6 +301,7 @@ export default function ServiceLogin({
           <label className="sync-field">
             <span>{t("login.code")}</span>
             <input
+              className="showai-input"
               inputMode="numeric"
               ref={codeRef}
               aria-invalid={!!error}

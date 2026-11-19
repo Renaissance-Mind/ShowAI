@@ -102,6 +102,7 @@ function ProjectSelect({
     <label>
       {t("project")}
       <select
+        className="showai-select"
         value={value}
         required
         onChange={(event) => onChange(event.target.value)}
@@ -202,6 +203,7 @@ export function ForkDialog({
         <label>
           {t("name")}
           <input
+            className="showai-input"
             value={name}
             maxLength={200}
             onChange={(event) => setName(event.target.value)}
@@ -210,6 +212,7 @@ export function ForkDialog({
         <label>
           {t("version")}
           <input
+            className="showai-input"
             value={version}
             required
             pattern="\d+\.\d+\.\d+(-[0-9A-Za-z.\-]+)?"
@@ -343,6 +346,7 @@ export function PublishDialog({
               <label>
                 {t("manifestUrl")}
                 <input
+                  className="showai-input"
                   type="url"
                   required
                   value={url}
@@ -543,6 +547,7 @@ export function RemoveDialog({
         <fieldset className="catalog-choice" disabled={busy}>
           <label>
             <input
+              className="showai-radio"
               type="radio"
               name="remove-target"
               checked={!all}
@@ -553,6 +558,7 @@ export function RemoveDialog({
           {siblings.length > 1 && (
             <label>
               <input
+                className="showai-radio"
                 type="radio"
                 name="remove-target"
                 checked={all}
@@ -671,6 +677,7 @@ export function PackageVersions({
           <label>
             {t("originVersion")}
             <select
+              className="showai-select"
               value={theirs}
               onChange={(event) => setTheirs(event.target.value)}
             >
@@ -940,6 +947,7 @@ function PackageMergeDialog({
                     <label key={side}>
                       <span>
                         <input
+                          className="showai-radio"
                           type="radio"
                           name={conflict.path}
                           checked={(choices[conflict.path] ?? "ours") === side}
@@ -961,6 +969,7 @@ function PackageMergeDialog({
             <label>
               {t("mergedVersion")}
               <input
+                className="showai-input"
                 value={version}
                 required
                 pattern="\d+\.\d+\.\d+(-[0-9A-Za-z.\-]+)?"
@@ -1185,6 +1194,7 @@ export function SaveTemplateDialog({
         <label>
           {t("page")}
           <select
+            className="showai-select"
             value={pageId}
             required
             disabled={!pages?.length}
@@ -1210,6 +1220,7 @@ export function SaveTemplateDialog({
         <label>
           {t("template")}
           <select
+            className="showai-select"
             value={templateId}
             onChange={(event) => {
               const id = event.target.value;
@@ -1237,6 +1248,7 @@ export function SaveTemplateDialog({
         <label>
           {t("name")}
           <input
+            className="showai-input"
             value={name}
             required
             maxLength={200}
@@ -1246,6 +1258,7 @@ export function SaveTemplateDialog({
         <label>
           {t("description")}
           <textarea
+            className="showai-textarea"
             value={description}
             maxLength={2000}
             onChange={(event) => setDescription(event.target.value)}
@@ -1254,6 +1267,7 @@ export function SaveTemplateDialog({
         <label>
           {t("version")}
           <input
+            className="showai-input"
             value={version}
             required
             pattern="\d+\.\d+\.\d+(-[0-9A-Za-z.\-]+)?"

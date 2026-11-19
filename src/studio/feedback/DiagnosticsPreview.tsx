@@ -58,7 +58,7 @@ export function DiagnosticsPreview({
         </p>
       ) : (
         <textarea
-          className="feedback-diagnostics-text"
+          className="showai-textarea feedback-diagnostics-text"
           aria-label={t("diag.preview")}
           readOnly
           spellCheck={false}

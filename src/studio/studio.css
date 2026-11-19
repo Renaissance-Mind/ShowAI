@@ -407,18 +407,10 @@ button.studio-tree-chevron:hover {
   gap: 8px;
 }
 .studio-button {
-  border: 1px solid var(--line);
-  background: var(--paper);
-  border-radius: 5px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
+  min-height: 32px;
   padding: 5px 11px;
   font-size: 14px;
   line-height: 20px;
-  white-space: nowrap;
-  min-height: 32px;
 }
 .studio-button.primary {
   background: var(--accent);

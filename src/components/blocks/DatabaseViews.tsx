@@ -349,6 +349,7 @@ function BoardView(props: DatabaseViewProps) {
                   <div className="sb-board-card-footer">
                     {group && group.type !== "multiSelect" && (
                       <select
+                        className="showai-select"
                         aria-label={t("moveToGroup")}
                         disabled={!props.cellEditable(row, group)}
                         value={name}

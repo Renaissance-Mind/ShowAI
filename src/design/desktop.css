@@ -1,8 +1,11 @@
 @import "./tokens.css";
 @import "./content.css";
+@import "./controls.css";
 
-:root:not([data-keyboard-focus]) :focus-visible {
-  outline: none !important;
+@media (forced-colors: none) {
+  :root:not([data-keyboard-focus]) :focus-visible {
+    outline: none !important;
+  }
 }
 
 .studio {
@@ -207,10 +210,10 @@
   border-color: var(--action-hover);
   filter: none;
 }
-.studio-button:active:not(:disabled),
-.settings-button:active:not(:disabled),
-.studio-icon:active:not(:disabled) {
-  transform: scale(0.96);
+@media (prefers-reduced-motion: no-preference) {
+  .studio-icon:active:not(:disabled) {
+    transform: scale(0.96);
+  }
 }
 .studio-button.danger {
   color: #ffffff;

@@ -397,6 +397,7 @@ export function DirectorySelectionBar({
     >
       <label className="studio-page-select-all">
         <input
+          className="showai-checkbox"
           type="checkbox"
           checked={all}
           ref={(input) => {
@@ -567,6 +568,7 @@ export function BatchPagesDialog({
             <label>
               {t("targetProject")}
               <select
+                className="showai-select"
                 aria-label={t("targetProject")}
                 value={projectId}
                 disabled={busy || movingFolders.size > 0}
@@ -586,6 +588,7 @@ export function BatchPagesDialog({
             <label>
               {t("targetFolder")}
               <select
+                className="showai-select"
                 aria-label={t("targetFolder")}
                 value={parentId ?? ""}
                 disabled={busy || loaded?.projectId !== projectId}

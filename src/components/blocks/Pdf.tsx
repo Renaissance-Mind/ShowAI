@@ -155,6 +155,7 @@ function PdfReader({
           </button>
           <label className="sb-pdf-page">
             <input
+              className="showai-input"
               ref={pageInput}
               key={page}
               type="number"

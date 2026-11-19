@@ -278,6 +278,7 @@ function ExternalDiagramBlock({
           >
             <Field label={t("presentation.label")}>
               <select
+                className="showai-select"
                 aria-label={t("presentation.label")}
                 value={
                   JSON.stringify(diagramPresentation(draft)) ===
@@ -313,6 +314,7 @@ function ExternalDiagramBlock({
               ).map(([key, label]) => (
                 <Field key={key} label={t(label)}>
                   <select
+                    className="showai-select"
                     aria-label={t(label)}
                     value={diagramPresentation(draft)[key]}
                     onChange={(event) =>
@@ -333,6 +335,7 @@ function ExternalDiagramBlock({
               ))}
               <Field label={t("presentation.notes")}>
                 <select
+                  className="showai-select"
                   aria-label={t("presentation.notesDisplay")}
                   value={diagramPresentation(draft).notes}
                   onChange={(event) =>
@@ -358,6 +361,7 @@ function ExternalDiagramBlock({
               ).map(([key, label]) => (
                 <label key={key} className="sb-diagram-toggle">
                   <input
+                    className="showai-checkbox"
                     aria-label={t(label)}
                     type="checkbox"
                     checked={diagramPresentation(draft)[key]}
@@ -377,6 +381,7 @@ function ExternalDiagramBlock({
             </div>
             <Field label={t("template")}>
               <select
+                className="showai-select"
                 aria-label={t("diagramTemplate")}
                 value={text(draft.template)}
                 onChange={(event) => selectTemplate(event.target.value)}
@@ -392,6 +397,7 @@ function ExternalDiagramBlock({
             <div className="sb-diagram-fields">
               <Field label={t("title")}>
                 <input
+                  className="showai-input"
                   aria-label={t("diagramTitle")}
                   value={text(draft.title)}
                   onChange={(event) =>
@@ -404,6 +410,7 @@ function ExternalDiagramBlock({
               </Field>
               <Field label={t("height")}>
                 <input
+                  className="showai-input"
                   aria-label={t("diagramHeight")}
                   type="number"
                   min={240}
@@ -420,6 +427,7 @@ function ExternalDiagramBlock({
             </div>
             <Field label={t("description")}>
               <textarea
+                className="showai-textarea"
                 aria-label={t("diagramDescription")}
                 rows={2}
                 value={text(draft.description)}
@@ -440,6 +448,7 @@ function ExternalDiagramBlock({
                     label={t("labelField", { index: index + 1 })}
                   >
                     <input
+                      className="showai-input"
                       aria-label={t("labelInput", { index: index + 1 })}
                       value={label}
                       onChange={(event) => {
@@ -459,7 +468,7 @@ function ExternalDiagramBlock({
               <summary>{t("source")}</summary>
               <textarea
                 aria-label={t("source")}
-                className="sb-diagram-source"
+                className="showai-textarea sb-diagram-source"
                 rows={12}
                 spellCheck={false}
                 value={text(draft.source)}

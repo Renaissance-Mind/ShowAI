@@ -261,7 +261,7 @@ export function TemplateDialog({
         )}
         {status?.prompt && (
           <textarea
-            className="catalog-agent-prompt"
+            className="showai-textarea catalog-agent-prompt"
             aria-label={t("copyAgentPrompt")}
             readOnly
             value={status.prompt}
@@ -528,6 +528,7 @@ export function ComponentDialog({
                 accessory={
                   examples.length > 0 && (
                     <select
+                      className="showai-select"
                       aria-label={t("componentExample")}
                       value={example}
                       onChange={(event) =>

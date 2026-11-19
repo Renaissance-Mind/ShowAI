@@ -474,6 +474,7 @@ export function EventTimelineBlock({ data }: BlockProps) {
               ‹
             </button>
             <input
+              className="showai-range"
               type="range"
               min={0}
               max={count - 1}

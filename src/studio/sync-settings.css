@@ -598,8 +598,7 @@
   cursor: pointer;
 }
 .sync-segmented label:has(input:focus-visible) {
-  outline: 2px solid var(--brand-accent, var(--accent));
-  outline-offset: 1px;
+  box-shadow: inset 0 -2px var(--dialog-accent);
 }
 .sync-oauth {
   display: grid;
@@ -1587,6 +1586,9 @@
   width: 190px;
   color: var(--muted);
   border-bottom: 1px solid var(--line);
+}
+.sync-manager-search:focus-within {
+  border-color: var(--dialog-accent);
 }
 .sync-settings .sync-manager-search input {
   padding-left: 0;

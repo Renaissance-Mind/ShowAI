@@ -245,6 +245,7 @@ export function PlaygroundBlock({ data, onChange, readOnly }: BlockProps) {
             <div className="sb-form-row">
               <Field label={t("title")}>
                 <input
+                  className="showai-input"
                   value={draft.title}
                   onChange={(event) =>
                     setDraft((current) => ({
@@ -257,6 +258,7 @@ export function PlaygroundBlock({ data, onChange, readOnly }: BlockProps) {
               {legacy && (
                 <Field label={t("operation")}>
                   <select
+                    className="showai-select"
                     value={draft.operation}
                     onChange={(event) =>
                       setDraft((current) => ({
@@ -278,6 +280,7 @@ export function PlaygroundBlock({ data, onChange, readOnly }: BlockProps) {
               <div className="sb-form-row">
                 <Field label={t("resultLabel")}>
                   <input
+                    className="showai-input"
                     value={draft.resultLabel}
                     onChange={(event) =>
                       setDraft((current) => ({
@@ -289,6 +292,7 @@ export function PlaygroundBlock({ data, onChange, readOnly }: BlockProps) {
                 </Field>
                 <Field label={t("resultUnit")}>
                   <input
+                    className="showai-input"
                     value={draft.unit}
                     onChange={(event) =>
                       setDraft((current) => ({
@@ -307,6 +311,7 @@ export function PlaygroundBlock({ data, onChange, readOnly }: BlockProps) {
                 <div className="sb-form-row">
                   <Field label={t("parameterName")}>
                     <input
+                      className="showai-input"
                       value={input.label}
                       onChange={(event) =>
                         updateDraftInput(index, { label: event.target.value })
@@ -315,6 +320,7 @@ export function PlaygroundBlock({ data, onChange, readOnly }: BlockProps) {
                   </Field>
                   <Field label={t("unit")}>
                     <input
+                      className="showai-input"
                       value={input.unit ?? ""}
                       onChange={(event) =>
                         updateDraftInput(index, { unit: event.target.value })
@@ -341,6 +347,7 @@ export function PlaygroundBlock({ data, onChange, readOnly }: BlockProps) {
                     {LIMITS.map(({ key, label }) => (
                       <Field key={key} label={t(label)}>
                         <input
+                          className="showai-input"
                           type="number"
                           value={input[key] ?? ""}
                           onChange={(event) =>
@@ -474,6 +481,7 @@ export function PlaygroundBlock({ data, onChange, readOnly }: BlockProps) {
                     <label htmlFor={id}>{input.label}</label>
                     <div>
                       <input
+                        className="showai-input"
                         aria-label={t("parameterValue", { label: input.label })}
                         type="number"
                         min={input.min}
@@ -489,6 +497,7 @@ export function PlaygroundBlock({ data, onChange, readOnly }: BlockProps) {
                     </div>
                   </div>
                   <input
+                    className="showai-range"
                     id={id}
                     aria-label={input.label}
                     type="range"

@@ -452,6 +452,7 @@ export function StudioTopbar({
             <label>
               {t("catalogProjectLabel")}
               <select
+                className="showai-select"
                 aria-label={t("catalogProject")}
                 value={selectedProject ?? ""}
                 onChange={(event) => {
@@ -478,6 +479,7 @@ export function StudioTopbar({
               <label>
                 {t("catalogScopeLabel")}
                 <select
+                  className="showai-select"
                   aria-label={t("catalogScope")}
                   value={catalogScope ?? "all"}
                   onChange={(event) =>
@@ -496,6 +498,7 @@ export function StudioTopbar({
             )}
             <label className="catalog-version-toggle">
               <input
+                className="showai-checkbox"
                 type="checkbox"
                 checked={showTemplateVersions}
                 onChange={(event) =>
@@ -748,6 +751,7 @@ export function StudioTopbar({
               <label className="component-project-picker">
                 {t("componentProjectLabel")}
                 <select
+                  className="showai-select"
                   aria-label={t("catalogProject")}
                   value={componentProject}
                   onChange={(event) => {

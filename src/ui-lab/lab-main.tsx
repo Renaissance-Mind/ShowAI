@@ -4,6 +4,7 @@ import labMessages from "../i18n/messages/uiLab";
 import flowMessages from "../i18n/messages/uiFlow";
 import { messages, motionSummary } from "./messages";
 import type { LabSession, MotionObservation } from "./types";
+import "../design/controls.css";
 import "./lab.css";
 const t = messages(labMessages, "zh-CN"),
   f = messages(flowMessages, "zh-CN");
@@ -290,6 +291,7 @@ function Lab() {
         <label className="flow-feature">
           <span>{f("feature")}</span>
           <select
+            className="showai-select"
             aria-label={f("feature")}
             value={featureId}
             onChange={(event) => {
@@ -310,6 +312,7 @@ function Lab() {
         <label>
           {t("theme")}
           <select
+            className="showai-select"
             value={theme}
             onChange={(event) =>
               setTheme(event.target.value as "light" | "dark")
@@ -322,6 +325,7 @@ function Lab() {
         <label>
           {t("viewport")}
           <select
+            className="showai-select"
             value={viewport}
             onChange={(event) => setViewport(event.target.value)}
           >
@@ -332,6 +336,7 @@ function Lab() {
         </label>
         <label className="flow-annotation-toggle">
           <input
+            className="showai-checkbox"
             type="checkbox"
             checked={annotations}
             onChange={(event) => setAnnotations(event.target.checked)}

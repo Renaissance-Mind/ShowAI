@@ -118,6 +118,7 @@ export default function WorkRecordsSettings() {
           }}
         >
           <input
+            className="showai-input"
             aria-label={t("workRecordsLocation")}
             value={draft}
             autoFocus

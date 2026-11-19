@@ -30,6 +30,7 @@ export function PageWidthSwitch({
         ))}
       </div>
       <input
+        className="showai-range"
         type="range"
         min={0}
         max={2}

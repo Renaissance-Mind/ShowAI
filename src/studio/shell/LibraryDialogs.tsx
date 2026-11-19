@@ -54,6 +54,7 @@ export function MoveProjectDialog({
         <label>
           {t("group")}
           <select
+            className="showai-select"
             aria-label={t("targetGroup")}
             value={groupId}
             onChange={(event) => setGroupId(event.target.value)}
@@ -123,6 +124,7 @@ export function NameDialog({
         <label>
           {inputLabel}
           <input
+            className="showai-input"
             aria-label={inputLabel}
             value={name}
             maxLength={1000}
@@ -346,6 +348,7 @@ function DirectoryDialog({
           <label>
             {t("name")}
             <input
+              className="showai-input"
               aria-label={inputLabel}
               placeholder={placeholder}
               value={name}

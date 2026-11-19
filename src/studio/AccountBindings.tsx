@@ -88,6 +88,7 @@ export default function AccountBindings({
             <label className="sync-field sync-field-inline">
               <span>{t("bindingAccount")}</span>
               <select
+                className="showai-select"
                 disabled={busy || enabled.length < 2}
                 value={source}
                 onChange={(event) => {
@@ -166,6 +167,7 @@ export default function AccountBindings({
               <label className="sync-field sync-field-inline">
                 <span>{t("bindWith")}</span>
                 <select
+                  className="showai-select"
                   required
                   disabled={busy}
                   value={target}

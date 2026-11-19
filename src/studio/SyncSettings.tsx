@@ -680,6 +680,7 @@ export default function SyncSettings({
                 <label className="sync-field">
                   <span>{f("defaults")}</span>
                   <select
+                    className="showai-select"
                     value={status.defaultConnectionId ?? ""}
                     onChange={(e) =>
                       void run(() =>
@@ -805,6 +806,7 @@ export default function SyncSettings({
                   <label className="sync-field">
                     <span>{t("inviteLinkLabel")}</span>
                     <input
+                      className="showai-input"
                       id={`${viewId}-invite-link`}
                       type="url"
                       required
@@ -841,6 +843,7 @@ export default function SyncSettings({
                       <div className="sync-invitation-actions">
                         {invitedServer.length > 1 && (
                           <select
+                            className="showai-select"
                             aria-label={t("joinWithAccount")}
                             value={server}
                             onChange={(event) => setServer(event.target.value)}
@@ -1021,6 +1024,7 @@ export default function SyncSettings({
                     <label className="sync-field">
                       <span>{f("chooseAccount")}</span>
                       <select
+                        className="showai-select"
                         required
                         value={uploadTarget}
                         onChange={(event) =>
@@ -1193,6 +1197,7 @@ export default function SyncSettings({
                         <div key={side}>
                           <label>
                             <input
+                              className="showai-radio"
                               type="radio"
                               disabled={busy}
                               name={file.path}
@@ -1339,6 +1344,7 @@ export default function SyncSettings({
                   <label className="sync-field">
                     <span>{t("syncAccount")}</span>
                     <select
+                      className="showai-select"
                       value={binding.connectionId}
                       onChange={(e) =>
                         void run(() =>

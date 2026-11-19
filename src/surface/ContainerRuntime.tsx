@@ -700,6 +700,7 @@ export function ContainerRuntime({
                   <label>
                     {t("inspector.name")}
                     <input
+                      className="showai-input"
                       aria-label={t("inspector.nameLabel")}
                       value={
                         hasDefaultName(selectedEntry.node)
@@ -760,6 +761,7 @@ export function ContainerRuntime({
                     surfaceKind(selectedEntry.node) === "page" && (
                       <label>
                         <input
+                          className="showai-checkbox"
                           type="checkbox"
                           checked={!!selectedEntry.node.attrs?.frameless}
                           onChange={(event) =>
@@ -780,6 +782,7 @@ export function ContainerRuntime({
                     <label>
                       {t("inspector.arrange")}
                       <select
+                        className="showai-select"
                         aria-label={t("inspector.regionLayout")}
                         value={frame?.mode ?? "flow"}
                         onChange={(event) =>
@@ -799,6 +802,7 @@ export function ContainerRuntime({
                     <label>
                       {t("inspector.columns")}
                       <input
+                        className="showai-input"
                         aria-label={t("inspector.gridColumns")}
                         type="number"
                         min={1}
@@ -819,11 +823,11 @@ export function ContainerRuntime({
                   {selectedEntry.node.type === "region" && frame?.mode === "grid" && (
                     <>
                       <label>{t("inspector.minColumnWidth")}
-                        <input type="number" min={120} max={1200} aria-label={t("inspector.minColumnWidth")} value={frame.minColumnWidth ?? 320}
+                        <input className="showai-input" type="number" min={120} max={1200} aria-label={t("inspector.minColumnWidth")} value={frame.minColumnWidth ?? 320}
                           onChange={event => { const value = Number(event.target.value); if (Number.isFinite(value) && value >= 120 && value <= 1200) updateFrame({ ...frame, minColumnWidth: value }); }} />
                       </label>
                       <label>{t("inspector.columnGap")}
-                        <input type="number" min={0} max={160} aria-label={t("inspector.columnGap")} value={frame.gap ?? 24}
+                        <input className="showai-input" type="number" min={0} max={160} aria-label={t("inspector.columnGap")} value={frame.gap ?? 24}
                           onChange={event => { const value = Number(event.target.value); if (Number.isFinite(value) && value >= 0 && value <= 160) updateFrame({ ...frame, gap: value }); }} />
                       </label>
                     </>
@@ -837,6 +841,7 @@ export function ContainerRuntime({
                         <label>
                           {t("inspector.width")}
                           <input
+                            className="showai-input"
                             aria-label={t("inspector.moduleWidth")}
                             type="number"
                             min={
@@ -862,6 +867,7 @@ export function ContainerRuntime({
                             <label>
                               {t("inspector.heightMode")}
                               <select
+                                className="showai-select"
                                 aria-label={t("inspector.moduleHeightMode")}
                                 value={frame.heightMode ?? "fixed"}
                                 onChange={(event) =>
@@ -886,6 +892,7 @@ export function ContainerRuntime({
                               <label>
                                 {t("inspector.height")}
                                 <input
+                                  className="showai-input"
                                   aria-label={t("inspector.moduleHeight")}
                                   type="number"
                                   min={180}
@@ -906,6 +913,7 @@ export function ContainerRuntime({
                   <label>
                     {t("inspector.parent")}
                     <select
+                      className="showai-select"
                       aria-label={t("inspector.parent")}
                       value={selectedEntry.parent?.attrs?.id ?? ""}
                       onChange={(event) => {

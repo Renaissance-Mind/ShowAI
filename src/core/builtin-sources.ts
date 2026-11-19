@@ -48,6 +48,7 @@ import { diagramBuiltinSources } from "./diagram-builtin-sources";
 import g2Exports from "../components/blocks/g2/exports-map.json";
 import themeTokens from "../design/tokens.css?raw";
 import themeContent from "../design/content.css?raw";
+import themeControls from "../design/controls.css?raw";
 import contract from "../components/blocks/primitive-contract.mjs?raw";
 import nativeInkContract from "../surface/native-ink.mjs?raw";
 import portableInkContract from "../surface/portable-ink.mjs?raw";
@@ -397,7 +398,7 @@ const sources: Record<string, string> = {
   "i18n/messages/multiLevelView.ts": multiLevelViewMessages,
   "flowchart.css": flowchartCss,
   "flowchart-contract.mjs": flowchartContract,
-  "theme.css": `${themeTokens}\n${themeContent}`,
+  "theme.css": `${themeTokens}\n${themeContent}\n${themeControls}`,
   // Built-in blocks read their catalogs from here; each compiled component
   // keeps its own copy of the i18n core, which starts in the host's language.
   "i18n/index.ts": i18nCore,

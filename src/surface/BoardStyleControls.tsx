@@ -46,6 +46,7 @@ function StrokeWidthSlider({
         <output style={{ left: `${position}%` }}>{current}</output>
       </span>
       <input
+        className="showai-range"
         type="range"
         aria-orientation={vertical ? "vertical" : "horizontal"}
         aria-label={label}
@@ -93,6 +94,7 @@ export function LabelSizeSelect({
     <label className="board-label-size" title={t("style.labelSize")}>
       <Type size={14} aria-hidden="true" />
       <select
+        className="showai-select"
         aria-label={t("style.labelSize")}
         value={size ?? ""}
         onChange={(event) => onChange(Number(event.currentTarget.value))}

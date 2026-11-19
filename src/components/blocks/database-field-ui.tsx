@@ -196,7 +196,7 @@ function ChoiceList({
     <>
       {search && (
         <input
-          className="sb-field-search"
+          className="showai-input sb-field-search"
           aria-label={search}
           placeholder={search}
           value={query}
@@ -209,6 +209,7 @@ function ChoiceList({
           <li key={choice.id}>
             <label>
               <input
+                className={single ? "showai-radio" : "showai-checkbox"}
                 type={single ? "radio" : "checkbox"}
                 name={single ? name : undefined}
                 checked={selected.includes(choice.id)}
@@ -371,6 +372,7 @@ function InputCell({ column, value, editable, update }: CellProps) {
 function CheckboxCell({ column, value, editable, update }: CellProps) {
   return (
     <input
+      className="showai-checkbox"
       type="checkbox"
       aria-label={column.name}
       checked={value === true || value === "true"}
@@ -396,7 +398,7 @@ function SelectCell({ column, value, editable, update }: CellProps) {
     <select
       aria-label={column.name}
       value={current}
-      className={`sb-cell-select ${
+      className={`showai-select sb-cell-select ${
         tone && OPTION_TONES.includes(tone)
           ? `sb-tone-${tone}`
           : `sb-tag-${Math.max(0, column.options?.indexOf(current) ?? 0) % 5}`
@@ -591,7 +593,7 @@ function OptionsConfig({ column, onChange }: ConfigProps) {
   return (
     <div className="sb-field-config">
       <input
-        className="sb-options-input"
+        className="showai-input sb-options-input"
         aria-label={t("propertyOptions", { name: column.name })}
         placeholder={t("optionsPlaceholder")}
         value={column.options?.join(",") ?? ""}
@@ -605,6 +607,7 @@ function OptionsConfig({ column, onChange }: ConfigProps) {
             <label key={option} className={optionClass(column, option)}>
               {option}
               <select
+                className="showai-select"
                 aria-label={tf("optionTone", { option })}
                 value={column.colors?.[option] ?? ""}
                 onChange={(event) => {
@@ -636,7 +639,7 @@ function PageConfig({ column, columns, onChange }: ConfigProps) {
   const t = useTranslator(messages);
   return (
     <select
-      className="sb-options-input"
+      className="showai-select sb-options-input"
       aria-label={t("titleColumn", { name: column.name })}
       value={column.titleColumn ?? ""}
       onChange={(event) =>
@@ -664,6 +667,7 @@ function RelationConfig({ column, onChange, host }: ConfigProps) {
   return (
     <div className="sb-field-config">
       <select
+        className="showai-select"
         aria-label={tf("relationTarget", { name: column.name })}
         value={current}
         onChange={(event) =>
@@ -684,6 +688,7 @@ function RelationConfig({ column, onChange, host }: ConfigProps) {
       </select>
       <label className="sb-field-toggle">
         <input
+          className="showai-checkbox"
           type="checkbox"
           checked={!!relation.reverse}
           onChange={(event) => {
@@ -699,6 +704,7 @@ function RelationConfig({ column, onChange, host }: ConfigProps) {
       </label>
       {relation.reverse && (
         <input
+          className="showai-input"
           aria-label={tf("reverseName", { name: column.name })}
           value={relation.reverse.name ?? ""}
           maxLength={1000}
@@ -719,7 +725,7 @@ function FormulaConfig({ column, onChange }: ConfigProps) {
   return (
     <div className="sb-field-config">
       <input
-        className="sb-formula-input"
+        className="showai-input sb-formula-input"
         aria-label={tf("formulaExpression", { name: column.name })}
         placeholder='prop("…")'
         spellCheck={false}
@@ -730,6 +736,7 @@ function FormulaConfig({ column, onChange }: ConfigProps) {
         }
       />
       <select
+        className="showai-select"
         aria-label={tf("formulaKind", { name: column.name })}
         value={formula.kind ?? "text"}
         onChange={(event) =>
@@ -765,6 +772,7 @@ function RollupConfig({ column, columns, onChange, host }: ConfigProps) {
   return (
     <div className="sb-field-config">
       <select
+        className="showai-select"
         aria-label={tf("rollupRelation", { name: column.name })}
         value={rollup.relation}
         onChange={(event) =>
@@ -779,6 +787,7 @@ function RollupConfig({ column, columns, onChange, host }: ConfigProps) {
         ))}
       </select>
       <select
+        className="showai-select"
         aria-label={tf("rollupColumn", { name: column.name })}
         value={rollup.column ?? ""}
         onChange={(event) =>
@@ -803,6 +812,7 @@ function RollupConfig({ column, columns, onChange, host }: ConfigProps) {
           )}
       </select>
       <select
+        className="showai-select"
         aria-label={tf("rollupAggregate", { name: column.name })}
         value={rollup.aggregate}
         onChange={(event) =>
@@ -824,7 +834,7 @@ function CustomConfig({ column, onChange }: ConfigProps) {
   const [draft, setDraft] = useState(() => JSON.stringify(column.config ?? {}));
   return (
     <input
-      className="sb-formula-input"
+      className="showai-input sb-formula-input"
       aria-label={tf("fieldConfig", { name: column.name })}
       spellCheck={false}
       value={draft}

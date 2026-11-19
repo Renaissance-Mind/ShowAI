@@ -718,6 +718,7 @@ export function ExperimentTrackerBlock({ data }: BlockProps) {
                   >
                     {run ? (
                       <input
+                        className="showai-checkbox"
                         type="checkbox"
                         aria-label={t("tracker.showRun", { id: run.id })}
                         checked={!hidden.has(run.id)}

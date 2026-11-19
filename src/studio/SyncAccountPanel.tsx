@@ -107,6 +107,7 @@ export default function SyncAccountPanel({
               <label className="sync-field">
                 <span>{t("currentPassword")}</span>
                 <input
+                  className="showai-input"
                   type="password"
                   required
                   autoComplete="current-password"
@@ -119,6 +120,7 @@ export default function SyncAccountPanel({
               <label className="sync-field">
                 <span>{t("newPassword")}</span>
                 <input
+                  className="showai-input"
                   type="password"
                   required
                   minLength={12}
@@ -374,6 +376,7 @@ export function IssuedToken({
       </p>
       <div>
         <input
+          className="showai-input"
           type="password"
           readOnly
           aria-label={t("newToken")}

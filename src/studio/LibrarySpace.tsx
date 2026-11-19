@@ -308,6 +308,7 @@ export default function LibrarySpace({ home }: { home: string }) {
         <div className="library-space-section-content">
           <div className="library-space-archive">
             <input
+              className="showai-input"
               aria-label={t("archiveLocation")}
               placeholder={t("archivePlaceholder")}
               value={archivePath}

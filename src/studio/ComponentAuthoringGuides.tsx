@@ -60,6 +60,7 @@ export default function ComponentAuthoringGuides({
       <label>
         {t("authoring.guide")}
         <select
+          className="showai-select"
           aria-label={t("authoring.guide")}
           value={selected}
           onChange={(event) => setSelected(event.target.value)}

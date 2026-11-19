@@ -6,8 +6,6 @@
 }
 .ui-flow-target {
   position: absolute;
-  border: 1.5px dashed #7654cf;
-  border-radius: 6px;
   box-sizing: border-box;
   pointer-events: none;
 }
@@ -26,9 +24,6 @@
   cursor: pointer;
   pointer-events: auto;
   box-shadow: 0 1px 5px #21103940;
-}
-.ui-flow-target.disabled {
-  border-color: #a7a2ae;
 }
 .ui-flow-markers[data-mode="test"] .ui-flow-target > button {
   pointer-events: none;
