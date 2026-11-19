@@ -95,11 +95,11 @@ test(
         );
         assert.equal(binding.home, receipt.home);
         assert.equal(binding.launch.args[0], receipt.runtime);
-        assert(
-          server.transport.args.includes(
-            join(receipt.installedPath, "mcp/launch.mjs"),
-          ),
-        );
+        const installed = JSON.parse(
+          await readFile(join(receipt.installedPath, "mcp.json"), "utf8"),
+        ).mcpServers[receipt.registeredMcp];
+        assert.equal(server.transport.command, join(receipt.installedPath, installed.command));
+        assert.deepEqual(server.transport.args, installed.args);
       }
       const record = join(other, "agent-runtime.json");
       const before = await readFile(record, "utf8");
