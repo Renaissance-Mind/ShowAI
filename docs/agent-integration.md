@@ -102,7 +102,7 @@ The output creates a `showai-cloud` package from the same Skills/assets, with HT
 
 ## Saved-page presentation contract
 
-Install or update the Codex plugin from ShowAI **Settings → Plugins**. Call `card_present` with the saved `projectId` and `pageId` to show a Page card. Include a `blockId` from the page outline to link to a component. The card navigates the open editor in this conversation or expands into a new editor, with the library sidebar initially collapsed. For direct navigation, call `card_navigate` and use `card_open` if it reports `unavailable`. Use `workbench_page_reference` to deliver a local reference file.
+Install or update the Codex plugin from ShowAI **Settings → Plugins**. Call `card_present` with the saved `projectId` and `pageId` to show a Page card. Include a `blockId` from the page outline to link to a component. A card reuses an editor already showing that Page in the conversation. Codex opens a separate side tab for another Page. Click the ShowAI icon beside the page icon to open the current Page in the full Workbench. For direct navigation, call `card_navigate` and use `card_open` if it reports `unavailable`. Use `workbench_page_reference` to deliver a local reference file.
 
 Local and HTTP MCP share `page_present({projectId,pageId,blockIds?})`. It captures **one source revision**, returns identity/hash/revision, and **leaves the Page unchanged**. **Complete HTML/source contain the whole Page**; blockIds only selects the inline preview. Source and build intermediates use one snapshot, and temporary build directories are cleaned on failure.
 

@@ -1,4 +1,4 @@
-import { browserSearch, codexWorkbench } from "../../browser/codex-workbench";
+import { browserSearch, codexWorkbench, openCodexPageTab } from "../../browser/codex-workbench";
 import { findVisibleBlock, flashBlocks } from "../ExternalChangeNotice";
 import {
   useEffect,
@@ -144,6 +144,8 @@ export function useStudioRouter({
   const t = useTranslator(studioMessages);
   const tc = useTranslator(commonMessages);
   const revealGeneration = useRef(0);
+  const locateTarget = useRef(locateAssistantTarget);
+  locateTarget.current = locateAssistantTarget;
   useEffect(() => () => { revealGeneration.current++; }, []);
   useEffect(() => {
     const host = window as Window & { showaiPendingInvite?: string };
@@ -180,7 +182,7 @@ export function useStudioRouter({
         }>
       ).detail;
       if (!detail?.pageId) return;
-      void locateAssistantTarget(detail.pageId, detail.blockId ? [detail.blockId] : [], detail.projectId, true).catch(report);
+      void locateTarget.current(detail.pageId, detail.blockId ? [detail.blockId] : [], detail.projectId, true).catch(report);
     };
     window.addEventListener("showai:open-page", open);
     return () => window.removeEventListener("showai:open-page", open);
@@ -438,7 +440,13 @@ export function useStudioRouter({
       return routes.current.openProject(id, folderId, current);
     });
   }
+  function opensInCodexTab(projectId: string, pageId: string) {
+    return codexWorkbench()?.mode === "thread" && view === "page" && !!page.draft &&
+      (page.projectId !== projectId || page.draft.id !== pageId);
+  }
   function openPage(id: string, projectId = selectedProject) {
+    if (projectId && opensInCodexTab(projectId, id))
+      return openCodexPageTab({ projectId, pageId: id });
     const workspace = workspaceRef.current;
     return router.current.run(false, (current) => {
       workspace.rememberScroll();
@@ -489,6 +497,10 @@ export function useStudioRouter({
     const pageId = target.pageId ?? page.draft?.id;
     if (!projectId || !pageId) return;
     const ids = target.blockIds;
+    if (opensInCodexTab(projectId, pageId)) {
+      await openCodexPageTab({ projectId, pageId, blockId: ids[0] });
+      return;
+    }
     const disposition = modifiers
       ? clickDisposition(modifiers, info?.platform === "darwin")
       : "current";
@@ -530,6 +542,10 @@ export function useStudioRouter({
     projectId = page.projectId ?? selectedProject,
     animate = false,
   ) {
+    if (projectId && opensInCodexTab(projectId, pageId)) {
+      await openCodexPageTab({ projectId, pageId, blockId: ids[0] });
+      return;
+    }
     const generation = ++revealGeneration.current;
     if (
       (view !== "page" || page.draft?.id !== pageId || page.projectId !== projectId) &&
@@ -552,7 +568,7 @@ export function useStudioRouter({
         if (performance.now() < deadline) window.setTimeout(reveal, 80);
         return;
       }
-      if (!first.closest(".page-surface")) {
+      if (!first.closest(".page-surface") || (animate && !first.closest("[data-board-id]"))) {
         first.scrollIntoView({
           block: first.getBoundingClientRect().height > (scope?.clientHeight ?? innerHeight) ? "start" : "center",
           inline: "nearest",

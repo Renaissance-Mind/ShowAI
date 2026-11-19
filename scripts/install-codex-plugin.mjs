@@ -216,7 +216,10 @@ async function stageWorkbenchTest(marketplaceRoot, pluginRoot, home) {
     const server = mcp.mcpServers.showai;
     server.command = await writeWorkbenchTestLauncher(staging);
     server.args = [];
-    Object.assign(server.env, env, { SHOWAI_RUNTIME_CONFIG: binding });
+    Object.assign(server.env, env, {
+      SHOWAI_RUNTIME_CONFIG: binding,
+      SHOWAI_CODEX_PLUGIN_ID: `${workbenchTestName}@${workbenchTestName}`,
+    });
     mcp.mcpServers = { [workbenchTestServer]: server };
     await writeFile(mcpPath, JSON.stringify(mcp, null, 2) + "\n");
 

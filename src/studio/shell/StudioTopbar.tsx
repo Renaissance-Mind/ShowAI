@@ -1,4 +1,8 @@
 import { SettingsSearch } from "../Settings";
+import { codexWorkbench, codexWorkbenchPageOpener } from "../../browser/codex-workbench";
+import { appIconForTheme } from "../../design/app-icon";
+import { useAppearanceTheme } from "../../design/useAppearanceTheme";
+import codexWorkbenchMessages from "../../i18n/messages/codex-workbench";
 import type { MouseEvent as ReactMouseEvent } from "react";
 import {
   ArrowUpRight,
@@ -67,7 +71,7 @@ import {
 } from "./types";
 
 export function StudioTopbar({
-  feedback: { report, action },
+  feedback: { report, action, draftHeld },
   library,
   route,
   catalog,
@@ -97,6 +101,7 @@ export function StudioTopbar({
     openPage,
     openTarget,
     openTargetClick,
+    locateAssistantTarget,
     openDoc,
   },
   pageActions: { busy, importPage, activePageTarget },
@@ -127,6 +132,9 @@ export function StudioTopbar({
   const ta = useTranslator(assistantMessages);
   const tn = useTranslator(navigationMessages);
   const ts = useTranslator(syncMessages);
+  const tcodex = useTranslator(codexWorkbenchMessages);
+  const theme = useAppearanceTheme();
+  const openWorkbench = codexWorkbenchPageOpener();
   const locale = useLocale();
   const {
     navigationUpdating,
@@ -160,6 +168,7 @@ export function StudioTopbar({
     catalogScrollRef,
     selectedRef,
   } = route;
+  const codexPage = view === "page" && codexWorkbench()?.mode === "thread";
   const {
     showTemplateVersions,
     setShowTemplateVersions,
@@ -220,7 +229,9 @@ export function StudioTopbar({
       /^projects\/([^/]+)\/pages\/([^/]+)\.json$/,
     );
     if (match) {
-      if (await openPage(match[2], match[1])) setRevealNode(result.blockId);
+      if (codexPage)
+        await locateAssistantTarget(match[2], result.blockId ? [result.blockId] : [], match[1]);
+      else if (await openPage(match[2], match[1])) setRevealNode(result.blockId);
     } else if (result.kind === "project" && result.projectId) {
       await openProject(result.projectId);
     } else if (result.kind === "component" || result.kind === "source") {
@@ -293,7 +304,7 @@ export function StudioTopbar({
         </h1>
       ) : (
         <div className="studio-breadcrumb">
-          {selectedProject && (
+          {!codexPage && selectedProject && (
             <button
               onClick={(event) =>
                 project && openTargetClick(projectTarget(project), event)
@@ -315,7 +326,7 @@ export function StudioTopbar({
               )}
             </button>
           )}
-          {breadcrumbFolders.map((item) => (
+          {!codexPage && breadcrumbFolders.map((item) => (
             <span className="studio-breadcrumb-folder" key={item.id}>
               <ChevronRight size={13} />
               <button
@@ -351,7 +362,24 @@ export function StudioTopbar({
           )}
           {view === "page" && (
             <>
-              <ChevronRight size={13} />
+              {codexPage ? (
+                <button
+                  type="button"
+                  className="studio-codex-workbench-link"
+                  aria-label={tcodex("openWorkbench")}
+                  title={tcodex("openWorkbench")}
+                  disabled={!openWorkbench || !page.projectId || !page.draft}
+                  onClick={action(async () => {
+                    if (!openWorkbench || !page.projectId || !page.draft) return;
+                    if (!(await page.flushOrDefer())) return draftHeld();
+                    await openWorkbench(page.projectId, page.draft.id);
+                  })}
+                >
+                  <img src={appIconForTheme(theme)} alt="" draggable={false} />
+                </button>
+              ) : (
+                <ChevronRight size={13} />
+              )}
               <PageIcon value={page.draft?.icon} size={18} />
               <input
                 className="studio-page-title-input"

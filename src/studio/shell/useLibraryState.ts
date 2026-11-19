@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { codexWorkbench } from "../../browser/codex-workbench";
 import type { DesktopChange, DesktopInfo } from "../../host/protocol";
 import type {
   DirectoryPreferences,
@@ -58,7 +59,7 @@ export function useLibraryState({
   const ts = useTranslator(syncMessages);
   const [navigationUpdating, setNavigationUpdating] = useState(true);
   const [info, setInfo] = useState<DesktopInfo | null>(null);
-  const capabilities = workbenchCapabilities(info?.platform);
+  const capabilities = workbenchCapabilities(info?.platform, codexWorkbench()?.mode === "thread");
   const externalChangesAvailable =
     capabilities.externalChanges && info?.libraryVersion === 2;
   const [projects, setProjects] = useState<ProjectSummary[]>([]);

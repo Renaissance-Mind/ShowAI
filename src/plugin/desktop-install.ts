@@ -475,6 +475,7 @@ export class DesktopPluginInstaller {
       SHOWAI_RUNTIME_CONFIG: record,
       SHOWAI_HOST_DISPLAY: HOST_PROFILES[host],
       ...(host === "codex" && {
+        SHOWAI_CODEX_PLUGIN_ID: identity,
         SHOWAI_CODEX_WORKBENCH_PROFILE: join(
           this.options.root,
           "codex-workbench",

@@ -7,6 +7,7 @@ import { workbenchRoutes, type CodexWorkbenchTransport } from "../host/codex-wor
 import { mcpFailure, mcpSuccess } from "./presentation-tools";
 import type { AgentService } from "./service";
 import {
+  codexPageIdentity,
   codexPageTarget,
   type CodexPageTarget,
   codexPageReferenceExtension,
@@ -46,6 +47,7 @@ const codexWorkbenchIcons = ([
 const readOnly = { readOnlyHint: true, destructiveHint: false, openWorldHint: false };
 const appOnly = { ui: { visibility: ["app"] } };
 const clientId = z.string().regex(/^[\w-]{1,100}$/);
+const globalWorkbenchTool = "workbench_open_global";
 
 export function codexWorkbenchConnection(
   open: OpenCodexWorkbench,
@@ -71,6 +73,10 @@ function registerCodexWorkbench(
 ) {
   const key = randomBytes(32).toString("hex");
   const navigation = new CodexWorkbenchNavigation(key);
+  const plugin = /^([\w-]+)@([\w-]+)$/.exec(process.env.SHOWAI_CODEX_PLUGIN_ID ?? "");
+  const globalEntrypoint = plugin
+    ? `codex://plugins/${encodeURIComponent(plugin[1])}@${encodeURIComponent(plugin[2])}/app/${globalWorkbenchTool}`
+    : undefined;
   let runtime: ReturnType<OpenCodexWorkbench> | undefined;
   const workbench = () => (runtime ??= open(key).catch((error) => {
     runtime = undefined;
@@ -85,7 +91,7 @@ function registerCodexWorkbench(
   };
 
   const views = [
-    { mode: "global", name: "workbench_open_global", uri: codexWorkbenchUri, title: "ShowAI Workbench" },
+    { mode: "global", name: globalWorkbenchTool, uri: codexWorkbenchUri, title: "ShowAI Workbench" },
     { mode: "thread", name: "workbench_open_page", uri: codexWorkbenchThreadUri, title: "ShowAI" },
   ] as const;
   const resources = [
@@ -93,9 +99,13 @@ function registerCodexWorkbench(
     { mode: "thread", name: "workbench_file", uri: codexWorkbenchFileUri, entrypoint: "file" },
     { mode: "thread", name: "workbench_page_card", uri: codexWorkbenchCardUri, entrypoint: "card" },
     { mode: "thread", name: "workbench_page_target", uri: codexWorkbenchTargetUri, entrypoint: "open" },
+    { mode: "thread", name: "workbench_page_target_v1", uri: "ui://showai/workbench-target-v1.html", entrypoint: "open" },
+    { mode: "thread", name: "workbench_page_card_v3", uri: "ui://showai/workbench-card-v3.html", entrypoint: "card" },
     { mode: "thread", name: "workbench_page_card_v2", uri: "ui://showai/workbench-card-v2.html", entrypoint: "card" },
     { mode: "thread", name: "workbench_page_card_v1", uri: "ui://showai/workbench-card-v1.html", entrypoint: "card" },
+    { mode: "thread", name: "workbench_thread_v4", uri: "ui://showai/workbench-thread-v4.html" },
     { mode: "thread", name: "workbench_thread_v3", uri: "ui://showai/workbench-thread-v3.html" },
+    { mode: "thread", name: "workbench_file_v2", uri: "ui://showai/workbench-file-v2.html", entrypoint: "file" },
     { mode: "thread", name: "workbench_file_v1", uri: "ui://showai/workbench-file-v1.html", entrypoint: "file" },
     { mode: undefined, name: "workbench_legacy", uri: legacyWorkbenchUri },
     { mode: "global", name: "workbench_global_v2", uri: "ui://showai/workbench-v2.html" },
@@ -110,7 +120,7 @@ function registerCodexWorkbench(
         contents: [{
           uri,
           mimeType,
-          text: codexWorkbenchHtml(mode, entrypoint, codexWorkbenchIcons[0].src),
+          text: codexWorkbenchHtml(mode, entrypoint, codexWorkbenchIcons[0].src, globalEntrypoint),
           _meta: {
             ui: {
               csp: {
@@ -206,7 +216,7 @@ function registerCodexWorkbench(
   }, (target, extra) => presentPageCard(target, extra._meta));
   server.registerTool("card_navigate", {
     title: "Navigate the current ShowAI editor",
-    description: "Navigate the visible editor in this conversation to the saved Page or its blockId. If status is unavailable, call card_open with the same target.",
+    description: "Locate a saved Page or its blockId in a visible ShowAI tab already showing that Page in this conversation. If status is unavailable, call card_open with the same target to open a separate Codex tab.",
     inputSchema: codexPageTarget,
     annotations: readOnly,
     _meta: { ui: { visibility: ["model", "app"] } },
@@ -292,7 +302,12 @@ function registerCodexWorkbench(
     description: "Read workbench changes after a cursor.",
     inputSchema: {
       after: z.number().int().min(-1), client: clientId,
-      panel: z.object({ scope: z.string().regex(/^[0-9a-f]{64}$/).optional(), visible: z.boolean(), acknowledged: z.string().uuid().optional() }).optional(),
+      panel: z.object({
+        scope: z.string().regex(/^[0-9a-f]{64}$/).optional(),
+        visible: z.boolean(),
+        page: z.object(codexPageIdentity).optional(),
+        acknowledged: z.string().uuid().optional(),
+      }).optional(),
     },
     annotations: readOnly,
     _meta: appOnly,
@@ -300,7 +315,7 @@ function registerCodexWorkbench(
     const changes = transport.changes(after, client);
     if (!panel) return changes;
     const scope = navigation.scope(extra._meta) ?? panel.scope;
-    return scope ? { ...changes, navigation: navigation.poll(scope, client, panel.visible, panel.acknowledged) } : changes;
+    return scope ? { ...changes, navigation: navigation.poll(scope, client, panel) } : changes;
   }));
   server.registerTool("workbench_media", {
     description: "Read local media from a workbench grant.",

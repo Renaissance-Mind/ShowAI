@@ -41,6 +41,7 @@ export default function AutoHideSidebar({
   mobileBoardKey,
   onMobileBack,
   compactOverlay = false,
+  pageOnly = false,
 }: {
   enabled: boolean;
   interactionHeld: boolean;
@@ -54,6 +55,7 @@ export default function AutoHideSidebar({
   mobileBoardKey?: string;
   onMobileBack?: () => void;
   compactOverlay?: boolean | "always";
+  pageOnly?: boolean;
 }) {
   const t = useTranslator(sidebarMessages);
   const tn = useTranslator(navigationMessages);
@@ -112,7 +114,7 @@ export default function AutoHideSidebar({
     : clampWidth(preferredWidth ?? (viewportWidth <= 1100 ? 208 : 240));
   const sidebar = useRef<HTMLElement>(null);
   const compact = !nativeTouch && (compactOverlay === "always" || (compactOverlay && viewportWidth < 720));
-  const automatic = enabled && !locked && !nativeTouch && !compact;
+  const automatic = enabled && !locked && !nativeTouch && !compact && !pageOnly;
   const mode = nativeTouch
     ? nativeLayout.docked
       ? "docked"
@@ -184,7 +186,7 @@ export default function AutoHideSidebar({
       return !current;
     });
   useEffect(() => {
-    if (nativeTouch) return;
+    if (nativeTouch || pageOnly) return;
     const toggle = () => {
       if (compact) setNativeOpen((value) => !value);
       else toggleLocked();
@@ -200,7 +202,7 @@ export default function AutoHideSidebar({
       window.removeEventListener("keydown", key);
       window.removeEventListener(SIDEBAR_TOGGLE_EVENT, toggle);
     };
-  }, [nativeTouch, compact]);
+  }, [nativeTouch, compact, pageOnly]);
   useEffect(() => {
     if (!locating) return;
     const timer = window.setTimeout(
@@ -330,6 +332,13 @@ export default function AutoHideSidebar({
       setKeyboardFocus(true);
     });
   };
+
+  if (pageOnly)
+    return (
+      <div className="studio-workspace" inert={switchingTab} aria-busy={switchingTab}>
+        {children}
+      </div>
+    );
 
   if (nativeTouch)
     return (

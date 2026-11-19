@@ -1,11 +1,12 @@
-export function workbenchCapabilities(platform?: string) {
+export function workbenchCapabilities(platform?: string, singlePage = false) {
   const ios =
     platform === "ios" ||
     (typeof document !== "undefined" &&
       document.documentElement.dataset.native === "ios");
+  const workspaceWindows = !ios && !singlePage;
   return {
-    tabs: !ios,
-    windows: !ios,
+    tabs: workspaceWindows,
+    windows: workspaceWindows,
     revealFiles: !ios,
     exportSite: !ios,
     advancedPageExport: !ios,

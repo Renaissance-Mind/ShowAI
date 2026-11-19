@@ -89,6 +89,7 @@ test(
           (item) => item.name === receipt.registeredMcp,
         );
         assert(server.enabled);
+        assert.equal(server.transport.env.SHOWAI_CODEX_PLUGIN_ID, receipt.pluginId);
         const binding = JSON.parse(
           await readFile(server.transport.env.SHOWAI_RUNTIME_CONFIG, "utf8"),
         );

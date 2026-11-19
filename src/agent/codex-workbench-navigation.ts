@@ -7,7 +7,12 @@ type Pending = {
   sent: boolean;
   finish: (status: "accepted" | "superseded" | "unavailable") => void;
 };
-type Panel = { client: string; seen: number; pending?: Pending };
+type PageIdentity = Pick<CodexPageTarget, "projectId" | "pageId">;
+type PanelReport = { visible: boolean; page?: PageIdentity; acknowledged?: string };
+type Panel = { scope: string; page: PageIdentity; seen: number; pending?: Pending };
+
+const samePage = (left: PageIdentity, right: PageIdentity) =>
+  left.projectId === right.projectId && left.pageId === right.pageId;
 
 export class CodexWorkbenchNavigation {
   private readonly panels = new Map<string, Panel>();
@@ -19,7 +24,7 @@ export class CodexWorkbenchNavigation {
       return createHmac("sha256", this.key).update(thread).digest("hex");
   }
 
-  poll(scope: string, client: string, visible: boolean, acknowledged?: string) {
+  poll(scope: string, client: string, { visible, page, acknowledged }: PanelReport) {
     const now = Date.now();
     for (const [id, panel] of this.panels) {
       if (now - panel.seen > 5000) {
@@ -27,18 +32,17 @@ export class CodexWorkbenchNavigation {
         this.panels.delete(id);
       }
     }
-    let panel = this.panels.get(scope);
-    if (!visible) {
-      if (panel?.client === client) {
-        panel.pending?.finish("unavailable");
-        this.panels.delete(scope);
-      }
+    const id = `${scope}:${client}`;
+    let panel = this.panels.get(id);
+    if (!visible || !page) {
+      panel?.pending?.finish("unavailable");
+      this.panels.delete(id);
       return;
     }
-    if (panel?.client !== client) {
-      if (panel?.pending) return;
-      panel = { client, seen: now };
-      this.panels.set(scope, panel);
+    if (!panel || !samePage(panel.page, page)) {
+      panel?.pending?.finish("unavailable");
+      panel = { scope, page, seen: now };
+      this.panels.set(id, panel);
     }
     panel.seen = now;
     const pending = panel.pending;
@@ -52,17 +56,23 @@ export class CodexWorkbenchNavigation {
   }
 
   async navigate(scope: string | undefined, target: CodexPageTarget) {
-    const panel = scope && this.panels.get(scope);
-    if (!panel || Date.now() - panel.seen > 5000) return "unavailable";
+    const cutoff = Date.now() - 5000;
+    let panel: Panel | undefined;
+    for (const candidate of this.panels.values()) {
+      if (candidate.scope === scope && candidate.seen >= cutoff && samePage(candidate.page, target) &&
+          (!panel || candidate.seen > panel.seen)) panel = candidate;
+    }
+    if (!panel) return "unavailable";
+    const selected = panel;
     panel.pending?.finish("superseded");
     return new Promise<"accepted" | "superseded" | "unavailable">((resolve) => {
       const timer = setTimeout(() => finish("unavailable"), 3500);
       const finish: Pending["finish"] = (status) => {
         clearTimeout(timer);
-        panel.pending = undefined;
+        selected.pending = undefined;
         resolve(status);
       };
-      panel.pending = { id: randomUUID(), target, sent: false, finish };
+      selected.pending = { id: randomUUID(), target, sent: false, finish };
     });
   }
 }

@@ -1,4 +1,5 @@
 import type { AgentComponentContext } from "../agent-host/types";
+import type { CodexPageTarget } from "../agent/codex-page-reference";
 import type { PageReference } from "../core/page-reference";
 import type { DesktopResponse } from "../host/protocol";
 import type { WorkbenchChanges, WorkbenchRoute } from "../host/codex-workbench-transport";
@@ -20,9 +21,11 @@ declare global {
         components?: AgentComponentContext[],
       ): Promise<unknown>;
       openLink(url: string): Promise<unknown>;
+      openWorkbench?(projectId: string, pageId: string): Promise<unknown>;
+      openPageTab?(target: CodexPageTarget): Promise<void>;
       ready(): void;
       canReference(): boolean;
-      updatePage?(projectId: string, pageId: string): void;
+      updatePage?(projectId: string | null, pageId?: string): void;
       createWorker?(kind: "source" | "cubic"): Worker;
       workbenchRequest?(route: WorkbenchRoute, args: Record<string, unknown>, client: string): Promise<DesktopResponse<unknown>>;
       workbenchChanges?(after: number, client: string): Promise<WorkbenchChanges>;
@@ -46,7 +49,18 @@ export function reportCodexWorkbenchReady() {
 }
 
 export function rememberCodexWorkbenchPage(projectId: string | null, pageId?: string) {
-  if (projectId && pageId) window.__SHOWAI_CODEX_HOST__?.updatePage?.(projectId, pageId);
+  window.__SHOWAI_CODEX_HOST__?.updatePage?.(projectId, pageId);
+}
+
+export function codexWorkbenchPageOpener() {
+  return window.__SHOWAI_CODEX_HOST__?.openWorkbench;
+}
+
+export async function openCodexPageTab(target: CodexPageTarget) {
+  const open = window.__SHOWAI_CODEX_HOST__?.openPageTab;
+  if (!open) throw new Error(t("cannotOpenPageTab"));
+  await open(target);
+  return true;
 }
 
 export function sendCodexWorkbenchReference(

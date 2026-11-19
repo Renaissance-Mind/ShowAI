@@ -10,7 +10,7 @@ export const codexPageReferenceExtension = ".showai-ref";
 export const codexPageReferenceMaxLength = 4096;
 
 const identity = z.string().regex(/^[a-zA-Z0-9][a-zA-Z0-9_-]{0,127}$/);
-const codexPageIdentity = { projectId: identity, pageId: identity };
+export const codexPageIdentity = { projectId: identity, pageId: identity };
 export const codexPageTarget = { ...codexPageIdentity, blockId: z.string().min(1).max(512).optional() };
 export type CodexPageTarget = { projectId: string; pageId: string; blockId?: string };
 const pageReference = z.strictObject({

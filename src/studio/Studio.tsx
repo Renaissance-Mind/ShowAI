@@ -117,6 +117,7 @@ export default function Studio() {
     setRevealNode,
     catalogScrollRef,
   } = route;
+  const codexThread = codexWorkbench()?.mode === "thread";
   const appUpdate = useAppUpdate();
   const catalog = useCatalogState(route);
   const dialogs = useDialogState();
@@ -473,7 +474,8 @@ export default function Studio() {
         />
         <AutoHideSidebar
           enabled={view === "page" && !!page.draft}
-          compactOverlay={codexWorkbench()?.mode === "thread" ? "always" : view === "settings" && settingsSection === "sync"}
+          pageOnly={codexThread && view === "page"}
+          compactOverlay={codexThread ? "always" : view === "settings" && settingsSection === "sync"}
           mobileBoardKey={
             view === "page" && page.draft?.content.attrs?.kind === "board"
               ? page.draft.id
@@ -525,7 +527,7 @@ export default function Studio() {
               onStep={(offset) => void workspace.step(offset).catch(report)}
             />
           }
-          topbar={
+          topbar={capabilities.tabs && (
             <WorkspaceTabs
               tabs={workspace.tabs}
               activeId={workspace.activeId}
@@ -538,7 +540,7 @@ export default function Studio() {
               onMove={workspace.move}
               shortcutHint={info?.mode !== "browser"}
             />
-          }
+          )}
         >
           <AssistantWorkbench
             enabled={view === "page" && !!page.draft}
@@ -568,8 +570,8 @@ export default function Studio() {
             <main
               className={`studio-main${recordPeek.view ? " has-record-peek" : ""}`}
               id="studio-tab-panel"
-              role="tabpanel"
-              aria-labelledby={`workspace-tab-${workspace.activeId}`}
+              role={capabilities.tabs ? "tabpanel" : undefined}
+              aria-labelledby={capabilities.tabs ? `workspace-tab-${workspace.activeId}` : undefined}
             >
               <StudioTopbar
                 feedback={feedback}

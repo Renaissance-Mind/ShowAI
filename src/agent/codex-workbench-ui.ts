@@ -4,16 +4,17 @@ import { codexPageReferenceMaxLength } from "./codex-page-reference";
 
 export type CodexWorkbenchMode = "global" | "thread";
 export const codexWorkbenchUri = "ui://showai/workbench-v3.html";
-export const codexWorkbenchThreadUri = "ui://showai/workbench-thread-v4.html";
-export const codexWorkbenchFileUri = "ui://showai/workbench-file-v2.html";
+export const codexWorkbenchThreadUri = "ui://showai/workbench-thread-v5.html";
+export const codexWorkbenchFileUri = "ui://showai/workbench-file-v3.html";
 
-export const codexWorkbenchCardUri = "ui://showai/workbench-card-v3.html";
-export const codexWorkbenchTargetUri = "ui://showai/workbench-target-v1.html";
+export const codexWorkbenchCardUri = "ui://showai/workbench-card-v4.html";
+export const codexWorkbenchTargetUri = "ui://showai/workbench-target-v2.html";
 
 export function codexWorkbenchHtml(
   mode?: CodexWorkbenchMode,
   entrypoint?: "file" | "card" | "open",
   icon?: string,
+  globalEntrypoint?: string,
 ) {
   const useCard = entrypoint === "card" || entrypoint === "open";
   const card = useCard
@@ -54,6 +55,7 @@ ${card}
 <script>
 (() => {
   const translations = ${JSON.stringify(messages.catalogs)};
+  const globalEntrypoint = ${JSON.stringify(globalEntrypoint ?? null)};
   const chunkBytes = ${workbenchChunkBytes};
   const useFileEntrypoint = ${entrypoint === "file"};
   const usePageCard = ${useCard};
@@ -67,7 +69,7 @@ ${card}
   const card = document.getElementById("showai-page-card");
   const openCardButton = document.getElementById("showai-card-open");
   let pageCard, openingCard = false;
-  let navigationScope, acknowledgedNavigation;
+  let navigationScope, activePage, acknowledgedNavigation;
   const pending = new Map();
   let locale = navigator.language.startsWith("zh") ? "zh-CN" : "en";
   let context = {};
@@ -141,6 +143,26 @@ ${card}
 
   function openLink(url) {
     return request("ui/open-link", { url });
+  }
+
+  async function openWorkbench(projectId, pageId) {
+    const url = new URL(globalEntrypoint);
+    url.searchParams.set("path", "/?" + new URLSearchParams({ project: projectId, page: pageId }));
+    const result = await openLink(url.href);
+    if (result?.isError) throw new Error(t("cannotOpenWorkbench"));
+  }
+
+  async function openPageTab(target) {
+    if (!capabilities.experimental?.["openai/files"] || !capabilities.serverTools)
+      throw new Error(t("cannotOpenPageTab"));
+    const result = resultPayload(await request("tools/call", {
+      name: "workbench_page_reference", arguments: target,
+    }));
+    const path = result?.structuredContent?.data?.path;
+    if (result?.isError || typeof path !== "string")
+      throw new Error(result?.structuredContent?.error?.message ?? t("cannotOpenPageTab"));
+    const opened = await request("openai/files/open", { path });
+    if (opened?.isError) throw new Error(t("cannotOpenPageTab"));
   }
 
   function canReference() {
@@ -439,26 +461,33 @@ ${card}
         attachReference,
         canReference,
         openLink,
+        ...(globalEntrypoint && { openWorkbench }),
+        openPageTab,
         importAsset,
         readMedia,
         workbenchRequest: (route, args, client) => callWorkbench("workbench_request", { route, args, client }),
         workbenchChanges: async (after, client) => {
           const panel = ready && mode === "thread" ? {
-            scope: navigationScope, visible: document.visibilityState === "visible", acknowledged: acknowledgedNavigation,
+            scope: navigationScope, visible: document.visibilityState === "visible",
+            page: activePage, acknowledged: acknowledgedNavigation,
           } : undefined;
           const changes = await callWorkbench("workbench_changes", { after, client, panel });
-          if (changes.navigation && panel?.visible) {
+          if (changes.navigation && document.visibilityState === "visible") {
             const { id, target } = changes.navigation;
-            displayPage(target.pageId, target.projectId, target.blockId);
-            acknowledgedNavigation = id;
+            if (activePage?.projectId === target.projectId && activePage?.pageId === target.pageId) {
+              displayPage(target.pageId, target.projectId, target.blockId);
+              acknowledgedNavigation = id;
+            }
           }
           return changes;
         },
         updatePage: (projectId, pageId) => {
-          if (mode === "thread")
+          if (mode !== "thread") return;
+          activePage = projectId && pageId ? { projectId, pageId } : undefined;
+          if (activePage)
             window.openai?.setWidgetState?.({
               ...window.openai.widgetState,
-              showaiWorkbench: { projectId, pageId },
+              showaiWorkbench: activePage,
             });
         },
         ready: () => {

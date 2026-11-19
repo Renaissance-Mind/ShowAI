@@ -118,6 +118,29 @@
   height: 20px;
   flex-shrink: 0;
 }
+.studio-topbar .studio-breadcrumb > button.studio-codex-workbench-link {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 26px;
+  height: 26px;
+  padding: 3px;
+  border-radius: 6px;
+}
+.studio-codex-workbench-link img {
+  width: 20px;
+  height: 20px;
+}
+.studio-codex-workbench-link:hover:not(:disabled) {
+  background: var(--hover);
+}
+.studio-codex-workbench-link:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+.studio-codex-workbench-link:disabled {
+  opacity: 0.45;
+}
 .studio-topbar-brand strong {
   font-size: 16px;
   font-weight: 600;

@@ -8,7 +8,7 @@ import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
 import { expect, it } from "vitest";
 import { codexWorkbenchUri, codexWorkbenchThreadUri, codexWorkbenchFileUri, codexWorkbenchCardUri, codexWorkbenchTargetUri } from "./codex-workbench-ui";
-import { codexPageReferenceExtension } from "./codex-page-reference";
+import { codexPageReferenceExtension, type CodexPageTarget } from "./codex-page-reference";
 import type { ShowDocument } from "../types";
 
 type SavedPage = { document: ShowDocument; hash: string; revision?: string };
@@ -27,7 +27,10 @@ it("opens both Codex workbench entries and saves into the MCP library", async ()
   const transport = new StdioClientTransport({
     command: process.execPath,
     args: [join(process.cwd(), "dist-agent/cli.mjs"), "mcp", "--home", home],
-    env: { SHOWAI_CODEX_WORKBENCH_PROFILE: join(root, "profile") },
+    env: {
+      SHOWAI_CODEX_WORKBENCH_PROFILE: join(root, "profile"),
+      SHOWAI_CODEX_PLUGIN_ID: "showai-workbench-test@showai-workbench-test",
+    },
     stderr: "pipe",
   });
   try {
@@ -69,7 +72,9 @@ it("opens both Codex workbench entries and saves into the MCP library", async ()
     expect(cardResource.contents[0]).toHaveProperty(
       "text", expect.stringContaining('"ui/request-display-mode"'),
     );
-    expect(cardResource.contents[0]).not.toHaveProperty("text", expect.stringContaining("openai/files/open"));
+    expect(cardResource.contents[0]).toHaveProperty("text", expect.stringContaining(
+      "codex://plugins/showai-workbench-test@showai-workbench-test/app/workbench_open_global",
+    ));
     const direct = await client.readResource({ uri: codexWorkbenchTargetUri });
     expect(direct.contents[0]._meta?.["openai/ui"]).toMatchObject({ preferredDisplayMode: "fullscreen" });
     const fileResource = await client.readResource({ uri: codexWorkbenchFileUri });
@@ -237,26 +242,41 @@ it("opens both Codex workbench entries and saves into the MCP library", async ()
     const show = await client.callTool({ name: "card_open", arguments: component, _meta: { threadId: "first" } });
     expect(show._meta?.showaiPageCard).toMatchObject(component);
     expect(show._meta?.showaiNavigationScope).toEqual(expect.any(String));
+    expect(show.content).toEqual([expect.objectContaining({ type: "text" })]);
     const lost = await client.callTool({ name: "card_present", arguments: { ...component, blockId: "deleted-block" } });
     expect(lost.isError).toBe(true);
-    const poll = async (threadId: string, acknowledged?: string) => {
+    const other = await invoke<SavedPage>("pages:create", { projectId, title: "A separate Codex tab" });
+    const otherPage = { projectId, pageId: other.document.id };
+    const poll = async (threadId: string, opened: CodexPageTarget, acknowledged?: string, visible = true) => {
       const result = await client.callTool({ name: "workbench_changes", _meta: { threadId }, arguments: {
-        after: -1, client: "editor-" + threadId, panel: { visible: true, acknowledged },
+        after: -1, client: "editor-" + opened.pageId, panel: {
+          page: { projectId: opened.projectId, pageId: opened.pageId }, visible, acknowledged,
+        },
       } });
-      return (result._meta!.showaiWorkbenchData as { navigation?: { id: string; target: typeof component } }).navigation;
+      return (result._meta!.showaiWorkbenchData as { navigation?: { id: string; target: CodexPageTarget } }).navigation;
     };
-    const jump = (threadId: string) => client.callTool({
-      name: "card_navigate", arguments: component, _meta: { threadId },
+    const jump = (threadId: string, target: CodexPageTarget) => client.callTool({
+      name: "card_navigate", arguments: target, _meta: { threadId },
     });
-    await poll("first");
-    expect((await jump("second")).structuredContent).toMatchObject({ data: { status: "unavailable" } });
-    const navigating = jump("first");
+    await poll("first", component);
+    expect((await jump("second", component)).structuredContent).toMatchObject({ data: { status: "unavailable" } });
+    expect((await jump("first", otherPage)).structuredContent).toMatchObject({ data: { status: "unavailable" } });
+    await poll("first", otherPage);
+    const navigating = jump("first", component);
     let navigation: Awaited<ReturnType<typeof poll>>;
-    await expect.poll(async () => !!(navigation = await poll("first"))).toBe(true);
+    await expect.poll(async () => !!(navigation = await poll("first", component))).toBe(true);
     expect(navigation!.target).toEqual(component);
-    expect(await poll("second")).toBeUndefined();
-    await poll("first", navigation!.id);
+    expect(await poll("first", otherPage)).toBeUndefined();
+    expect(await poll("second", component)).toBeUndefined();
+    await poll("first", component, navigation!.id);
     expect((await navigating).structuredContent).toMatchObject({ data: { status: "accepted" } });
+    await poll("first", component, undefined, false);
+    expect((await jump("first", component)).structuredContent).toMatchObject({ data: { status: "unavailable" } });
+    const navigatingOther = jump("first", otherPage);
+    await expect.poll(async () => !!(navigation = await poll("first", otherPage))).toBe(true);
+    expect(navigation!.target).toEqual(otherPage);
+    await poll("first", otherPage, navigation!.id);
+    expect((await navigatingOther).structuredContent).toMatchObject({ data: { status: "accepted" } });
     const fileLaunch = await client.callTool({
       name: "workbench_open_file",
       arguments: {

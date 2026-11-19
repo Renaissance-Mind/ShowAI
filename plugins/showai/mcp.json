@@ -6,7 +6,10 @@
       "command": "node",
       "args": ["./mcp/launch.mjs"],
       "cwd": "./",
-      "env": { "SHOWAI_HOST_DISPLAY": "mcp-app" }
+      "env": {
+        "SHOWAI_HOST_DISPLAY": "mcp-app",
+        "SHOWAI_CODEX_PLUGIN_ID": "showai@renaissance-mind"
+      }
     }
   }
 }

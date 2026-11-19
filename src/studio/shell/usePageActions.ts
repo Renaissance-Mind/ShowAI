@@ -63,6 +63,7 @@ export function usePageActions({
     refreshProjects,
   },
   route: {
+    view,
     selectedProject,
     setSelectedProject,
     selectedFolder,
@@ -94,6 +95,7 @@ export function usePageActions({
   >;
   route: Pick<
     RouteState,
+    | "view"
     | "selectedProject"
     | "setSelectedProject"
     | "selectedFolder"
@@ -158,8 +160,8 @@ export function usePageActions({
   }, [exportReceipt]);
   const tcodex = useTranslator(codexWorkbenchMessages);
   useEffect(() => {
-    rememberCodexWorkbenchPage(page.projectId, activePageId ?? undefined);
-  }, [page.projectId, activePageId]);
+    rememberCodexWorkbenchPage(view === "page" ? page.projectId : null, activePageId);
+  }, [view, page.projectId, activePageId]);
   const referenceOwner = useRef<string | undefined>(undefined);
   const activeReferenceScope = `${page.projectId ?? ""}:${activePageId ?? ""}`;
   useEffect(() => {
