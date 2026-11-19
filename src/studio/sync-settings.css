@@ -1803,6 +1803,40 @@
   margin: 0;
   line-height: 1.6;
 }
+.sync-binding-summary {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 12px;
+  border: 1px solid var(--dialog-rule);
+  border-radius: 9px;
+  background: var(--dialog-fill);
+}
+.sync-binding-summary > svg {
+  flex: none;
+  color: var(--muted);
+}
+.sync-binding-summary > h3 {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+.sync-binding-summary + .sync-field,
+.sync-binding-detach {
+  margin-top: 18px;
+}
+.sync-binding-detach > h3 {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+}
+.sync-binding-detach .settings-help {
+  margin: 5px 0 12px;
+  line-height: 1.6;
+}
 .sync-manager-mobile-state {
   display: none;
 }

@@ -164,18 +164,20 @@ export function PackagingDialog({
             </section>
           );
         })}
-        <div className={`packaging-total${over ? " is-over" : ""}`}>
-          <span>
-            {t("total", {
-              size: formatSize(total),
-              limit: formatSize(plan.limits.totalBytes),
-            })}
-          </span>
-          <progress
-            max={plan.limits.totalBytes}
-            value={Math.min(total, plan.limits.totalBytes)}
-          />
-        </div>
+        {plan.items.length > 0 && (
+          <div className={`packaging-total${over ? " is-over" : ""}`}>
+            <span>
+              {t("total", {
+                size: formatSize(total),
+                limit: formatSize(plan.limits.totalBytes),
+              })}
+            </span>
+            <progress
+              max={plan.limits.totalBytes}
+              value={Math.min(total, plan.limits.totalBytes)}
+            />
+          </div>
+        )}
         {over && (
           <p className="studio-form-error" role="alert">
             {t("overLimit")}

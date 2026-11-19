@@ -66,6 +66,10 @@
   min-width: 0;
 }
 .studio-dialog-header h2 {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
   min-width: 0;
   margin: 0;
   font-size: 20px;
@@ -104,7 +108,9 @@
 }
 .studio-dialog-description {
   flex: 0 1 auto;
+  max-height: 32dvh;
   overflow-y: auto;
+  overscroll-behavior: contain;
   margin: 0;
   padding: 0 var(--dialog-pad);
   font-size: 14px;
@@ -121,6 +127,9 @@
 .studio-dialog-form {
   display: grid;
   gap: 16px;
+}
+.studio-dialog-description + .studio-form {
+  padding-top: 16px;
 }
 .studio-modal :is(.studio-dialog-form, .studio-form) > label {
   display: grid;

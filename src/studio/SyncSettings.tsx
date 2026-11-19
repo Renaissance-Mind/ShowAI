@@ -1311,7 +1311,30 @@ export default function SyncSettings({
               className="sync-dialog"
             >
               <div className="sync-dialog-body studio-dialog-body">
-                <h3>{project.name}</h3>
+                <div className="sync-binding-summary">
+                  <Folder size={17} aria-hidden="true" />
+                  <h3>{project.name}</h3>
+                  {binding.role !== "viewer" && (
+                    <button
+                      type="button"
+                      className="settings-button"
+                      onClick={() =>
+                        void run(async () =>
+                          setPackaging({
+                            projectId: project.id,
+                            name: project.name,
+                            plan: await desktop.invoke<PackagingPlan>(
+                              "packaging:sync",
+                              { projectId: project.id },
+                            ),
+                          }),
+                        )
+                      }
+                    >
+                      {t("choosePackagedFiles")}
+                    </button>
+                  )}
+                </div>
                 {sameServer.length > 1 && (
                   <label className="sync-field">
                     <span>{t("syncAccount")}</span>
@@ -1335,31 +1358,11 @@ export default function SyncSettings({
                   </label>
                 )}
                 {binding.error && <p className="sync-error">{binding.error}</p>}
-                {binding.role !== "viewer" && (
-                  <button
-                    type="button"
-                    className="sync-text-button"
-                    onClick={() =>
-                      void run(async () =>
-                        setPackaging({
-                          projectId: project.id,
-                          name: project.name,
-                          plan: await desktop.invoke<PackagingPlan>(
-                            "packaging:sync",
-                            { projectId: project.id },
-                          ),
-                        }),
-                      )
-                    }
-                  >
-                    {t("choosePackagedFiles")}
-                  </button>
-                )}
-                <section className="sync-account-disclosure">
+                <section className="sync-binding-detach">
                   <h3 className="settings-section-heading">{t("detach")}</h3>
                   <p className="settings-help">{t("detachHelp")}</p>
                   {confirmDetach === project.id ? (
-                    <div className="sync-form-actions">
+                    <div className="studio-dialog-actions">
                       <button
                         className="sync-text-button"
                         onClick={() => setConfirmDetach("")}
@@ -1367,7 +1370,7 @@ export default function SyncSettings({
                         {tc("cancel")}
                       </button>
                       <button
-                        className="sync-text-button sync-danger"
+                        className="settings-button danger"
                         disabled={busy}
                         onClick={() =>
                           void run(async () => {
@@ -1387,7 +1390,7 @@ export default function SyncSettings({
                     </div>
                   ) : (
                     <button
-                      className="sync-text-button sync-danger"
+                      className="settings-button sync-danger"
                       onClick={() => setConfirmDetach(project.id)}
                     >
                       {t("detach")}

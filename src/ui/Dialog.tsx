@@ -140,11 +140,11 @@ export default function Dialog({
                   <Icon size={20} strokeWidth={1.7} />
                 </span>
               )}
-              <h2>{title}</h2>
+              <h2 title={title}>{title}</h2>
               {titleAccessory}
             </div>
           ) : (
-            <h2>{title}</h2>
+            <h2 title={title}>{title}</h2>
           )}
           {headerContent}
           {headerActions ? (
