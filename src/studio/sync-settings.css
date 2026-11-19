@@ -656,13 +656,6 @@
   font-size: 14px;
   line-height: 1.5;
 }
-.sync-dialog > header {
-  padding: 16px 22px;
-}
-.sync-dialog > header h2 {
-  font-size: 17px;
-  font-weight: 600;
-}
 .sync-dialog .settings-button,
 .sync-dialog input:not([type="radio"], [type="checkbox"]),
 .sync-dialog select {
@@ -681,9 +674,12 @@
   outline-offset: 3px;
 }
 .sync-dialog .sync-primary {
-  background: var(--text);
-  border-color: var(--text);
+  background: var(--dialog-button);
+  border-color: var(--dialog-button);
   color: var(--paper);
+}
+.sync-dialog .sync-primary:hover:enabled {
+  background: color-mix(in srgb, var(--dialog-button) 84%, var(--text));
 }
 .sync-dialog .sync-danger {
   color: var(--danger);
@@ -697,9 +693,9 @@
 .sync-dialog .settings-help {
   font-size: 13px;
 }
-.sync-dashboard-dialog.wide {
-  width: min(940px, 100%);
-  height: min(700px, calc(100dvh - 48px));
+.studio-modal.sync-dashboard-dialog {
+  width: min(900px, 100%);
+  height: min(690px, 100%);
 }
 .sync-dashboard-body {
   padding: 0;
@@ -715,6 +711,7 @@
   flex-shrink: 0;
 }
 .sync-management {
+  container: sync-project-content / inline-size;
   display: grid;
   grid-template-columns: 220px minmax(0, 1fr);
   flex: 1;
@@ -840,31 +837,57 @@
   height: 28px;
 }
 .sync-management-content {
-  padding: 26px 28px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  align-content: start;
+  align-items: start;
+  gap: 14px;
+  padding: 16px var(--dialog-pad) 22px;
   min-width: 0;
   min-height: 0;
   overflow: auto;
 }
 .sync-project-overview {
-  padding-bottom: 24px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  grid-column: 1 / -1;
 }
-.sync-eyebrow {
-  font-size: 12px;
+.sync-project-overview > svg {
+  flex: none;
   color: var(--muted);
-  margin-bottom: 6px;
+}
+.sync-project-overview > div {
+  min-width: 0;
 }
 .sync-project-overview h2 {
-  font-size: 23px;
+  margin: 0;
+  font-size: 17px;
   font-weight: 600;
   letter-spacing: -0.4px;
   overflow-wrap: anywhere;
 }
 .sync-project-overview p {
-  margin: 7px 0 0;
+  margin: 3px 0 0;
+  line-height: 1.5;
 }
 .sync-management-section {
-  padding: 22px 0;
-  border-top: 1px solid var(--line);
+  min-width: 0;
+  padding: 16px;
+  border: 1px solid var(--dialog-rule);
+  border-radius: 12px;
+}
+@container sync-project-content (min-width: 752px) {
+  .sync-management-focused .sync-management-content {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  }
+}
+.sync-management-content
+  > :is(.sync-inline-confirm, .sync-archive-section, .sync-management-empty) {
+  grid-column: 1 / -1;
+}
+.sync-invite-section {
+  background: var(--dialog-fill);
 }
 .sync-management-section-heading {
   display: flex;
@@ -902,14 +925,15 @@
   border-top: 1px solid var(--line);
 }
 .sync-members-table td:nth-child(2) {
-  width: 125px;
+  width: 92px;
 }
 .sync-members-table td:last-child {
-  width: 62px;
+  width: 44px;
   text-align: right;
 }
 .sync-members-table select {
-  width: 115px;
+  width: 88px;
+  max-width: 100%;
 }
 .sync-member-identity {
   display: flex;
@@ -917,9 +941,20 @@
   gap: 11px;
   padding-right: 12px;
 }
-.sync-member-identity > svg {
-  color: var(--muted);
-  flex-shrink: 0;
+.sync-member-avatar {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 29px;
+  height: 29px;
+  border-radius: 50%;
+  color: var(--dialog-ink);
+  background: color-mix(in srgb, var(--dialog-ink) 9%, var(--paper));
+  font-size: 12px;
+  font-weight: 650;
+}
+.sync-member-identity > div {
+  min-width: 0;
 }
 .sync-member-identity strong {
   font-size: 14px;
@@ -941,25 +976,31 @@
   font-size: 12px;
 }
 .sync-section-description {
-  margin: -4px 0 18px;
+  margin: -4px 0 14px;
+  line-height: 1.55;
 }
 .sync-invite-controls {
-  display: flex;
-  align-items: flex-end;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(142px, 100%), 1fr));
+  align-items: end;
   gap: 12px;
 }
 .sync-invite-controls label {
   display: grid;
+  min-width: 0;
   gap: 6px;
   font-size: 12px;
 }
-.sync-invite-controls select {
-  min-width: 145px;
+.sync-invite-controls :is(select, input) {
+  width: 100%;
+  min-width: 0;
+  max-width: none;
 }
-.sync-invite-controls input {
-  min-width: 180px;
-  max-width: 100%;
+.sync-invite-submit {
+  margin-top: 14px;
+}
+.sync-invite-submit > button {
+  width: 100%;
 }
 .sync-revoke-choice {
   display: flex;
@@ -1023,7 +1064,7 @@
   justify-content: space-between;
   gap: 20px;
   border-top: 1px solid var(--line);
-  padding: 22px 0 0;
+  padding: 16px 0 0;
 }
 .sync-archive-section h3 {
   font-size: 13px;
@@ -1457,8 +1498,8 @@
     grid-column: 1 / -1;
   }
 }
-.sync-upload-dialog .sync-field {
-  margin: 18px 0;
+.sync-upload-dialog .studio-dialog-body {
+  padding-top: 16px;
 }
 .sync-connect .sync-account-disclosure {
   margin: 16px 0;
@@ -1758,8 +1799,9 @@
   .settings-button:not(.sync-primary, .sync-danger-fill):hover {
   background: var(--surface);
 }
-.sync-simple-dialog {
-  width: min(460px, calc(100vw - 28px));
+.sync-simple-dialog .studio-dialog-body > .settings-help {
+  margin: 0;
+  line-height: 1.6;
 }
 .sync-manager-mobile-state {
   display: none;

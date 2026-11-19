@@ -2,7 +2,7 @@
 
 [简体中文](README.zh-CN.md)
 
-Copy the folder and open [preview.html](preview.html). Numbers identify controls on the current screen. The inspector offers actions, state shortcuts and an expandable flow tree. A node opens a working state where the reviewer can continue. The `#state=ID` address opens a state directly. Each task builds and delivers its own HTML file.
+Copy the folder and open [preview.html](preview.html). Numbers identify controls on the current screen. The inspector offers actions, state shortcuts and an expandable flow tree. A node opens a working state where the reviewer can continue. Use `#state=ID` to open a state directly and `?marks=0` to start a visual review with the markers hidden. Each task builds and delivers its own HTML file.
 
 ```text
 Use the independent UI acceptance template for this change. Use real controls and identify any simulated data or services.
@@ -15,6 +15,6 @@ Return the tested revision, preview, what to try and the observed result in this
 
 A direct jump starts a fresh frame and calls `enter`. The app can read its name `ui-review/<id>` and preserve data across frames as needed. Use `dataSource` to describe the data and `preparation` to describe changes made for the jump. For asynchronous screens, use `ui.click(target, label)`, `ui.fill(target, text, label)` and `ui.wait(predicate, label)`. Markers programmatically click controls. Verify pointer, keyboard, drag and native behavior through actual interaction.
 
-**Checks.** Set `checkIsolation: true` only when `ui-review-check/<id>` frames use isolated data and preparation has no persistent side effects. The flow check prepares each state in its own frame and reports controls and failures. Mark conditional actions with `optional: true`. Motion observation records the actual system preference, animation events and visible frame intervals. Exercise the interaction under both normal and reduced motion.
+**Checks.** Set `checkIsolation: true` only when `ui-review-check/<id>` frames use isolated data and preparation has no persistent side effects. The flow check prepares each state in its own frame and reports controls and failures. Expand a successful row to see its controls. Failed rows open with the reason. Mark conditional actions with `optional: true`. Motion observation records the actual system preference, animation events and visible frame intervals. Exercise the interaction under both normal and reduced motion.
 
 **Package.** Bundle the app into self-contained HTML, then run `node pack.mjs app.html preview.html --source <checkout> --title <title> --data <data-description>`. `--source` defaults to the current directory. The packer checks common HTML and CSS external assets and records branch, revision, working-tree status, build time and content fingerprint. Check dynamic runtime requests separately. Alternatively import `buildReview(appHtml, {title, lang, metadata})` from [pack.mjs](pack.mjs). Native apps use their own screen and test tools.

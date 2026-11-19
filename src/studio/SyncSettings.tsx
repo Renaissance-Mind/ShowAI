@@ -4,11 +4,15 @@ import { useEffect, useMemo, useId, useRef, useState } from "react";
 import {
   ChevronLeft,
   ChevronRight,
+  CloudUpload,
   Database,
   FolderOpen,
   Folder,
   Plus,
   RefreshCw,
+  Settings2,
+  Share2,
+  Workflow,
   X,
 } from "../ui/icons";
 import { desktop, errorMessage } from "../host/bridge";
@@ -454,6 +458,14 @@ export default function SyncSettings({
         ) ?? document.getElementById(`${viewId}-accounts-title`)
       )?.focus(),
     );
+  }
+  const uploadProjectName = uploadProject
+    ? (localProjects.find((project) => project.id === uploadProject.projectId)
+        ?.name ?? "")
+    : "";
+  function closePanel() {
+    setPanel(null);
+    if (panel === "upload") setUploadProject(null);
   }
   const invitedServer =
     preview &&
@@ -913,8 +925,24 @@ export default function SyncSettings({
       {panel && (
         <Dialog
           key={panel}
-          initialFocus="auto"
+          initialFocus={panel === "dashboard" ? "container" : "auto"}
           returnFocus={panelTrigger.current}
+          icon={
+            panel === "dashboard" ||
+            (panel === "upload" && uploadProject?.intent === "share")
+              ? Share2
+              : panel === "upload"
+                ? CloudUpload
+                : Workflow
+          }
+          description={
+            panel === "upload" && uploadProject
+              ? f(
+                  uploadProject.intent === "share" ? "shareHelp" : "uploadHelp",
+                  { name: uploadProjectName },
+                )
+              : undefined
+          }
           title={
             panel === "upload"
               ? f(
@@ -926,16 +954,13 @@ export default function SyncSettings({
                 ? f("manageMembers")
                 : t("compareChanges")
           }
-          wide
-          onClose={() => {
-            setPanel(null);
-            if (panel === "upload") setUploadProject(null);
-          }}
+          wide={panel !== "upload"}
+          onClose={closePanel}
           className={`sync-dialog sync-${panel}-dialog`}
         >
           <div
             ref={panelBody}
-            className={`sync-dialog-body ${panel === "dashboard" ? "sync-dashboard-body" : ""}`}
+            className={`sync-dialog-body ${panel === "dashboard" ? "sync-dashboard-body" : "studio-dialog-body"}`}
             aria-busy={busy}
           >
             {error && (
@@ -954,29 +979,10 @@ export default function SyncSettings({
               </p>
             )}
             {panel === "upload" && uploadProject && (
-              <section className="settings-group">
-                <h3>
-                  {
-                    localProjects.find(
-                      (project) => project.id === uploadProject.projectId,
-                    )?.name
-                  }
-                </h3>
-                <p>
-                  {f(
-                    uploadProject.intent === "share"
-                      ? "shareHelp"
-                      : "uploadHelp",
-                    {
-                      name:
-                        localProjects.find(
-                          (project) => project.id === uploadProject.projectId,
-                        )?.name ?? "",
-                    },
-                  )}
-                </p>
+              <>
                 {status.connections.some((item) => !item.signedOut) ? (
                   <form
+                    className="studio-dialog-form"
                     onSubmit={(event) => {
                       event.preventDefault();
                       void run(async () => {
@@ -1030,14 +1036,23 @@ export default function SyncSettings({
                           ))}
                       </select>
                     </label>
-                    <button
-                      className="settings-button sync-primary"
-                      disabled={busy || !uploadTarget}
-                    >
-                      {uploadProject.intent === "share"
-                        ? f("uploadShare")
-                        : f("enableSync")}
-                    </button>
+                    <div className="studio-dialog-actions">
+                      <button
+                        type="button"
+                        className="settings-button"
+                        onClick={closePanel}
+                      >
+                        {tc("cancel")}
+                      </button>
+                      <button
+                        className="settings-button sync-primary"
+                        disabled={busy || !uploadTarget}
+                      >
+                        {uploadProject.intent === "share"
+                          ? f("uploadShare")
+                          : f("enableSync")}
+                      </button>
+                    </div>
                   </form>
                 ) : (
                   <button
@@ -1050,7 +1065,7 @@ export default function SyncSettings({
                     {f("addAccount")}
                   </button>
                 )}
-              </section>
+              </>
             )}
             {panel === "dashboard" && dashboard && (
               <SyncDashboard
@@ -1291,10 +1306,11 @@ export default function SyncSettings({
           return (
             <Dialog
               title={f("projects.details")}
+              icon={Settings2}
               onClose={() => setExpanded("")}
               className="sync-dialog"
             >
-              <div className="sync-dialog-body">
+              <div className="sync-dialog-body studio-dialog-body">
                 <h3>{project.name}</h3>
                 {sameServer.length > 1 && (
                   <label className="sync-field">

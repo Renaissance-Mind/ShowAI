@@ -1,8 +1,9 @@
 import { topDialog } from "./modal";
-import { useEffect, useRef, type ReactNode } from "react";
+import { useEffect, useId, useRef, type ReactNode } from "react";
 import { X } from "./icons";
 import { useTranslator } from "../i18n/react";
 import studioMessages from "../i18n/messages/studio";
+import "./dialog.css";
 
 export default function Dialog({
   title,
@@ -10,6 +11,9 @@ export default function Dialog({
   onClose,
   wide = false,
   className = "",
+  icon: Icon,
+  tone,
+  description,
   titleAccessory,
   headerContent,
   headerActions,
@@ -22,6 +26,9 @@ export default function Dialog({
   onClose: () => void;
   wide?: boolean;
   className?: string;
+  icon?: typeof X;
+  tone?: "caution" | "positive" | "danger";
+  description?: string;
   titleAccessory?: ReactNode;
   headerContent?: ReactNode;
   headerActions?: ReactNode;
@@ -30,6 +37,7 @@ export default function Dialog({
   returnFocus?: HTMLElement | null;
 }) {
   const t = useTranslator(studioMessages);
+  const descriptionId = useId();
   const panel = useRef<HTMLDivElement>(null);
   const close = useRef(onClose);
   close.current = dismissible ? onClose : () => {};
@@ -96,6 +104,17 @@ export default function Dialog({
       });
     };
   }, []);
+  const closeButton = dismissible && (
+    <button
+      type="button"
+      className="studio-icon studio-dialog-close"
+      aria-label={t("closeDialog")}
+      data-no-tooltip
+      onClick={onClose}
+    >
+      <X size={16} aria-hidden="true" />
+    </button>
+  );
   return (
     <div
       className="studio-modal-shade"
@@ -108,12 +127,19 @@ export default function Dialog({
         role="dialog"
         aria-modal="true"
         aria-label={title}
+        aria-describedby={description ? descriptionId : undefined}
+        data-tone={tone}
         tabIndex={-1}
         className={`studio-modal ${wide ? "wide" : ""} ${className}`}
       >
-        <header>
-          {titleAccessory ? (
+        <header className="studio-dialog-header">
+          {Icon || titleAccessory ? (
             <div className="studio-modal-title">
+              {Icon && (
+                <span className="studio-dialog-mark" aria-hidden="true">
+                  <Icon size={20} strokeWidth={1.7} />
+                </span>
+              )}
               <h2>{title}</h2>
               {titleAccessory}
             </div>
@@ -123,34 +149,18 @@ export default function Dialog({
           {headerContent}
           {headerActions ? (
             <div className="studio-modal-header-actions">
-              {headerActions}{" "}
-              {dismissible && (
-                <button
-                  className="studio-icon"
-                  aria-label={t("closeDialog")}
-                  data-no-tooltip
-                  onClick={onClose}
-                >
-                  <X size={18} />
-                </button>
-              )}
+              {headerActions}
+              {closeButton}
             </div>
           ) : (
-            <>
-              {" "}
-              {dismissible && (
-                <button
-                  className="studio-icon"
-                  aria-label={t("closeDialog")}
-                  data-no-tooltip
-                  onClick={onClose}
-                >
-                  <X size={18} />
-                </button>
-              )}
-            </>
+            closeButton
           )}
         </header>
+        {description && (
+          <p className="studio-dialog-description" id={descriptionId}>
+            {description}
+          </p>
+        )}
         {children}
       </div>
     </div>

@@ -487,7 +487,7 @@ export function StudioDialogs({
         />
       )}
       {dialog?.type === "newPage" && (
-        <Dialog title={t("newPage")} onClose={closeDialog}>
+        <Dialog title={t("newPage")} icon={FileText} onClose={closeDialog}>
           <div className="studio-template-picker">
             <button
               disabled={busy}

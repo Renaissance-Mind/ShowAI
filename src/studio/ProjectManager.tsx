@@ -10,6 +10,7 @@ import {
   Eye,
   EyeOff,
   FolderOpen,
+  FolderPlus,
   HardDrive,
   Link2,
   Loader2,
@@ -20,6 +21,7 @@ import {
   Search,
   Settings2,
   Share2,
+  User,
   X,
 } from "../ui/icons";
 import { useTranslator } from "../i18n/react";
@@ -712,6 +714,33 @@ export default function ProjectManager({
       )}
       {dialog && (
         <Dialog
+          icon={
+            {
+              create: loginInCreate ? User : FolderPlus,
+              rename: Pencil,
+              pause: CloudOff,
+              archive: dialog.row?.archived ? ArchiveRestore : Archive,
+            }[dialog.kind]
+          }
+          tone={
+            dialog.kind === "pause"
+              ? "caution"
+              : dialog.kind === "archive" && dialog.row?.archived
+                ? "positive"
+                : undefined
+          }
+          description={
+            dialog.kind === "archive"
+              ? f(
+                  dialog.row!.archived
+                    ? "projects.restoreConfirm"
+                    : "projects.archiveConfirm",
+                  { name: dialog.row!.name },
+                )
+              : dialog.kind === "pause"
+                ? f("projects.pendingChanges")
+                : undefined
+          }
           title={
             loginInCreate && dialog.kind === "create"
               ? f("auth.title")
@@ -728,7 +757,7 @@ export default function ProjectManager({
           onClose={() => setDialog(null)}
           className="sync-dialog sync-simple-dialog"
         >
-          <div className="sync-dialog-body">
+          <div className="sync-dialog-body studio-dialog-body">
             {dialog.kind === "create" && loginInCreate ? (
               <>
                 <AccountLogin
@@ -749,6 +778,7 @@ export default function ProjectManager({
               </>
             ) : dialog.kind === "create" || dialog.kind === "rename" ? (
               <form
+                className="studio-dialog-form"
                 onSubmit={(e) => {
                   e.preventDefault();
                   void act("dialog", async () => {
@@ -823,7 +853,7 @@ export default function ProjectManager({
                       {f("projects.signInToSave")}
                     </button>
                   )}
-                <div className="sync-form-actions">
+                <div className="studio-dialog-actions">
                   <button
                     type="button"
                     className="sync-text-button"
@@ -844,9 +874,8 @@ export default function ProjectManager({
               </form>
             ) : dialog.kind === "pause" ? (
               <>
-                <p>{f("projects.pendingChanges")}</p>
                 <p className="settings-help">{f("projects.stopKeepsLocal")}</p>
-                <div className="sync-form-actions">
+                <div className="studio-dialog-actions">
                   <button
                     className="sync-text-button"
                     onClick={() => setDialog(null)}
@@ -863,52 +892,42 @@ export default function ProjectManager({
                 </div>
               </>
             ) : (
-              <>
-                <p>
-                  {f(
-                    dialog.row!.archived
-                      ? "projects.restoreConfirm"
-                      : "projects.archiveConfirm",
-                    { name: dialog.row!.name },
-                  )}
-                </p>
-                <div className="sync-form-actions">
-                  <button
-                    className="sync-text-button"
-                    onClick={() => setDialog(null)}
-                  >
-                    {tc("cancel")}
-                  </button>
-                  <button
-                    className="settings-button sync-primary"
-                    disabled={pending.has("dialog")}
-                    onClick={() =>
-                      void act("dialog", async () => {
-                        const row = dialog.row!,
-                          next = !row.archived;
-                        if (row.connection && row.remote)
-                          await desktop.invoke("sync:manage", {
-                            connectionId: row.connection.id,
-                            projectId: row.remote.id,
-                            operation: "project",
-                            input: { archived: next },
-                          });
-                        if (row.local)
-                          await desktop.invoke(
-                            next ? "projects:remove" : "library:restore",
-                            { projectId: row.local.id, kind: "project" },
-                          );
-                        setRevision((n) => n + 1);
-                        setDialog(null);
-                      })
-                    }
-                  >
-                    {dialog.row!.archived
-                      ? t("restoreProject")
-                      : t("archiveProject")}
-                  </button>
-                </div>
-              </>
+              <div className="studio-dialog-actions">
+                <button
+                  className="sync-text-button"
+                  onClick={() => setDialog(null)}
+                >
+                  {tc("cancel")}
+                </button>
+                <button
+                  className="settings-button sync-primary"
+                  disabled={pending.has("dialog")}
+                  onClick={() =>
+                    void act("dialog", async () => {
+                      const row = dialog.row!,
+                        next = !row.archived;
+                      if (row.connection && row.remote)
+                        await desktop.invoke("sync:manage", {
+                          connectionId: row.connection.id,
+                          projectId: row.remote.id,
+                          operation: "project",
+                          input: { archived: next },
+                        });
+                      if (row.local)
+                        await desktop.invoke(
+                          next ? "projects:remove" : "library:restore",
+                          { projectId: row.local.id, kind: "project" },
+                        );
+                      setRevision((n) => n + 1);
+                      setDialog(null);
+                    })
+                  }
+                >
+                  {dialog.row!.archived
+                    ? t("restoreProject")
+                    : t("archiveProject")}
+                </button>
+              </div>
             )}
             {errors.dialog && (
               <p className="sync-error" role="alert">

@@ -36,7 +36,10 @@
   --radius-pill: 999px;
   --space-unit: 8px;
   --shadow: 0 0 0 1px #00000005, 0 2px 6px #0000000a, 0 4px 8px #00000014;
-  --shadow-dialog: 0 16px 64px #00000024;
+  --shadow-dialog: 0 24px 72px -18px #1517253b, 0 4px 16px -5px #15172524;
+  --dialog-scrim: rgb(32 34 47 / 27%);
+  --dialog-radius: 16px;
+  --dialog-accent: var(--brand);
   --studio-topbar-height: 56px;
   font-family: var(--font-sans);
   font-weight: 500;
@@ -69,7 +72,9 @@
   --info: #93b8ef;
   --success: #86d3a0;
   --shadow: 0 0 0 1px #ffffff08, 0 2px 6px #00000030, 0 4px 8px #00000040;
-  --shadow-dialog: 0 16px 64px #00000066;
+  --shadow-dialog: 0 24px 72px -16px #0009, 0 4px 16px -4px #0007;
+  --dialog-scrim: rgb(6 7 12 / 64%);
+  --dialog-accent: #aaa4ff;
   color-scheme: dark;
 }
 :root,

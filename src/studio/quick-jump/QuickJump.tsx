@@ -44,6 +44,7 @@ import {
   type QuickJumpContext,
   type WorkbenchCommand,
 } from "./sources";
+import "../../ui/dialog.css";
 import "./quick-jump.css";
 
 export const quickJumpSources = new QuickJumpRegistry<QuickJumpContext>(

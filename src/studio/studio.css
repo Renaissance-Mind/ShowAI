@@ -914,51 +914,6 @@ button.studio-tree-chevron:hover {
   font-size: 12px;
   line-height: 1.5;
 }
-.studio-modal-shade {
-  position: fixed;
-  inset: 0;
-  z-index: 200;
-  background: #19191938;
-  backdrop-filter: blur(2px);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 24px;
-  animation: showai-fade-in var(--duration-base) var(--ease-out);
-}
-.studio-modal {
-  animation: showai-pop-in var(--duration-base) var(--ease-out);
-  background: var(--paper);
-  border: 1px solid var(--line);
-  border-radius: 10px;
-  box-shadow: 0 16px 64px #0002;
-  width: 470px;
-  max-height: calc(100dvh - 48px);
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-}
-.studio-modal:focus {
-  outline: none;
-}
-.studio-modal.wide {
-  width: min(920px, 100%);
-}
-.studio-modal > header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 11px 18px;
-  border-bottom: 1px solid var(--line);
-  flex-shrink: 0;
-  min-height: 50px;
-}
-.studio-modal h2 {
-  font-size: 16px;
-  font-weight: 500;
-  letter-spacing: -0.15px;
-  margin: 0;
-}
 .studio-modal > form,
 .studio-template-edit,
 .studio-component-detail,

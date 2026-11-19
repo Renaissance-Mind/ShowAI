@@ -425,31 +425,6 @@
   height: 32px;
   border-radius: 8px;
 }
-.studio-modal-shade {
-  background: #00000052;
-  backdrop-filter: blur(4px);
-  padding: 32px;
-}
-.studio-modal {
-  border: 0;
-  border-radius: 20px;
-  box-shadow: var(--shadow-dialog);
-  width: 500px;
-  max-height: calc(100dvh - 64px);
-}
-.studio-modal.wide {
-  width: min(1040px, 100%);
-}
-.studio-modal > header {
-  min-height: 72px;
-  padding: 20px 24px;
-}
-.studio-modal h2 {
-  font-size: 22px;
-  font-weight: 600;
-  line-height: 1.3;
-  letter-spacing: -0.02em;
-}
 .studio-form,
 .studio-template-edit,
 .studio-component-detail {
@@ -689,19 +664,6 @@
   }
 }
 @media (max-width: 780px) {
-  .studio-modal-shade {
-    padding: 16px;
-  }
-  .studio-modal {
-    max-height: calc(100dvh - 32px);
-  }
-  .studio-modal > header {
-    min-height: 64px;
-    padding: 16px 20px;
-  }
-  .studio-modal h2 {
-    font-size: 20px;
-  }
   .studio-template-edit,
   .studio-component-detail,
   .studio-form {

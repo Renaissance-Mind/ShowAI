@@ -4,6 +4,7 @@ export default defineMessages("packaging", {
   "zh-CN": {
     exportTitle: "导出包含的内容",
     syncTitle: "随同步携带的本机文件",
+    empty: "这个项目没有需要选择的文件。",
     "kind.file-dataset": "本机数据文件",
     "kind.url-dataset": "在线数据",
     "kind.transform-output": "处理结果",
@@ -31,6 +32,7 @@ export default defineMessages("packaging", {
   en: {
     exportTitle: "What this export includes",
     syncTitle: "Files from this device that sync with the project",
+    empty: "There are no files to choose for this project.",
     "kind.file-dataset": "Data files on this device",
     "kind.url-dataset": "Online data",
     "kind.transform-output": "Computed data",

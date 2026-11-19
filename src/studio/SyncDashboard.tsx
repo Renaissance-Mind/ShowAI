@@ -297,15 +297,18 @@ export default function SyncDashboard({
         {project ? (
           <>
             <header className="sync-project-overview">
-              <div className="sync-eyebrow">{t("currentProject")}</div>
-              <h2>
-                {project.name}
-                {project.archived && (
-                  <span className="sync-badge">{t("archived")}</span>
-                )}
-              </h2>
-              <p>{t("adminOverview", { count: members.length })}</p>
-              <p>{f("scope")}</p>
+              <Folder size={18} aria-hidden="true" />
+              <div>
+                <h2>
+                  {project.name}
+                  {project.archived && (
+                    <span className="sync-badge">{t("archived")}</span>
+                  )}
+                </h2>
+                <p>
+                  {t(roles[project.role])} · {f("scope")}
+                </p>
+              </div>
             </header>
             <section
               className="sync-management-section"
@@ -334,7 +337,11 @@ export default function SyncDashboard({
                       <tr key={member.id}>
                         <td>
                           <div className="sync-member-identity">
-                            <User size={18} aria-hidden="true" />
+                            <span className="sync-member-avatar" aria-hidden="true">
+                              {Array.from(member.name.trim())[0]?.toLocaleUpperCase() || (
+                                <User size={15} />
+                              )}
+                            </span>
                             <div>
                               <strong>
                                 {member.name}
@@ -459,27 +466,21 @@ export default function SyncDashboard({
                     {roleOptions}
                   </select>
                 </label>
-                <button
-                  className="settings-button sync-primary"
-                  disabled={busy}
-                  onClick={() =>
-                    onInvite({
-                      maxUses:
-                        inviteUses === "unlimited" ? null : Number(inviteUses),
-                      days: Number(days),
-                      ...(inviteTarget.trim()
-                        ? { targetName: inviteTarget.trim() }
-                        : {}),
-                    })
-                  }
-                >
-                  {f("createCopy")}
-                </button>
-              </div>
-              <section className="sync-account-disclosure">
-                <h3 className="settings-section-heading">
-                  {f("inviteAdvanced")}
-                </h3>
+                <label className="sync-field">
+                  <span>{f("days")}</span>
+                  <select
+                    aria-label={f("days")}
+                    value={days}
+                    disabled={busy}
+                    onChange={(event) => setDays(event.target.value)}
+                  >
+                    {[1, 7, 14, 30].map((count) => (
+                      <option key={count} value={count}>
+                        {f("dayCount", { count })}
+                      </option>
+                    ))}
+                  </select>
+                </label>
                 {controlledInvites && (
                   <>
                     <label>
@@ -515,24 +516,28 @@ export default function SyncDashboard({
                     </label>
                   </>
                 )}
-                <label className="sync-field">
-                  <span>{f("days")}</span>
-                  <select
-                    value={days}
-                    disabled={busy}
-                    onChange={(event) => setDays(event.target.value)}
-                  >
-                    {[1, 7, 14, 30].map((count) => (
-                      <option key={count} value={count}>
-                        {f("dayCount", { count })}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-              </section>
+              </div>
               <p className="sync-permission-note">
                 {t(permissions[inviteRole])}
               </p>
+              <div className="sync-invite-submit">
+                <button
+                  className="settings-button sync-primary"
+                  disabled={busy}
+                  onClick={() =>
+                    onInvite({
+                      maxUses:
+                        inviteUses === "unlimited" ? null : Number(inviteUses),
+                      days: Number(days),
+                      ...(inviteTarget.trim()
+                        ? { targetName: inviteTarget.trim() }
+                        : {}),
+                    })
+                  }
+                >
+                  {f("createCopy")}
+                </button>
+              </div>
               {generatedInvite && (
                 <div className="sync-generated-invite">
                   <label htmlFor="sync-generated-link">{t("inviteLink")}</label>

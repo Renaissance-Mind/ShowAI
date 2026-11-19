@@ -32,6 +32,8 @@
         close: "关闭",
         checking: "正在检查",
         checked: "检查完成",
+        passed: "通过",
+        failed: "失败",
         stopped: "检查已停止",
         stop: "停止检查",
         unavailable: "未出现",
@@ -76,6 +78,8 @@
         close: "Close",
         checking: "Checking",
         checked: "Checks complete",
+        passed: "Passed",
+        failed: "Failed",
         stopped: "Checks stopped",
         stop: "Stop checks",
         unavailable: "Unavailable",
@@ -114,7 +118,8 @@
   const marksLabel = el("label"),
     marksToggle = el("input");
   marksToggle.type = "checkbox";
-  marksToggle.checked = true;
+  marksToggle.checked =
+    new URLSearchParams(location.search).get("marks") !== "0";
   marksLabel.append(marksToggle, t.marks);
   const body = el("main", "rv-body"),
     stage = el("div", "rv-stage"),
@@ -199,15 +204,23 @@
 
   const checksDialog = el("dialog", "rv-check-dialog");
   const checksHead = el("div", "rv-check-head");
-  checksHead.append(
-    el("h2", "", t.checks),
-    button(t.close, () => checksDialog.close()),
-  );
+  const checksTitle = el("h2", "", t.checks);
+  checksTitle.id = "review-checks-title";
+  checksDialog.setAttribute("aria-labelledby", checksTitle.id);
+  const checksSymbol = el("span", "rv-check-symbol");
+  checksSymbol.setAttribute("aria-hidden", "true");
+  const closeChecks = button("×", () => checksDialog.close(), "rv-check-close");
+  closeChecks.setAttribute("aria-label", t.close);
+  checksHead.append(checksSymbol, checksTitle, closeChecks);
+  const checksSummary = el("div", "rv-check-summary");
   const checksStatus = el("p", "rv-check-status");
   checksStatus.setAttribute("role", "status");
+  const checksProgress = el("progress", "rv-check-progress");
+  checksProgress.setAttribute("aria-label", t.checks);
   const checksList = el("ol", "rv-check-results");
   const stopChecks = button(t.stop, () => checkController?.abort());
-  checksDialog.append(checksHead, checksStatus, checksList, stopChecks);
+  checksSummary.append(checksStatus, stopChecks, checksProgress);
+  checksDialog.append(checksHead, checksSummary, checksList);
   root.append(checksDialog);
 
   const motion = el("details", "rv-motion");
@@ -991,6 +1004,8 @@
     const controller = new AbortController();
     checkController = controller;
     checksList.replaceChildren();
+    checksProgress.max = states.length;
+    checksProgress.value = 0;
     checksStatus.textContent = t.checking + " 0 / " + states.length;
     stopChecks.hidden = false;
     checksDialog.showModal();
@@ -998,22 +1013,36 @@
     for (const [index, state] of states.entries()) {
       if (controller.signal.aborted) break;
       const row = el("li", "rv-check-row");
-      row.append(el("strong", "", state.title));
+      const entry = el("details", "rv-check-entry");
+      const summary = el("summary");
+      const indicator = el("span", "rv-check-indicator");
+      indicator.setAttribute("aria-hidden", "true");
+      const outcome = el("span", "rv-check-outcome", t.checking);
+      summary.append(indicator, el("strong", "", state.title), outcome);
+      entry.append(summary);
+      row.append(entry);
       checksList.append(row);
       try {
         const result = await checkState(state, controller.signal);
-        row.append(el("span", "", result.present.join(" · ")));
+        entry.append(el("p", "", result.present.join(" · ")));
         if (result.absent.length)
-          row.append(
+          entry.append(
             el("small", "", t.unavailable + ": " + result.absent.join(" · ")),
           );
         row.dataset.result = "pass";
+        outcome.textContent = t.passed;
       } catch (reason) {
-        if (controller.signal.aborted) break;
+        if (controller.signal.aborted) {
+          outcome.textContent = t.stopped;
+          break;
+        }
         failures++;
         row.dataset.result = "fail";
-        row.append(el("span", "", reason.message || String(reason)));
+        outcome.textContent = t.failed;
+        entry.append(el("p", "", reason.message || String(reason)));
+        entry.open = true;
       }
+      checksProgress.value = index + 1;
       checksStatus.textContent =
         t.checking +
         " " +

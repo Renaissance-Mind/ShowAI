@@ -141,6 +141,7 @@ function FileDialog({
   return (
     <Dialog
       title={options.title}
+      icon={Folder}
       onClose={cancel}
       wide
       className="local-file-dialog"

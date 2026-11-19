@@ -259,30 +259,44 @@ a {
   position: fixed;
   inset: 0;
   z-index: 20;
-  background: #25202870;
+  background: rgb(32 34 47 / 27%);
   display: grid;
   place-items: center;
-  padding: 24px;
+  padding: clamp(12px, 3vw, 26px);
 }
 .flow-results {
-  background: #fafaf9;
+  background: #fff;
   width: min(1060px, 100%);
-  max-height: 90dvh;
-  border-radius: 10px;
+  max-height: min(90dvh, 100%);
+  border: 1px solid #e1dfe3;
+  border-radius: 16px;
+  overflow: hidden;
   display: flex;
   flex-direction: column;
-  box-shadow: 0 12px 60px #0003;
+  box-shadow:
+    0 24px 72px -18px #1517253b,
+    0 4px 16px -5px #15172524;
 }
 .flow-results > header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 12px 20px;
+  padding: 16px 22px;
   border-bottom: 1px solid #dedbd6;
 }
 .flow-results h2 {
-  font-size: 16px;
+  font-size: 20px;
   margin: 0;
+}
+.flow-results > header > button {
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: #f3f2f3;
+  color: #67636a;
+  font-size: 21px;
 }
 .flow-results-body {
   padding: 20px;

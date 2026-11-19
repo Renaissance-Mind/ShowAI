@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import Dialog from "../ui/Dialog";
+import { Package } from "../ui/icons";
 import { formatSize } from "../lib/format-size";
 import { useTranslator } from "../i18n/react";
 import commonMessages from "../i18n/messages/common";
@@ -79,8 +80,10 @@ export function PackagingDialog({
   return (
     <Dialog
       title={t(purpose === "sync" ? "syncTitle" : "exportTitle")}
+      icon={Package}
+      description={plan.items.length ? undefined : t("empty")}
       onClose={() => onDecide(null)}
-      wide
+      wide={plan.items.length > 0}
     >
       <div className="studio-form packaging-dialog">
         {KINDS.map((kind) => {

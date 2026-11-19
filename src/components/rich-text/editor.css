@@ -623,23 +623,22 @@
   position: fixed;
   inset: 0;
   z-index: 120;
-  background: #18281d35;
-  backdrop-filter: blur(3px);
-  padding: 12vh 20px 25px;
+  background: var(--dialog-scrim, rgb(32 34 47 / 27%));
+  padding: clamp(12px, 4vmin, 32px);
   display: flex;
-  align-items: flex-start;
+  align-items: safe center;
   justify-content: center;
   overflow-y: auto;
 }
 .editor-modal {
   width: 440px;
   max-width: 100%;
-  padding: 25px;
+  padding: 24px;
   border: 1px solid var(--line, #e8ece5);
-  border-radius: 12px;
+  border-radius: var(--dialog-radius, 16px);
   background: var(--paper, #fff);
   color: var(--text);
-  box-shadow: 0 24px 70px #16251c26;
+  box-shadow: var(--shadow-dialog, 0 20px 60px #15172529);
   animation: editor-modal-appear 0.18s ease;
 }
 .editor-modal-heading {
@@ -670,6 +669,59 @@
   color: var(--muted);
   padding: 5px;
   border-radius: 4px;
+}
+.editor-modal-backdrop .editor-modal-heading {
+  margin-bottom: 18px;
+}
+.editor-modal-backdrop .editor-modal-heading h3 {
+  font-size: 20px;
+  letter-spacing: -0.025em;
+}
+.editor-modal-backdrop .editor-modal-symbol {
+  width: 38px;
+  height: 38px;
+  border-radius: 11px;
+  background: var(--accent-soft);
+  color: var(--dialog-accent, var(--accent));
+}
+.editor-modal-backdrop .editor-modal-heading > button {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--surface);
+}
+.editor-modal-backdrop .editor-field > span,
+.editor-modal-backdrop .editor-modal-actions button {
+  font-size: 13px;
+}
+.editor-modal-backdrop .editor-field :is(input, textarea) {
+  border-radius: 8px;
+  font-size: 14px;
+}
+.editor-modal-backdrop .editor-field :is(input, textarea):focus {
+  border-color: var(--dialog-accent, var(--accent));
+}
+.editor-modal-backdrop .editor-modal-actions {
+  border-top: 1px solid var(--line);
+  padding-top: 14px;
+  margin-top: 18px;
+  flex-wrap: wrap;
+}
+.editor-modal-backdrop .editor-modal-actions button {
+  border-radius: 8px;
+  min-height: 36px;
+}
+.editor-modal-backdrop .editor-modal-actions .editor-primary {
+  background: var(--action, #120a8f);
+}
+@media (pointer: coarse) {
+  .editor-modal-backdrop .editor-modal-heading > button,
+  .editor-modal-backdrop .editor-modal-actions button {
+    min-width: 44px;
+    min-height: 44px;
+  }
 }
 .image-source-choices {
   display: flex;
