@@ -68,13 +68,23 @@ it("opens both Codex workbench entries and saves into the MCP library", async ()
     });
     expect(tools.find((tool) => tool.name === "workbench_open_file")?._meta).toMatchObject({
       ui: { resourceUri: codexWorkbenchFileUri, visibility: ["app"] },
-      "openai/ui": { entrypoints: [{ type: "file", extensions: [codexPageReferenceExtension] }] },
+      "openai/ui": { entrypoints: [{ type: "file", extensions: [codexPageReferenceExtension, ".showai-test-ref"] }] },
     });
     for (const name of ["card_present", "workbench_page_reference"]) {
       expect(tools.find((tool) => tool.name === name)?._meta?.ui)
         .toEqual({ resourceUri: codexWorkbenchCardUri, visibility: ["model", "app"] });
     }
     const cardResource = await client.readResource({ uri: codexWorkbenchCardUri });
+    expect((await client.readResource({ uri: "ui://showai/workbench-card-v6.html" })).contents[0].mimeType)
+      .toBe("text/html;profile=mcp-app");
+    const [cardContent] = cardResource.contents;
+    if (!("text" in cardContent)) throw new Error("Expected a card HTML resource");
+    const cardHtml = cardContent.text;
+    expect(cardHtml).toContain('aria-haspopup="menu"');
+    for (const destination of ["workbench", "desktop"])
+      expect(cardHtml).toContain(`data-destination="${destination}"`);
+    expect(cardHtml).not.toContain("<select");
+    expect(cardHtml).not.toContain("__CHATGPT_ICON__");
     expect((await client.readResource({ uri: "ui://showai/workbench-card-v5.html" })).contents[0].mimeType)
       .toBe("text/html;profile=mcp-app");
     expect(tools.find(tool => tool.name === "workbench_open_destination")?._meta?.ui)
@@ -82,11 +92,10 @@ it("opens both Codex workbench entries and saves into the MCP library", async ()
     expect(cardResource.contents[0]).toMatchObject({
       mimeType: "text/html;profile=mcp-app",
       text: expect.stringContaining('id="showai-page-card"'),
-      _meta: { "openai/ui": { availableDisplayModes: ["inline", "fullscreen"], preferredDisplayMode: "inline" } },
+      _meta: { "openai/ui": { availableDisplayModes: ["inline"], preferredDisplayMode: "inline" } },
     });
-    expect(cardResource.contents[0]).toHaveProperty(
-      "text", expect.stringContaining('"ui/request-display-mode"'),
-    );
+    expect(cardHtml).not.toContain('"ui/request-display-mode"');
+    expect(cardHtml).toContain('"openai/files/open"');
     expect(cardResource.contents[0]).toHaveProperty("text", expect.stringContaining(
       "const hasGlobalEntrypoint = true",
     ));
@@ -252,6 +261,13 @@ it("opens both Codex workbench entries and saves into the MCP library", async ()
     expect(card.content).toHaveLength(1);
     const blockId = saved.document.content.attrs!.id as string;
     const component = { projectId, pageId, blockId };
+    const sideFile = await workbenchTool<string>(client, "workbench_side_file", component);
+    expect(sideFile.endsWith(".showai-test-ref")).toBe(true);
+    expect(await workbenchTool(client, "workbench_resolve_reference", { source: await readFile(sideFile, "utf8") })).toEqual(component);
+    const tuning = await client.callTool({
+      name: "card_present", arguments: { projectId, pageId, additionalTargets: [component], adjustSpacing: true },
+    });
+    expect(tuning._meta?.showaiCardGroup).toMatchObject({ adjustSpacing: true, cards: [{ pageId }, { blockId }] });
     const annotated = await client.callTool({
       name: "card_present", arguments: { ...component, description: "  Compare the two dates  " },
     });

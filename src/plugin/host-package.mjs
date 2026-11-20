@@ -122,7 +122,11 @@ export async function writeHostLauncher(source, target, profile) {
     profile === "codex"
       ? 'join(env.SHOWAI_CODEX_WORKBENCH_PROFILE || join(home, "local"), "agent-runtime-probe.json")'
       : 'join(home, "local", "agent-runtime-probe.json")';
-  await writeFile(join(target, "mcp/launch.mjs"), parts.join(cache));
+  const cwd = profile === "codex"
+    ? "    // Codex can retire the versioned plugin directory while its chat is open.\n" +
+      "    ...(launch.env.SHOWAI_CODEX_WORKBENCH_PROFILE && { cwd: home }),\n"
+    : "";
+  await writeFile(join(target, "mcp/launch.mjs"), parts.join(cache).replace("__SHOWAI_HOST_CWD__\n", cwd));
 }
 
 export async function publishPluginDirectory(staging, target) {

@@ -95,6 +95,7 @@ export async function writeCodexPageReference(
   service: AgentService,
   directory: string | undefined,
   target: CodexPageTarget,
+  extension = codexPageReferenceExtension,
 ) {
   const page = await readCodexPageTarget(service, target);
   const contents = JSON.stringify(
@@ -112,7 +113,7 @@ export async function writeCodexPageReference(
   await mkdir(root, { recursive: true });
   const output = await mkdtemp(join(root, "page-"));
   const title = page.title.replace(/[<>:"/\\|?*\p{C}]/gu, " ").trim().slice(0, 65);
-  const name = "ShowAI - " + (title || "Page") + codexPageReferenceExtension;
+  const name = "ShowAI - " + (title || "Page") + extension;
   const path = join(output, name);
   try {
     await writeFile(path, contents, { flag: "wx", mode: 0o600 });
