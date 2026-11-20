@@ -26,6 +26,8 @@ Choose one topic for the current operation: `workspace`, `authoring`, `container
 
 Every successful `--json` command returns `{ "ok": true, "data": ... }`. Failures return `{ "ok": false, "error": { "code", "message", "currentHash"? } }` and a nonzero exit code (`3` for page conflicts).
 
+Only `import` and `datasets transform` support `--dry-run`. The CLI rejects unknown or unsupported options before opening the library. With `--json`, these errors use the same JSON format.
+
 ## Page and Board containers
 
 New resources use artifact v3 and default to Page. Use `pages create --kind board` for a spatial workspace. `showai guide containers --json` describes recursive surfaces, parent-owned frames, per-surface views and drawing nodes. Content lives in the tree, frames in layout and saved views in surfaceViews. The project folder parentId differs from a content operation's container parentId.

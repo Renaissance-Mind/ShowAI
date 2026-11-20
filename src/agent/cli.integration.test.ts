@@ -84,6 +84,42 @@ afterAll(async () => {
   await rm(bundleDirectory, { recursive: true, force: true });
 });
 
+test("invalid options report CLI errors before opening the library", async () => {
+  const library = join(home, "invalid-options");
+  const failure = (args: string[]) =>
+    execute(process.execPath, [cli, ...args], {
+      env: { ...environment(), SHOWAI_HOME: library },
+    }).then(
+      () => {
+        throw new Error(`Expected showai ${args.join(" ")} to fail.`);
+      },
+      (error: { code: number; stdout: string; stderr: string }) => error,
+    );
+
+  const dryRun = await failure([
+    "pages", "create", "--title", "Preview", "--dry-run", "--json",
+  ]);
+  expect(dryRun).toMatchObject({ code: 1, stderr: "" });
+  expect(JSON.parse(dryRun.stdout)).toMatchObject({
+    ok: false,
+    error: {
+      message: "showai pages create does not take --dry-run. Run showai --help.",
+    },
+  });
+  const unknown = await failure(["pages", "list", "--bogus", "--json"]);
+  expect(unknown).toMatchObject({ code: 1, stderr: "" });
+  expect(JSON.parse(unknown.stdout)).toMatchObject({
+    ok: false,
+    error: { code: "ERROR", message: "Unknown option --bogus. Run showai --help." },
+  });
+  expect(await failure(["pages", "list", "--bogus"])).toMatchObject({
+    code: 1,
+    stdout: "",
+    stderr: "ShowAI: Unknown option --bogus. Run showai --help.\n",
+  });
+  await expect(access(library)).rejects.toMatchObject({ code: "ENOENT" });
+});
+
 test("public CLI and stdio render customized content without creating a personal project or sync connection", async () => {
   const isolated = await mkdtemp(join(tmpdir(), "showai-public-cli-"));
   const output = join(isolated, "output", "page.html");

@@ -67,6 +67,7 @@ const guides: Record<
       "Use common ShowAI capabilities across harnesses, choosing display and synchronization independently.",
     rules: [
       "Discover actual capabilities with runtime info (CLI) or showai_capabilities (MCP). Harness names do not prove inline, MCP Apps, shell or filesystem support.",
+      "CLI scripts can preview import and datasets transform with --dry-run. Commands reject unsupported options before opening the library. With --json, argument errors return ok:false and error.message.",
       "Public components/templates and customization do not require a personal project or synchronization. public list/describe and render are the CLI equivalents of public_catalog_list/describe and render_document.",
       "render input is {document?,templateId?,title?,componentSources?}; supply document or templateId. componentSources use the editable manifest/schema/source/files/assets contract from guide component. Rendering returns HTML, inline and source plus savedToProject=false/synchronized=false.",
       "For persistent work use the selected local project or OAuth-authorized remote project. Remote tools require projectId from projects_list and never accept local filesystem paths. CLI and project-bound stdio use the actual local project.",

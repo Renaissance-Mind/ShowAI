@@ -2,6 +2,8 @@
 
 所有 Agent 使用同一套 ShowAI MCP 文档操作。入口由宿主配置，Agent不在 CLI 与 MCP之间自行选择。CLI保留启动、诊断、脚本与管理用途。缺少连接时按 [连接配置](runtime.md) 处理。
 
+脚本使用 CLI 时，`import` 和 `datasets transform` 支持 `--dry-run` 预览。其他命令拒绝该选项。使用 `--json` 时，参数错误返回 `ok:false`，原因在 `error.message` 中。
+
 ## 项目操作
 
 1. 复用当前连接已核实的能力；连接信息未知或变化时调用一次 `showai_capabilities`。
