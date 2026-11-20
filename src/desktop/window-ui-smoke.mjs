@@ -21,6 +21,76 @@ const result = { passed: false, output, checks: [] };
 const errors = [];
 let application, source;
 
+async function verifyTabReorder(page) {
+  const list = page.getByRole("tablist", { name: "工作区标签页" });
+  const tabs = list.getByRole("tab");
+  const add = page.getByRole("button", { name: "新建标签页", exact: true });
+  await add.click();
+  await tabs.nth(1).waitFor();
+  await add.click();
+  await tabs.nth(2).waitFor();
+  const order = () => tabs.evaluateAll((items) => items.map((item) => item.id));
+  const [first, second, active] = await order();
+  const centers = () =>
+    tabs.evaluateAll((items) =>
+      items.map((item) => {
+        const box = item.getBoundingClientRect();
+        return { x: box.x + box.width / 2, y: box.y + box.height / 2 };
+      }),
+    );
+  const drag = async (from, to) => {
+    const points = await centers();
+    await page.mouse.move(points[from].x, points[from].y);
+    await page.mouse.down();
+    await page.mouse.move(points[to].x, points[to].y, { steps: 16 });
+  };
+  const ghost = page.locator(".studio-tab-drag-ghost");
+  await drag(0, 2);
+  await page.mouse.up();
+  await page.reload();
+  await tabs.nth(2).waitFor();
+  assert.deepEqual(await order(), [second, active, first]);
+  assert.equal(
+    await list.getByRole("tab", { selected: true }).getAttribute("id"),
+    active,
+  );
+  await drag(2, 0);
+  await ghost.waitFor();
+  assert.deepEqual(await order(), [first, second, active]);
+  await page.keyboard.press("Escape");
+  await page.mouse.up();
+  await ghost.waitFor({ state: "detached" });
+  assert.deepEqual(await order(), [second, active, first]);
+  await drag(2, 0);
+  await page.mouse.up();
+  await ghost.waitFor({ state: "detached" });
+  assert.deepEqual(await order(), [first, second, active]);
+  assert.equal(
+    await list.getByRole("tab", { selected: true }).getAttribute("id"),
+    active,
+  );
+  await tabs.first().click();
+  await tabs
+    .first()
+    .and(list.getByRole("tab", { selected: true }))
+    .waitFor();
+
+  const session = await page.context().newCDPSession(page);
+  const touch = (type, point) =>
+    session.send("Input.dispatchTouchEvent", {
+      type,
+      touchPoints: point ? [point] : [],
+    });
+  const [left, middle, right] = await centers();
+  await touch("touchStart", left);
+  await touch("touchMove", middle);
+  await touch("touchMove", right);
+  await touch("touchEnd");
+  await ghost.waitFor({ state: "detached" });
+  assert.deepEqual(await order(), [second, active, first]);
+  await session.detach();
+}
+
 try {
   application = await _electron.launch({
     executablePath: electron,
@@ -36,6 +106,10 @@ try {
     .getByRole("button", { name: "新建项目", exact: true })
     .first()
     .waitFor();
+  await verifyTabReorder(source);
+  result.checks.push(
+    "Mouse and touch reorder workspace tabs, drops survive reload, Escape cancels and clicks select",
+  );
   const target = await source.evaluate(async () => {
     const api = window.showai;
     const project = await api.invoke("projects:create", {

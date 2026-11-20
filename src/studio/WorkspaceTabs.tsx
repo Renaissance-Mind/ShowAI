@@ -84,7 +84,6 @@ export default function WorkspaceTabs({
     startX: number;
     startY: number;
     pointerId: number;
-    element: HTMLButtonElement;
     active: boolean;
     finishing: boolean;
     offsetX: number;
@@ -94,6 +93,10 @@ export default function WorkspaceTabs({
     original: string[];
     layout: Map<string, { left: number; width: number }>;
   } | null>(null);
+  const original = gesture.current?.original;
+  const tabsMatchDrag =
+    original?.length === tabs.length &&
+    tabs.every((tab, index) => tab.id === original[index]);
   const latest = useRef({ busy, onMove });
   latest.current = { busy, onMove };
   const suppressClick = useRef(false);
@@ -123,10 +126,10 @@ export default function WorkspaceTabs({
   };
   const finishDrag = () => {
     const current = gesture.current;
-    if (current?.active) suppressClick.current = true;
+    if (!current) return;
     gesture.current = null;
-    if (current?.element.hasPointerCapture(current.pointerId))
-      current.element.releasePointerCapture(current.pointerId);
+    if (list.current?.hasPointerCapture(current.pointerId))
+      list.current.releasePointerCapture(current.pointerId);
     shownOrder.current = null;
     flip.current = null;
     setDragging(null);
@@ -150,12 +153,10 @@ export default function WorkspaceTabs({
     const right = left + current.width;
     const from = current.original.indexOf(current.id);
     const others = current.original.filter((id) => id !== current.id);
-    let index = others.findIndex((id) => {
+    let index = others.findIndex((id, position) => {
       const slot = current.layout.get(id)!;
       const middle = slot.left + slot.width / 2;
-      return current.original.indexOf(id) < from
-        ? left < middle
-        : right <= middle;
+      return position < from ? left < middle : right <= middle;
     });
     if (index < 0) index = others.length;
     others.splice(index, 0, current.id);
@@ -221,17 +222,20 @@ export default function WorkspaceTabs({
           return;
         const container = list.current;
         if (!container) return finishDrag();
+        const rects = measure();
+        const box = rects.get(current.id);
+        if (!box || rects.size < 2) return finishDrag();
         const bounds = container.getBoundingClientRect();
-        const box = current.element
-          .closest<HTMLElement>(".studio-tab")!
-          .getBoundingClientRect();
+        container.setPointerCapture(current.pointerId);
         current.active = true;
+        suppressClick.current = true;
         current.offsetX = current.startX - box.left;
         current.offsetY = current.startY - box.top;
         current.width = box.width;
         current.height = box.height;
+        current.original = [...rects.keys()];
         current.layout = new Map(
-          Array.from(measure(), ([id, rect]) => [
+          Array.from(rects, ([id, rect]) => [
             id,
             {
               left: rect.left - bounds.left + container.scrollLeft,
@@ -260,7 +264,15 @@ export default function WorkspaceTabs({
       current.x = event.clientX;
       current.y = event.clientY;
       const target = latest.current.busy ? null : locate(current.x, current.y);
-      flushSync(() => preview(target));
+      flushSync(() => {
+        preview(null);
+        if (!target) return;
+        const index = target.indexOf(current.id);
+        if (index === current.original.indexOf(current.id)) return;
+        if (index > 0)
+          latest.current.onMove(current.id, target[index - 1], "after");
+        else latest.current.onMove(current.id, target[1], "before");
+      });
       const slot = list.current?.querySelector<HTMLElement>(
         `.studio-tab[data-tab-id="${CSS.escape(current.id)}"]`,
       );
@@ -280,17 +292,11 @@ export default function WorkspaceTabs({
         );
         await animation.finished.catch(() => undefined);
       }
-      if (gesture.current !== current) return;
-      finishDrag();
-      if (!target || latest.current.busy) return;
-      const index = target.indexOf(current.id);
-      if (target.every((id, position) => id === current.original[position]))
-        return;
-      if (index > 0)
-        latest.current.onMove(current.id, target[index - 1], "after");
-      else latest.current.onMove(current.id, target[1], "before");
+      if (gesture.current === current) finishDrag();
     };
-    const cancel = () => finishDrag();
+    const cancelPointer = (event: PointerEvent) => {
+      if (gesture.current?.pointerId === event.pointerId) finishDrag();
+    };
     const key = (event: KeyboardEvent) => {
       if (event.key === "Escape" && gesture.current) {
         event.preventDefault();
@@ -300,26 +306,22 @@ export default function WorkspaceTabs({
     };
     window.addEventListener("pointermove", move, { passive: false });
     window.addEventListener("pointerup", up);
-    window.addEventListener("pointercancel", cancel);
-    window.addEventListener("blur", cancel);
+    window.addEventListener("pointercancel", cancelPointer);
+    window.addEventListener("blur", finishDrag);
     window.addEventListener("keydown", key, true);
     return () => {
       window.removeEventListener("pointermove", move);
       window.removeEventListener("pointerup", up);
-      window.removeEventListener("pointercancel", cancel);
-      window.removeEventListener("blur", cancel);
+      window.removeEventListener("pointercancel", cancelPointer);
+      window.removeEventListener("blur", finishDrag);
       window.removeEventListener("keydown", key, true);
       finishDrag();
     };
   }, []);
-  useEffect(() => {
-    if (!dragging) return;
+  useLayoutEffect(() => {
     const current = gesture.current;
-    if (
-      busy ||
-      !current ||
-      tabs.map((tab) => tab.id).join("\n") !== current.original.join("\n")
-    ) {
+    if (!dragging || !current || current.finishing) return;
+    if (busy || !tabsMatchDrag) {
       finishDrag();
       return;
     }
@@ -350,7 +352,7 @@ export default function WorkspaceTabs({
     };
     frame = requestAnimationFrame(scroll);
     return () => cancelAnimationFrame(frame);
-  }, [dragging, busy, tabs]);
+  }, [dragging, busy, tabsMatchDrag]);
   useEffect(() => {
     list.current
       ?.querySelector('[aria-selected="true"]')
@@ -364,9 +366,10 @@ export default function WorkspaceTabs({
       ?.focus();
   }, [activeId, busy, tabs.length]);
   const draggedTab = tabs.find((tab) => tab.id === dragging);
-  const shown = order
-    ? order.map((id) => tabs.find((tab) => tab.id === id)!)
-    : tabs;
+  const shown =
+    order && tabsMatchDrag
+      ? order.map((id) => tabs.find((tab) => tab.id === id)!)
+      : tabs;
   const tabIcon = (tab: (typeof tabs)[number]) => {
     const entry = currentEntry(tab);
     const view = entry.location.view;
@@ -398,8 +401,10 @@ export default function WorkspaceTabs({
         event.preventDefault();
         event.stopPropagation();
       }}
-      onPointerDownCapture={() => {
-        suppressClick.current = false;
+      onPointerDownCapture={(event) => {
+        if (!event.isPrimary) return;
+        if (gesture.current?.finishing) finishDrag();
+        if (!gesture.current) suppressClick.current = false;
       }}
     >
       <div
@@ -407,6 +412,15 @@ export default function WorkspaceTabs({
         className="studio-tabs"
         role="tablist"
         aria-label={t("workspaceTabs")}
+        onLostPointerCapture={(event) => {
+          const current = gesture.current;
+          if (
+            event.target === event.currentTarget &&
+            current?.pointerId === event.pointerId &&
+            !current.finishing
+          )
+            finishDrag();
+        }}
       >
         {shown.map((tab) => {
           const index = tabs.indexOf(tab);
@@ -437,7 +451,8 @@ export default function WorkspaceTabs({
                     busy ||
                     tabs.length < 2 ||
                     event.button !== 0 ||
-                    !event.isPrimary
+                    !event.isPrimary ||
+                    gesture.current
                   )
                     return;
                   gesture.current = {
@@ -447,21 +462,15 @@ export default function WorkspaceTabs({
                     startX: event.clientX,
                     startY: event.clientY,
                     pointerId: event.pointerId,
-                    element: event.currentTarget,
                     active: false,
                     finishing: false,
                     offsetX: 0,
                     offsetY: 0,
                     width: 0,
                     height: 0,
-                    original: tabs.map((item) => item.id),
+                    original: [],
                     layout: new Map(),
                   };
-                  event.currentTarget.setPointerCapture(event.pointerId);
-                }}
-                onLostPointerCapture={() => {
-                  if (gesture.current && !gesture.current.finishing)
-                    finishDrag();
                 }}
                 onClick={() => {
                   restoreFocus.current = true;
