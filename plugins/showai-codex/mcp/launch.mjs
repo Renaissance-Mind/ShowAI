@@ -487,6 +487,8 @@ try {
 if (launch) {
   const child = spawn(launch.command, launch.args, {
     env: launch.env,
+    // Codex can retire the versioned plugin directory while its chat is open.
+    ...(launch.env.SHOWAI_CODEX_WORKBENCH_PROFILE && { cwd: home }),
     stdio: "inherit",
   });
   child.once("error", (error) => {

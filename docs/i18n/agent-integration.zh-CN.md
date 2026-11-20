@@ -90,7 +90,7 @@ npm run package:plugin -- --mcp-url https://agent.example.com/mcp --out /absolut
 
 从 ShowAI「设置 → 插件」安装或更新 Codex 插件。调用 `card_present` 并传入已保存页面的 `projectId` 和 `pageId`，卡片会显示页面标题及项目、各级文件夹和页面组成的完整路径。传入页面大纲中的 `blockId` 即可定位组件，卡片正文默认显示该组件的标题。可选的 `description` 支持最多 1000 个字符，用于在这张卡片上写与当前任务相关的说明。
 
-一次发多张时，首张照常传参，其余目标按顺序放入同一次调用的 `additionalTargets`。每张卡片都可以有自己的组件和说明。「打开页面」在聊天右侧打开原页，已有同页标签时会直接跳转。旁边的小箭头提供「从工作台打开」和「从 ShowAI App 打开」，都带上这张卡片指向的组件位置。需要直接跳转时，先调用 `card_navigate`，返回 `unavailable` 时再调用 `card_open`。交付本机引用文件时使用 `workbench_page_reference`。
+一次发多张时，首张照常传参，其余目标按顺序放入同一次调用的 `additionalTargets`。每张卡片都可以有自己的组件和说明。「侧边打开」在聊天右侧打开原页，已有同页标签时会直接跳转。侧栏打开或关闭时，卡片都会留在聊天里。需要调间距时在顶层传 `adjustSpacing:true`，拖动滑块预览，点击「采用这组间距」把数值送回对话。旁边的小箭头提供「从工作台打开」和「从 ShowAI App 打开」，都带上这张卡片指向的组件位置。需要直接跳转时，先调用 `card_navigate`，返回 `unavailable` 时再调用 `card_open`。交付本机引用文件时使用 `workbench_page_reference`。
 
 `page_present({projectId,pageId,blockIds?})` 捕获一个源版本，返回身份/hash/revision，不修改 Page。HTML/source 始终完整；blockIds 只选择 inline 预览。临时构建失败会清理中间目录。
 

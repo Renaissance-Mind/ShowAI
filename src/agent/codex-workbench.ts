@@ -78,9 +78,15 @@ function registerCodexWorkbench(
 ) {
   const key = randomBytes(32).toString("hex");
   const navigation = new CodexWorkbenchNavigation(key);
-  // A host can remount an inline view in a different frame when it expands.
+  // Cached v1–v6 card views use this choice when the host remounts them in fullscreen.
   const cardChoices = new Map<string, { index: number; expires: number }>();
   const plugin = /^([\w-]+)@([\w-]+)$/.exec(process.env.SHOWAI_CODEX_PLUGIN_ID ?? "");
+  // A test installation can coexist with the stable file handler. Keep the
+  // side tab on the same MCP connection as its inline navigation controls.
+  const panelExtension = plugin?.[1].startsWith("showai-workbench-test")
+    ? "." + plugin[1].replace("showai-workbench-", "showai-") + "-ref"
+    : codexPageReferenceExtension;
+  const fileExtensions = [...new Set([codexPageReferenceExtension, panelExtension])];
   const globalEntrypoint = plugin
     ? `codex://plugins/${encodeURIComponent(plugin[1])}@${encodeURIComponent(plugin[2])}/app/${globalWorkbenchTool}`
     : undefined;
@@ -105,6 +111,8 @@ function registerCodexWorkbench(
     ...views,
     { mode: "thread", name: "workbench_file", uri: codexWorkbenchFileUri, entrypoint: "file" },
     { mode: "thread", name: "workbench_page_card", uri: codexWorkbenchCardUri, entrypoint: "card" },
+    { mode: "thread", name: "workbench_page_card_v7", uri: "ui://showai/workbench-card-v7.html", entrypoint: "card" },
+    { mode: "thread", name: "workbench_page_card_v6", uri: "ui://showai/workbench-card-v6.html", entrypoint: "card" },
     { mode: "thread", name: "workbench_page_card_v5", uri: "ui://showai/workbench-card-v5.html", entrypoint: "card" },
     { mode: "thread", name: "workbench_page_card_v4", uri: "ui://showai/workbench-card-v4.html", entrypoint: "card" },
     { mode: "thread", name: "workbench_page_target", uri: codexWorkbenchTargetUri, entrypoint: "open" },
@@ -140,7 +148,7 @@ function registerCodexWorkbench(
               permissions: { clipboardWrite: {} },
             },
             ...(entrypoint === "card" || entrypoint === "open" ? {
-              "openai/ui": { availableDisplayModes: ["inline", "fullscreen"], preferredDisplayMode: entrypoint === "open" ? "fullscreen" : "inline" },
+              "openai/ui": { availableDisplayModes: entrypoint === "open" ? ["inline", "fullscreen"] : ["inline"], preferredDisplayMode: entrypoint === "open" ? "fullscreen" : "inline" },
             } : {}),
           },
         }],
@@ -188,7 +196,7 @@ function registerCodexWorkbench(
     _meta: {
       ui: { resourceUri: codexWorkbenchFileUri, visibility: ["app"] },
       "openai/ui": {
-        entrypoints: [{ type: "file", extensions: [codexPageReferenceExtension] }],
+        entrypoints: [{ type: "file", extensions: fileExtensions }],
       },
     },
   }, (_, extra) => launch("thread", extra._meta));
@@ -199,14 +207,20 @@ function registerCodexWorkbench(
     _meta: { ui: { resourceUri: codexWorkbenchCardUri, visibility: ["model", "app"] } },
   };
   async function presentPageCard(
-    target: CodexCardTarget,
+    targets: CodexCardTarget[],
     meta?: Record<string, unknown>,
+    adjustSpacing = false,
   ) {
     try {
-      const page = await readCodexPageTarget(service, target);
+      const cards = await readCodexPageCards(service, targets);
+      const presentation = cards.length === 1 ? cards[0] : { id: randomUUID(), cards };
+      const data = adjustSpacing ? { ...presentation, adjustSpacing: true } : presentation;
       return {
-        ...mcpSuccess(page),
-        _meta: { showaiPageCard: page, showaiNavigationScope: navigation.scope(meta) },
+        ...mcpSuccess(data),
+        _meta: {
+          [cards.length === 1 ? "showaiPageCard" : "showaiCardGroup"]: data,
+          showaiNavigationScope: navigation.scope(meta),
+        },
       };
     } catch (error) {
       return mcpFailure(error);
@@ -219,23 +233,10 @@ function registerCodexWorkbench(
     inputSchema: {
       ...codexCardTarget,
       additionalTargets: z.array(z.object(codexCardTarget)).optional(),
+      adjustSpacing: z.boolean().optional().describe("Show live spacing controls only when the user wants to tune the card layout."),
     },
-  }, async ({ additionalTargets, ...first }, extra) => {
-    if (!additionalTargets?.length) return presentPageCard(first, extra._meta);
-    try {
-      const cards = await readCodexPageCards(service, [first, ...additionalTargets]);
-      const group = { id: randomUUID(), cards };
-      return {
-        ...mcpSuccess(group),
-        _meta: {
-          showaiCardGroup: group,
-          showaiNavigationScope: navigation.scope(extra._meta),
-        },
-      };
-    } catch (error) {
-      return mcpFailure(error);
-    }
-  });
+  }, ({ additionalTargets = [], adjustSpacing, ...first }, extra) =>
+    presentPageCard([first, ...additionalTargets], extra._meta, adjustSpacing));
   server.registerTool("workbench_open_destination", {
     title: "Open a ShowAI page",
     description: "Open the selected saved Page or component in Codex Workbench or the ShowAI app using its registered desktop link.",
@@ -275,7 +276,7 @@ function registerCodexWorkbench(
     title: "Open a ShowAI editor",
     description: "Open a saved Page or component directly in a new expanded editor. Try card_navigate first to reuse the current conversation's open editor.",
     _meta: { ui: { resourceUri: codexWorkbenchTargetUri, visibility: ["model", "app"] } },
-  }, (target, extra) => presentPageCard(target, extra._meta));
+  }, (target, extra) => presentPageCard([target], extra._meta));
   server.registerTool("card_navigate", {
     title: "Navigate the current ShowAI editor",
     description: "Locate a saved Page or its blockId in a visible ShowAI tab already showing that Page in this conversation. If status is unavailable, call card_open with the same target to open a separate Codex tab.",
@@ -288,6 +289,18 @@ function registerCodexWorkbench(
       const token = extra._meta?.["showai/navigationScope"];
       const scope = navigation.scope(extra._meta) ?? (typeof token === "string" ? token : undefined);
       return mcpSuccess({ status: await navigation.navigate(scope, target) });
+    } catch (error) {
+      return mcpFailure(error);
+    }
+  });
+  server.registerTool("workbench_side_file", {
+    description: "Prepare a saved Page or component reference for an independent Codex file tab.",
+    inputSchema: codexPageTarget,
+    _meta: appOnly,
+  }, async target => {
+    try {
+      const { path } = await writeCodexPageReference(service, presentationDirectory, target, panelExtension);
+      return { content: [], _meta: { showaiWorkbenchData: path } };
     } catch (error) {
       return mcpFailure(error);
     }
