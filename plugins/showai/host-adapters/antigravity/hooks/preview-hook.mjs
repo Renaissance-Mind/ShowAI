@@ -118,18 +118,44 @@ ${themeSyncScript}
 `;
 }
 
+function unquoteString(value) {
+  if (typeof value !== "string") return "";
+  const trimmed = value.trim();
+  if (trimmed.length >= 2 && trimmed.startsWith('"') && trimmed.endsWith('"')) {
+    try {
+      const parsed = JSON.parse(trimmed);
+      return typeof parsed === "string" ? parsed : trimmed;
+    } catch {
+      return trimmed.slice(1, -1);
+    }
+  }
+  return trimmed;
+}
+
 function matchShowaiTool(toolCall) {
-  const name = typeof toolCall?.name === "string" ? toolCall.name : "";
+  const name = unquoteString(toolCall?.name);
   const direct = TARGET_TOOL_RE.exec(name);
   if (direct) return direct[1];
-  const nested =
-    typeof toolCall?.args?.tool === "string"
-      ? toolCall.args.tool
-      : typeof toolCall?.args?.toolName === "string"
-        ? toolCall.args.toolName
-        : "";
+  const args = toolCall?.args && typeof toolCall.args === "object" ? toolCall.args : {};
+  const nested = unquoteString(args.ToolName || args.toolName || args.tool);
   const nestedMatch = TARGET_TOOL_RE.exec(nested);
   return nestedMatch ? nestedMatch[1] : null;
+}
+
+function extractToolArgs(toolCall) {
+  const raw = toolCall?.args;
+  if (!raw || typeof raw !== "object") return {};
+  const nested = raw.Arguments ?? raw.arguments;
+  if (nested && typeof nested === "object") return nested;
+  if (typeof nested === "string") {
+    try {
+      const parsed = JSON.parse(nested);
+      if (parsed && typeof parsed === "object") return parsed;
+    } catch {
+      // Ignore malformed JSON string arguments.
+    }
+  }
+  return raw;
 }
 
 function previewDirectories(env = process.env) {
@@ -333,9 +359,7 @@ async function handlePostToolUse(payload, env) {
   const filePath = join(artifactDir, `showai-preview-${digest}.html`);
   await atomicWrite(filePath, wrapped);
 
-  const args = payload.toolCall?.args && typeof payload.toolCall.args === "object"
-    ? payload.toolCall.args
-    : {};
+  const args = extractToolArgs(payload.toolCall);
   const projectId = meta.projectId || (typeof args.projectId === "string" ? args.projectId : undefined);
   const pageId = meta.pageId || (typeof args.pageId === "string" ? args.pageId : undefined);
   const blockIds = meta.blockIds || (Array.isArray(args.blockIds) ? args.blockIds.filter((x) => typeof x === "string") : undefined);

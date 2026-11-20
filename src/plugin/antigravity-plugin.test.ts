@@ -19,6 +19,7 @@ interface HookModule {
 }
 
 interface SidecarModule {
+  isAllowedSidecarOrigin(origin: string, sidecarPort: number): boolean;
   startAntigravitySidecar(options: {
     port?: number;
     token?: string;
@@ -45,7 +46,7 @@ const {
   ).href
 )) as HookModule;
 
-const { startAntigravitySidecar } = (await import(
+const { isAllowedSidecarOrigin, startAntigravitySidecar } = (await import(
   pathToFileURL(
     resolve(
       "plugins/showai/host-adapters/antigravity/sidecars/workbench/main.mjs",
@@ -149,6 +150,68 @@ describe("Antigravity preview hook", () => {
     expect(secondPre).toEqual({});
   });
 
+  test("handles Antigravity lazy MCP call_mcp_tool payload with PascalCase ToolName and timestamped transcript content", async () => {
+    const root = await makeTempDir("showai-ag-hook-lazy-");
+    const home = join(root, "home");
+    const previewDir = join(home, "local/agent-previews/show-components/u1");
+    const artifactDir = join(root, "artifacts");
+    const transcriptPath = join(root, "transcript.jsonl");
+    await mkdir(previewDir, { recursive: true });
+    await mkdir(artifactDir, { recursive: true });
+
+    const inlineFile = join(previewDir, "component.inline.html");
+    await writeFile(
+      inlineFile,
+      '<section id="showai-lazy" data-showai-inline-root><p>Lazy MCP</p></section>',
+      "utf8",
+    );
+
+    const resultPayload = JSON.stringify({
+      ok: true,
+      data: {
+        title: "实时验证",
+        display: { reader: "bundled" },
+        delivery: { mode: "fragment-file", inline: inlineFile },
+      },
+    });
+    await writeFile(
+      transcriptPath,
+      JSON.stringify({
+        step_index: 294,
+        type: "GENERIC",
+        status: "DONE",
+        content: `Created At: 2026-11-20T22:10:12+08:00\nCompleted At: 2026-11-20T22:11:04+08:00\n${resultPayload}`,
+      }) + "\n",
+      "utf8",
+    );
+
+    await handleHookEvent(
+      {
+        hookEventName: "PostToolUse",
+        artifactDirectoryPath: artifactDir,
+        transcriptPath,
+        toolCall: {
+          id: "call_lazy",
+          name: "call_mcp_tool",
+          args: {
+            ServerName: "showai_showai",
+            ToolName: "show_component",
+            Arguments: { kind: "flowchart", delivery: "auto" },
+          },
+        },
+      },
+      { SHOWAI_HOME: home },
+    );
+
+    const pre = await handleHookEvent({
+      hookEventName: "PreInvocation",
+      artifactDirectoryPath: artifactDir,
+    });
+    const message = pre.injectSteps?.[0]?.systemMessage?.systemMessage ?? "";
+    expect(message).toContain("<agent-embed src=\"file://");
+    expect(message).toContain("showai-preview-");
+  });
+
   test("rejects CDN fragments, errored tool calls, and files outside preview roots", async () => {
     const root = await makeTempDir("showai-ag-hook-guard-");
     const home = join(root, "home");
@@ -221,6 +284,106 @@ describe("Antigravity preview hook", () => {
 });
 
 describe("Antigravity sidecar workbench proxy", () => {
+  test("allows plugin://showai--workbench-<port> and loopback origins while blocking foreign origins", async () => {
+    let upstreamHits = 0;
+    const upstream = createServer((req, res) => {
+      upstreamHits++;
+      const expectedOrigin = `http://${req.headers.host}`;
+      if (req.headers.origin && req.headers.origin !== expectedOrigin) {
+        res.writeHead(403, { "Content-Type": "text/plain" });
+        res.end("Forbidden origin");
+        return;
+      }
+      if (req.url === "/assets/index.js") {
+        res.writeHead(200, {
+          "Content-Type": "text/javascript",
+          "X-Frame-Options": "DENY",
+        });
+        res.end("export const ok = true;");
+        return;
+      }
+      res.writeHead(200, {
+        "Content-Type": "text/html; charset=utf-8",
+        "X-Frame-Options": "DENY",
+        "Content-Security-Policy":
+          "default-src 'self'; frame-ancestors 'none'; object-src 'none'",
+      });
+      res.end("<!doctype html><html><head></head><body>ok</body></html>");
+    });
+    await new Promise<void>((done) => upstream.listen(0, "127.0.0.1", done));
+    const upstreamAddress = upstream.address();
+    const upstreamPort =
+      typeof upstreamAddress === "object" && upstreamAddress
+        ? upstreamAddress.port
+        : 0;
+    const upstreamUrl = new URL(`http://127.0.0.1:${upstreamPort}/`);
+
+    const sidecar = await startAntigravitySidecar({
+      port: 0,
+      token: "origin-test-token",
+      backend: {
+        ensure: async () => ({ url: upstreamUrl, home: "/tmp/showai-origin" }),
+        stop: async () => {},
+        status: () => ({
+          running: true,
+          url: upstreamUrl.href,
+          home: "/tmp/showai-origin",
+        }),
+      },
+    });
+
+    try {
+      const pluginOrigin = `plugin://showai--workbench-${sidecar.port}`;
+      expect(isAllowedSidecarOrigin(pluginOrigin, sidecar.port)).toBe(true);
+      expect(
+        isAllowedSidecarOrigin(`http://127.0.0.1:${sidecar.port}`, sidecar.port),
+      ).toBe(true);
+      expect(
+        isAllowedSidecarOrigin(`plugin://showai--workbench-${sidecar.port + 1}`, sidecar.port),
+      ).toBe(false);
+      expect(
+        isAllowedSidecarOrigin(`plugin://other--workbench-${sidecar.port}`, sidecar.port),
+      ).toBe(false);
+      expect(isAllowedSidecarOrigin("https://evil.example", sidecar.port)).toBe(false);
+
+      // Module asset request with Antigravity desktop plugin:// origin succeeds and strips X-Frame-Options.
+      const assetRes = await fetch(`${sidecar.url}/assets/index.js`, {
+        headers: { Origin: pluginOrigin },
+      });
+      expect(assetRes.status).toBe(200);
+      expect(assetRes.headers.get("access-control-allow-origin")).toBe(pluginOrigin);
+      expect(assetRes.headers.get("x-frame-options")).toBeNull();
+      expect(await assetRes.text()).toContain("export const ok = true;");
+
+      // Preflight OPTIONS from plugin:// origin succeeds.
+      const preflight = await fetch(`${sidecar.url}/api/invoke`, {
+        method: "OPTIONS",
+        headers: { Origin: pluginOrigin },
+      });
+      expect(preflight.status).toBe(204);
+      expect(preflight.headers.get("access-control-allow-origin")).toBe(pluginOrigin);
+
+      // Foreign origins are rejected with 403 before reaching upstream.
+      const hitsBeforeReject = upstreamHits;
+      for (const badOrigin of [
+        "https://evil.example",
+        `http://127.0.0.1:${sidecar.port + 1}`,
+        `plugin://other--workbench-${sidecar.port}`,
+        `plugin://showai--workbench-${sidecar.port + 1}`,
+      ]) {
+        const blocked = await fetch(`${sidecar.url}/assets/index.js`, {
+          headers: { Origin: badOrigin },
+        });
+        expect(blocked.status, badOrigin).toBe(403);
+        expect(await blocked.text()).toBe("Forbidden origin");
+      }
+      expect(upstreamHits).toBe(hitsBeforeReject);
+    } finally {
+      await sidecar.close();
+      await new Promise<void>((done) => upstream.close(() => done()));
+    }
+  });
+
   test("injects preload + bridge scripts, relaxes frame-ancestors, proxies API/SSE, and enforces sidecar token", async () => {
     const upstream = createServer((req, res) => {
       if (req.url?.startsWith("/api/events")) {

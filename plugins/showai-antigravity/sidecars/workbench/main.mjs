@@ -258,6 +258,17 @@ function rewriteCspForSidecar(csp) {
   return csp.replace(/\bframe-ancestors\s+[^;]+/i, "frame-ancestors *");
 }
 
+export function isAllowedSidecarOrigin(origin, sidecarPort) {
+  if (typeof origin !== "string" || !origin.trim()) return false;
+  if (!Number.isInteger(sidecarPort) || sidecarPort <= 0) return false;
+  const trimmed = origin.trim();
+  return (
+    trimmed === `plugin://showai--workbench-${sidecarPort}` ||
+    trimmed === `http://127.0.0.1:${sidecarPort}` ||
+    trimmed === `http://localhost:${sidecarPort}`
+  );
+}
+
 function injectSidecarScripts(html) {
   const scripts = '<script src="/preload.js"></script><script src="/_antigravity/bridge.js"></script>';
   if (html.includes("<head>")) {
@@ -285,46 +296,82 @@ export async function startAntigravitySidecar(options = {}) {
   const token = options.token ?? env.ANTIGRAVITY_SIDECAR_UI_TOKEN ?? "";
   const preloadJs = loadPreloadJs();
   const backend = options.backend ?? createBackendManager(env);
+  let actualPort = port;
 
   const server = createServer(async (req, res) => {
-    const reqUrl = new URL(req.url || "/", `http://${BIND_HOST}:${port || 80}`);
+    const reqUrl = new URL(req.url || "/", `http://${BIND_HOST}:${actualPort || 80}`);
     const pathname = reqUrl.pathname;
+    const requestOrigin =
+      typeof req.headers.origin === "string" ? req.headers.origin.trim() : "";
+
+    if (requestOrigin && !isAllowedSidecarOrigin(requestOrigin, actualPort)) {
+      res.writeHead(403, { "Content-Type": "text/plain; charset=utf-8" });
+      res.end("Forbidden origin");
+      return;
+    }
+
+    const corsHeaders = requestOrigin
+      ? {
+          "access-control-allow-origin": requestOrigin,
+          vary: "Origin",
+        }
+      : {};
+
+    if (requestOrigin && req.method === "OPTIONS") {
+      res.writeHead(204, {
+        ...corsHeaders,
+        "access-control-allow-methods": "GET, HEAD, POST, OPTIONS",
+        "access-control-allow-headers":
+          "Authorization, Content-Type, X-ShowAI-Client, X-Sidecar-Token",
+      });
+      res.end();
+      return;
+    }
 
     if (req.method === "GET" && pathname === "/preload.js") {
-      res.writeHead(200, { "Content-Type": "application/javascript; charset=utf-8" });
+      res.writeHead(200, {
+        ...corsHeaders,
+        "Content-Type": "application/javascript; charset=utf-8",
+      });
       res.end(preloadJs);
       return;
     }
     if (req.method === "GET" && pathname === "/_antigravity/bridge.js") {
-      res.writeHead(200, { "Content-Type": "application/javascript; charset=utf-8" });
+      res.writeHead(200, {
+        ...corsHeaders,
+        "Content-Type": "application/javascript; charset=utf-8",
+      });
       res.end(BRIDGE_JS);
       return;
     }
     if (req.method === "GET" && pathname === "/_antigravity/health") {
-      res.writeHead(200, { "Content-Type": "application/json; charset=utf-8" });
+      res.writeHead(200, {
+        ...corsHeaders,
+        "Content-Type": "application/json; charset=utf-8",
+      });
       res.end(JSON.stringify({ ok: true, backend: backend.status() }));
       return;
     }
     if (req.method === "POST" && pathname === "/_antigravity/restart") {
       if (!validateToken(token, req, reqUrl)) {
-        res.writeHead(401, { "Content-Type": "application/json" });
+        res.writeHead(401, { ...corsHeaders, "Content-Type": "application/json" });
         res.end(JSON.stringify({ error: "unauthorized" }));
         return;
       }
       await backend.stop();
-      res.writeHead(200, { "Content-Type": "application/json" });
+      res.writeHead(200, { ...corsHeaders, "Content-Type": "application/json" });
       res.end(JSON.stringify({ ok: true }));
       return;
     }
 
     if (pathname.startsWith("/_sidecar/")) {
       if (req.method !== "POST") {
-        res.writeHead(405, { "Content-Type": "application/json" });
+        res.writeHead(405, { ...corsHeaders, "Content-Type": "application/json" });
         res.end(JSON.stringify({ error: "Method Not Allowed" }));
         return;
       }
       if (!validateToken(token, req, reqUrl)) {
-        res.writeHead(401, { "Content-Type": "application/json" });
+        res.writeHead(401, { ...corsHeaders, "Content-Type": "application/json" });
         res.end(JSON.stringify({ error: "unauthorized" }));
         return;
       }
@@ -348,14 +395,14 @@ export async function startAntigravitySidecar(options = {}) {
             { env },
           );
         } else {
-          res.writeHead(404, { "Content-Type": "application/json" });
+          res.writeHead(404, { ...corsHeaders, "Content-Type": "application/json" });
           res.end(JSON.stringify({ error: "Not found" }));
           return;
         }
-        res.writeHead(200, { "Content-Type": "application/json" });
+        res.writeHead(200, { ...corsHeaders, "Content-Type": "application/json" });
         res.end(JSON.stringify(result));
       } catch (error) {
-        res.writeHead(500, { "Content-Type": "application/json" });
+        res.writeHead(500, { ...corsHeaders, "Content-Type": "application/json" });
         res.end(JSON.stringify({ error: error.message }));
       }
       return;
@@ -366,10 +413,10 @@ export async function startAntigravitySidecar(options = {}) {
       upstream = await backend.ensure();
     } catch (error) {
       if (pathname === "/" || pathname === "/index.html") {
-        res.writeHead(503, { "Content-Type": "text/html; charset=utf-8" });
+        res.writeHead(503, { ...corsHeaders, "Content-Type": "text/html; charset=utf-8" });
         res.end(renderStatusHtml("无法启动 ShowAI 工作台", error.message));
       } else {
-        res.writeHead(503, { "Content-Type": "application/json; charset=utf-8" });
+        res.writeHead(503, { ...corsHeaders, "Content-Type": "application/json; charset=utf-8" });
         res.end(JSON.stringify({ ok: false, error: { code: "BACKEND_UNAVAILABLE", message: error.message } }));
       }
       return;
@@ -377,6 +424,12 @@ export async function startAntigravitySidecar(options = {}) {
 
     const forwardHeaders = { ...req.headers, host: upstream.url.host };
     delete forwardHeaders["accept-encoding"];
+    if (requestOrigin) {
+      forwardHeaders.origin = upstream.url.origin;
+    }
+    if (typeof forwardHeaders.referer === "string") {
+      delete forwardHeaders.referer;
+    }
 
     const proxyReq = httpRequest(
       {
@@ -398,10 +451,11 @@ export async function startAntigravitySidecar(options = {}) {
           proxyRes.on("data", (chunk) => chunks.push(chunk));
           proxyRes.on("end", () => {
             const injected = injectSidecarScripts(Buffer.concat(chunks).toString("utf8"));
-            const headers = { ...proxyRes.headers };
+            const headers = { ...proxyRes.headers, ...corsHeaders };
             delete headers["content-length"];
             delete headers["transfer-encoding"];
             delete headers["connection"];
+            delete headers["x-frame-options"];
             if (headers["content-security-policy"]) {
               headers["content-security-policy"] = rewriteCspForSidecar(
                 headers["content-security-policy"],
@@ -416,7 +470,8 @@ export async function startAntigravitySidecar(options = {}) {
           return;
         }
 
-        const headers = { ...proxyRes.headers };
+        const headers = { ...proxyRes.headers, ...corsHeaders };
+        delete headers["x-frame-options"];
         if (headers["content-security-policy"]) {
           headers["content-security-policy"] = rewriteCspForSidecar(
             headers["content-security-policy"],
@@ -436,10 +491,10 @@ export async function startAntigravitySidecar(options = {}) {
         return;
       }
       if (pathname === "/" || pathname === "/index.html") {
-        res.writeHead(502, { "Content-Type": "text/html; charset=utf-8" });
+        res.writeHead(502, { ...corsHeaders, "Content-Type": "text/html; charset=utf-8" });
         res.end(renderStatusHtml("与 ShowAI 工作台连接中断", error.message));
       } else {
-        res.writeHead(502, { "Content-Type": "application/json; charset=utf-8" });
+        res.writeHead(502, { ...corsHeaders, "Content-Type": "application/json; charset=utf-8" });
         res.end(JSON.stringify({ ok: false, error: { code: "PROXY_ERROR", message: error.message } }));
       }
     });
@@ -461,7 +516,7 @@ export async function startAntigravitySidecar(options = {}) {
   });
 
   const address = server.address();
-  const actualPort = typeof address === "object" && address ? address.port : port;
+  actualPort = typeof address === "object" && address ? address.port : port;
 
   const close = async () => {
     await backend.stop();

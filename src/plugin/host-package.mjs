@@ -203,7 +203,8 @@ export function antigravityHookConfig(launch) {
     "showai-preview": {
       PostToolUse: [
         {
-          matcher: ".*(?:show_component|page_present|render_document).*|mcp_tool",
+          matcher:
+            ".*(?:show_component|page_present|render_document).*|call_mcp_tool|mcp_tool",
           hooks: [
             {
               type: "command",
