@@ -60,7 +60,7 @@ description: 在对话中直接展示 1–5 个 ShowAI 组件（图表、示意�
 
 ## 之后要保存
 
-用户说“存下来”时，只存这几个组件：按 [use-showai](../use-showai/SKILL.md) 确定项目，用 `page_create({projectId,blocks})` 或 `component.insert` 原样写入同一份 {kind,data}（自定义组件沿用返回的 version 与 integrity；只用 componentSources 预览过的组件先按 create-component 用 `component_save` 保存，再引用回执中的版本），再 `page_present`。读者在预览里调整的取值（`showai.readerState`）不会自动写入：用户要保留调整后的状态时，先说明会改哪些字段，再写进 data。要把多次展示整理成一份文档时按 show-document 的流程制作，已有展示作为材料。
+用户说“存下来”时，只存这几个组件：按 [use-showai](../use-showai/SKILL.md) 确定项目，用 `page_create({projectId,blocks})` 或 `component.insert` 原样写入同一份 {kind,data}（自定义组件沿用返回的 version 与 integrity；只用 componentSources 预览过的组件先按 create-component 用 `component_save` 保存，再引用回执中的版本）。保存成功后，按[当前宿主适配](../use-showai/references/host-adapter.md)交付承载这些组件的原页。读者在预览里调整的取值（`showai.readerState`）不会自动写入：用户要保留调整后的状态时，先说明会改哪些字段，再写进 data。要把多次展示整理成一份文档时按 show-document 的流程制作，已有展示作为材料。
 
 展示本身没有保存，不要说已保存；连接或保存失败时也不改用展示了事。
 

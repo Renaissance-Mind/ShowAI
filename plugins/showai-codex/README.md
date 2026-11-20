@@ -80,7 +80,7 @@ The marketplace identity stays `showai@renaissance-mind`. The generated Codex an
 | [create-template](skills/create-template/SKILL.md)       | Reusable template folders and methods                                |
 | [collaborate-canvas](skills/collaborate-canvas/SKILL.md) | Co-editing on canvases, multi-device pairing                         |
 
-Agent document operations use MCP. Read the installed use-showai Skill and discover the required project. Query showai_capabilities once when the current connection is unknown or changes. Formal work is saved in the selected project before page_present. render_document serves explicitly standalone delivery. Detailed methods remain in the canonical Skills; this README is the installation entrypoint.
+Agent document operations use MCP. Read the installed use-showai Skill and discover the required project. Query showai_capabilities once when the current connection is unknown or changes. Save formal work in the selected project and use the installed host adapter to deliver it. Use `render_document` for standalone files. Detailed methods remain in the canonical Skills; this README is the installation entrypoint.
 
 ## Runtime and library
 

@@ -4,7 +4,7 @@
 
 **Agent document operations use MCP** in every host. Read the installed `use-showai` Skill for task routing and ownership. Query `showai_capabilities` when the connection is unknown or changes, and reuse the result for that connection. It reports runtime capabilities and limits; workflows stay in Skills. Local plugins include a stdio launcher; remote packages provide an HTTP endpoint. CLI examples below configure services or support scripts and operators.
 
-Local library MCP uses explicit `projectId` per operation. Use `projects_list` for read-only discovery, `project_resolve` with a trusted absolute `sourceDirectory` for new formal content, or a project-bound connection. New formal work is **saved before** `page_present`; `render_document` is for explicitly standalone deliverables. **Connection failure** does not change the destination or persistence mode.
+Local library MCP uses explicit `projectId` per operation. Use `projects_list` for read-only discovery, `project_resolve` with a trusted absolute `sourceDirectory` for new formal content, or a project-bound connection. Save formal work before delivering it through the host adapter. Use `render_document` for explicitly standalone deliverables. **Connection failure** does not change the destination or persistence mode.
 
 ShowAI 0.9 provides independent presentations and shared-project work. **Display and synchronization are separate choices**:
 
@@ -102,7 +102,7 @@ The output creates a `showai-cloud` package from the same Skills/assets, with HT
 
 ## Saved-page presentation contract
 
-Install or update the Codex plugin from ShowAI **Settings → Plugins**. Call `card_present` with the saved `projectId` and `pageId`. The card shows the Page title and its full path through the project and folders. Add a `blockId` from the Page outline to target a component and display its title in the card body. Supply an optional `description` (up to 1,000 characters) to show text about the current task. These descriptions belong to the chat card.
+Install or update the Codex plugin from ShowAI **Settings → Plugins**. Use `show_component` for temporary, interactive results in chat. When the connection exposes `card_present`, finish a successful Page creation or edit with an original-Page card in the same reply. Use the saved `projectId` and `pageId`. The card shows the Page title and its full project and folder path. Its optional `description` (up to 1,000 characters) can summarize the new contents or the edit. Add a verified `blockId` from the saved outline to point to a particular component. An explicit inline reading preview uses `page_present`.
 
 For several cards, pass the first target at the top level and the others in the ordered `additionalTargets` array of the same call. Each card has its own target and description. **Open in side panel** opens the original in a separate side tab or navigates its existing tab. The cards stay visible in chat when the tab opens or closes. To tune the layout, set `adjustSpacing:true` on the top-level call. Its controls preview spacing and send the chosen values back to the conversation when applied. The adjacent menu offers **Open in Workbench** and **Open in ShowAI App**, including the component location. For direct navigation, call `card_navigate` and use `card_open` if it reports `unavailable`. Use `workbench_page_reference` to deliver a local reference file.
 

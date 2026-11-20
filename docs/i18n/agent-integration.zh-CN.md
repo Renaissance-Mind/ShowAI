@@ -4,7 +4,7 @@
 
 所有宿主的 Agent 文档操作统一使用 MCP，操作方法从已安装的 use-showai Skill 及其参考文件读取。连接信息未知或变化时查询一次 showai_capabilities，复用当前连接的结果；它提供运行时能力和限制，工作流由 Skill 提供。本机插件提供 stdio launcher，远程连接使用 HTTP；CLI 面向服务配置、脚本与运维。
 
-正式内容先保存到项目再 page_present；明确的独立交付使用 render_document。本机 library 连接每次携带 projectId，只读发现用 projects_list，新正式内容可用 project_resolve 与可信宿主绝对目录定位。绑定项目连接沿用其身份。
+正式内容先保存到项目，再按宿主适配交付。明确要求独立文件时使用 render_document。本机 library 连接每次携带 projectId，只读发现用 projects_list，新正式内容可用 project_resolve 与可信宿主绝对目录定位。绑定项目连接沿用其身份。
 
 ## 连接、展示与同步
 
@@ -88,7 +88,7 @@ npm run package:plugin -- --mcp-url https://agent.example.com/mcp --out /absolut
 
 ## 已保存页面的展示约定
 
-从 ShowAI「设置 → 插件」安装或更新 Codex 插件。调用 `card_present` 并传入已保存页面的 `projectId` 和 `pageId`，卡片会显示页面标题及项目、各级文件夹和页面组成的完整路径。传入页面大纲中的 `blockId` 即可定位组件，卡片正文默认显示该组件的标题。可选的 `description` 支持最多 1000 个字符，用于在这张卡片上写与当前任务相关的说明。
+从 ShowAI「设置 → 插件」安装或更新 Codex 插件。临时图表和组件用 `show_component` 在聊天里交互展示。当前连接提供 `card_present` 时，新建或编辑页面并保存成功后，默认在同一轮交付原页卡片。传入已保存页面的 `projectId` 和 `pageId`，卡片会显示标题及完整路径。可用 `description` 简述新内容或本次改动，最多 1000 个字符。要指向某个组件，再传入保存后大纲里的 `blockId`。明确要求在对话里阅读正文时使用 `page_present`。
 
 一次发多张时，首张照常传参，其余目标按顺序放入同一次调用的 `additionalTargets`。每张卡片都可以有自己的组件和说明。「侧边打开」在聊天右侧打开原页，已有同页标签时会直接跳转。侧栏打开或关闭时，卡片都会留在聊天里。需要调间距时在顶层传 `adjustSpacing:true`，拖动滑块预览，点击「采用这组间距」把数值送回对话。旁边的小箭头提供「从工作台打开」和「从 ShowAI App 打开」，都带上这张卡片指向的组件位置。需要直接跳转时，先调用 `card_navigate`，返回 `unavailable` 时再调用 `card_open`。交付本机引用文件时使用 `workbench_page_reference`。
 

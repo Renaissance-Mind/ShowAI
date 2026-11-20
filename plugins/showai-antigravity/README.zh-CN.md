@@ -65,7 +65,7 @@ npm run plugin:dsh
 | [create-template](skills/create-template/SKILL.md)       | 可复用模板文件夹与方法                         |
 | [collaborate-canvas](skills/collaborate-canvas/SKILL.md) | 画布协作、多端配对与保存状态                   |
 
-Agent 文档操作使用 MCP，先读取已安装的 use-showai Skill，核对项目；连接信息未知或变化时查询一次 showai_capabilities。正式成果先保存到项目再 page_present；明确独立交付使用 render_document。详细方法由同源 Skill 维护，本页用于安装与接入。
+Agent 文档操作使用 MCP，先读取已安装的 use-showai Skill，核对项目；连接信息未知或变化时查询一次 showai_capabilities。正式成果先保存到项目，再按当前宿主适配交付。明确要求独立文件时使用 `render_document`。详细方法由同源 Skill 维护，本页用于安装与接入。
 
 ## 运行时与内容库
 

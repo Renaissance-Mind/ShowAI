@@ -229,7 +229,7 @@ function registerCodexWorkbench(
   server.registerTool("card_present", {
     ...cardTool,
     title: "Show saved ShowAI cards",
-    description: "Show a card for a saved Page or a blockId from page_read. Each target can have its own task-specific description. Put the remaining targets in additionalTargets to display multiple cards together in order. The user can open each target beside the chat, in Workbench, or in the ShowAI app.",
+    description: "Deliver the original Page as a clickable card after successfully creating or editing it in Codex, or when the user asks for a saved target. Optionally use a blockId from page_read to point to a component and description to summarize its contents or changes. Put remaining targets in additionalTargets to deliver all cards together. The user chooses where to open them.",
     inputSchema: {
       ...codexCardTarget,
       additionalTargets: z.array(z.object(codexCardTarget)).optional(),

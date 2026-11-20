@@ -139,6 +139,7 @@ describe("host-specific plugin distributions", () => {
         "utf8",
       );
       expect(entrySkill.includes("## Codex 工作台")).toBe(profile === "codex");
+      expect(entrySkill.includes("`card_present`")).toBe(profile === "codex");
       if (profile !== "codex") expect(adapter).not.toContain("visualize");
       expect((await readdir(join(target, "skills"))).sort()).toEqual(
         (await readdir(join(source, "skills"))).sort(),
