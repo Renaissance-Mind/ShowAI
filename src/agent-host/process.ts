@@ -252,7 +252,8 @@ export class RpcProcess {
           else {
             const wait = this.pending.get(item.id);
             this.pending.delete(item.id);
-            if (item.error) wait?.reject(new Error(item.error.message));
+            if (item.error)
+              wait?.reject(Object.assign(new Error(item.error.message), { code: item.error.code }));
             else wait?.resolve(item.result);
           }
         }

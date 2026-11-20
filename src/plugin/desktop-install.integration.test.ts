@@ -12,8 +12,9 @@ import { join, resolve, sep } from "node:path";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
 import type { Tool } from "@modelcontextprotocol/sdk/types.js";
-import { spawn } from "node:child_process";
+import { execFile, spawn } from "node:child_process";
 import { createInterface } from "node:readline";
+import { promisify } from "node:util";
 import { DesktopPluginInstaller, hostExecutable } from "./desktop-install";
 import { registerRuntime, type RuntimeLaunch } from "../agent/runtime";
 
@@ -413,6 +414,31 @@ describe.skipIf(!output || !config)(
       },
       120000,
     );
+    test("Codex status reads local versions and detects enabled ShowAI plugins from other marketplaces", async () => {
+      const executable = (await hostExecutable("codex"))!;
+      const run = (args: string[]) =>
+        promisify(execFile)(executable, ["plugin", ...args, "--json"], { cwd: root });
+      const original = await installer.install("codex");
+      const alternate = join(root, "alternate-market");
+      const market = "showai-status-alternate";
+      const id = "showai@" + market;
+      await mkdir(join(alternate, ".agents/plugins"), { recursive: true });
+      await cp(original.installedPath, join(alternate, "plugins/showai"), { recursive: true });
+      await writeFile(join(alternate, ".agents/plugins/marketplace.json"), JSON.stringify({
+        name: market, plugins: [{ name: "showai", source: { source: "local", path: "./plugins/showai" } }],
+      }));
+      await run(["marketplace", "add", alternate]);
+      await run(["add", id]);
+      try {
+        expect((await installer.status("codex"))[0]).toMatchObject({
+          installed: true, enabled: true, version: original.version, current: true, otherSources: [id],
+        });
+        await expect(installer.install("codex")).rejects.toMatchObject({ code: "PLUGIN_OTHER_SOURCE" });
+      } finally {
+        await run(["remove", id]);
+      }
+      expect((await installer.status("codex"))[0].otherSources).toEqual([]);
+    }, 60000);
     test("a development build does not install the user-scope Claude Code plugin", async () => {
       const development = new DesktopPluginInstaller({
         root: join(root, "profile/development-plugins"),

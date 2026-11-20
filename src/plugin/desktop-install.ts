@@ -19,7 +19,9 @@ import {
   execute,
   executablePaths,
   findExecutable,
+  RpcProcess,
 } from "../agent-host/process";
+import { AgentFailure } from "../agent-host/problems";
 import {
   registerRuntime,
   runtimeRegistrationStatus,
@@ -79,6 +81,13 @@ export interface PluginInstallReceipt {
   treeSha256: string;
   home: string;
   dsh?: DshPendingSteps;
+}
+
+interface CodexInstalledPlugin {
+  id: string;
+  installed: boolean;
+  enabled: boolean;
+  localVersion?: string | null;
 }
 
 const marketplaceName = "showai-desktop";
@@ -339,7 +348,7 @@ export class DesktopPluginInstaller {
     };
   }
 
-  private async command(executable: string, args: string[], timeout = 120000) {
+  private commandEnv(executable: string) {
     const env: NodeJS.ProcessEnv = {
       ...process.env,
       PATH: executablePaths().join(delimiter),
@@ -349,10 +358,26 @@ export class DesktopPluginInstaller {
         : {}),
     };
     delete env.ELECTRON_RUN_AS_NODE;
+    return env;
+  }
+
+  private commandTimeout(command: string, timeout: number) {
+    return new PluginInstallError(
+      "PLUGIN_HOST_COMMAND_TIMEOUT",
+      `${command} timed out after ${timeout / 1000} seconds.`,
+      { command, timeoutMs: timeout },
+    );
+  }
+
+  private async command(executable: string, args: string[], timeout = 120000) {
     const result = await execute(executable, ["plugin", ...args], {
-      env,
+      env: this.commandEnv(executable),
       cwd: this.options.root,
       timeout,
+    }).catch((error) => {
+      if (error instanceof AgentFailure && error.problem.code === "timeout")
+        throw this.commandTimeout(`${executable} plugin ${args.join(" ")}`, timeout);
+      throw error;
     });
     if (result.code !== 0)
       throw new PluginInstallError(
@@ -556,14 +581,10 @@ export class DesktopPluginInstaller {
     expected?: Promise<string>,
   ): Promise<PluginInstallation> {
     if (host === "deepseek") return this.inspectDsh(executable, expected);
-    const data = await this.listJson(
-      host,
-      executable,
-      ["list", "--json"],
-      STATUS_TIMEOUT,
-    );
-    const items = host === "codex" ? data?.installed : data;
-    if (!Array.isArray(items)) throw this.tooOld(host, JSON.stringify(data));
+    const items = host === "codex"
+      ? await this.codexInstalled(executable)
+      : await this.listJson(host, executable, ["list", "--json"], STATUS_TIMEOUT);
+    if (!Array.isArray(items)) throw this.tooOld(host, JSON.stringify(items));
     const receipt = await readFile(
       join(this.options.root, `${host}-install.json`),
       "utf8",
@@ -627,6 +648,48 @@ export class DesktopPluginInstaller {
             : (item.pluginId ?? item.id),
         ),
     };
+  }
+
+  private async codexInstalled(executable: string) {
+    const controller = new AbortController();
+    const rpc = new RpcProcess(
+      executable, ["app-server", "--listen", "stdio://"], this.options.root,
+      () => {}, controller.signal, { env: this.commandEnv(executable) },
+    );
+    const timer = setTimeout(() => controller.abort(), STATUS_TIMEOUT);
+    try {
+      await rpc.request("initialize", {
+        clientInfo: { name: "showai-plugin-settings", version: "1" },
+        capabilities: { experimentalApi: true },
+      });
+      rpc.send({ jsonrpc: "2.0", method: "initialized" });
+      // This inventory includes other installed sources without refreshing remote catalogs.
+      const data: { marketplaces: { plugins: CodexInstalledPlugin[] }[] } =
+        await rpc.request("plugin/installed", { cwds: [this.options.root] });
+      if (!Array.isArray(data?.marketplaces) || !data.marketplaces.every((m) => Array.isArray(m?.plugins)))
+        throw this.tooOld("codex", "Invalid plugin/installed response.");
+      return data.marketplaces.flatMap((m) => m.plugins)
+        .filter((item) => item.installed === true)
+        .map((item) => ({ ...item, version: item.localVersion }));
+    } catch (error) {
+      if (controller.signal.aborted)
+        throw this.commandTimeout(`${executable} app-server plugin/installed`, STATUS_TIMEOUT);
+      if (error instanceof PluginInstallError) throw error;
+      const code = (error as { code?: unknown }).code;
+      const unsupported = code === -32601 ||
+        (code === -32600 && error instanceof Error && error.message.includes("plugin/installed"));
+      if (!unsupported)
+        throw new PluginInstallError("PLUGIN_HOST_COMMAND_FAILED",
+          `Codex plugin/installed failed: ${error instanceof Error ? error.message : String(error)}`,
+          { host: "codex", command: "plugin/installed" });
+    } finally {
+      clearTimeout(timer);
+      rpc.close();
+    }
+    // Older app servers can still provide the installed array through their CLI.
+    const legacy = await this.listJson("codex", executable, ["list", "--json"], STATUS_TIMEOUT);
+    if (!Array.isArray(legacy?.installed)) throw this.tooOld("codex", "Invalid plugin list response.");
+    return legacy.installed;
   }
 
   async status(only?: PluginHost) {
