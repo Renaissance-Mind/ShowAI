@@ -1,12 +1,9 @@
 import { useMemo, useState } from "react";
 import { folderBreadcrumb } from "../../core/folder-breadcrumb";
-import {
-  directoryEntries,
-  sortDirectoryItems,
-} from "../../core/directory-sort";
+import { sortDirectoryItems } from "../../core/directory-sort";
 import { useTranslator } from "../../i18n/react";
 import commonMessages from "../../i18n/messages/common";
-import type { FolderThumbnailEntry } from "../FolderThumbnail";
+import { indexFolderPreviews } from "../folder-previews";
 import {
   useDirectoryMarquee,
   useDirectoryPageSelection,
@@ -106,22 +103,45 @@ export function useDirectory({
     selectedProject ? folderPreferences(selectedProject, selectedFolder) : {},
     organization.entryOrder?.[selectedProject ?? ""],
   );
-  const folderChildren = new Map<string, ReturnType<typeof directoryEntries>>();
-  if (view === "project" && directoryView !== "list")
-    for (const item of directoryEntries(folders, pages)) {
-      const parent = item.parentId ?? "";
-      if (!folderChildren.has(parent)) folderChildren.set(parent, []);
-      folderChildren.get(parent)!.push(item);
-    }
-  function folderThumbnailEntries(folderId: string): FolderThumbnailEntry[] {
-    return sortDirectoryItems(
-      folderChildren.get(folderId) ?? [],
-      folderPreferences(selectedProject!, folderId),
-      organization.entryOrder?.[selectedProject!],
-    )
-      .slice(0, 3)
-      .map(({ kind, id, updatedAt, hash }) => ({ kind, id, updatedAt, hash }));
+  const [arrivals, setArrivals] = useState<{
+    home: string;
+    projectId: string;
+    pages: Map<string, string>;
+  }>();
+  function showDroppedPage(
+    home: string,
+    projectId: string,
+    folderId: string,
+    pageId: string,
+  ) {
+    setArrivals((previous) => {
+      const pages = new Map(
+        previous?.home === home && previous.projectId === projectId
+          ? previous.pages
+          : [],
+      );
+      pages.set(folderId, pageId);
+      return { home, projectId, pages };
+    });
   }
+  const grid = view === "project" && directoryView !== "list";
+  const content = selectedProject ? contents[selectedProject] : undefined;
+  const order = selectedProject
+    ? organization.entryOrder?.[selectedProject]
+    : undefined;
+  const fronts =
+    arrivals &&
+    arrivals.home === info?.home &&
+    arrivals.projectId === selectedProject
+      ? arrivals.pages
+      : undefined;
+  const folderPreviews = useMemo(
+    () =>
+      grid && content
+        ? indexFolderPreviews(content.folders, content.pages, order, fronts)
+        : undefined,
+    [grid, content, order, fronts],
+  );
   const pageSelection = useDirectoryPageSelection(
     JSON.stringify([
       info?.home,
@@ -158,7 +178,8 @@ export function useDirectory({
     recent,
     currentFolder,
     visibleEntries,
-    folderThumbnailEntries,
+    folderPreviews,
+    showDroppedPage,
     pageSelection,
     directoryMarquee,
     selectedPageTargets,

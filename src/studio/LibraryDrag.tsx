@@ -101,6 +101,7 @@ export function useLibraryDragController(options: {
       if (!current) return { destination: null };
       const item = current.source;
       if (visual.current?.inPlaceholder(point.x, point.y)) {
+        if (visual.current.overFolderCard) return { destination: null };
         const next = destination.current;
         const binding = next && rows.current.get(next.key);
         return {
@@ -201,7 +202,12 @@ export function useLibraryDragController(options: {
               : {}),
           },
         },
-        expand: inside && !binding.expanded ? binding.toggle : undefined,
+        expand:
+          inside &&
+          !binding.expanded &&
+          !element.hasAttribute("data-folder-card")
+            ? binding.toggle
+            : undefined,
       };
     };
     const update = () => {
@@ -217,44 +223,39 @@ export function useLibraryDragController(options: {
       if (next?.position === "inside" && expand) {
         if (expansion?.key !== next.key) {
           clearExpansion();
-          expansion = { key: next.key, timer: setTimeout(expand, 650) };
+          expansion = {
+            key: next.key,
+            timer: setTimeout(() => {
+              expand();
+              schedule();
+            }, 650),
+          };
         }
       } else clearExpansion();
     };
-    const scroll = () => {
+    const paint = () => {
+      frame = 0;
       const current = gesture.current;
       if (!current?.active || finishing.current) return;
-      const panel = [
-        ...current.sidebar.querySelectorAll<HTMLElement>(
-          ".studio-sidebar-projects, .studio-scroll",
-        ),
-      ].find((element) => {
-        const rect = element.getBoundingClientRect();
-        return (
-          point.x >= rect.left &&
-          point.x <= rect.right &&
-          point.y >= rect.top &&
-          point.y <= rect.bottom
-        );
-      });
-      if (panel) {
+      visual.current?.move(point);
+      update();
+      const panel = document
+        .elementFromPoint(point.x, point.y)
+        ?.closest<HTMLElement>(".studio-sidebar-projects, .studio-scroll");
+      if (panel && current.sidebar.contains(panel)) {
         const rect = panel.getBoundingClientRect();
-        if (
-          point.x >= rect.left &&
-          point.x <= rect.right &&
-          point.y >= rect.top &&
-          point.y <= rect.bottom
-        ) {
-          const delta =
-            point.y < rect.top + 32 ? -8 : point.y > rect.bottom - 32 ? 8 : 0;
-          if (delta) {
-            panel.scrollTop += delta;
-            update();
-          }
+        const delta =
+          point.y < rect.top + 32 ? -8 : point.y > rect.bottom - 32 ? 8 : 0;
+        if (delta) {
+          const previous = panel.scrollTop;
+          panel.scrollTop += delta;
+          if (panel.scrollTop !== previous) schedule();
         }
       }
-      update();
-      frame = requestAnimationFrame(scroll);
+    };
+    const schedule = () => {
+      if (!frame && gesture.current?.active && !finishing.current)
+        frame = requestAnimationFrame(paint);
     };
     const move = (event: PointerEvent) => {
       const current = gesture.current;
@@ -273,15 +274,14 @@ export function useLibraryDragController(options: {
           current.sidebar,
           current.x,
           current.y,
+          current.source,
         );
         latest.current.onStart();
         setDragging(current.source.id);
         document.body.classList.add("library-drag-active");
-        frame = requestAnimationFrame(scroll);
       }
       event.preventDefault();
-      visual.current?.move(point);
-      update();
+      schedule();
     };
     const up = async (event: PointerEvent) => {
       if (event.pointerId !== gesture.current?.pointerId || finishing.current)
@@ -297,11 +297,21 @@ export function useLibraryDragController(options: {
       finishing.current = true;
       cancelAnimationFrame(frame);
       clearExpansion();
+      visual.current?.move(point);
+      if (next) visual.current?.project(next.element, next.position);
       if (!next) visual.current?.restorePosition();
       await visual.current?.settle();
       if (gesture.current !== current) return;
-      reset();
-      if (next) await latest.current.onDrop(next.drop);
+      if (next && visual.current?.overFolderCard) {
+        try {
+          await latest.current.onDrop(next.drop);
+        } finally {
+          if (gesture.current === current) reset();
+        }
+      } else {
+        reset();
+        if (next) await latest.current.onDrop(next.drop);
+      }
     };
     const key = (event: KeyboardEvent) => {
       if (event.key === "Escape" && gesture.current?.active) {
@@ -317,6 +327,7 @@ export function useLibraryDragController(options: {
       }
     };
     window.addEventListener("pointermove", move, { passive: false });
+    window.addEventListener("scroll", schedule, true);
     window.addEventListener("pointerup", up, true);
     window.addEventListener("pointercancel", reset);
     window.addEventListener("blur", reset);
@@ -325,6 +336,7 @@ export function useLibraryDragController(options: {
     return () => {
       reset();
       window.removeEventListener("pointermove", move);
+      window.removeEventListener("scroll", schedule, true);
       window.removeEventListener("pointerup", up, true);
       window.removeEventListener("pointercancel", reset);
       window.removeEventListener("blur", reset);

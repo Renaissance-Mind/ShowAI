@@ -46,28 +46,40 @@ const names = new Intl.Collator("zh-CN", {
   sensitivity: "base",
 });
 
-export function sortDirectoryItems<
-  T extends Omit<DirectoryEntry, "kind" | "parentId">,
->(
-  items: T[],
+type SortableItem = Omit<DirectoryEntry, "kind" | "parentId">;
+
+export function directoryItemComparator(
   preferences: DirectoryPreferences = {},
-  legacyOrder: string[] = [],
-): T[] {
+  legacyRanks?: ReadonlyMap<string, number>,
+) {
   const sortBy = preferences.sortBy ?? "updatedAt";
-  const ranks = new Map(
-    (preferences.manualOrder ?? legacyOrder).map((id, index) => [id, index]),
-  );
-  return [...items].sort((a, b) => {
+  const ranks =
+    sortBy === "manual" && preferences.manualOrder
+      ? new Map(preferences.manualOrder.map((id, index) => [id, index]))
+      : legacyRanks;
+  return (a: SortableItem, b: SortableItem) => {
     const pinned = Number(b.pinned) - Number(a.pinned);
     if (pinned) return pinned;
     if (sortBy === "manual") {
       const rank =
-        (ranks.get(a.id) ?? Infinity) - (ranks.get(b.id) ?? Infinity);
+        (ranks?.get(a.id) ?? Infinity) - (ranks?.get(b.id) ?? Infinity);
       if (rank) return rank;
     } else if (sortBy !== "name") {
       const date = Date.parse(b[sortBy]) - Date.parse(a[sortBy]);
       if (date) return date;
     }
     return names.compare(a.name, b.name) || a.id.localeCompare(b.id, "en");
-  });
+  };
+}
+
+export function sortDirectoryItems<T extends SortableItem>(
+  items: T[],
+  preferences: DirectoryPreferences = {},
+  legacyOrder: string[] = [],
+): T[] {
+  const legacyRanks =
+    preferences.sortBy === "manual" && !preferences.manualOrder
+      ? new Map(legacyOrder.map((id, index) => [id, index]))
+      : undefined;
+  return [...items].sort(directoryItemComparator(preferences, legacyRanks));
 }

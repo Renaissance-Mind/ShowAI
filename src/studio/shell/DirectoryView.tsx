@@ -43,7 +43,7 @@ export function DirectoryView({
     project,
     currentFolder,
     visibleEntries,
-    folderThumbnailEntries,
+    folderPreviews,
     pageSelection,
   },
   router: { openTargetClick },
@@ -95,6 +95,9 @@ export function DirectoryView({
                 ? libraryDrag.bindings.row(target, false)
                 : {})}
               data-library-id={target.id}
+              data-folder-card={
+                (directoryView !== "list" && target.kind === "folder") || undefined
+              }
               data-selectable
               className={`studio-page-list-row${pageSelection.ids.includes(target.id) ? " selected" : ""}`}
               onContextMenu={(event) => {
@@ -166,7 +169,7 @@ export function DirectoryView({
                 ) : (
                   <FolderThumbnail
                     projectId={target.projectId}
-                    entries={folderThumbnailEntries(target.id)}
+                    preview={folderPreviews?.get(target.id)}
                   />
                 ))}
               <DirectoryEntryButton
@@ -192,7 +195,15 @@ export function DirectoryView({
                 }}
               >
                 {target.pinned && <Pin size={12} aria-label={t("pinned")} />}
-                <time>{shortDate(updatedAt)}</time>
+                {target.kind === "folder" && directoryView !== "list" ? (
+                  <span className="studio-folder-count">
+                    {t("folderItemCount", {
+                      count: folderPreviews?.get(target.id)?.count ?? 0,
+                    })}
+                  </span>
+                ) : (
+                  <time>{shortDate(updatedAt)}</time>
+                )}
               </DirectoryEntryButton>
               <button
                 className="studio-icon studio-row-menu"

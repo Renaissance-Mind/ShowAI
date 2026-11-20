@@ -135,11 +135,60 @@
 .library-drag-ghost .studio-row-menu {
   visibility: hidden;
 }
+.library-drag-ghost.library-card-ghost {
+  opacity: 1;
+  background: none;
+  box-shadow: none;
+}
+.library-carry-sheet {
+  position: relative;
+  box-sizing: border-box;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--text) 12%, var(--paper));
+  border-radius: 9px;
+  background: var(--paper);
+  color: var(--text);
+  box-shadow: 0 5px 16px #00000020;
+  pointer-events: none;
+}
+.library-carry-sheet > span {
+  position: absolute;
+  inset: 9% 8% auto;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-size: 12px;
+  font-weight: 600;
+}
+.library-carry-sheet::after {
+  content: "";
+  position: absolute;
+  inset: calc(9% + 24px) 9% 14%;
+  background: repeating-linear-gradient(to bottom, var(--line) 0 3px, transparent 3px 10px);
+  clip-path: polygon(0 0, 85% 0, 85% 23%, 100% 23%, 100% 55%, 76% 55%, 76% 73%, 95% 73%, 95% 100%, 0 100%);
+}
+.library-carry-sheet[data-kind="folder"] {
+  background: linear-gradient(to bottom, var(--surface) 38%, var(--line) 39%, var(--paper) 42%);
+}
+.library-carry-sheet[data-kind="folder"]::after {
+  display: none;
+}
+.studio-folder-arrival {
+  position: absolute;
+  inset: -1px;
+  width: auto;
+  height: auto;
+  z-index: 3;
+  transform-origin: top left;
+}
+.studio-page-list .library-card-space {
+  background: var(--hover);
+  opacity: .55;
+}
 .library-drag-active .studio-page-list-row {
   touch-action: none;
-}
-.library-drag-active [data-library-id] {
-  will-change: transform;
 }
 .studio-tree-row.is-located {
   animation: studio-tree-row-locate 1.6s ease-out;

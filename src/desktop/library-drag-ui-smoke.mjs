@@ -1,5 +1,6 @@
 import { desktopTestEnvironment } from "../../scripts/desktop-test-env.mjs";
 import assert from "node:assert/strict";
+import { existsSync } from "node:fs";
 import { mkdir, mkdtemp, readFile, writeFile } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -65,6 +66,84 @@ try {
   const sidebar = page.locator(".studio-sidebar");
   const row = (id) =>
     sidebar.locator(`.studio-tree-row[data-library-id="${id}"]`);
+  const makePage = async (title, parentId, kind = "page") =>
+    (
+      await invoke("pages:create", {
+        projectId: source.id,
+        title,
+        parentId,
+        kind,
+      })
+    ).document.id;
+  const first = await makePage("A", folder.id);
+  await makePage("B", folder.id);
+  await makePage("C", folder.id);
+  const board = await makePage("Z", null, "board");
+  await invoke("directory:sort", {
+    projectId: source.id,
+    parentId: folder.id,
+    sortBy: "name",
+  });
+  await row(source.id).locator(".studio-tree-main").click();
+  await page.getByRole("button", { name: "视图", exact: true }).click();
+  await page.getByRole("menuitemradio", { name: "缩略图（中）" }).click();
+  const grid = page.locator(
+    '.studio-library .studio-page-list[data-view="medium"]',
+  );
+  const card = (id) => grid.locator(`[data-library-id="${id}"]`);
+  const receiver = card(folder.id);
+  await receiver.locator(`[data-cover-page="${first}"]`).waitFor();
+  assert.equal(await receiver.locator(".studio-page-thumbnail").count(), 1);
+  assert.equal(await receiver.locator(".studio-folder-sheet").count(), 3);
+  const pickup = async () => {
+    await card(board).locator(".studio-page-list-open").hover();
+    const start = await card(board).boundingBox();
+    assert.ok(start);
+    await page.mouse.down();
+    await page.mouse.move(
+      start.x + start.width / 2 + 12,
+      start.y + start.height / 2,
+    );
+    await page
+      .locator(".library-card-ghost")
+      .getByText("Z", { exact: true })
+      .waitFor();
+    await receiver.hover();
+    await grid
+      .locator(`[data-library-id="${folder.id}"][data-folder-drop="over"]`)
+      .waitFor();
+    assert.equal(
+      await page.locator(".library-drag-ghost .studio-page-thumbnail").count(),
+      0,
+    );
+    return start;
+  };
+  const start = await pickup();
+  await page.mouse.move(start.x + start.width / 2, start.y + start.height / 2);
+  await page.mouse.up();
+  await page.locator(".library-drag-ghost").waitFor({ state: "detached" });
+  assert.equal(
+    await receiver.locator(".studio-folder-count").textContent(),
+    "3 项",
+  );
+  await card(board).waitFor();
+  await pickup();
+  await page.mouse.up();
+  await receiver.locator(`[data-cover-page="${board}"]`).waitFor();
+  await page.locator(".library-drag-ghost").waitFor({ state: "detached" });
+  assert.equal(
+    await receiver.locator(".studio-folder-count").textContent(),
+    "4 项",
+  );
+  const movedBoard = await invoke("pages:get", {
+    projectId: source.id,
+    pageId: board,
+  });
+  assert.equal(movedBoard.document.parentId, folder.id);
+  assert.equal(await card(board).count(), 0);
+  result.checks.push(
+    "A three-sheet grid folder mounts one preview, cancels at the source and receives the dropped board as its cover",
+  );
   await row(source.id).locator(".studio-tree-main").click();
   await row(id).locator(".studio-tree-main").click();
   const title = page.getByRole("textbox", { name: "页面标题", exact: true });
@@ -85,31 +164,29 @@ try {
     }
     assert.fail(`Timed out: ${JSON.stringify(value)}`);
   };
+  const pagePath = (projectId) =>
+    join(home, "workspace", "projects", projectId, "pages", `${id}.json`);
   const saved = async (projectId = source.id) =>
-    JSON.parse(
-      await readFile(
-        join(home, "workspace", "projects", projectId, "pages", `${id}.json`),
-        "utf8",
-      ),
-    );
+    JSON.parse(await readFile(pagePath(projectId), "utf8"));
   const ready = () =>
     page.locator(".studio-toast").filter({ hasText: "已调整位置" }).waitFor();
   const parent = (id) =>
     row(id).evaluate(
       (element) =>
-        element.parentElement.parentElement
-          .closest("div:has(> .studio-tree-row)")
+        element.parentElement?.parentElement
+          ?.closest("div:has(> .studio-tree-row)")
           ?.querySelector(":scope > .studio-tree-row")?.dataset.libraryId ??
         null,
     );
   const drag = async (from, to) => {
+    await row(from).locator(".studio-tree-main").hover();
     const start = await row(from).boundingBox();
-    const end = await row(to).boundingBox();
-    assert.ok(start && end);
+    assert.ok(start);
     await page.mouse.move(start.x + 70, start.y + start.height / 2);
     await page.mouse.down();
-    await page.mouse.move(end.x + 70, end.y + end.height / 2, { steps: 10 });
+    await page.mouse.move(start.x + 82, start.y + start.height / 2);
     await page.locator(".library-drag-ghost").waitFor();
+    await row(to).locator(".studio-tree-main").hover();
     const released = Date.now();
     await page.mouse.up();
     await waitFor(
@@ -152,7 +229,7 @@ try {
     (value) => value.document.parentId === second.id,
   );
   await row(id).locator(".studio-tree-main").focus();
-  await page.keyboard.press("Meta+z");
+  await page.keyboard.press("ControlOrMeta+z");
   await waitFor(
     () => saved(),
     (value) => value.document.parentId === folder.id,
@@ -162,8 +239,7 @@ try {
     (value) => value === folder.id,
   );
   await ready();
-  await row(id).locator(".studio-tree-main").focus();
-  await page.keyboard.press("Meta+Shift+z");
+  await row(id).locator(".studio-tree-main").press("ControlOrMeta+Shift+z");
   await waitFor(
     () => saved(),
     (value) => value.document.parentId === second.id,
@@ -174,6 +250,7 @@ try {
   );
 
   await drag(id, other.id);
+  await waitFor(() => existsSync(pagePath(other.id)), Boolean);
   await waitFor(
     () => saved(other.id),
     (value) => value.document.title === "移动后继续编辑",

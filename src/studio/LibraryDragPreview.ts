@@ -1,3 +1,5 @@
+import type { LibraryTarget } from "./LibraryNavigation";
+
 let cloneSerial = 0;
 const rowSelector =
   ".studio-tree-row[data-library-id], .studio-page-list-row[data-library-id]";
@@ -17,15 +19,29 @@ export class LibraryDragPreview {
   private lastPoint: { x: number; y: number };
   private signature = "";
   private closed = false;
+  private receiver: HTMLElement | null = null;
+  private arrival: HTMLElement | null = null;
+  private landing: Animation | null = null;
+  private compact: boolean;
+  private sourceHeight: number;
 
   constructor(
     private source: HTMLElement,
     private root: HTMLElement,
     x: number,
     y: number,
+    private item: LibraryTarget,
   ) {
     const box = source.getBoundingClientRect();
-    this.offset = { x: x - box.left, y: y - box.top };
+    const grid = source.closest<HTMLElement>(".studio-page-list");
+    this.compact = !!grid?.dataset.view && grid.dataset.view !== "list";
+    this.sourceHeight = box.height;
+    const width = this.compact ? Math.min(112, box.width * 0.78) : box.width;
+    const height = this.compact ? width * 1.12 : box.height;
+    this.offset = {
+      x: ((x - box.left) * width) / box.width,
+      y: ((y - box.top) * height) / box.height,
+    };
     this.lastPoint = { x, y };
     this.unit = source.matches(".studio-tree-row")
       ? source.parentElement!
@@ -33,23 +49,56 @@ export class LibraryDragPreview {
     this.originalParent = this.unit.parentElement!;
     this.originalNext = this.unit.nextSibling;
     this.originalDisplay = this.unit.style.display;
-    this.placeholder = this.clone(this.unit);
-    this.placeholder.classList.add("library-drag-placeholder");
+    this.placeholder = this.makePlaceholder(this.unit);
     this.ghost = document.createElement("div");
-    const grid = source.closest<HTMLElement>(".studio-page-list");
-    this.ghost.className = `library-drag-ghost${grid ? " studio-page-list" : ""}`;
+    this.ghost.className = this.compact
+      ? "library-drag-ghost library-card-ghost"
+      : `library-drag-ghost${grid ? " studio-page-list" : ""}`;
     if (grid?.dataset.view) this.ghost.dataset.view = grid.dataset.view;
     this.ghost.setAttribute("aria-hidden", "true");
     this.ghost.inert = true;
     Object.assign(this.ghost.style, {
-      width: `${box.width}px`,
-      height: `${box.height}px`,
+      width: `${width}px`,
+      height: `${height}px`,
     });
-    this.ghost.append(this.clone(source));
+    const face = this.compact ? this.makePaper() : this.clone(source);
+    this.ghost.append(face);
     root.append(this.ghost);
     this.unit.before(this.placeholder);
     this.unit.style.display = "none";
     this.move({ x, y });
+    if (this.compact && duration()) {
+      face.style.transformOrigin = `${this.offset.x}px ${this.offset.y}px`;
+      face.animate(
+        [
+          { transform: `scale(${box.width / width}, ${box.height / height})` },
+          { transform: "scale(1)" },
+        ],
+        { duration: 180, easing: "cubic-bezier(.2,.8,.2,1)" },
+      );
+    }
+  }
+  private makePaper() {
+    const face = document.createElement("div");
+    face.className = "library-carry-sheet";
+    face.dataset.kind = this.item.kind;
+    const title = document.createElement("span");
+    title.textContent = this.item.title;
+    face.append(title);
+    return face;
+  }
+  private makePlaceholder(unit: HTMLElement) {
+    let copy: HTMLElement;
+    if (this.compact && unit.matches(".studio-page-list-row")) {
+      copy = document.createElement("div");
+      copy.className = "studio-page-list-row library-card-space";
+      copy.style.height = `${this.sourceHeight}px`;
+      copy.setAttribute("aria-hidden", "true");
+      copy.inert = true;
+    } else copy = this.clone(unit);
+    copy.classList.add("library-drag-placeholder");
+    copy.style.display = "";
+    return copy;
   }
   private clone(element: HTMLElement) {
     const copy = element.cloneNode(true) as HTMLElement;
@@ -105,6 +154,7 @@ export class LibraryDragPreview {
     );
   }
   hit(x: number, y: number) {
+    if (!this.animations.size) return null;
     return (
       [...this.root.querySelectorAll<HTMLElement>(rowSelector)]
         .reverse()
@@ -126,6 +176,15 @@ export class LibraryDragPreview {
     return (
       x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom
     );
+  }
+  get overFolderCard() {
+    return !!this.receiver;
+  }
+  private receive(folder: HTMLElement | null) {
+    if (folder === this.receiver) return;
+    if (this.receiver) delete this.receiver.dataset.folderDrop;
+    this.receiver = folder;
+    if (folder) folder.dataset.folderDrop = "over";
   }
   move(point: { x: number; y: number }) {
     this.lastPoint = point;
@@ -163,6 +222,12 @@ export class LibraryDragPreview {
     }
   }
   project(target: HTMLElement, position: "before" | "after" | "inside"): void {
+    this.receive(
+      position === "inside" && target.hasAttribute("data-folder-card")
+        ? target
+        : null,
+    );
+    if (this.receiver) return;
     let parent: HTMLElement, before: ChildNode | null;
     if (position === "inside") {
       const unit = target.matches("[data-library-drop-section]")
@@ -232,9 +297,7 @@ export class LibraryDragPreview {
           ? representative
           : representative.parentElement!
         : this.unit;
-      const next = this.clone(unit);
-      next.style.display = "";
-      next.classList.add("library-drag-placeholder");
+      const next = this.makePlaceholder(unit);
       this.placeholder.remove();
       this.placeholder = next;
       parent.insertBefore(next, before);
@@ -246,25 +309,50 @@ export class LibraryDragPreview {
   }
   async settle() {
     if (this.closed) return;
-    const target = this.placeholder.getBoundingClientRect();
     const from = this.ghost.getBoundingClientRect();
-    const animation = this.ghost.animate(
-      [
-        { transform: `translate(${from.x}px, ${from.y}px)`, opacity: 0.75 },
-        { transform: `translate(${target.x}px, ${target.y}px)`, opacity: 0.3 },
-      ],
-      {
-        duration: duration(),
-        easing: "cubic-bezier(.2,.8,.2,1)",
-        fill: "forwards",
-      },
+    const folder = this.receiver;
+    const slot = folder?.querySelector<HTMLElement>(
+      '.studio-folder-sheet[data-position="0"]',
     );
+    let element = this.ghost;
+    let keyframes: Keyframe[];
+    if (folder && slot) {
+      folder.dataset.folderDrop = "landing";
+      const paper = this.makePaper();
+      paper.classList.add("studio-folder-arrival");
+      slot.append(paper);
+      const to = paper.getBoundingClientRect();
+      element = this.arrival = paper;
+      this.ghost.style.visibility = "hidden";
+      keyframes = [
+        {
+          transform: `translate(${from.x - to.x}px, ${from.y - to.y}px) scale(${from.width / to.width}, ${from.height / to.height})`,
+        },
+        { transform: "none" },
+      ];
+    } else {
+      const to = this.placeholder.getBoundingClientRect();
+      element.style.transformOrigin = "top left";
+      keyframes = [
+        { transform: `translate(${from.x}px, ${from.y}px)`, opacity: 0.78 },
+        {
+          transform: `translate(${to.x}px, ${to.y}px) scale(${to.width / from.width}, ${to.height / from.height})`,
+          opacity: 0.3,
+        },
+      ];
+    }
+    const animation = element.animate(keyframes, {
+      duration: duration(),
+      easing: "cubic-bezier(.2,.82,.3,1)",
+      fill: "forwards",
+    });
+    this.landing = animation;
     await new Promise<void>((resolve) => {
-      animation.onfinish = () => resolve();
-      animation.oncancel = () => resolve();
+      animation.onfinish = animation.oncancel = () => resolve();
     });
   }
   restorePosition() {
+    this.receive(null);
     if (!this.signature) return;
     this.signature = "";
     this.animateLayout(() => {
@@ -282,6 +370,9 @@ export class LibraryDragPreview {
   dispose() {
     if (this.closed) return;
     this.closed = true;
+    this.receive(null);
+    this.landing?.cancel();
+    this.arrival?.remove();
     for (const animation of this.animations.values()) animation.cancel();
     this.animations.clear();
     this.ghost.remove();

@@ -62,7 +62,7 @@ export function useLibraryMoves({
   route: { view, selectedProject, selectedFolder, setSelectedFolder },
   dialogs: { dialog, setDialog },
   menus: { setContextMenu, setProjectsMenu, setGroupMenu },
-  directory: { pageSelection, selectedPageTargets },
+  directory: { pageSelection, selectedPageTargets, showDroppedPage },
   router: { settlePages, forgetDeleted, relocateMoved, openPage },
   edits: { updateTarget, deletionScope, deleteTarget, restoreTargetOf },
   page,
@@ -100,7 +100,10 @@ export function useLibraryMoves({
   >;
   dialogs: Pick<DialogControl, "dialog" | "setDialog">;
   menus: Pick<MenuState, "setContextMenu" | "setProjectsMenu" | "setGroupMenu">;
-  directory: Pick<DirectoryState, "pageSelection" | "selectedPageTargets">;
+  directory: Pick<
+    DirectoryState,
+    "pageSelection" | "selectedPageTargets" | "showDroppedPage"
+  >;
   router: Pick<
     StudioRouter,
     "settlePages" | "forgetDeleted" | "relocateMoved" | "openPage"
@@ -114,6 +117,16 @@ export function useLibraryMoves({
   const t = useTranslator(studioMessages);
   const tn = useTranslator(navigationMessages);
   const movingLibrary = useRef(false);
+  const pendingInput = useRef<Promise<unknown> | null>(null);
+  function sequenceLibraryInput<T>(action: () => Promise<T>) {
+    const home = sidebarHome.current;
+    const run = () => (sidebarHome.current === home ? action() : undefined);
+    const next = (pendingInput.current ?? Promise.resolve()).then(run, run);
+    pendingInput.current = next;
+    return next.finally(() => {
+      if (pendingInput.current === next) pendingInput.current = null;
+    });
+  }
   function inverseLibraryDrop(drop: LibraryDrop): LibraryDrop {
     const source = drop.source;
     const siblings =
@@ -202,19 +215,21 @@ export function useLibraryMoves({
       }
     }
   }
-  async function replayLibraryChange(redo: boolean) {
-    if (historyBusy.current || movingLibrary.current) return;
-    const entry = libraryHistory.current.next(redo);
-    if (!entry) return;
-    historyBusy.current = true;
-    refreshLibraryHistory((value) => value + 1);
-    try {
-      if (await applyLibraryChange(entry, redo))
-        libraryHistory.current.replayed(entry, redo);
-    } finally {
-      historyBusy.current = false;
+  function replayLibraryChange(redo: boolean) {
+    return sequenceLibraryInput(async () => {
+      if (historyBusy.current || movingLibrary.current) return;
+      const entry = libraryHistory.current.next(redo);
+      if (!entry) return;
+      historyBusy.current = true;
       refreshLibraryHistory((value) => value + 1);
-    }
+      try {
+        if (await applyLibraryChange(entry, redo))
+          libraryHistory.current.replayed(entry, redo);
+      } finally {
+        historyBusy.current = false;
+        refreshLibraryHistory((value) => value + 1);
+      }
+    });
   }
   async function undoLibraryChange(entry: LibraryChange) {
     if (libraryHistory.current.next(false) === entry)
@@ -245,7 +260,8 @@ export function useLibraryMoves({
         !(target === document.body && libraryLast.current)
       )
         return;
-      if (!libraryHistory.current.next(event.shiftKey)) return;
+      if (!libraryHistory.current.next(event.shiftKey) && !pendingInput.current)
+        return;
       event.preventDefault();
       event.stopPropagation();
       void replayLibraryRef.current(event.shiftKey).catch((error) =>
@@ -535,7 +551,23 @@ export function useLibraryMoves({
     parentFor: (projectId, id) =>
       contents[projectId]?.folders.find((item) => item.id === id)?.parentId ??
       null,
-    onDrop: (drop) => dropLibraryItem(drop),
+    onDrop: (drop) =>
+      sequenceLibraryInput(async () => {
+        const home = info?.home;
+        const moved = await dropLibraryItem(drop);
+        if (
+          moved &&
+          home &&
+          sidebarHome.current === home &&
+          drop.source.kind === "page" &&
+          drop.projectId &&
+          drop.parentId &&
+          !drop.relativeId
+        ) {
+          showDroppedPage(home, drop.projectId, drop.parentId, drop.source.id);
+        }
+        return moved;
+      }),
     onStart: () => {
       setContextMenu(null);
       setProjectsMenu(null);

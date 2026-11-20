@@ -1,67 +1,49 @@
-import { memo, type CSSProperties } from "react";
-import { Folder } from "../ui/icons";
+import { memo } from "react";
+import { useTranslator } from "../i18n/react";
+import commonMessages from "../i18n/messages/common";
+import type { FolderPreview } from "./folder-previews";
 import PageThumbnail from "./PageThumbnail";
 
-export interface FolderThumbnailEntry {
-  kind: "folder" | "page";
-  id: string;
-  updatedAt: string;
-  hash?: string;
-}
-
-export default memo(
-  function FolderThumbnail({
-    projectId,
-    entries,
-  }: {
-    projectId: string;
-    entries: FolderThumbnailEntry[];
-  }) {
-    const sheets = entries.slice(0, 3);
-    return (
+export default memo(function FolderThumbnail({
+  projectId,
+  preview,
+}: {
+  projectId: string;
+  preview?: FolderPreview;
+}) {
+  const t = useTranslator(commonMessages);
+  const cover = preview?.cover;
+  return (
+    <span className="studio-folder-thumbnail" aria-hidden="true" inert>
+      <span className="studio-folder-back" />
+      {(preview?.sheets ?? 0) >= 3 && (
+        <span className="studio-folder-sheet" data-position="2" />
+      )}
+      {(preview?.sheets ?? 0) >= 2 && (
+        <span className="studio-folder-sheet" data-position="1" />
+      )}
       <span
-        className="studio-folder-thumbnail"
-        data-sheets={sheets.length}
-        aria-hidden="true"
-        inert
+        className="studio-folder-sheet"
+        data-position="0"
+        data-cover-page={cover?.id}
       >
-        {sheets.length ? (
-          sheets.map((entry, index) => (
-            <span
-              key={entry.id}
-              className="studio-folder-sheet"
-              data-kind={entry.kind}
-              data-position={index}
-              style={{ zIndex: sheets.length - index } as CSSProperties}
-            >
-              {entry.kind === "page" ? (
-                <PageThumbnail
-                  projectId={projectId}
-                  pageId={entry.id}
-                  updatedAt={entry.updatedAt}
-                  hash={entry.hash}
-                  padding={3}
-                />
-              ) : (
-                <Folder size={18} strokeWidth={1.5} />
-              )}
+        {cover && (
+          <>
+            <span className="studio-folder-sheet-title">
+              {cover.title || t("untitled")}
             </span>
-          ))
-        ) : (
-          <Folder className="studio-folder-empty" size={30} strokeWidth={1} />
+            <PageThumbnail
+              key={cover.id}
+              projectId={projectId}
+              pageId={cover.id}
+              updatedAt={cover.updatedAt}
+              hash={cover.hash}
+              padding={5}
+            />
+          </>
         )}
       </span>
-    );
-  },
-  (previous, next) =>
-    previous.projectId === next.projectId &&
-    previous.entries.length === next.entries.length &&
-    previous.entries.every((entry, index) => {
-      const other = next.entries[index];
-      return (
-        entry.kind === other.kind &&
-        entry.id === other.id &&
-        entry.updatedAt === other.updatedAt && entry.hash === other.hash
-      );
-    }),
-);
+      <span className="studio-folder-flap" />
+    </span>
+  );
+});

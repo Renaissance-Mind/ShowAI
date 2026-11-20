@@ -125,6 +125,7 @@ export default defineMessages("studio", {
     itemActions: "{title}的操作",
     noMatchingContent: "没有匹配的内容",
     folderEmpty: "文件夹为空",
+    folderItemCount: "{count} 项",
     projectEmpty: "项目为空",
     emptyHint: "使用上方的「+」卡片添加页面、白板或文件夹，也可以从下面开始。",
     viewTemplate: "查看模板 {name} {version} {scope}",
@@ -357,6 +358,7 @@ export default defineMessages("studio", {
     itemActions: "Actions for {title}",
     noMatchingContent: "No matching content",
     folderEmpty: "This folder is empty",
+    folderItemCount: { one: "{count} item", other: "{count} items" },
     projectEmpty: "This project is empty",
     emptyHint:
       "Use the + card above to add a page, board or folder, or start with one of the options below.",
