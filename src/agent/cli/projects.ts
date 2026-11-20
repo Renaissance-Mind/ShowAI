@@ -2,6 +2,7 @@ import { importerCommand, importCommand } from "../import-commands";
 import { systemPresentationGuide } from "../system-presentation";
 import { runtimeInfo, registerRuntime } from "../runtime";
 import {
+  flag,
   option,
   requireCount,
   text,
@@ -80,7 +81,7 @@ export const projectCommands: CommandDeclaration[] = [
   },
   {
     command: "import",
-    options: { folder: text, importer: text },
+    options: { folder: text, importer: text, "dry-run": flag },
     access: (args) => (args.options["dry-run"] ? "read" : "write"),
     ownTransaction: true,
     help: [

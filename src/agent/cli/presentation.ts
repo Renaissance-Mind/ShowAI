@@ -128,6 +128,7 @@ export const presentationCommands: CommandDeclaration[] = [
       presentation: hiddenText,
       import: hiddenText,
       snapshot: hiddenText,
+      revision: hiddenText,
     },
     help: [
       "export --project PROJECT --page PAGE [--blocks ID,ID] --format html|inline --out PATH [--reader bundled|cdn]",

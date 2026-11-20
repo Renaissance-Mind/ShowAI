@@ -208,6 +208,7 @@ export const datasetCommands: CommandDeclaration[] = [
       inputs: text,
       script: text,
       "base-hash": text,
+      "dry-run": flag,
       description: hiddenText,
     },
     fields: {

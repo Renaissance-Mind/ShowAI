@@ -219,7 +219,7 @@ export const libraryCommands: CommandDeclaration[] = [
   {
     command: "workspace",
     actions: ["merge"],
-    options: { input: text, "base-revision": text },
+    options: { input: text, "base-revision": text, revision: text },
     access: (args) => (option(args, "revision") ? "write" : "read"),
     help: [
       "workspace merge PAGE --project ID --input DRAFT --base-revision BASE [--revision CURRENT_TO_SAVE]",

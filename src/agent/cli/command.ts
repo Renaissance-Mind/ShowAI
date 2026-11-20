@@ -80,9 +80,6 @@ export const GLOBAL_OPTIONS: Record<string, OptionSpec> = {
   "operation-id": hiddenText,
   group: hiddenText,
   message: hiddenText,
-  "dry-run": flag,
-  revision: text,
-  response: text,
 };
 
 export function option(
