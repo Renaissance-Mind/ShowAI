@@ -3,6 +3,7 @@ import codex from "./assets/agent-brands/codex.svg";
 import kimi from "./assets/agent-brands/kimi.svg";
 import claude from "./assets/agent-brands/claude-code.svg";
 import gemini from "./assets/agent-brands/gemini-cli.svg";
+import antigravity from "./assets/agent-brands/antigravity.svg";
 import opencode from "./assets/agent-brands/opencode.svg";
 import openai from "./assets/agent-brands/openai.svg";
 import openrouter from "./assets/agent-brands/openrouter.svg";
@@ -13,7 +14,7 @@ const icons = new Map([
   ["kimi", kimi],
   ["claude", claude],
   ["gemini", gemini],
-  ["antigravity", gemini],
+  ["antigravity", antigravity],
   ["opencode", opencode],
   ["chatgpt", openai],
   ["openai", openai],

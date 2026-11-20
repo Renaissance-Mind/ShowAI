@@ -1,32 +1,18 @@
 {
-  "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
   "name": "showai",
+  "displayName": "ShowAI",
   "version": "0.29.3",
-  "description": "One entry Skill and a presentation workflow from reader intent to review, templates read whole with optional component libraries, and unified MCP presentation for local and web agents.",
-  "keywords": [
-    "research",
-    "interactive-pages",
-    "templates",
-    "components",
-    "html"
-  ],
-  "extensions": {
-    "com.openai": {
-      "interface": {
-        "displayName": "ShowAI",
-        "shortDescription": "Read, create and present ShowAI pages",
-        "longDescription": "Operate ShowAI through MCP. Local installation connects the selected ShowAI runtime; remote packages use their authorized endpoint. Formal work is saved to a project before presentation.",
-        "category": "Productivity",
-        "defaultPrompt": [
-          "Use ShowAI to present this research as an interactive page."
-        ],
-        "brandColor": "#06A5FA",
-        "composerIcon": "./assets/logo.svg",
-        "composerIconDark": "./assets/logo-dark.svg",
-        "logo": "./assets/logo.svg",
-        "logoDark": "./assets/logo-dark.svg"
-      },
-      "onboardingSkill": "./skills/use-showai/SKILL.md"
-    }
-  }
+  "description": "Create, edit, and present interactive ShowAI pages, diagrams, and components with a live side-pane workbench.",
+  "logo": "assets/logo.svg",
+  "author": {
+    "name": "Renaissance Mind",
+    "url": "https://github.com/Renaissance-Mind"
+  },
+  "homepage": "https://github.com/Renaissance-Mind/ShowAI",
+  "repository": "https://github.com/Renaissance-Mind/ShowAI",
+  "suggestedPrompts": [
+    "Use ShowAI to turn this topic into an interactive page.",
+    "Draw an interactive architecture diagram in ShowAI.",
+    "Open my recent ShowAI pages in the workbench."
+  ]
 }

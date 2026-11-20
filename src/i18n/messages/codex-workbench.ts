@@ -25,6 +25,9 @@ export default defineMessages("codex-workbench", {
     drafted: "已打开 Codex 草稿 · {version}",
     unavailable: "当前 Codex 宿主未提供对话引用接口",
     timedOut: "等待 Codex 对话回执超时",
+    antigravityReference: "引用到 Antigravity 对话",
+    antigravityReferenced: "已添加到 Antigravity 对话 · {version}",
+    antigravityUnavailable: "当前 Antigravity 宿主未提供对话引用接口",
   },
   en: {
     loading: "Opening ShowAI…",
@@ -50,5 +53,8 @@ export default defineMessages("codex-workbench", {
     drafted: "Codex draft opened · {version}",
     unavailable: "This Codex host does not provide conversation references",
     timedOut: "Timed out waiting for Codex",
+    antigravityReference: "Reference in Antigravity chat",
+    antigravityReferenced: "Added to Antigravity chat · {version}",
+    antigravityUnavailable: "This Antigravity host does not provide conversation references",
   },
 });

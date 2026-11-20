@@ -22,7 +22,15 @@ import { insertComponent } from "../../surface/component-insertion";
 import { desktop } from "../../host/bridge";
 import { formatSize } from "../../lib/format-size";
 import { useTranslator } from "../../i18n/react";
-import { codexWorkbench, codexWorkbenchCanReference, openCodexWorkbenchLink, rememberCodexWorkbenchPage, sendCodexWorkbenchReference } from "../../browser/codex-workbench";
+import {
+  antigravityWorkbenchCanReference,
+  codexWorkbench,
+  codexWorkbenchCanReference,
+  openCodexWorkbenchLink,
+  rememberCodexWorkbenchPage,
+  sendAntigravityWorkbenchReference,
+  sendCodexWorkbenchReference,
+} from "../../browser/codex-workbench";
 import codexWorkbenchMessages from "../../i18n/messages/codex-workbench";
 import assistantMessages from "../../i18n/messages/assistant";
 import commonMessages from "../../i18n/messages/common";
@@ -197,6 +205,13 @@ export function usePageActions({
       ...(record ? { expectedHash: record.hash } : {}),
     });
     const text = formatReference(reference, referenceHeading(ta, reference));
+    if (antigravityWorkbenchCanReference()) {
+      await sendAntigravityWorkbenchReference(reference, text, target.components);
+      setNotice(tcodex("antigravityReferenced", {
+        version: referenceVersion(reference),
+      }));
+      return;
+    }
     const connection = codexWorkbench();
     if (connection && codexWorkbenchCanReference()) {
       await sendCodexWorkbenchReference(reference, text, target.components);

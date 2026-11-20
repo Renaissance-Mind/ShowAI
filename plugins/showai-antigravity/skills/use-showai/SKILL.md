@@ -63,3 +63,7 @@ Agent 通过 MCP 操作 ShowAI。App、网页、CLI 和 MCP 共用内容核心�
 - [共享数据](references/shared-data.md)、[页面与 Board 阅读](references/page-reading.md)、[Board 对象编辑](references/board-authoring.md)、[容量与大文件](references/capacity.md)。
 - [宿主显示](references/host-display.md) 与 [当前宿主适配](references/host-adapter.md)：展示组件和页面前先读。
 - [连接配置](references/runtime.md) 与 [集成](references/integration.md)：连接、错误码、远程授权与反馈。
+
+## Antigravity 侧栏工作台与自动预览
+
+此插件在 Antigravity 侧栏提供实时可编辑的 **ShowAI 工作台**（`sidecar://showai/workbench/`），并通过插件 Hook 自动将预览包装并同步到当前会话的 Artifact 目录。展示组件、保存页面后给出侧栏工作台直达胶囊，或处理用户从侧栏发来的页面/组件引用前，先读 [当前宿主适配](references/host-adapter.md)。

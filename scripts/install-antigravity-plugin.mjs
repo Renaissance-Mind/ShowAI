@@ -17,7 +17,12 @@ import { delimiter, dirname, isAbsolute, join, resolve } from "node:path";
 import { createInterface } from "node:readline";
 import { fileURLToPath } from "node:url";
 import { parseArgs, promisify } from "node:util";
-import { skillFiles } from "../src/plugin/host-package.mjs";
+import {
+  antigravityHookConfig,
+  antigravityManifest,
+  antigravitySidecarConfig,
+  skillFiles,
+} from "../src/plugin/host-package.mjs";
 
 const execute = promisify(execFile);
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
@@ -284,10 +289,10 @@ async function install(executable) {
         .digest("hex")
         .slice(0, 12)}`
     : manifest.version;
-  await writeJson(join(plugin, "plugin.json"), {
-    ...manifest,
-    version,
-  });
+  await writeJson(
+    join(plugin, "plugin.json"),
+    antigravityManifest(manifest, version),
+  );
   await writeJson(record, {
     format: "showai-agent-runtime",
     protocol: 1,
@@ -298,19 +303,28 @@ async function install(executable) {
     registeredAt: new Date().toISOString(),
   });
   const targetInstallPath = join(agyHome(), ".gemini/config/plugins/showai");
+  const serverEnv = {
+    ...binding.launch.env,
+    SHOWAI_HOME: binding.home,
+    SHOWAI_RUNTIME_CONFIG: record,
+    SHOWAI_HOST_DISPLAY: "fragment-file",
+  };
   const server = {
     command: binding.launch.command,
     args: [join(targetInstallPath, "mcp/launch.mjs")],
-    env: {
-      ...binding.launch.env,
-      SHOWAI_HOME: binding.home,
-      SHOWAI_RUNTIME_CONFIG: record,
-      SHOWAI_HOST_DISPLAY: "fragment-file",
-    },
+    env: serverEnv,
   };
   await writeJson(join(plugin, "mcp_config.json"), {
     mcpServers: { showai: server },
   });
+  await writeJson(
+    join(plugin, "hooks.json"),
+    antigravityHookConfig({ command: binding.launch.command, env: serverEnv }),
+  );
+  await writeJson(
+    join(plugin, "sidecars/workbench/sidecar.json"),
+    antigravitySidecarConfig({ command: binding.launch.command, env: serverEnv }),
+  );
 
   await agy(executable, ["install", plugin]);
   const find = async () =>
@@ -328,6 +342,20 @@ async function install(executable) {
   if (JSON.stringify(copied) !== expected)
     throw new Error(
       `Installed files at ${installed.path} differ from ${plugin}.`,
+    );
+  const validation = await agyJson(executable, [
+    "validate",
+    installed.path,
+    "--strict",
+  ]);
+  if (
+    (validation.components?.mcpServers ?? 0) < 1 ||
+    (validation.components?.sidecars ?? 0) < 1 ||
+    (validation.components?.hooks ?? 0) < 1 ||
+    (validation.findings?.length ?? 0) > 0
+  )
+    throw new Error(
+      `Antigravity plugin validation failed: ${JSON.stringify(validation)}`,
     );
   const connection = await handshake(server);
   if (
@@ -347,6 +375,11 @@ async function install(executable) {
     enabled: installed.enabled,
     installedPath: installed.path,
     verifiedFiles: Object.keys(copied).length,
+    validation: {
+      agentPluginsSpec: validation.agentPluginsSpec,
+      components: validation.components,
+      findings: validation.findings,
+    },
     ...(binding.instance ? { instance: binding.instance } : {}),
     home: binding.home,
     runtime: binding.runtime,

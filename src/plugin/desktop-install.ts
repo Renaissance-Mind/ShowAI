@@ -31,6 +31,7 @@ import { PluginInstallError, VERIFIED_HOST_VERSIONS } from "./plugin-errors";
 import {
   bindHostSkills,
   HOST_PROFILES,
+  writeAntigravityAssets,
   writeHostLauncher,
   publishPluginDirectory,
 } from "./host-package.mjs";
@@ -169,7 +170,10 @@ function hostFiles(host: PluginHost, files: [string, string][]) {
           [
             "host-adapters/codex-entry.md",
             "host-adapters/launch.mjs.in",
-          ].includes(name))
+          ].includes(name)) ||
+        (host === "antigravity" &&
+          (name === "host-adapters/antigravity-entry.md" ||
+            name.startsWith("host-adapters/antigravity/")))
       );
     if (name === "skills/use-showai/references/host-adapter.md") return false;
     if (host === "deepseek")
@@ -804,7 +808,20 @@ export class DesktopPluginInstaller {
         this.options.channel,
       );
       await json(join(staging, launch.filename), launch.config);
-      await json(join(staging, "plugin.json"), { ...manifest, version });
+      if (host === "antigravity") {
+        await writeAntigravityAssets({
+          source: this.options.pluginRoot(),
+          target: staging,
+          manifest,
+          version,
+          launch: {
+            command: runtime.cli.command,
+            env: launch.config.mcpServers.showai.env,
+          },
+        });
+      } else {
+        await json(join(staging, "plugin.json"), { ...manifest, version });
+      }
       const claudeManifest = JSON.parse(
         await readFile(join(staging, ".claude-plugin/plugin.json"), "utf8"),
       );
@@ -919,6 +936,33 @@ export class DesktopPluginInstaller {
         "Installed plugin files do not match the App bundle. Refresh the host's plugin cache and retry.",
         { host, installedPath },
       );
+    if (host === "antigravity") {
+      const validation = (await this.listJson(host, executable, [
+        "validate",
+        installedPath,
+        "--strict",
+        "--json",
+      ])) as {
+        components?: {
+          mcpServers?: number;
+          sidecars?: number;
+          hooks?: number;
+          skills?: number;
+        };
+        findings?: unknown[];
+      };
+      if (
+        (validation.components?.mcpServers ?? 0) < 1 ||
+        (validation.components?.sidecars ?? 0) < 1 ||
+        (validation.components?.hooks ?? 0) < 1 ||
+        (validation.findings?.length ?? 0) > 0
+      )
+        throw new PluginInstallError(
+          "PLUGIN_NOT_CONFIRMED",
+          "Antigravity plugin validation did not confirm MCP, hooks, and sidecar workbench.",
+          { host, installedPath, validation },
+        );
+    }
     const receipt = {
       host,
       version,

@@ -157,32 +157,21 @@ description: 创作或修改要保存的作品：可交互报告、讲解页面�
 
 核对 `showai_capabilities.templateWorkflow.protocol` 为 `showai-template-workflow-v3`。协议版本不兼容时说明需要更新 ShowAI 运行时；安装 Skill 不会升级工具。
 
-新作品先按 use-showai 确定项目；只要规划或设计稿时也先确定项目，查模板需要它。续改已有作品时先 `page_read({projectId,pageId,rendered:false,response:"source"})` 读回原 Page，取它的 `templateContext`（源超过 256 KiB 的大页这样读只返回大纲窗口，要取 templateContext 时加 `detail:"full"`，本机连接也可用 `out` 写入文件再读），并在记录目录中查找 presentation-plan.json 里写有这个 pageId 的记录；找到就沿用其中的读者简报、规划和设计稿，只重做受影响的部分；找不到时从页面本身和用户说明反推，新建一个记录文件夹：brief.md 标明内容是反推的，presentation-plan.json 只为本次要改的部分写节点和幕（含现有块的 blockIds），check_plan 与评审以这部分为准。
+新作品先按 use-showai 确定项目；只要规划或设计稿时也先确定项目，查模板需要它。续改已有作品先 `page_read({projectId,pageId,rendered:false,response:"source"})` 读回原 Page 并沿用或反推工作记录，详细做法见 [工作记录与结构检查](references/records.md)。
 
-**查模板。** 每个新作品在理解意图之前调用一次 `catalog_list({kind:"template",projectId})`，按用户的请求和手上材料的类型（例如给了一篇论文）对照各模板的 scenarios，判断是否适用；选中的模板从第一个环节起就补充方法。用户指定模板时直接使用。用户要求空白，或没有合适的模板时，只按上面的流程制作，用 page_create 建页；需要查看模板上下文时 `template_context` 传 `templates:[]`，它会覆盖连接启动时带的默认模板。续改沿用 Page.templateContext 记下的精确版本，没有记录时不猜它原先用过哪个模板。内置模板升级后旧版本不再随运行时提供，按记下的版本读取报找不到时，改用同一模板的当前版本，并告诉用户模板版本变了。
+**查模板与读模板。** 每个新作品在理解意图之前调用一次 `catalog_list({kind:"template",projectId})`，对照各模板的 scenarios 判断是否适用；选定后调用一次 `template_context({projectId,templates})` 一次读完，并保留返回的 `context.templates` 供建页使用。用户要求空白或无合适模板时用 `page_create` 建页；需要覆盖启动默认模板时传 `templates:[]`。续改沿用 Page.templateContext 记下的精确版本；旧内置模板已升级不可读时改用当前版本并告知用户。
 
-**读模板。** 选定模板后调用一次 `template_context({projectId,templates})`，它返回每个所选模板的 README、全部指南和组件索引（组件多时按 componentPage 分页）。一次读完，然后在每个环节把模板对这类内容的方法叠加在默认做法上；模板没有写到的环节按默认做法。保留返回的 `context.templates`，建页时使用。
+### 记录与结构检查
 
-### 记录
-
-每个环节交出的记录写成文件，供续改、评审和提炼模板时使用。`showai_capabilities.authoring.workRecords.available` 为 true 时，记录目录是它返回的 directory：默认在系统临时目录，用户可以在「设置 → 通用」改成固定目录。每份作品新建一个文件夹 `<directory>/<YYYYMMDD-HHmm>-<作品短名>-<8 位随机十六进制>/`，随机部分保证每次都不同。文件夹里放：
-
-- `brief.md`：读者简报。
-- `material.md`：材料底稿，省略材料环节时不建。
-- `presentation-plan.json`：顶层写 reader、startingKnowledge、goal（各一句，详细内容在 brief.md）、cutoff（材料检索截止日期；省略材料环节时写当天日期）、environment `{width,height,interactive}`、nodes（呈现规划）和 scenes（设计稿）；每个节点（包括上级节点）都要出现在某一幕的 nodes 里。建页后补上 projectId 与 pageId，制作后为各幕填入 blockIds。
-- `review.md`：评审发现、修订与未验证项；以后续改时在末尾追加。
-
-设计稿完成、第一次写入页面之前，运行 `python3 <本 Skill 目录>/scripts/check_plan.py <规划路径>` 检查规划与设计稿的结构覆盖。评审时把 `page_read({response:"source"})` 的完整结果存进同一文件夹，再加 `--page <页面源>` 检查各幕的 blockIds。宿主不能运行脚本时手工核对同样的关系并说明。脚本只检查结构，不证明内容讲清楚了。
-
-`workRecords.available` 为 false 时（例如远程连接）不落盘，记录写在对话里，交付时说明。几句话就能写完的简单任务，可以只写一个 brief.md 或写在对话里。只改一两处措辞、数字或样式的局部小改不新建记录，有原记录时在它的 review.md 追加一行；改动涉及讲解顺序、增删部分或重做画面时按续改处理。记录是这台设备上的工作材料，不随页面同步或导出；交付时告诉用户记录文件夹的位置。
+按 [工作记录与结构检查](references/records.md) 在 `workRecords.directory` 为每份作品建独立记录文件夹（`brief.md`、`material.md`、`presentation-plan.json`、`review.md`），设计稿完成后先跑 `scripts/check_plan.py` 校验结构覆盖，评审时加 `--page` 核对 `blockIds`。无本机目录或简单小改的简化规则见该参考。
 
 ### 制作与交付
 
-验收首屏或图文同屏时，用 `page_read({projectId,pageId,view:"image",capture:"viewport",viewport:{width:1440,height:900}})` 保持真实视口；默认全文截图会扩高，不能证明一屏可见。需要测量时添加 `inspect:{layout:true,blockIds:[...]}`，可用 `scrollToBlockId` 在原页面中定位；顶层 blockIds 会抽出局部、改变布局。测量字段与限制见[固定视口与实际布局测量](../use-showai/references/page-reading.md#固定视口与实际布局测量)。
+验收首屏或图文同屏时，用 `page_read({projectId,pageId,view:"image",capture:"viewport",viewport:{width:1440,height:900}})` 保持真实视口；需要测量时添加 `inspect:{layout:true,blockIds:[...]}`，可用 `scrollToBlockId` 定位，详见 [固定视口与实际布局测量](../use-showai/references/page-reading.md#固定视口与实际布局测量)。
 
-用了模板时用 `template_apply` 建页，它生成空白 Page 并记住模板引用；不用模板时用 `page_create`，只传标题和少量块，再用 `page_apply` 逐幕插入。插入组件、文字标记、图片、链接、修改已有页面的具体写法见 [写入页面的操作](../use-showai/references/authoring.md)；组件的 guide 与参数在选用时读取。设计稿确认的组件缺口进入 [create-component](../create-component/SKILL.md)，完成后回到这里继续制作。要嵌入较多图片或视频时，设计阶段先按 [容量与大文件](../use-showai/references/capacity.md) 决定用引用还是嵌入。
+用了模板时用 `template_apply` 建页；不用模板时用 `page_create` 建页再用 `page_apply` 逐幕插入。具体写入写法见 [写入页面的操作](../use-showai/references/authoring.md)；确认的组件缺口进入 [create-component](../create-component/SKILL.md)；大量图片或视频先看 [容量与大文件](../use-showai/references/capacity.md)。
 
-新作品保存后调用 `page_present`，并先读 [当前宿主适配](../use-showai/references/host-adapter.md)，在同一轮把页面展示给用户；告诉用户页面存在哪个项目，给出 openUrl。续改已有作品时在原页面上修改，保存后默认不再展示，告诉用户改了什么、页面在哪；用户要求查看效果时再展示。导出文件、多页网站和本机文件打包的做法见 [写入页面的操作](../use-showai/references/authoring.md#展示与导出)。
+新作品保存后调用 `page_present`，并先读 [当前宿主适配](../use-showai/references/host-adapter.md)，在同一轮把页面展示给用户；告诉用户页面存在哪个项目，给出 openUrl。续改已有作品在原页面上修改，保存后默认不再展示，告诉用户改了什么、页面在哪；用户要求查看效果时再展示。导出做法见 [展示与导出](../use-showai/references/authoring.md#展示与导出)。
 
 ## 从对话展示升级
 

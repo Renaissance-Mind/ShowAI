@@ -1,0 +1,23 @@
+{
+  "command": "node",
+  "args": [
+    "main.mjs"
+  ],
+  "restart_policy": "on-failure",
+  "display_name": "ShowAI",
+  "description": "Live ShowAI workbench in the side pane: browse, edit, and reference ShowAI pages alongside your Antigravity conversation.",
+  "has_web_ui": true,
+  "agent_permissions": {
+    "allows_user_interactions": true
+  },
+  "ui_config": {
+    "display_name": "ShowAI",
+    "views": [
+      {
+        "entrypoint": "SIDECAR_UI_ENTRYPOINT_AUX_PANE",
+        "path": "/",
+        "title": "ShowAI"
+      }
+    ]
+  }
+}

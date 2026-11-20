@@ -31,6 +31,15 @@ declare global {
       workbenchChanges?(after: number, client: string): Promise<WorkbenchChanges>;
       readMedia?(grant: string): Promise<Blob>;
     };
+    __SHOWAI_ANTIGRAVITY_HOST__?: {
+      attachReference(
+        reference?: PageReference,
+        text?: string,
+        components?: AgentComponentContext[],
+      ): Promise<unknown>;
+      openLink?(url: string): Promise<unknown>;
+      canReference(): boolean;
+    };
   }
 }
 
@@ -42,6 +51,24 @@ export function codexWorkbench() {
 
 export function codexWorkbenchCanReference() {
   return window.__SHOWAI_CODEX_HOST__?.canReference() === true;
+}
+
+export function antigravityWorkbench() {
+  return window.__SHOWAI_ANTIGRAVITY_HOST__;
+}
+
+export function antigravityWorkbenchCanReference() {
+  return window.__SHOWAI_ANTIGRAVITY_HOST__?.canReference() === true;
+}
+
+export function sendAntigravityWorkbenchReference(
+  reference?: PageReference,
+  text?: string,
+  components?: AgentComponentContext[],
+) {
+  const host = window.__SHOWAI_ANTIGRAVITY_HOST__;
+  if (!host) throw new Error(t("antigravityUnavailable"));
+  return host.attachReference(reference, text, components);
 }
 
 export function reportCodexWorkbenchReady() {

@@ -1,0 +1,23 @@
+{
+  "showai-preview": {
+    "PostToolUse": [
+      {
+        "matcher": ".*(?:show_component|page_present|render_document).*|mcp_tool",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node ./hooks/preview-hook.mjs",
+            "timeout": 15
+          }
+        ]
+      }
+    ],
+    "PreInvocation": [
+      {
+        "type": "command",
+        "command": "node ./hooks/preview-hook.mjs",
+        "timeout": 10
+      }
+    ]
+  }
+}

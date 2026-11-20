@@ -38,11 +38,17 @@ async function expectedWorkflowHashes(
   common: Record<string, string>,
   profile: string,
 ) {
-  if (profile !== "codex") return common;
+  const noteName =
+    profile === "codex"
+      ? "codex-entry.md"
+      : profile === "antigravity"
+        ? "antigravity-entry.md"
+        : undefined;
+  if (!noteName) return common;
   const entry = "use-showai/SKILL.md";
   const original = await readFile(join(source, "skills", entry), "utf8");
   const note = await readFile(
-    join(source, "host-adapters/codex-entry.md"),
+    join(source, "host-adapters", noteName),
     "utf8",
   );
   const bound = original.trimEnd() + "\n\n" + note;
@@ -139,6 +145,9 @@ describe("host-specific plugin distributions", () => {
         "utf8",
       );
       expect(entrySkill.includes("## Codex 工作台")).toBe(profile === "codex");
+      expect(entrySkill.includes("## Antigravity 侧栏工作台与自动预览")).toBe(
+        profile === "antigravity",
+      );
       if (profile !== "codex") expect(adapter).not.toContain("visualize");
       expect((await readdir(join(target, "skills"))).sort()).toEqual(
         (await readdir(join(source, "skills"))).sort(),
@@ -169,6 +178,34 @@ describe("host-specific plugin distributions", () => {
       ))
         expect(await readdir(target)).not.toContain(other);
       expect(await readdir(target)).not.toContain("host-adapters");
+      if (profile === "antigravity") {
+        const pluginManifest = JSON.parse(
+          await readFile(join(target, "plugin.json"), "utf8"),
+        );
+        expect(pluginManifest).toMatchObject({
+          name: "showai",
+          displayName: "ShowAI",
+          logo: "assets/logo.svg",
+        });
+        expect(pluginManifest.$schema).toBeUndefined();
+        expect(pluginManifest.extensions).toBeUndefined();
+        expect(pluginManifest.suggestedPrompts).toHaveLength(3);
+        const hooks = JSON.parse(
+          await readFile(join(target, "hooks.json"), "utf8"),
+        );
+        expect(hooks["showai-preview"].PostToolUse).toHaveLength(1);
+        expect(hooks["showai-preview"].PreInvocation).toHaveLength(1);
+        const sidecar = JSON.parse(
+          await readFile(join(target, "sidecars/workbench/sidecar.json"), "utf8"),
+        );
+        expect(sidecar).toMatchObject({
+          has_web_ui: true,
+          display_name: "ShowAI",
+          ui_config: {
+            views: [{ entrypoint: "SIDECAR_UI_ENTRYPOINT_AUX_PANE", path: "/" }],
+          },
+        });
+      }
       expect(await stageHostPlugin({ source, target, profile })).toEqual(first);
     },
   );

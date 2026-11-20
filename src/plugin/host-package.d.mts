@@ -28,6 +28,25 @@ export function writeHostLauncher(
   profile: HostProfile,
 ): Promise<void>;
 export function publishPluginDirectory(staging: string, target: string): Promise<void>;
+export function antigravityManifest(
+  manifest: { name?: string; version: string },
+  version?: string,
+): Record<string, unknown>;
+export function antigravityHookConfig(launch?: {
+  command: string;
+  env?: Record<string, string | undefined>;
+}): Record<string, unknown>;
+export function antigravitySidecarConfig(launch?: {
+  command: string;
+  env?: Record<string, string | undefined>;
+}): Record<string, unknown>;
+export function writeAntigravityAssets(options: {
+  source: string;
+  target: string;
+  manifest: { name?: string; version: string };
+  version?: string;
+  launch?: { command: string; env?: Record<string, string | undefined> };
+}): Promise<void>;
 export function stageHostPlugin(options: {
   source: string;
   target: string;

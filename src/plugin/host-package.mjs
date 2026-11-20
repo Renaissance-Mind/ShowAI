@@ -64,9 +64,13 @@ export async function bindHostSkills({ source, target, profile }) {
   );
   const expected = { ...commonFiles };
   const entry = "use-showai/SKILL.md";
-  const notePath = join(source, "host-adapters/codex-entry.md");
-  const note =
-    profile === "codex" ? await readFile(notePath, "utf8") : undefined;
+  const notePath =
+    profile === "codex"
+      ? join(source, "host-adapters/codex-entry.md")
+      : profile === "antigravity"
+        ? join(source, "host-adapters/antigravity-entry.md")
+        : undefined;
+  const note = notePath ? await readFile(notePath, "utf8") : undefined;
   if (note !== undefined) {
     const original = await readFile(join(source, "skills", entry), "utf8");
     const bound = original.trimEnd() + "\n\n" + note;
@@ -99,7 +103,7 @@ export async function bindHostSkills({ source, target, profile }) {
     commonSha256: hash(JSON.stringify(commonFiles)),
     commonFiles,
     adapterSha256: hash(adapter),
-    ...(profile === "codex" && { entrySha256: expected[entry] }),
+    ...(note !== undefined && { entrySha256: expected[entry] }),
   };
   await writeFile(
     join(target, "host-profile.json"),
@@ -141,6 +145,142 @@ export async function publishPluginDirectory(staging, target) {
     throw error;
   }
   if (moved) await rm(previous, { recursive: true });
+}
+
+function shellQuote(value) {
+  if (process.platform === "win32") {
+    return `"${String(value).replaceAll('"', '""')}"`;
+  }
+  return `'${String(value).replaceAll("'", `'\\''`)}'`;
+}
+
+function antigravityHookCommand(launch) {
+  if (!launch?.command) return "node ./hooks/preview-hook.mjs";
+  const envEntries = Object.entries(launch.env ?? {}).filter(
+    ([key, value]) =>
+      ["ELECTRON_RUN_AS_NODE", "SHOWAI_HOME", "SHOWAI_PRESENTATION_DIR"].includes(key) &&
+      typeof value === "string",
+  );
+  if (process.platform === "win32") {
+    const sets = envEntries.map(([key, value]) => `set "${key}=${value}"`);
+    return [...sets, `${shellQuote(launch.command)} ./hooks/preview-hook.mjs`].join(" && ");
+  }
+  const prefix = envEntries.map(([key, value]) => `${key}=${shellQuote(value)}`).join(" ");
+  return [prefix, shellQuote(launch.command), "./hooks/preview-hook.mjs"]
+    .filter(Boolean)
+    .join(" ");
+}
+
+export function antigravityManifest(manifest, version = manifest.version) {
+  return {
+    name: manifest.name || "showai",
+    displayName: "ShowAI",
+    version,
+    description:
+      "Create, edit, and present interactive ShowAI pages, diagrams, and components with a live side-pane workbench.",
+    logo: "assets/logo.svg",
+    author: {
+      name: "Renaissance Mind",
+      url: "https://github.com/Renaissance-Mind",
+    },
+    homepage: "https://github.com/Renaissance-Mind/ShowAI",
+    repository: "https://github.com/Renaissance-Mind/ShowAI",
+    suggestedPrompts: [
+      "Use ShowAI to turn this topic into an interactive page.",
+      "Draw an interactive architecture diagram in ShowAI.",
+      "Open my recent ShowAI pages in the workbench.",
+    ],
+  };
+}
+
+export function antigravityHookConfig(launch) {
+  const command = antigravityHookCommand(launch);
+  return {
+    "showai-preview": {
+      PostToolUse: [
+        {
+          matcher: ".*(?:show_component|page_present|render_document).*|mcp_tool",
+          hooks: [
+            {
+              type: "command",
+              command,
+              timeout: 15,
+            },
+          ],
+        },
+      ],
+      PreInvocation: [
+        {
+          type: "command",
+          command,
+          timeout: 10,
+        },
+      ],
+    },
+  };
+}
+
+export function antigravitySidecarConfig(launch) {
+  const env = {};
+  for (const key of [
+    "ELECTRON_RUN_AS_NODE",
+    "SHOWAI_HOME",
+    "SHOWAI_RUNTIME_CONFIG",
+    "SHOWAI_PRESENTATION_DIR",
+  ]) {
+    if (typeof launch?.env?.[key] === "string") env[key] = launch.env[key];
+  }
+  return {
+    command: launch?.command || "node",
+    args: ["main.mjs"],
+    ...(Object.keys(env).length ? { env } : {}),
+    restart_policy: "on-failure",
+    display_name: "ShowAI",
+    description:
+      "Live ShowAI workbench in the side pane: browse, edit, and reference ShowAI pages alongside your Antigravity conversation.",
+    has_web_ui: true,
+    agent_permissions: {
+      allows_user_interactions: true,
+    },
+    ui_config: {
+      display_name: "ShowAI",
+      views: [
+        {
+          entrypoint: "SIDECAR_UI_ENTRYPOINT_AUX_PANE",
+          path: "/",
+          title: "ShowAI",
+        },
+      ],
+    },
+  };
+}
+
+export async function writeAntigravityAssets({
+  source,
+  target,
+  manifest,
+  version = manifest.version,
+  launch,
+}) {
+  const assetsRoot = join(source, "host-adapters/antigravity");
+  await cp(join(assetsRoot, "hooks"), join(target, "hooks"), {
+    recursive: true,
+  });
+  await cp(join(assetsRoot, "sidecars"), join(target, "sidecars"), {
+    recursive: true,
+  });
+  await writeFile(
+    join(target, "plugin.json"),
+    JSON.stringify(antigravityManifest(manifest, version), null, 2) + "\n",
+  );
+  await writeFile(
+    join(target, "hooks.json"),
+    JSON.stringify(antigravityHookConfig(launch), null, 2) + "\n",
+  );
+  await writeFile(
+    join(target, "sidecars/workbench/sidecar.json"),
+    JSON.stringify(antigravitySidecarConfig(launch), null, 2) + "\n",
+  );
 }
 
 export async function stageHostPlugin({ source, target, profile }) {
@@ -192,12 +332,20 @@ export async function stageHostPlugin({ source, target, profile }) {
     } else if (profile === "claude") {
       await rm(join(staging, "mcp.json"), { force: true });
     } else {
+      const manifest = JSON.parse(
+        await readFile(join(source, "plugin.json"), "utf8"),
+      );
       await rm(join(staging, ".claude-plugin"), {
         recursive: true,
         force: true,
       });
       await rm(join(staging, ".mcp.json"), { force: true });
       await rm(join(staging, "mcp.json"), { force: true });
+      await writeAntigravityAssets({
+        source,
+        target: staging,
+        manifest,
+      });
       await writeFile(
         join(staging, "mcp_config.json"),
         JSON.stringify(

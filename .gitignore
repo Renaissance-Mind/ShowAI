@@ -90,6 +90,7 @@ plugins/showai/scripts/cli.mjs
 !/plugins/showai/skills/create-template/references/template-abstraction.md
 !/plugins/showai/skills/create-template/references/template-creation.md
 !/plugins/showai/skills/show-document/SKILL.md
+!/plugins/showai/skills/show-document/references/records.md
 !/plugins/showai/skills/use-showai/references/host-display.md
 !/plugins/showai/skills/show-visual/SKILL.md
 !/plugins/showai/skills/use-showai/SKILL.md
@@ -210,6 +211,7 @@ plugins/showai/scripts/cli.mjs
 
 # Public generated host packages; edit common Skills and adapters, then package:plugin.
 !/plugins/showai/host-adapters/antigravity.md
+!/plugins/showai/host-adapters/antigravity-entry.md
 !/plugins/showai/host-adapters/claude.md
 !/plugins/showai/host-adapters/codex.md
 !/plugins/showai/host-adapters/codex-entry.md
@@ -236,6 +238,7 @@ plugins/showai/scripts/cli.mjs
 !/plugins/showai-antigravity/skills/create-template/references/template-abstraction.md
 !/plugins/showai-antigravity/skills/create-template/references/template-creation.md
 !/plugins/showai-antigravity/skills/show-document/SKILL.md
+!/plugins/showai-antigravity/skills/show-document/references/records.md
 !/plugins/showai-antigravity/skills/show-visual/SKILL.md
 !/plugins/showai-antigravity/skills/use-showai/SKILL.md
 !/plugins/showai-antigravity/skills/use-showai/references/host-adapter.md
@@ -264,6 +267,7 @@ plugins/showai/scripts/cli.mjs
 !/plugins/showai-claude/skills/create-template/references/template-abstraction.md
 !/plugins/showai-claude/skills/create-template/references/template-creation.md
 !/plugins/showai-claude/skills/show-document/SKILL.md
+!/plugins/showai-claude/skills/show-document/references/records.md
 !/plugins/showai-claude/skills/show-visual/SKILL.md
 !/plugins/showai-claude/skills/use-showai/SKILL.md
 !/plugins/showai-claude/skills/use-showai/references/host-adapter.md
@@ -292,6 +296,7 @@ plugins/showai/scripts/cli.mjs
 !/plugins/showai-codex/skills/create-template/references/template-abstraction.md
 !/plugins/showai-codex/skills/create-template/references/template-creation.md
 !/plugins/showai-codex/skills/show-document/SKILL.md
+!/plugins/showai-codex/skills/show-document/references/records.md
 !/plugins/showai-codex/skills/show-visual/SKILL.md
 !/plugins/showai-codex/skills/use-showai/SKILL.md
 !/plugins/showai-codex/skills/use-showai/references/host-adapter.md
@@ -318,6 +323,7 @@ plugins/showai/scripts/cli.mjs
 !/plugins-kimi/showai/skills/create-template/references/template-abstraction.md
 !/plugins-kimi/showai/skills/create-template/references/template-creation.md
 !/plugins-kimi/showai/skills/show-document/SKILL.md
+!/plugins-kimi/showai/skills/show-document/references/records.md
 !/plugins-kimi/showai/skills/show-visual/SKILL.md
 !/plugins-kimi/showai/skills/use-showai/SKILL.md
 !/plugins-kimi/showai/skills/use-showai/references/host-adapter.md
