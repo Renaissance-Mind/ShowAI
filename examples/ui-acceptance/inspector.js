@@ -8,6 +8,13 @@
         review: "验收面板",
         marks: "操作标注",
         tree: "流程树",
+        flow: "流程画布",
+        flowBack: "返回",
+        flowFit: "全图",
+        flowGroups: "流程分组",
+        flowZoomIn: "放大画布",
+        flowZoomOut: "缩小画布",
+        flowCurrent: "当前",
         states: "界面状态",
         actions: "当前可测试操作",
         empty: "当前没有可标注的控件",
@@ -54,6 +61,13 @@
         review: "Review inspector",
         marks: "Action markers",
         tree: "Flow tree",
+        flow: "Flow canvas",
+        flowBack: "Back",
+        flowFit: "Fit",
+        flowGroups: "Flow groups",
+        flowZoomIn: "Zoom in",
+        flowZoomOut: "Zoom out",
+        flowCurrent: "Current",
         states: "UI states",
         actions: "Available actions",
         empty: "No controls to mark in this state",
@@ -113,13 +127,16 @@
   }
   const root = document.getElementById("review-root");
   root.className = "rv-shell";
+  const options = new URLSearchParams(location.search);
+  const capture = options.get("capture") === "1";
+  let openFlowOnLoad = options.get("flow") === "1";
+  if (capture) root.classList.add("rv-capture");
   const header = el("header", "rv-head"),
     tools = el("div", "rv-tools");
   const marksLabel = el("label"),
     marksToggle = el("input");
   marksToggle.type = "checkbox";
-  marksToggle.checked =
-    new URLSearchParams(location.search).get("marks") !== "0";
+  marksToggle.checked = options.get("marks") !== "0";
   marksLabel.append(marksToggle, t.marks);
   const body = el("main", "rv-body"),
     stage = el("div", "rv-stage"),
@@ -161,6 +178,16 @@
   });
   treeToggle.setAttribute("aria-controls", tree.id);
   treeToggle.setAttribute("aria-expanded", "true");
+  let flowCanvas;
+  const flowToggle =
+    config.flow &&
+    button(t.flow, () => {
+      flowCanvas ??= createReviewFlowCanvas(config.flow, t, (id) => {
+        if (id !== selected) load(id);
+      });
+      flowCanvas.open(selected);
+    });
+  if (flowToggle) flowToggle.setAttribute("aria-haspopup", "dialog");
   const reset = button(t.reset, () => scenario?.reset?.());
   reset.hidden = true;
   const home = button(t.home, () => load(scenario.entry), "rv-home");
@@ -195,7 +222,9 @@
   const dataLine = infoBody.lastElementChild;
   const checksButton = button(t.checks, openChecks);
   checksButton.hidden = true;
-  tools.append(marksLabel, treeToggle, checksButton, reset, info);
+  tools.append(marksLabel, treeToggle);
+  if (flowToggle) tools.append(flowToggle);
+  tools.append(checksButton, reset, info);
   header.append(el("h1", "", document.title), tools);
   panel.append(stateSection, actionSection, treeSection, error, home);
   stage.append(marks, loading);
@@ -786,6 +815,7 @@
     home.disabled = true;
     reset.disabled = true;
     checksButton.hidden = true;
+    if (flowToggle) flowToggle.disabled = true;
     panel.setAttribute("aria-busy", "true");
     activeName.textContent = t.loading;
     preparation.hidden = true;
@@ -793,7 +823,11 @@
     actionList.replaceChildren();
     const nextFrame = el("iframe");
     nextFrame.title = t.preview;
-    nextFrame.name = id ? "ui-review/" + id : "";
+    nextFrame.name = capture
+      ? "ui-review-check/" + id
+      : id
+        ? "ui-review/" + id
+        : "";
     nextFrame.addEventListener(
       "load",
       async () => {
@@ -803,6 +837,10 @@
           if (!doc?.body) throw Error(t.preview);
           const definition = nextFrame.contentWindow.reviewScenario;
           validate(definition);
+          if (capture && definition.checkIsolation !== true)
+            throw Error(
+              "Capturing thumbnails requires an isolated review scenario (checkIsolation).",
+            );
           scenario = definition;
           orderedStates = [...scenario.states].sort(
             (a, b) =>
@@ -846,8 +884,15 @@
         }
         home.disabled = !scenario?.entry;
         reset.disabled = false;
+        if (flowToggle) flowToggle.disabled = !scenario;
         panel.setAttribute("aria-busy", "false");
-        if (scenario?.states) refresh();
+        if (scenario?.states) {
+          refresh();
+          if (flowToggle && openFlowOnLoad && !capture) {
+            openFlowOnLoad = false;
+            flowToggle.click();
+          }
+        }
       },
       { once: true },
     );

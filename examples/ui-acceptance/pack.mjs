@@ -132,16 +132,18 @@ export function sourceMetadata(directory) {
 
 export async function buildReview(
   appHtml,
-  { title, lang = "", revision = "", metadata = {} } = {},
+  { title, lang = "", revision = "", metadata = {}, flow } = {},
 ) {
   const external = findExternalAssets(appHtml);
   if (external.length)
     throw new Error(
       "Preview contains external assets:\n" + external.join("\n"),
     );
-  const [style, script] = await Promise.all([
+  const [style, script, canvasStyle, canvasScript] = await Promise.all([
     readFile(new URL("./inspector.css", import.meta.url), "utf8"),
     readFile(new URL("./inspector.js", import.meta.url), "utf8"),
+    flow ? readFile(new URL("./flow-canvas.css", import.meta.url), "utf8") : "",
+    flow ? readFile(new URL("./flow-canvas.js", import.meta.url), "utf8") : "",
   ]);
   const info = {
     ...metadata,
@@ -153,6 +155,7 @@ export async function buildReview(
     title,
     lang,
     metadata: info,
+    ...(flow && { flow }),
   }).replace(/</g, "\\u003c");
   const version = String(info.revision).replace(/[^0-9a-f]/gi, "");
   return (
@@ -162,13 +165,24 @@ export async function buildReview(
     version +
     '"><title>UI review</title><style>' +
     style +
+    canvasStyle +
     "</style></head><body>" +
     '<div id="review-root"></div><script id="review-app" type="application/json">' +
     payload +
     "</script><script>" +
-    script.replace(/<\/script/gi, "<\\/script") +
+    (canvasScript + "\n" + script).replace(/<\/script/gi, "<\\/script") +
     "</script></body></html>\n"
   );
+}
+
+export async function buildFlowReview(
+  appHtml,
+  { source, lang = "en-US", ...options } = {},
+) {
+  const { captureReviewFlow } = await import("./capture-flow.mjs");
+  const preview = await buildReview(appHtml, { ...options, lang });
+  const flow = await captureReviewFlow(preview, { source, lang });
+  return buildReview(appHtml, { ...options, lang, flow });
 }
 
 if (
@@ -178,24 +192,31 @@ if (
   const [input, output, ...options] = process.argv.slice(2);
   if (!input || !output || resolve(input) === resolve(output))
     throw new Error(
-      "Usage: node pack.mjs <app.html> <preview.html> [--source <checkout>] [--title <title>] [--data <description>]",
+      "Usage: node pack.mjs <app.html> <preview.html> [--flow] [--source <checkout>] [--title <title>] [--data <description>] [--lang <locale>]",
     );
   const values = {};
-  for (let index = 0; index < options.length; index += 2) {
+  for (let index = 0; index < options.length; index++) {
     const flag = options[index];
+    if (flag === "--flow") {
+      values[flag] = true;
+      continue;
+    }
     if (
       !["--source", "--title", "--data", "--lang"].includes(flag) ||
       !options[index + 1]
     )
       throw new Error("Invalid option: " + flag);
-    values[flag] = options[index + 1];
+    values[flag] = options[++index];
   }
+  const source = resolve(values["--source"] || process.cwd());
   const metadata = {
-    ...sourceMetadata(resolve(values["--source"] || process.cwd())),
+    ...sourceMetadata(source),
     generatedAt: new Date().toISOString(),
     dataSource: values["--data"] || "",
   };
-  const html = await buildReview(await readFile(input, "utf8"), {
+  const build = values["--flow"] ? buildFlowReview : buildReview;
+  const html = await build(await readFile(input, "utf8"), {
+    source,
     title: values["--title"],
     lang: values["--lang"],
     metadata,

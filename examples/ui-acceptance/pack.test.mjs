@@ -20,6 +20,7 @@ test("the copyable example embeds the current app and inspector", async () => {
       title: config.title,
       lang: config.lang,
       metadata: config.metadata,
+      flow: config.flow,
     }),
     preview,
   );
@@ -27,6 +28,28 @@ test("the copyable example embeds the current app and inspector", async () => {
     preview,
     /<(?:script|link|iframe)\b[^>]*\s(?:src|href)=/i,
   );
+  assert.deepEqual(
+    config.flow.nodes.map(({ id }) => id),
+    ["all", "matches", "empty"],
+  );
+  for (const node of config.flow.nodes) {
+    assert.match(node.image, /^data:image\/jpeg;base64,\/9j\//);
+    assert.ok(node.width > 0 && node.height > 0);
+  }
+  assert.deepEqual(
+    config.flow.edges
+      .filter(({ kind }) => kind === "back")
+      .map(({ from, to }) => [from, to]),
+    [
+      ["matches", "all"],
+      ["empty", "all"],
+    ],
+  );
+  const legacy = await buildReview(app, {
+    title: config.title,
+    lang: config.lang,
+  });
+  assert.doesNotMatch(legacy, /function createReviewFlowCanvas\(/);
 });
 
 test("external assets in the embedded page are reported before packaging", async () => {

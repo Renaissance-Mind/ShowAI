@@ -152,6 +152,16 @@ button:disabled {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 294px;
 }
+.rv-capture,
+.rv-capture .rv-body {
+  display: block;
+}
+.rv-capture :is(.rv-body, .rv-stage) {
+  height: 100%;
+}
+.rv-capture :is(.rv-head, .rv-inspector) {
+  display: none;
+}
 .rv-stage {
   position: relative;
   min-width: 0;

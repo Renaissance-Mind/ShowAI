@@ -4,6 +4,8 @@
 
 复制整个目录，打开 [preview.html](preview.html) 即可试用。页面标出当前控件，右侧提供操作按钮、状态切换和可折叠的流程树。点树节点进入该状态并继续操作。地址中的 `#state=状态ID` 可直接打开对应状态，`?marks=0` 可在查看外观时收起编号。
 
+点「流程画布」可查看所有状态的界面缩略图和操作连线。用分组按钮定位流程，或点「全图」查看所有状态。点缩略图进入对应状态，点「返回」或按 Escape 回到刚才的预览，继续操作。链接加上 `?flow=1` 可直接打开画布。
+
 GitHub 可以收录验收工具、可复用的回归场景和通用示例。每次任务的验收页、操作记录、截图、日志和检查报告保存在本机任务目录。
 
 ```text
@@ -20,3 +22,5 @@ GitHub 可以收录验收工具、可复用的回归场景和通用示例。每�
 **检查。** 当应用针对 `ui-review-check/<id>` 提供隔离数据且准备过程无持久副作用时，设置 `checkIsolation: true`。页面的「检查流程」会在独立帧逐项准备状态并核对目标，成功项可展开查看控件，失败项直接显示原因。条件性操作设置 `optional: true`。「动效观察」记录当前系统动态偏好、动画事件和前台帧间隔；分别在正常和减少动态效果下操作，帧间隔是观察数据。
 
 **打包。** 自己的应用先生成自包含网页，再运行 `node pack.mjs app.html preview.html --source <源码目录> --title <标题> --data <数据说明>`。`--source` 省略时使用当前目录。打包器检查常见 HTML 和 CSS 外部资源，并写入源码分支、提交、未提交状态、时间与内容指纹。运行时动态请求仍需实际验证。也可导入 `buildReview(appHtml, {title, lang, metadata})`。输出为单文件；原生端继续使用本端的运行和测试环境。
+
+**打包流程画布。** 设置 `checkIsolation: true`，并在 `reviewScenario.transitions` 中声明 `{ from, to, label, kind? }`。两端使用现有状态 ID，`label` 写出触发操作。`kind` 支持 `forward`、`back` 和 `error`。打包时加 `--flow`，通过 `--source` 指向已安装依赖的 ShowAI 源码目录，必要时用 `--lang` 指定预览语言。打包器用无头 Chromium 在隔离帧中准备每个状态，拍下实际界面并嵌入单文件。也可调用 `buildFlowReview(appHtml, { source, title, lang, metadata })`。

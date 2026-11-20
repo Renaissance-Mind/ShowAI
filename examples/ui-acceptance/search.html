@@ -95,7 +95,12 @@
       </footer>
     </main>
     <script>
-      const chinese = navigator.language.toLowerCase().startsWith("zh");
+      const chinese = (
+        window.frameElement?.ownerDocument.documentElement.lang ||
+        navigator.language
+      )
+        .toLowerCase()
+        .startsWith("zh");
       const copy = chinese
         ? {
             heading: "页面搜索 · 模拟目录",
@@ -214,6 +219,20 @@
         entry: "all",
         checkIsolation: true,
         dataSource: chinese ? "静态示例页面" : "Static example pages",
+        transitions: [
+          {
+            from: "all",
+            to: "matches",
+            label: chinese ? "输入匹配关键词" : "Enter a match",
+          },
+          {
+            from: "all",
+            to: "empty",
+            label: chinese ? "输入不匹配关键词" : "Enter a non-match",
+          },
+          { from: "matches", to: "all", label: copy.clear, kind: "back" },
+          { from: "empty", to: "all", label: copy.clear, kind: "back" },
+        ],
         states: stateIds.map((id, i) => ({
           id,
           title: titles[i],

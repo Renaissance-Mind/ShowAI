@@ -1,0 +1,204 @@
+.rv-flow-dialog {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  max-width: none;
+  max-height: none;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  overflow: hidden;
+  background: var(--rv-panel);
+  color: var(--rv-text);
+}
+.rv-flow-dialog[open] {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+}
+.rv-flow-head,
+.rv-flow-tools {
+  display: flex;
+  align-items: center;
+}
+.rv-flow-head {
+  min-height: 52px;
+  gap: 14px;
+  padding: 8px 16px;
+  background: var(--rv-paper);
+  border-bottom: 1px solid var(--rv-line);
+}
+.rv-flow-head h2 {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 650;
+  white-space: nowrap;
+}
+.rv-flow-tools {
+  gap: 5px;
+  margin-inline-start: auto;
+}
+.rv-flow-groups {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  min-width: 0;
+  overflow-x: auto;
+  scrollbar-width: thin;
+}
+.rv-flow-head button {
+  min-width: 32px;
+  min-height: 32px;
+  padding: 4px 9px;
+  border: 1px solid var(--rv-line);
+  border-radius: 6px;
+  background: var(--rv-paper);
+  font-size: 13px;
+  white-space: nowrap;
+}
+.rv-flow-head button:hover:not(:disabled) {
+  background: var(--rv-panel);
+}
+.rv-flow-head .rv-flow-groups button {
+  border-color: transparent;
+}
+.rv-flow-groups button[aria-pressed="true"] {
+  color: var(--rv-accent);
+  background: var(--rv-tint);
+}
+.rv-flow-scroll {
+  background: radial-gradient(#d9d6ce 0.8px, transparent 0.8px) 0 0 / 16px 16px;
+  overflow: auto;
+  overscroll-behavior: contain;
+  cursor: grab;
+}
+.rv-flow-scroll:active {
+  cursor: grabbing;
+}
+.rv-flow-plane {
+  position: relative;
+  overflow: clip;
+  margin-inline: auto;
+}
+.rv-flow-world {
+  position: absolute;
+  inset: 0 auto auto 0;
+  transform-origin: top left;
+  user-select: none;
+}
+.rv-flow-group,
+.rv-flow-card,
+.rv-flow-edges {
+  position: absolute;
+}
+.rv-flow-group {
+  padding: 10px 12px;
+  border: 1px solid #dedbd3;
+  border-radius: 12px;
+  background: #f4f2eda8;
+  color: var(--rv-muted);
+  font-size: 14px;
+  font-weight: 650;
+}
+.rv-flow-edges {
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  pointer-events: none;
+}
+.rv-flow-edges g,
+.rv-flow-edges marker {
+  color: #827887;
+}
+.rv-flow-edges .rv-flow-edge-back {
+  color: #8b8277;
+}
+.rv-flow-edges .rv-flow-edge-error {
+  color: #a04438;
+}
+.rv-flow-edges polyline {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8px;
+  stroke-linejoin: round;
+}
+.rv-flow-cross polyline {
+  stroke-opacity: 0.6;
+}
+.rv-flow-edge-back polyline {
+  stroke-dasharray: 5 4;
+}
+.rv-flow-edges marker path {
+  fill: currentColor;
+}
+.rv-flow-edges text {
+  fill: var(--rv-text);
+  stroke: var(--rv-panel);
+  stroke-width: 6px;
+  stroke-linejoin: round;
+  paint-order: stroke;
+  font-size: 14px;
+  font-weight: 560;
+}
+.rv-flow-edge-error text {
+  fill: currentColor;
+}
+.rv-flow-card {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  padding: 0;
+  border: 1px solid #d5d0c7;
+  border-radius: 9px;
+  background: var(--rv-paper);
+  box-shadow: 0 2px 5px #30292510;
+  text-align: left;
+}
+.rv-flow-card img {
+  width: 100%;
+  aspect-ratio: 1200 / 760;
+  background: var(--rv-panel);
+  object-fit: contain;
+}
+.rv-flow-card-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex: 1;
+  gap: 8px;
+  min-height: 0;
+  padding: 0 12px;
+  border-top: 1px solid var(--rv-line);
+  font-size: 16px;
+}
+.rv-flow-card-title strong {
+  font-weight: 650;
+}
+.rv-flow-current {
+  display: none;
+  color: var(--rv-accent);
+  font-size: 13px;
+  white-space: nowrap;
+}
+.rv-flow-card[aria-current] .rv-flow-current {
+  display: inline;
+}
+.rv-flow-card:is(:hover, :focus-visible, [aria-current]) {
+  border-color: var(--rv-accent);
+  box-shadow: 0 0 0 2px var(--rv-accent);
+}
+.rv-flow-card[aria-current] .rv-flow-card-title {
+  background: var(--rv-tint);
+}
+@media (max-width: 680px) {
+  .rv-flow-head {
+    flex-wrap: wrap;
+    gap: 6px 10px;
+    padding: 7px 10px;
+  }
+  .rv-flow-groups {
+    order: 1;
+    flex-basis: 100%;
+  }
+}
