@@ -51,6 +51,8 @@ Saved pages, content libraries and exported pages outlive the code that wrote th
 
 Use native elements with `showai-select`, `showai-input`, `showai-textarea`, `showai-checkbox`, `showai-radio`, `showai-range` or `showai-button` for standard controls. The desktop, reader and embedded components share these daisyUI styles. Change `src/design/controls.source.css` and run `npm run controls:generate` to update them. Compact selects can set `--select-arrow-inset` and `--select-arrow-size`.
 
+Use the shared `Dialog` for dismissible forms and confirmations. Keep the title short, center explanatory copy and use spacing before the actions. Settings actions use `useNotify()` for short-lived results and optional undo. Keep input errors with their field and offer details when recovery needs them.
+
 Copy the [independent UI acceptance template](examples/ui-acceptance/README.md) for a task-owned preview with numbered controls, an action list and a flow tree that opens working states. For reusable ShowAI workbench scenarios, see [UI Lab](docs/ui-lab.md).
 
 Run the tests of the area you changed:

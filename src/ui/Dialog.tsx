@@ -1,6 +1,5 @@
 import { topDialog } from "./modal";
 import { useEffect, useId, useRef, type ReactNode } from "react";
-import { X } from "./icons";
 import { useTranslator } from "../i18n/react";
 import studioMessages from "../i18n/messages/studio";
 import "./dialog.css";
@@ -11,7 +10,7 @@ export default function Dialog({
   onClose,
   wide = false,
   className = "",
-  icon: Icon,
+  showTitle = true,
   tone,
   description,
   titleAccessory,
@@ -26,7 +25,7 @@ export default function Dialog({
   onClose: () => void;
   wide?: boolean;
   className?: string;
-  icon?: typeof X;
+  showTitle?: boolean;
   tone?: "caution" | "positive" | "danger";
   description?: string;
   titleAccessory?: ReactNode;
@@ -39,6 +38,7 @@ export default function Dialog({
   const t = useTranslator(studioMessages);
   const descriptionId = useId();
   const panel = useRef<HTMLDivElement>(null);
+  const startedOutside = useRef(false);
   const close = useRef(onClose);
   close.current = dismissible ? onClose : () => {};
   useEffect(() => {
@@ -56,13 +56,14 @@ export default function Dialog({
         panel.current)
     )?.focus();
     const handle = (event: KeyboardEvent) => {
-      if (panel.current !== topDialog()) return;
+      if (event.defaultPrevented || panel.current !== topDialog()) return;
       if (event.key === "Escape") {
         if (
           panel.current?.contains(document.fullscreenElement) ||
           document.querySelector('[role="menu"]')
         )
           return;
+        event.preventDefault();
         close.current();
       }
       if (event.key === "Tab") {
@@ -104,22 +105,21 @@ export default function Dialog({
       });
     };
   }, []);
-  const closeButton = dismissible && (
-    <button
-      type="button"
-      className="studio-icon studio-dialog-close"
-      aria-label={t("closeDialog")}
-      data-no-tooltip
-      onClick={onClose}
-    >
-      <X size={16} aria-hidden="true" />
-    </button>
-  );
   return (
     <div
       className="studio-modal-shade"
-      onMouseDown={(event) => {
-        if (dismissible && event.target === event.currentTarget) onClose();
+      onPointerDown={(event) => {
+        startedOutside.current =
+          event.target === event.currentTarget && event.button === 0;
+      }}
+      onPointerCancel={() => {
+        startedOutside.current = false;
+      }}
+      onClick={(event) => {
+        const outside =
+          startedOutside.current && event.target === event.currentTarget;
+        startedOutside.current = false;
+        if (outside && dismissible && panel.current === topDialog()) onClose();
       }}
     >
       <div
@@ -132,36 +132,41 @@ export default function Dialog({
         tabIndex={-1}
         className={`studio-modal ${wide ? "wide" : ""} ${className}`}
       >
-        <header className="studio-dialog-header">
-          {Icon || titleAccessory ? (
-            <div className="studio-modal-title">
-              {Icon && (
-                <span className="studio-dialog-mark" aria-hidden="true">
-                  <Icon size={20} strokeWidth={1.7} />
-                </span>
-              )}
-              <h2 title={title}>{title}</h2>
-              {titleAccessory}
-            </div>
-          ) : (
-            <h2 title={title}>{title}</h2>
-          )}
-          {headerContent}
-          {headerActions ? (
-            <div className="studio-modal-header-actions">
-              {headerActions}
-              {closeButton}
-            </div>
-          ) : (
-            closeButton
-          )}
-        </header>
+        {(showTitle || headerContent || headerActions || titleAccessory) && (
+          <header
+            className="studio-dialog-header"
+            data-toolbar={
+              headerContent || headerActions || titleAccessory ? "" : undefined
+            }
+          >
+            {showTitle && (
+              <div className="studio-modal-title">
+                <h2 title={title}>{title}</h2>
+                {titleAccessory}
+              </div>
+            )}
+            {headerContent}
+            {headerActions && (
+              <div className="studio-modal-header-actions">{headerActions}</div>
+            )}
+          </header>
+        )}
         {description && (
           <p className="studio-dialog-description" id={descriptionId}>
             {description}
           </p>
         )}
         {children}
+        {dismissible && (
+          <button
+            type="button"
+            className="studio-dialog-dismiss"
+            data-review-ignore
+            onClick={onClose}
+          >
+            {t("closeDialog")}
+          </button>
+        )}
       </div>
     </div>
   );

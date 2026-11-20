@@ -1,3 +1,4 @@
+import { useNotify } from "../problems/toast-context";
 import { useEffect, useId, useState } from "react";
 import { Copy, Folder } from "../ui/icons";
 import { desktop, errorMessage } from "../host/bridge";
@@ -8,7 +9,7 @@ import type { WorkRecordsLocation } from "../core/work-records";
 export default function WorkRecordsSettings() {
   const t = useTranslator(messages);
   const errorId = useId();
-  const [notice, setNotice] = useState("");
+  const notify = useNotify();
   const [busy, setBusy] = useState(false);
   const [invalid, setInvalid] = useState(false);
   const [location, setLocation] = useState<WorkRecordsLocation | null>(null);
@@ -22,7 +23,7 @@ export default function WorkRecordsSettings() {
   async function save(directory: string | null) {
     if (busy) return;
     setError("");
-    setNotice("");
+
     setInvalid(
       directory !== null && !/^(?:[/\\]|[A-Za-z]:[/\\])/.test(directory),
     );
@@ -38,7 +39,7 @@ export default function WorkRecordsSettings() {
         }),
       );
       setDraft(null);
-      setNotice(t("recordsLocationSaved"));
+      notify(t("recordsLocationSaved"));
     } catch (reason) {
       setError(errorMessage(reason));
     } finally {
@@ -78,7 +79,7 @@ export default function WorkRecordsSettings() {
                 void desktop
                   .invoke("clipboard:write", { text: location.directory })
                   .then(
-                    () => setNotice(t("directoryCopied")),
+                    () => notify(t("directoryCopied")),
                     (reason) => setError(errorMessage(reason)),
                   )
               }
@@ -102,7 +103,7 @@ export default function WorkRecordsSettings() {
             disabled={!location || pinned || busy}
             onClick={() => {
               setDraft(location?.directory ?? "");
-              setNotice("");
+
               setError("");
             }}
           >
@@ -174,11 +175,6 @@ export default function WorkRecordsSettings() {
         </form>
       )}
       {pinned && <p className="settings-help">{t("workRecordsPinned")}</p>}
-      {notice && (
-        <p role="status" className="settings-help">
-          {notice}
-        </p>
-      )}
       {error && (
         <p id={errorId} className="studio-form-error" role="alert">
           {error}

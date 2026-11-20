@@ -169,9 +169,9 @@
 }
 .feedback-input {
   width: 100%;
-  padding: 9px 11px;
+  padding: 4px var(--field-pad);
   border: 1px solid var(--line);
-  border-radius: 8px;
+  border-radius: var(--field-radius);
   background: var(--surface);
   color: var(--text);
   font: inherit;

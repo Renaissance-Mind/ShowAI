@@ -221,7 +221,7 @@
 }
 .studio-toast-stack {
   position: fixed;
-  bottom: 18px;
+  bottom: max(18px, env(safe-area-inset-bottom));
   left: 50%;
   transform: translateX(-50%);
   z-index: 250;
@@ -231,6 +231,16 @@
   gap: 8px;
   max-width: min(560px, calc(100vw - 32px));
 }
+.studio-toast-stack {
+  pointer-events: none;
+}
+.studio-toast-stack .studio-toast:has(button) {
+  pointer-events: auto;
+}
+.studio-toast-message {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
 .studio-toast-stack .studio-toast {
   position: static;
   transform: none;
@@ -238,8 +248,8 @@
   background: var(--paper);
   color: var(--text);
   border: 1px solid var(--line);
-  border-radius: 12px;
-  padding: 10px 16px;
+  border-radius: 8px;
+  padding: 7px 12px;
 }
 .studio-toast-icon {
   display: flex;

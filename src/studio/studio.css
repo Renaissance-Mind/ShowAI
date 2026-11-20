@@ -932,7 +932,7 @@ button.studio-tree-chevron:hover {
   border: 1px solid var(--line);
   background: var(--paper);
   border-radius: 5px;
-  padding: 7px 9px;
+  padding: 4px var(--field-pad);
   color: var(--text);
   width: 100%;
   font-size: 14px;
@@ -1013,7 +1013,6 @@ button.studio-tree-chevron:hover {
 .studio-template-edit > footer,
 .studio-component-detail > footer {
   margin-top: 16px;
-  border-top: 1px solid var(--line);
   padding-top: 12px;
 }
 .studio-template-edit > footer > span,

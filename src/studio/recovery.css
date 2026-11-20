@@ -403,7 +403,6 @@
 .history-external-dialog > .history-footer {
   flex-shrink: 0;
   flex-wrap: wrap;
-  border-top: 1px solid var(--line);
   padding: 18px 22px;
 }
 .history-footer {

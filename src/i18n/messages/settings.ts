@@ -37,7 +37,7 @@ export default defineMessages("settings", {
     workRecords: "制作记录",
     workRecordsLocation: "存放位置",
     workRecordsDetail:
-      "Agent 制作页面时，读者简报、材料、规划与评审记录保存在这里，只留在这台设备上。默认位置是系统临时目录，系统可能定期清理。",
+      "制作记录仅保存在本机。系统可能清理默认的临时目录。",
     changeWorkRecords: "更改记录位置",
     resetWorkRecords: "恢复默认",
     saveWorkRecords: "保存",
@@ -100,7 +100,7 @@ export default defineMessages("settings", {
     workRecords: "Work records",
     workRecordsLocation: "Location",
     workRecordsDetail:
-      "When an Agent makes a page, its reader brief, material, plan and review records are kept here, on this device only. By default this is the system temporary directory, which the system may clean up.",
+      "Work records stay on this device. The system may clear the default temporary folder.",
     changeWorkRecords: "Change records location",
     resetWorkRecords: "Use default",
     saveWorkRecords: "Save",

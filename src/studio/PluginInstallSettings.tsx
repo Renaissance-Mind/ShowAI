@@ -1,3 +1,4 @@
+import { useNotify } from "../problems/toast-context";
 import { useEffect, useState } from "react";
 import type {
   DshPendingSteps,
@@ -37,7 +38,7 @@ import "./agent-settings.css";
 
 function DshSteps({ steps }: { steps: DshPendingSteps }) {
   const t = useTranslator(messages);
-  const [copied, setCopied] = useState(false);
+  const notify = useNotify();
   const items = [
     steps.profileMissing && t("dshOpenOnce"),
     steps.otherSource && `${t("dshRemoveOther")} ${steps.otherSource}`,
@@ -63,10 +64,17 @@ function DshSteps({ steps }: { steps: DshPendingSteps }) {
           onClick={() =>
             void desktop
               .invoke("clipboard:write", { text: steps.bundlePath })
-              .then(() => setCopied(true))
+              .then(
+                () => notify(t("copied")),
+                (reason) =>
+                  notify(errorMessage(reason), {
+                    kind: "warning",
+                    duration: 8000,
+                  }),
+              )
           }
         >
-          {copied ? t("copied") : t("copyPath")}
+          {t("copyPath")}
         </button>
       </div>
     </div>
@@ -203,7 +211,7 @@ function useFailureReason() {
 
 function VerifyPrompt({ label }: { label: string }) {
   const t = useTranslator(onboardingMessages);
-  const [copied, setCopied] = useState(false);
+  const notify = useNotify();
   const [error, setError] = useState("");
   return (
     <div className="plugin-verify-prompt">
@@ -215,12 +223,12 @@ function VerifyPrompt({ label }: { label: string }) {
           onClick={() =>
             void desktop
               .invoke("clipboard:write", { text: t("verify.prompt") })
-              .then(() => setCopied(true))
+              .then(() => notify(t("verify.copied")))
               .catch((reason) => setError(errorMessage(reason)))
           }
         >
           <Copy size={14} aria-hidden="true" />
-          {copied ? t("verify.copied") : t("verify.copy")}
+          {t("verify.copy")}
         </button>
       </div>
       <a href={AGENT_TROUBLESHOOTING} target="_blank" rel="noreferrer">
@@ -248,6 +256,7 @@ export function VerifyConnection({
   const t = useTranslator(onboardingMessages);
   const { states, error } = useVerifyStates(hosts);
   const reason = useFailureReason();
+  const notify = useNotify();
   const [repaired, setRepaired] = useState<PluginHost[]>([]);
   return (
     <div className="settings-row plugin-verify">
@@ -281,8 +290,14 @@ export function VerifyConnection({
                       disabled={busy}
                       onClick={() =>
                         void onRepair(host.host, state.code).then((done) => {
-                          if (done)
-                            setRepaired((items) => [...items, host.host]);
+                          if (done) {
+                            notify(t("verify.repaired"));
+                            setRepaired((items) =>
+                              items.includes(host.host)
+                                ? items
+                                : [...items, host.host],
+                            );
+                          }
                         })
                       }
                     >
@@ -304,12 +319,7 @@ export function VerifyConnection({
             );
           })}
         </ul>
-        {repaired.length > 0 && (
-          <div role="status" className="plugin-install-result">
-            <p>{t("verify.repaired")}</p>
-            <RestartHints hosts={repaired} />
-          </div>
-        )}
+        {repaired.length > 0 && <RestartHints hosts={repaired} />}
         {error && (
           <p role="alert" className="plugin-install-error">
             {error}

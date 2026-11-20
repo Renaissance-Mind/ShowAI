@@ -1,3 +1,4 @@
+import { useNotify } from "../problems/toast-context";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   Bot,
@@ -132,9 +133,9 @@ export default function AgentSettings({
         ? t("preset.custom")
         : fallback;
   const [status, setStatus] = useState<AgentHostStatus | null>(null);
+  const notify = useNotify();
   const [busy, setBusy] = useState(false),
-    [error, setError] = useState(""),
-    [notice, setNotice] = useState("");
+    [error, setError] = useState("");
   const [adding, setAdding] = useSessionDraft("agent-settings.adding", false);
   const [editing, setEditing] = useSessionDraft<ModelSource | null>(
       "agent-settings.source",
@@ -239,7 +240,7 @@ export default function AgentSettings({
   const action = (work: () => Promise<void>) => async () => {
     setBusy(true);
     setError("");
-    setNotice("");
+
     try {
       await work();
     } catch (error) {
@@ -309,7 +310,7 @@ export default function AgentSettings({
     setModels([]);
     update(next);
     setEditing(null);
-    setNotice(t("toast.sourceSaved"));
+    notify(t("toast.sourceSaved"));
   };
   const test = async (localAgent?: string) => {
     const task = await desktop.invoke<AgentTask>("agent:start", {
@@ -335,7 +336,6 @@ export default function AgentSettings({
       setKey("");
       setModels([]);
       setTaskId("");
-      setNotice("");
     }
     latestStatus.current = null;
     settingsRef.current = null;
@@ -969,7 +969,7 @@ export default function AgentSettings({
                             id: editing.id,
                           }),
                         );
-                        setNotice(t("toast.modelsLoaded"));
+                        notify(t("toast.modelsLoaded"));
                       })}
                     >
                       {t("fetchModels")}
@@ -1171,11 +1171,6 @@ export default function AgentSettings({
       {error && (
         <p className="agent-error agent-feedback" role="alert">
           {error}
-        </p>
-      )}
-      {notice && (
-        <p className="agent-feedback" role="status">
-          {notice}
         </p>
       )}
     </div>

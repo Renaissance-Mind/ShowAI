@@ -143,9 +143,7 @@ try {
     await markdownDialog.locator(".sb-text blockquote strong").innerText(),
     "关键结论",
   );
-  await markdownDialog
-    .getByRole("button", { name: "关闭弹窗", exact: true })
-    .click();
+  await markdownDialog.press("Escape");
   const nav = page.getByRole("navigation", { name: "组件类型" });
   for (const label of ["页面与白板", "图片", "表格", "数据", "流程", "其他"]) {
     await nav.getByRole("button", { name: label, exact: true }).click();
@@ -203,9 +201,7 @@ try {
       ),
       animations: "disabled",
     });
-    await nativeDialog
-      .getByRole("button", { name: "关闭弹窗", exact: true })
-      .click();
+    await nativeDialog.press("Escape");
   }
   const preview = await api("components:thumbnail", {
     id: "text",
@@ -284,7 +280,7 @@ try {
     path: join(output, "markdown-dark.png"),
     animations: "disabled",
   });
-  await page.getByRole("button", { name: "关闭弹窗", exact: true }).click();
+  await page.keyboard.press("Escape");
   await page
     .locator(".studio-component-card")
     .filter({
@@ -324,7 +320,7 @@ try {
     2,
     "all-project editing saves back into owner B",
   );
-  await page.getByRole("button", { name: "关闭弹窗", exact: true }).click();
+  await page.keyboard.press("Escape");
   await page.getByLabel("目录项目", { exact: true }).selectOption(a.id);
   await page.waitForFunction(
     (expected) =>
@@ -343,7 +339,7 @@ try {
     await dialog.getByLabel("组件说明", { exact: true }).inputValue(),
     ca.description,
   );
-  await page.getByRole("button", { name: "关闭弹窗", exact: true }).click();
+  await page.keyboard.press("Escape");
   await page.getByLabel("目录项目", { exact: true }).selectOption("all");
   await page.waitForFunction(
     () => document.querySelectorAll(".studio-component-card").length === 3,

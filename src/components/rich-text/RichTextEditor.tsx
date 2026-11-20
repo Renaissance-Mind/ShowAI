@@ -101,7 +101,6 @@ import {
   ListOrdered,
   ArrowRight,
   MessageSquareQuote,
-  MessageSquareText,
   Minus,
   PanelTop,
   Plus,
@@ -2532,15 +2531,6 @@ export default function RichTextEditor({
               }}
             >
               <div className="editor-modal-heading">
-                <div className="editor-modal-symbol">
-                  {dialog.type === "image" ? (
-                    <ImagePlus size={21} />
-                  ) : dialog.type === "note" ? (
-                    <MessageSquareText size={21} />
-                  ) : (
-                    <Link2 size={21} />
-                  )}
-                </div>
                 <h3 id="editor-dialog-title">
                   {dialog.type === "image"
                     ? t("insert.image")
@@ -2550,14 +2540,6 @@ export default function RichTextEditor({
                         )
                       : t("dialog.addLink")}
                 </h3>
-                <button
-                  type="button"
-                  aria-label={t("dialog.close")}
-                  data-no-tooltip
-                  onClick={() => setDialog(null)}
-                >
-                  <X size={18} />
-                </button>
               </div>
               {dialog.type === "image" && (
                 <div className="image-source-choices">

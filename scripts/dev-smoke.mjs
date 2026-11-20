@@ -474,9 +474,7 @@ try {
     await componentDialog.getByLabel("组件源码", { exact: true }).count(),
     0,
   );
-  await componentDialog
-    .getByRole("button", { name: "关闭弹窗", exact: true })
-    .click();
+  await componentDialog.press("Escape");
   const packages = await page.evaluate(
     (projectId) =>
       window.showai.invoke("components:list", { projectId, scope: "project" }),

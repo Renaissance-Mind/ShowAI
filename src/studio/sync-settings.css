@@ -9,10 +9,10 @@
 }
 .sync-settings input:not([type="radio"], [type="checkbox"]),
 .sync-settings select {
-  min-height: 34px;
-  padding: 7px 10px;
+  min-height: var(--field-height);
+  padding: 4px var(--field-pad);
   border: 1px solid var(--line);
-  border-radius: 7px;
+  border-radius: var(--field-radius);
   background: var(--paper);
   color: var(--text);
   font: inherit;
@@ -53,36 +53,6 @@
 }
 .sync-settings .settings-button > svg {
   flex-shrink: 0;
-}
-.sync-feedback {
-  position: sticky;
-  bottom: 16px;
-  z-index: 5;
-  width: min(560px, 100%);
-  margin: 0 auto;
-  animation: studio-enter var(--duration-fast) var(--ease-out);
-  display: flex;
-  align-items: flex-start;
-  gap: 10px;
-  padding: 10px 10px 10px 14px;
-  border: 1px solid var(--line);
-  border-left: 3px solid var(--brand-accent, var(--accent));
-  border-radius: 8px;
-  background: var(--paper);
-  box-shadow: var(--shadow);
-}
-.sync-feedback.is-error {
-  border-left-color: var(--danger);
-}
-.sync-feedback p {
-  flex: 1;
-  margin: 3px 0;
-  font-size: 13px;
-  line-height: 1.6;
-  overflow-wrap: anywhere;
-}
-.sync-feedback.is-error p {
-  color: var(--danger);
 }
 .sync-section {
   margin-bottom: 30px !important;
@@ -162,10 +132,6 @@
   color: var(--danger) !important;
   font-size: 12px;
   line-height: 1.6;
-}
-.sync-message {
-  color: var(--brand-accent, var(--accent));
-  font-size: 12px;
 }
 .sync-badge {
   display: inline-block;
@@ -658,7 +624,7 @@
 .sync-dialog .settings-button,
 .sync-dialog input:not([type="radio"], [type="checkbox"]),
 .sync-dialog select {
-  min-height: 38px;
+  min-height: var(--field-height);
   font-size: 13px;
 }
 .sync-dialog
@@ -688,13 +654,12 @@
   cursor: not-allowed;
 }
 .sync-dialog .sync-error,
-.sync-dialog .sync-message,
 .sync-dialog .settings-help {
   font-size: 13px;
 }
 .studio-modal.sync-dashboard-dialog {
   width: min(900px, 100%);
-  height: min(690px, 100%);
+  max-height: min(690px, 100%);
 }
 .sync-dashboard-body {
   padding: 0;
@@ -703,7 +668,7 @@
   flex-direction: column;
   flex: 1;
 }
-.sync-dashboard-body > :is(.sync-error, .sync-message, .settings-help) {
+.sync-dashboard-body > :is(.sync-error, .settings-help) {
   margin: 0;
   padding: 10px 24px;
   border-bottom: 1px solid var(--line);
@@ -1660,16 +1625,6 @@
   font-size: 12px;
   white-space: nowrap;
 }
-.sync-manager-notice {
-  display: flex;
-  align-items: center;
-  gap: 20px;
-  border-left: 2px solid var(--brand-accent, var(--accent));
-  padding: 8px 12px;
-  margin-top: 20px;
-  font-size: 13px;
-  color: var(--muted);
-}
 .sync-text-button {
   border: 0;
   background: none;
@@ -1954,4 +1909,12 @@
 }
 .sync-manager-filters {
   flex-wrap: wrap;
+}
+
+.sync-load-failure {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 10px;
+  padding-block: 16px;
 }

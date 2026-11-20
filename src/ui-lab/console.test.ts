@@ -90,6 +90,42 @@ test("the feature selector and its direct link open the interactive workbench mo
   }
 }, 90000);
 
+test("simple dialogs dismiss on the backdrop and return keyboard focus", async () => {
+  const review = await context.newPage();
+  try {
+    await review.goto(server.url + "?feature=workbench");
+    const app = review.frameLocator("iframe");
+    await app.locator('html[data-ui-lab-node="project"]').waitFor();
+    const opener = app
+      .locator('[data-project-section="projects"]')
+      .getByRole("button", { name: "新建项目", exact: true });
+    const dialog = app.getByRole("dialog", { name: "新项目", exact: true });
+    await opener.click();
+    await dialog.waitFor();
+    expect(await dialog.locator("header button, header svg").count()).toBe(0);
+    const field = dialog.getByRole("textbox", {
+      name: "项目名称",
+      exact: true,
+    });
+    await field.fill("草稿");
+    await app
+      .locator(".studio-modal-shade")
+      .click({ position: { x: 4, y: 4 } });
+    await dialog.waitFor({ state: "detached" });
+    expect(await opener.evaluate((el) => el === document.activeElement)).toBe(
+      true,
+    );
+    await opener.click();
+    await field.press("Escape");
+    await dialog.waitFor({ state: "detached" });
+    expect(await opener.evaluate((el) => el === document.activeElement)).toBe(
+      true,
+    );
+  } finally {
+    await review.close();
+  }
+}, 60000);
+
 async function state(id: string) {
   await expect
     .poll(() => frame().locator("html").getAttribute("data-ui-lab-node"), {

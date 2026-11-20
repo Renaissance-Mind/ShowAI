@@ -2,6 +2,7 @@ import { defineMessages } from "../index";
 
 export default defineMessages("sync", {
   "zh-CN": {
+    operationFailed: "操作未完成",
     "newConflictVersion": "同步状态有变化，请加载最新版本后重新确认。",
     "reloadConflict": "加载最新版本",
     "role.admin": "管理员",
@@ -311,6 +312,7 @@ export default defineMessages("sync", {
     "methods.remove": "移除",
   },
   en: {
+    operationFailed: "Action could not be completed",
     "newConflictVersion": "Sync state changed. Load the latest versions and review your choices.",
     "reloadConflict": "Load latest versions",
     "role.admin": "Admin",

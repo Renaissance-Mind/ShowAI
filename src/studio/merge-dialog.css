@@ -342,7 +342,6 @@
 }
 .conflict-footer {
   flex: none;
-  border-top: 1px solid var(--line);
   display: flex;
   justify-content: space-between;
   align-items: center;

@@ -1,3 +1,4 @@
+import { useNotify } from "../problems/toast-context";
 import { useSessionDraft } from "./session-draft";
 import { useEffect, useRef, useState } from "react";
 import {
@@ -10,7 +11,6 @@ import {
   Eye,
   EyeOff,
   FolderOpen,
-  FolderPlus,
   HardDrive,
   Link2,
   Loader2,
@@ -21,7 +21,6 @@ import {
   Search,
   Settings2,
   Share2,
-  User,
   X,
 } from "../ui/icons";
 import { useTranslator } from "../i18n/react";
@@ -92,8 +91,8 @@ export default function ProjectManager({
   const [query, setQuery] = useSessionDraft("project-manager.query", ""),
     [archived, setArchived] = useState(false),
     [pending, setPending] = useState<Set<string>>(new Set()),
-    [errors, setErrors] = useState<Record<string, string>>({}),
-    [notice, setNotice] = useState("");
+    [errors, setErrors] = useState<Record<string, string>>({});
+  const notify = useNotify();
   const [menu, setMenu] = useState<{
       row: ManagedProject;
       anchor: HTMLElement;
@@ -104,10 +103,7 @@ export default function ProjectManager({
     } | null>(null);
   const [name, setName] = useState(""),
     [loginInCreate, setLoginInCreate] = useState(false),
-    [location, setLocation] = useState(status.defaultConnectionId ?? ""),
-    [undo, setUndo] = useState<{ projectId: string; enabled: boolean } | null>(
-      null,
-    );
+    [location, setLocation] = useState(status.defaultConnectionId ?? "");
   const downloadIds = useRef(new Map<string, string>()),
     creationId = useRef(crypto.randomUUID()),
     cancelled = useRef(new Set<string>()),
@@ -181,7 +177,6 @@ export default function ProjectManager({
   async function act(key: string, operation: () => Promise<void>) {
     setPending((current) => new Set(current).add(key));
     setErrors((current) => ({ ...current, [key]: "" }));
-    setNotice("");
     try {
       await operation();
       if (mounted.current) await onRefresh();
@@ -202,7 +197,6 @@ export default function ProjectManager({
   async function download(row: ManagedProject) {
     if (!row.connection || !row.remote?.head) return;
     cancelled.current.delete(row.key);
-    setUndo(null);
     const requestId = crypto.randomUUID();
     downloadIds.current.set(row.key, requestId);
     await act(row.key, async () => {
@@ -225,7 +219,7 @@ export default function ProjectManager({
       );
       if (!scan.projects.some((item) => item.id === binding?.projectId))
         throw new Error(f("projects.downloadIncomplete"));
-      setNotice(f("projects.downloaded", { name: row.name }));
+      notify(f("projects.downloaded", { name: row.name }));
     });
     if (downloadIds.current.get(row.key) === requestId)
       downloadIds.current.delete(row.key);
@@ -244,7 +238,7 @@ export default function ProjectManager({
               item.connectionId === row.connection?.id,
           )?.requestId,
       });
-      setNotice(f("projects.downloadCancelled", { name: row.name }));
+      notify(f("projects.downloadCancelled", { name: row.name }));
     });
   }
   async function enable(row: ManagedProject, enabled: boolean) {
@@ -254,11 +248,31 @@ export default function ProjectManager({
         projectId: row.local!.id,
         enabled,
       });
-      setUndo({ projectId: row.local!.id, enabled: !enabled });
-      setNotice(
+      const projectId = row.local!.id;
+      notify(
         f(enabled ? "projects.syncEnabled" : "projects.syncStopped", {
           name: row.name,
         }),
+        {
+          duration: 10000,
+          action: {
+            label: f("projects.undo"),
+            onSelect: () => {
+              void desktop
+                .invoke("sync:setEnabled", { projectId, enabled: !enabled })
+                .then(async () => {
+                  if (mounted.current) await onRefresh();
+                  notify(f("projects.undone"));
+                })
+                .catch((reason) =>
+                  notify(errorMessage(reason), {
+                    kind: "warning",
+                    duration: 8000,
+                  }),
+                );
+            },
+          },
+        },
       );
     });
     if (success) setDialog(null);
@@ -597,32 +611,6 @@ export default function ProjectManager({
           )}
         </div>
       )}
-      {notice && (
-        <div className="sync-manager-notice" role="status">
-          <span>{notice}</span>
-          {undo && (
-            <button
-              type="button"
-              className="sync-text-button"
-              onClick={() => {
-                const saved = undo;
-                setUndo(null);
-                void act("undo", async () => {
-                  await desktop.invoke("sync:setEnabled", saved);
-                  setNotice(f("projects.undone"));
-                });
-              }}
-            >
-              {f("projects.undo")}
-            </button>
-          )}
-        </div>
-      )}
-      {errors.undo && (
-        <p className="sync-error" role="alert">
-          {errors.undo}
-        </p>
-      )}
       {menu && (
         <LibraryContextMenu
           anchor={menu.anchor}
@@ -715,14 +703,7 @@ export default function ProjectManager({
       )}
       {dialog && (
         <Dialog
-          icon={
-            {
-              create: loginInCreate ? User : FolderPlus,
-              rename: Pencil,
-              pause: CloudOff,
-              archive: dialog.row?.archived ? ArchiveRestore : Archive,
-            }[dialog.kind]
-          }
+          showTitle={dialog.kind !== "archive" && dialog.kind !== "rename"}
           tone={
             dialog.kind === "pause"
               ? "caution"
@@ -739,7 +720,7 @@ export default function ProjectManager({
                   { name: dialog.row!.name },
                 )
               : dialog.kind === "pause"
-                ? f("projects.pendingChanges")
+                ? f("projects.stopKeepsLocal")
                 : undefined
           }
           title={
@@ -877,7 +858,6 @@ export default function ProjectManager({
               </form>
             ) : dialog.kind === "pause" ? (
               <>
-                <p className="settings-help">{f("projects.stopKeepsLocal")}</p>
                 <div className="studio-dialog-actions">
                   <button
                     className="sync-text-button"

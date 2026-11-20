@@ -9,7 +9,7 @@
   background: var(--dialog-scrim, rgb(32 34 47 / 27%));
 }
 .studio-modal {
-  --dialog-pad: clamp(18px, 3vw, 26px);
+  --dialog-pad: clamp(14px, 2.5vw, 20px);
   --dialog-ink: var(--dialog-accent, var(--accent));
   --dialog-rule: color-mix(in srgb, var(--text) 12%, var(--paper));
   --dialog-fill: color-mix(in srgb, var(--text) 3%, var(--paper));
@@ -21,7 +21,7 @@
   position: relative;
   display: flex;
   flex-direction: column;
-  width: min(448px, 100%);
+  width: min(384px, 100%);
   min-width: 0;
   max-width: 100%;
   max-height: 100%;
@@ -29,7 +29,7 @@
   color: var(--text);
   background: var(--paper);
   border: 1px solid var(--dialog-rule);
-  border-radius: var(--dialog-radius, 16px);
+  border-radius: var(--dialog-radius, 12px);
   box-shadow: var(--shadow-dialog);
 }
 .studio-modal:focus {
@@ -52,59 +52,55 @@
   display: flex;
   flex: none;
   align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 21px var(--dialog-pad) 15px;
+  justify-content: center;
+  gap: 8px;
+  padding: 15px var(--dialog-pad) 8px;
 }
-.studio-modal.wide > :where(.studio-dialog-header) {
-  border-bottom: 1px solid var(--dialog-rule);
+.studio-dialog-header[data-toolbar] {
+  justify-content: space-between;
 }
 .studio-modal-title {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 8px;
   min-width: 0;
 }
 .studio-dialog-header h2 {
   display: -webkit-box;
-  -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
   overflow: hidden;
-  min-width: 0;
   margin: 0;
-  font-size: 20px;
-  font-weight: 650;
-  line-height: 1.3;
-  letter-spacing: -0.025em;
+  min-width: 0;
   overflow-wrap: anywhere;
+  font-size: 16px;
+  font-weight: 620;
+  line-height: 1.35;
+  text-align: center;
 }
-.studio-dialog-mark {
-  display: grid;
-  flex: none;
-  width: 38px;
-  height: 38px;
-  place-items: center;
-  border-radius: 11px;
-  background: color-mix(in srgb, var(--dialog-ink) 9%, var(--paper));
-  color: var(--dialog-ink);
+.studio-dialog-header[data-toolbar] h2 {
+  text-align: start;
 }
-.studio-modal .studio-dialog-close {
-  display: inline-grid;
-  flex: none;
-  place-items: center;
-  width: 32px;
-  height: 32px;
-  min-width: 32px;
-  min-height: 32px;
+.studio-dialog-dismiss {
+  position: absolute;
+  inset-inline-start: 50%;
+  inset-block-end: 6px;
+  transform: translateX(-50%);
+}
+.studio-dialog-dismiss:not(:focus-visible) {
+  width: 1px;
+  height: 1px;
   padding: 0;
-  color: var(--muted);
-  background: var(--dialog-fill);
   border: 0;
-  border-radius: 50%;
+  overflow: hidden;
+  clip-path: inset(50%);
 }
-.studio-modal .studio-dialog-close:hover {
+.studio-dialog-dismiss:focus-visible {
+  padding: 3px 10px;
+  background: var(--paper);
   color: var(--text);
-  background: var(--hover);
+  border: 1px solid var(--line);
+  border-radius: 5px;
 }
 .studio-dialog-description {
   flex: 0 1 auto;
@@ -113,27 +109,44 @@
   overscroll-behavior: contain;
   margin: 0;
   padding: 0 var(--dialog-pad);
-  font-size: 14px;
-  line-height: 1.65;
+  color: var(--muted);
+  text-align: center;
+  text-wrap: pretty;
+  font-size: 13px;
+  line-height: 1.5;
   overflow-wrap: anywhere;
+}
+.studio-dialog-description:first-child {
+  padding-top: 18px;
+  color: var(--text);
+  font-size: 15px;
 }
 .studio-modal .studio-dialog-body,
 .studio-modal > .studio-form {
   min-height: 0;
   overflow-y: auto;
   overscroll-behavior: contain;
-  padding: 4px var(--dialog-pad) 20px;
+  padding: 5px var(--dialog-pad) 16px;
+}
+.studio-modal > .studio-form:first-child,
+.studio-modal > .studio-dialog-body:first-child {
+  padding-top: 16px;
+}
+.studio-modal .studio-delete-description,
+.studio-modal .studio-delete-description + .settings-help {
+  text-align: center;
+  margin: 0;
 }
 .studio-dialog-form {
   display: grid;
-  gap: 16px;
+  gap: 11px;
 }
 .studio-dialog-description + .studio-form {
-  padding-top: 16px;
+  padding-top: 10px;
 }
 .studio-modal :is(.studio-dialog-form, .studio-form) > label {
   display: grid;
-  gap: 7px;
+  gap: 4px;
   color: var(--text);
   font-size: 13px;
   line-height: 1.45;
@@ -156,12 +169,12 @@
   width: 100%;
   min-width: 0;
   max-width: none;
-  min-height: 40px;
-  padding: 8px 11px;
+  min-height: var(--field-height, 32px);
+  padding: 4px var(--field-pad, 8px);
   color: var(--text);
   background-color: var(--paper);
   border: 1px solid color-mix(in srgb, var(--text) 22%, var(--paper));
-  border-radius: 8px;
+  border-radius: var(--field-radius, 5px);
   font-size: 14px;
   line-height: 1.45;
 }
@@ -178,20 +191,20 @@
   align-items: center;
   justify-content: flex-end;
   gap: 8px;
-  margin: 18px 0 0;
-  padding: 15px 0 0;
-  border-top: 1px solid var(--dialog-rule);
+  margin: 12px 0 0;
+  padding: 0;
+  border: 0;
 }
 .studio-modal .studio-dialog-form > .studio-dialog-actions,
 .studio-modal .studio-form > footer {
   margin-top: 0;
 }
 .studio-modal :is(.studio-dialog-actions, .studio-form > footer) > button {
-  min-height: 36px;
-  min-width: 64px;
-  padding: 7px 14px;
+  min-height: 31px;
+  min-width: 56px;
+  padding: 4px 11px;
   border: 1px solid var(--dialog-rule);
-  border-radius: 8px;
+  border-radius: var(--field-radius, 5px);
   background: var(--paper);
   color: var(--text);
   font-size: 13px;
@@ -240,10 +253,6 @@
   }
 }
 @media (pointer: coarse) {
-  .studio-modal .studio-dialog-close {
-    min-width: 44px;
-    min-height: 44px;
-  }
   .studio-modal :is(.studio-dialog-actions, .studio-form > footer) > button {
     min-height: 44px;
   }
@@ -252,9 +261,26 @@
   .studio-dialog-header {
     padding-block: 12px 10px;
   }
-  .studio-dialog-mark {
-    width: 32px;
-    height: 32px;
-    border-radius: 9px;
-  }
+}
+
+.studio-failure-details {
+  margin: 0;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+  text-align: center;
+  font-size: 13px;
+}
+
+.studio-modal :is(.settings-help, .history-merge-summary) {
+  text-align: center;
+}
+.studio-failure-diagnostics {
+  margin-block-start: 8px;
+  font-size: 12px;
+}
+.studio-failure-diagnostics pre {
+  max-height: 36dvh;
+  overflow: auto;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
 }

@@ -6,7 +6,7 @@ import {
   validatePageIcon,
 } from "../lib/page-icon.mjs";
 import Dialog from "../ui/Dialog";
-import { Shapes } from "../ui/icons";
+
 import { errorMessage } from "../host/bridge";
 import "./page-icon.css";
 import { translator } from "../i18n";
@@ -123,7 +123,7 @@ export default function PageIconDialog({
     }
   };
   return (
-    <Dialog title={title ?? t("icon.pageIcon")} icon={Shapes} onClose={onClose}>
+    <Dialog title={title ?? t("icon.pageIcon")} onClose={onClose}>
       <form
         className="page-icon-form studio-dialog-body studio-dialog-form"
         onSubmit={(event) => {

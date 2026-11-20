@@ -1,3 +1,4 @@
+import { useNotify } from "../problems/toast-context";
 import { useState } from "react";
 import { desktop, errorMessage } from "../host/bridge";
 import type { ResolvedResource } from "../sync/accounts";
@@ -17,14 +18,14 @@ export default function ServerResources({
   const t = useTranslator(strings);
   const [resources, setResources] = useState<ResolvedResource[] | null>(null),
     [servers, setServers] = useState<Omit<ServerConnection, "token">[]>([]);
+  const notify = useNotify();
   const [target, setTarget] = useState(""),
     [busy, setBusy] = useState(false),
-    [error, setError] = useState(""),
-    [message, setMessage] = useState("");
+    [error, setError] = useState("");
   async function run(action: () => Promise<unknown>) {
     setBusy(true);
     setError("");
-    setMessage("");
+
     try {
       await action();
     } catch (error) {
@@ -64,7 +65,7 @@ export default function ServerResources({
                 federation: { errors: Record<string, string> };
               }>("sync:status");
               if (Object.keys(refreshed.federation.errors).length)
-                setMessage(t("resources.partial"));
+                notify(t("resources.partial"));
             })
           }
         >
@@ -74,11 +75,6 @@ export default function ServerResources({
       {error && (
         <p className="sync-error" role="alert">
           {error}
-        </p>
-      )}
-      {message && (
-        <p className="sync-message" role="status">
-          {message}
         </p>
       )}
       {resources?.map((resource) => (
@@ -110,7 +106,7 @@ export default function ServerResources({
                     { id: resource.id },
                   ),
                 );
-                setMessage(t("resources.added"));
+                notify(t("resources.added"));
               })
             }
           >
@@ -162,7 +158,7 @@ export default function ServerResources({
                   }),
                 );
                 setResources(await desktop.invoke("agent:serverResources"));
-                setMessage(t("resources.saved"));
+                notify(t("resources.saved"));
               })
             }
           >

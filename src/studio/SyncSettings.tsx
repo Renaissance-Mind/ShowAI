@@ -1,18 +1,22 @@
+import { useNotify } from "../problems/toast-context";
 import { useSessionDraft } from "./session-draft";
 import { settingsTabKeyDown } from "./settings-tab-keys";
-import { useEffect, useMemo, useId, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useId,
+  useRef,
+  useState,
+} from "react";
 import {
   ChevronLeft,
   ChevronRight,
-  CloudUpload,
   Database,
   FolderOpen,
   Folder,
   Plus,
   RefreshCw,
-  Settings2,
-  Share2,
-  Workflow,
   X,
 } from "../ui/icons";
 import { desktop, errorMessage } from "../host/bridge";
@@ -91,8 +95,19 @@ export default function SyncSettings({
   const [status, setStatus] = useState<Status | null>(null),
     [localProjects, setLocalProjects] = useState<ProjectSummary[]>([]);
   const [busy, setBusy] = useState(false),
-    [error, setError] = useState(""),
-    [message, setMessage] = useState("");
+    [error, setError] = useState("");
+  const notify = useNotify();
+  const [loadFailure, setLoadFailure] = useState("");
+  const reportFailure = useCallback(
+    (detail: string) => {
+      notify(t("operationFailed"), {
+        kind: "warning",
+        duration: 8000,
+        details: detail,
+      });
+    },
+    [notify, t],
+  );
   const [loginInitial, setLoginInitial] = useState<{
     url: string;
     account?: string;
@@ -167,17 +182,30 @@ export default function SyncSettings({
     [],
   );
   useEffect(() => {
-    void refresh().catch((error) => setError(errorMessage(error)));
-    const timer = setInterval(() => {
-      void refresh().catch((error) => setError(errorMessage(error)));
-    }, 3000);
-    return () => clearInterval(timer);
-  }, [refresh]);
-  useEffect(() => {
-    if (!message) return;
-    const timer = setTimeout(() => setMessage(""), 6000);
-    return () => clearTimeout(timer);
-  }, [message]);
+    let active = true;
+    let previousFailure = "";
+    const poll = () =>
+      void refresh().then(
+        () => {
+          previousFailure = "";
+          if (active) setLoadFailure("");
+        },
+        (reason) => {
+          const detail = errorMessage(reason);
+          if (active && detail !== previousFailure) {
+            setLoadFailure(detail);
+            reportFailure(detail);
+          }
+          previousFailure = detail;
+        },
+      );
+    poll();
+    const timer = setInterval(poll, 3000);
+    return () => {
+      active = false;
+      clearInterval(timer);
+    };
+  }, [refresh, reportFailure]);
   useEffect(() => {
     const link = pendingInvite();
     if (!link) return;
@@ -240,7 +268,7 @@ export default function SyncSettings({
         );
       else {
         setExpanded(request.projectId);
-        setMessage(t("membersOnlyAdmins", { role: role(binding.role) }));
+        notify(t("membersOnlyAdmins", { role: role(binding.role) }));
       }
     } else if (binding) setExpanded(request.projectId);
     else {
@@ -294,13 +322,14 @@ export default function SyncSettings({
         : null;
     setBusy(true);
     setError("");
-    setMessage("");
     try {
       await action();
       await refresh();
       return true;
     } catch (error) {
-      setError(errorMessage(error));
+      const detail = errorMessage(error);
+      if (panel || showJoin) setError(detail);
+      else reportFailure(detail);
       return false;
     } finally {
       setBusy(false);
@@ -371,7 +400,7 @@ export default function SyncSettings({
     setPanel(null);
     setActiveView("projects");
     setProjectFilter(connectionId);
-    setMessage(
+    notify(
       f("projects.downloaded", {
         name:
           localProjects.find((item) => item.id === binding.projectId)?.name ??
@@ -411,7 +440,7 @@ export default function SyncSettings({
       return;
     }
     setActiveView("projects");
-    setMessage(f("connected"));
+    notify(f("connected"));
   }
   function openConnect(next: { url?: string; account?: string } = {}) {
     setLoginInitial({ url: next.url ?? defaultServer, account: next.account });
@@ -438,11 +467,31 @@ export default function SyncSettings({
   };
   if (!status)
     return (
-      <PendingNotice
-        label={t("readingConnections")}
-        lines={3}
-        minHeight={240}
-      />
+      <>
+        {loadFailure ? (
+          <section
+            aria-label={t("operationFailed")}
+            className="sync-load-failure"
+          >
+            <button
+              className="settings-button"
+              onClick={() =>
+                void refresh().catch((reason) =>
+                  reportFailure(errorMessage(reason)),
+                )
+              }
+            >
+              {tc("retry")}
+            </button>
+          </section>
+        ) : (
+          <PendingNotice
+            label={t("readingConnections")}
+            lines={3}
+            minHeight={240}
+          />
+        )}
+      </>
     );
   const projectsOn = (connectionId: string) =>
     status.projects.filter((item) => item.connectionId === connectionId).length;
@@ -591,7 +640,7 @@ export default function SyncSettings({
               busy={busy}
               syncedProjects={projectsOn(managedAccount.id)}
               run={run}
-              notify={setMessage}
+              notify={notify}
               onSignedOut={() =>
                 openConnect({
                   url: managedAccount.url,
@@ -822,6 +871,11 @@ export default function SyncSettings({
                     {t("viewInvite")}
                   </button>
                 </form>
+                {error && (
+                  <p className="sync-error" role="alert">
+                    {error}
+                  </p>
+                )}
                 {preview && (
                   <div className="sync-invitation">
                     <Folder size={18} aria-hidden="true" />
@@ -907,37 +961,11 @@ export default function SyncSettings({
           )}
         </section>
       )}
-      {(error || message) && !panel && (
-        <div
-          className={`sync-feedback ${error ? "is-error" : ""}`}
-          role={error ? "alert" : "status"}
-        >
-          <p>{error || message}</p>
-          <button
-            className="settings-icon-button"
-            aria-label={t("dismiss")}
-            onClick={() => {
-              setError("");
-              setMessage("");
-            }}
-          >
-            <X size={14} aria-hidden="true" />
-          </button>
-        </div>
-      )}
       {panel && (
         <Dialog
           key={panel}
           initialFocus={panel === "dashboard" ? "container" : "auto"}
           returnFocus={panelTrigger.current}
-          icon={
-            panel === "dashboard" ||
-            (panel === "upload" && uploadProject?.intent === "share")
-              ? Share2
-              : panel === "upload"
-                ? CloudUpload
-                : Workflow
-          }
           description={
             panel === "upload" && uploadProject
               ? f(
@@ -971,11 +999,6 @@ export default function SyncSettings({
                 {error}
               </p>
             )}
-            {message && (
-              <p className="sync-message" role="status">
-                {message}
-              </p>
-            )}
             {busy && (
               <p className="settings-help" role="status">
                 {t("processing")}
@@ -1006,7 +1029,7 @@ export default function SyncSettings({
                           );
                         } else {
                           setPanel(null);
-                          setMessage(
+                          notify(
                             t("toast.uploaded", {
                               name:
                                 localProjects.find(
@@ -1102,13 +1125,13 @@ export default function SyncSettings({
                       project.id,
                       dashboardFocused,
                     );
-                    setMessage(t("toast.projectCreated", { name }));
+                    notify(t("toast.projectCreated", { name }));
                   })
                 }
                 onRole={(member, next) => {
                   void run(async () => {
                     await manage("member", { userId: member.id, role: next });
-                    setMessage(
+                    notify(
                       t("toast.roleChanged", {
                         name: member.name,
                         role: role(next),
@@ -1123,7 +1146,7 @@ export default function SyncSettings({
                       role: null,
                       revokeInvites,
                     });
-                    setMessage(t("toast.memberRemoved", { name: member.name }));
+                    notify(t("toast.memberRemoved", { name: member.name }));
                   })
                 }
                 onInviteRole={setInviteRole}
@@ -1142,7 +1165,7 @@ export default function SyncSettings({
                     await desktop.invoke("clipboard:write", {
                       text: invitation.url,
                     });
-                    setMessage(t("toast.inviteCopied"));
+                    notify(t("toast.inviteCopied"));
                     setGeneratedInviteExpiresAt(invitation.expiresAt);
                     setGeneratedInvitePolicy(
                       invitation.targetName
@@ -1158,19 +1181,19 @@ export default function SyncSettings({
                     await desktop.invoke("clipboard:write", {
                       text: url || generatedInvite,
                     });
-                    setMessage(t("toast.inviteCopied"));
+                    notify(t("toast.inviteCopied"));
                   })
                 }
                 onRevoke={(digest) => {
                   void run(async () => {
                     await manage("revokeInvite", { digest });
-                    setMessage(t("toast.inviteRevoked"));
+                    notify(t("toast.inviteRevoked"));
                   });
                 }}
                 onArchive={(archived) =>
                   run(async () => {
                     await manage("project", { archived });
-                    setMessage(
+                    notify(
                       archived
                         ? t("toast.projectArchived")
                         : t("toast.projectRestored"),
@@ -1311,7 +1334,6 @@ export default function SyncSettings({
           return (
             <Dialog
               title={f("projects.details")}
-              icon={Settings2}
               onClose={() => setExpanded("")}
               className="sync-dialog"
             >
@@ -1385,9 +1407,7 @@ export default function SyncSettings({
                             });
                             setExpanded("");
                             setConfirmDetach("");
-                            setMessage(
-                              t("toast.detached", { name: project.name }),
-                            );
+                            notify(t("toast.detached", { name: project.name }));
                           })
                         }
                       >
@@ -1421,7 +1441,7 @@ export default function SyncSettings({
                 projectId: current.projectId,
                 packaging: decisions,
               });
-              setMessage(t("toast.packaging", { name: current.name }));
+              notify(t("toast.packaging", { name: current.name }));
             });
           }}
         />

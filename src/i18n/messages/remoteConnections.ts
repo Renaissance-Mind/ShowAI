@@ -1,6 +1,7 @@
 import { defineMessages } from "../index";
 export default defineMessages("remoteConnections", {
   "zh-CN": {
+    copyPath: "复制路径",
     setupPrompt: "复制接入提示词",
     sharedDevice: "设备授权",
     invitedLanClient: "一次性局域网邀请",
@@ -150,6 +151,7 @@ export default defineMessages("remoteConnections", {
     oauthEndpoints: "OAuth 端点",
   },
   en: {
+    copyPath: "Copy path",
     setupPrompt: "Copy setup prompt",
     sharedDevice: "Device approval",
     invitedLanClient: "Single-use LAN invitation",

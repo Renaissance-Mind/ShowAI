@@ -195,7 +195,7 @@
 }
 .settings-select select {
   min-height: 32px;
-  padding-block: 5px;
+  padding-block: 4px;
   background: var(--paper);
   font-size: 13px;
   line-height: 20px;
@@ -446,7 +446,7 @@
 .catalog-edit-form :is(input, textarea, select),
 .catalog-composition :is(input, select),
 .catalog-scope-controls select {
-  border-radius: 8px;
+  border-radius: var(--field-radius);
   padding: 12px 14px;
   font-size: 14px;
   line-height: 1.5;

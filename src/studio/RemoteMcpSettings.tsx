@@ -1,3 +1,5 @@
+import { useNotify } from "../problems/toast-context";
+import commonMessages from "../i18n/messages/common";
 import { useSessionDraft } from "./session-draft";
 import { settingsTabKeyDown } from "./settings-tab-keys";
 import { useEffect, useId, useRef, useState } from "react";
@@ -50,6 +52,8 @@ type Tab = "network" | "permissions" | "clients";
 export default function RemoteMcpSettings({ home }: { home?: string }) {
   const t = useTranslator(messages);
   const locale = useLocale();
+  const notify = useNotify();
+  const tc = useTranslator(commonMessages);
   const tabId = useId();
   const [addingClient, setAddingClient] = useState(0);
   const [copiedPrompt, setCopiedPrompt] = useState("");
@@ -70,10 +74,8 @@ export default function RemoteMcpSettings({ home }: { home?: string }) {
     >(`remote-connections.tokens:${home ?? ""}`, {}),
     [busy, setBusy] = useState(false),
     [error, setError] = useState(""),
-    [saved, setSaved] = useState(false),
     [modal, setModal] = useState<"diagnostics" | "plugin" | null>(null),
-    [pluginLink, setPluginLink] = useState(""),
-    [exported, setExported] = useState("");
+    [pluginLink, setPluginLink] = useState("");
   const current = useRef(selected),
     opening = useRef<RemoteMcpProvider | undefined>(undefined);
   current.current = selected;
@@ -238,7 +240,6 @@ export default function RemoteMcpSettings({ home }: { home?: string }) {
   }, [selected]);
   function change(patch: Partial<RemoteMcpConfig>) {
     if (selected && config) {
-      setSaved(false);
       setDrafts((previous) => ({
         ...previous,
         [selected]: { ...config, ...patch },
@@ -263,8 +264,6 @@ export default function RemoteMcpSettings({ home }: { home?: string }) {
     setAddingClient(0);
     setState(undefined);
     setError("");
-    setSaved(false);
-    setExported("");
   }
   function back() {
     opening.current = undefined;
@@ -353,7 +352,7 @@ export default function RemoteMcpSettings({ home }: { home?: string }) {
       if (!permissionsOnly)
         setTokens((previous) => ({ ...previous, [provider]: "" }));
       apply(value);
-      setSaved(true);
+      notify(t(value.phase === "starting" ? "savingReconnect" : "saved"));
     });
   }
   async function prepareRoute() {
@@ -410,7 +409,22 @@ export default function RemoteMcpSettings({ home }: { home?: string }) {
         { provider: selected, connection: pluginLink },
       );
       if (value) {
-        setExported(value.path);
+        notify(t("exported"), {
+          duration: 10000,
+          action: {
+            label: t("copyPath"),
+            onSelect: () => {
+              void desktop.invoke("clipboard:write", { text: value.path }).then(
+                () => notify(tc("copied")),
+                (reason) =>
+                  notify(errorMessage(reason), {
+                    kind: "warning",
+                    duration: 8000,
+                  }),
+              );
+            },
+          },
+        });
         setModal(null);
         await refresh();
       }
@@ -590,11 +604,6 @@ export default function RemoteMcpSettings({ home }: { home?: string }) {
               </button>
             ))}
           </nav>
-          {saved && !error && !state?.error && (
-            <p className="settings-help" role="status">
-              {t(state?.phase === "starting" ? "savingReconnect" : "saved")}
-            </p>
-          )}
           {dirty && (
             <div className="rm-draft-actions">
               <span className="settings-help" role="status">
@@ -732,7 +741,6 @@ export default function RemoteMcpSettings({ home }: { home?: string }) {
                                 value={token}
                                 placeholder={state.tokenSaved ? t("saved") : ""}
                                 onChange={(event) => {
-                                  setSaved(false);
                                   setTokens((previous) => ({
                                     ...previous,
                                     [selected]: event.target.value,
@@ -955,7 +963,7 @@ export default function RemoteMcpSettings({ home }: { home?: string }) {
                         disabled={busy || !valid || !dirty}
                         onClick={() => void save()}
                       >
-                        {saved ? <Check size={15} /> : <Save size={15} />}
+                        <Save size={15} />
                         {t(active ? "saveReconnect" : "save")}
                       </button>
                       {ready ? (
@@ -1169,6 +1177,16 @@ export default function RemoteMcpSettings({ home }: { home?: string }) {
               .filter(Boolean)
               .join("\n\n")}
           </pre>
+          <div className="studio-dialog-body">
+            <div className="studio-dialog-actions">
+              <button
+                className="settings-button"
+                onClick={() => setModal(null)}
+              >
+                {tc("done")}
+              </button>
+            </div>
+          </div>
         </Dialog>
       )}
       {modal === "plugin" && (
@@ -1192,6 +1210,13 @@ export default function RemoteMcpSettings({ home }: { home?: string }) {
             </div>
             <div className="rm-form-actions">
               <button
+                type="button"
+                className="rm-button"
+                onClick={() => setModal(null)}
+              >
+                {tc("cancel")}
+              </button>
+              <button
                 className="rm-button primary"
                 disabled={busy || !/asdk_app_[A-Za-z0-9]+/.test(pluginLink)}
                 type="submit"
@@ -1202,13 +1227,6 @@ export default function RemoteMcpSettings({ home }: { home?: string }) {
             </div>
           </form>
         </Dialog>
-      )}
-      {exported && (
-        <div role="status" className="rm-exported">
-          <Check size={15} />
-          {t("exported")}
-          <code>{exported}</code>
-        </div>
       )}
     </section>
   );

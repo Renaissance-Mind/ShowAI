@@ -71,7 +71,6 @@ export default function RemoteMcpApprovalDialog() {
   return (
     <Dialog
       title={t("approvalTitle")}
-      icon={ShieldCheck}
       className="remote-approval-dialog"
       onClose={() => void decide("deny")}
       dismissible={!busy}

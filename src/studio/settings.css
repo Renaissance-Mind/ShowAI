@@ -156,10 +156,10 @@
 .settings-select select {
   appearance: none;
   min-width: 118px;
-  min-height: 33px;
-  padding: 6px 12px;
+  min-height: var(--field-height);
+  padding: 4px var(--field-pad);
   border: 1px solid var(--line);
-  border-radius: 7px;
+  border-radius: var(--field-radius);
   background: var(--surface);
   font-size: 12px;
   line-height: 19px;

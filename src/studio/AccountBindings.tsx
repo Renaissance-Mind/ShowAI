@@ -1,3 +1,4 @@
+import { useNotify } from "../problems/toast-context";
 import { useEffect, useState } from "react";
 import { Link2 } from "../ui/icons";
 import { desktop, errorMessage } from "../host/bridge";
@@ -16,9 +17,9 @@ export default function AccountBindings({
   const [source, setSource] = useState(""),
     [target, setTarget] = useState(""),
     [profile, setProfile] = useState<AccountProfile | null>(null);
+  const notify = useNotify();
   const [busy, setBusy] = useState(false),
-    [error, setError] = useState(""),
-    [message, setMessage] = useState("");
+    [error, setError] = useState("");
   const enabled = connections.filter((item) =>
     item.capabilities?.includes("account-federation-v1"),
   );
@@ -46,7 +47,7 @@ export default function AccountBindings({
   async function run(action: () => Promise<unknown>) {
     setBusy(true);
     setError("");
-    setMessage("");
+
     try {
       await action();
       await refresh();
@@ -73,11 +74,6 @@ export default function AccountBindings({
       {error && (
         <p role="alert" className="sync-error">
           {error}
-        </p>
-      )}
-      {message && (
-        <p role="status" className="sync-message">
-          {message}
         </p>
       )}
       {!enabled.length ? (
@@ -126,7 +122,7 @@ export default function AccountBindings({
                         connectionId: source,
                         serverId: binding.descriptor.identity.serverId,
                       });
-                      setMessage(
+                      notify(
                         result.pending.length
                           ? t("toast.unbindPending")
                           : t("toast.unbound"),
@@ -155,7 +151,7 @@ export default function AccountBindings({
                     connectionId: source,
                     targetConnectionId: target,
                   });
-                  setMessage(
+                  notify(
                     result.pending.length || Object.keys(result.errors).length
                       ? t("toast.bindPending")
                       : t("toast.bound"),
@@ -202,7 +198,7 @@ export default function AccountBindings({
                     pending: unknown[];
                     errors: Record<string, string>;
                   }>("sync:restoreAccounts", { connectionId: source });
-                  setMessage(
+                  notify(
                     Object.keys(result.errors).length
                       ? t("toast.restoredPartial")
                       : t("toast.restoredAll"),

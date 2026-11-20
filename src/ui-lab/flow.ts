@@ -3,6 +3,7 @@ import { workbenchMotion } from "./features/workbench-motion";
 import type { Locale } from "../i18n";
 import labMessages from "../i18n/messages/uiLab";
 import flowMessages from "../i18n/messages/uiFlow";
+import commonMessages from "../i18n/messages/common";
 import studioMessages from "../i18n/messages/studio";
 import sidebarMessages from "../i18n/messages/sidebar";
 import { messages } from "./messages";
@@ -105,7 +106,12 @@ export function uiFlow(feature: string, locale: Locale = "zh-CN"): UiFlow {
           "created",
           dialog(s("newProjectTitle")),
         ),
-        b("close", t("closeDialog"), "project", dialog(s("newProjectTitle"))),
+        b(
+          "close",
+          messages(commonMessages, locale)("cancel"),
+          "project",
+          dialog(s("newProjectTitle")),
+        ),
       ],
     });
     nodes.push({

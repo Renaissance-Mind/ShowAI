@@ -62,7 +62,7 @@ export default defineMessages("accountFlow", {
     "projects.create": "创建",
     "projects.pendingChanges": "这个项目有尚未同步到服务器的更改。",
     "projects.stopKeepsLocal":
-      "停止同步后，当前内容和未上传的更改保留在本机，云端项目不受影响。",
+      "未上传的更改留在本机，云端项目不受影响。",
     "projects.continueSync": "继续同步",
     "projects.keepAndStop": "保留本机并停止",
     "projects.archiveConfirm": "将“{name}”移到已归档，可随时恢复。",
@@ -107,8 +107,8 @@ export default defineMessages("accountFlow", {
     uploadTitle: "同步到服务器",
     shareTitle: "共享给成员",
     shareHelp:
-      "先将“{name}”同步到所选账号所在的服务器，然后邀请成员。本机内容保留。",
-    uploadHelp: "将“{name}”同步到所选账号。本机内容保留，之后自动同步。",
+      "将“{name}”同步到所选账号后即可邀请成员。",
+    uploadHelp: "保留“{name}”的本机副本，后续更改自动同步。",
     enableSync: "同步到服务器",
     uploadShare: "共享给成员",
     chooseAccount: "选择用于同步的账号",
@@ -198,7 +198,7 @@ export default defineMessages("accountFlow", {
     "projects.pendingChanges":
       "This project has changes that have not reached the server.",
     "projects.stopKeepsLocal":
-      "Stopping sync keeps current content and unsent changes on this device. The server project is unaffected.",
+      "Unsent changes stay on this device. The cloud project stays available.",
     "projects.continueSync": "Keep syncing",
     "projects.keepAndStop": "Keep local content and stop",
     "projects.archiveConfirm":
@@ -248,9 +248,9 @@ export default defineMessages("accountFlow", {
     uploadTitle: "Sync to server",
     shareTitle: "Share with members",
     shareHelp:
-      "First sync “{name}” to the server of the chosen account, then invite members. Local content is kept.",
+      "Sync “{name}” to the selected account to invite members.",
     uploadHelp:
-      "Sync “{name}” to the selected account. Local content is kept and future changes sync automatically.",
+      "Keep a local copy of “{name}” and sync future changes.",
     enableSync: "Sync to server",
     uploadShare: "Share with members",
     chooseAccount: "Choose an account for sync",

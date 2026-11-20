@@ -1,3 +1,4 @@
+import { useNotify } from "../problems/toast-context";
 import settingsMessages from "../i18n/messages/settings";
 import { useCallback, useEffect, useState } from "react";
 import { Loader2, RefreshCw } from "../ui/icons";
@@ -25,12 +26,12 @@ export default function LibrarySpace({ home }: { home: string }) {
   const [archivePending, setArchivePending] = useState(false);
   const [archiveError, setArchiveError] = useState("");
   const [storage, setStorage] = useState<LibraryStorage | null>(null);
+  const notify = useNotify();
   const [plan, setPlan] = useState<CleanupPlan | null>(null),
     [busy, setBusy] = useState(false),
     [analyzing, setAnalyzing] = useState(false),
     [showProjects, setShowProjects] = useState(false),
-    [error, setError] = useState(""),
-    [notice, setNotice] = useState("");
+    [error, setError] = useState("");
   const [archivePath, setArchivePath] = useState("");
   const [integrity, setIntegrity] = useState<IntegrityResult | null>(null);
   const refresh = useCallback(
@@ -53,7 +54,7 @@ export default function LibrarySpace({ home }: { home: string }) {
   async function run(action: () => Promise<void>, refreshAfter = true) {
     setBusy(true);
     setError("");
-    setNotice("");
+
     try {
       await action();
       if (refreshAfter) await refresh(!!storage?.projects);
@@ -97,7 +98,7 @@ export default function LibrarySpace({ home }: { home: string }) {
                 setRefreshing(true);
                 void run(async () => {
                   await refresh(!!storage?.projects);
-                  setNotice(t("storageRefreshed"));
+                  notify(t("storageRefreshed"));
                 }, false).finally(() => setRefreshing(false));
               }}
             >
@@ -205,7 +206,7 @@ export default function LibrarySpace({ home }: { home: string }) {
                       .invoke("clipboard:write", {
                         text: `${t(`integrity.${integrity.problem}`)}\n${integrity.message}\n${home}\n${integrity.checkedAt}`,
                       })
-                      .then(() => setNotice(t("integrity.copied")))
+                      .then(() => notify(t("integrity.copied")))
                       .catch((reason) => setError(errorMessage(reason)))
                   }
                 >
@@ -237,7 +238,7 @@ export default function LibrarySpace({ home }: { home: string }) {
                       beforeBytes: number;
                       afterBytes: number;
                     }>("library:compact");
-                    setNotice(
+                    notify(
                       t("toast.compacted", {
                         before: bytes(result.beforeBytes),
                         after: bytes(result.afterBytes),
@@ -254,7 +255,7 @@ export default function LibrarySpace({ home }: { home: string }) {
                 onClick={() =>
                   void run(async () => {
                     await desktop.invoke("library:rebuildIndex");
-                    setNotice(t("toast.indexRebuilt"));
+                    notify(t("toast.indexRebuilt"));
                   })
                 }
               >
@@ -289,7 +290,7 @@ export default function LibrarySpace({ home }: { home: string }) {
                   void run(async () => {
                     await desktop.invoke("library:cleanup", { id: plan.id });
                     setPlan(null);
-                    setNotice(t("toast.cleaned"));
+                    notify(t("toast.cleaned"));
                   })
                 }
               >
@@ -360,7 +361,7 @@ export default function LibrarySpace({ home }: { home: string }) {
                       return null;
                     });
                   if (result)
-                    setNotice(t("toast.archived", { path: result.path }));
+                    notify(t("toast.archived", { path: result.path }));
                 }, false).finally(() => setArchivePending(false));
               }}
             >
@@ -387,11 +388,6 @@ export default function LibrarySpace({ home }: { home: string }) {
       {storage?.maintenance?.state === "failed" && (
         <p className="settings-help" role="status">
           {t("maintenanceFailed", { error: storage.maintenance.error ?? "" })}
-        </p>
-      )}
-      {notice && (
-        <p className="settings-help" role="status">
-          {notice}
         </p>
       )}
       {showProjects && (

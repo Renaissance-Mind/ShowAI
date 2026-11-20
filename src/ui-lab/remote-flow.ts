@@ -1,6 +1,7 @@
 import type { Locale } from "../i18n";
 import uiMessages from "../i18n/messages/uiLab";
 import flowMessages from "../i18n/messages/uiFlow";
+import commonMessages from "../i18n/messages/common";
 import connectionMessages from "../i18n/messages/remoteConnections";
 import remoteMessages from "../i18n/messages/remoteMcp";
 import { messages } from "./messages";
@@ -16,6 +17,7 @@ export function remoteConnectionFlow(locale: Locale = "zh-CN"): UiFlow {
   const t = messages(connectionMessages, locale),
     f = messages(flowMessages, locale),
     u = messages(uiMessages, locale),
+    common = messages(commonMessages, locale),
     r = messages(remoteMessages, locale);
   const button = (name: string): UiTarget => ({ role: "button", name }),
     selector = (value: string): UiTarget => ({ selector: value });
@@ -261,7 +263,7 @@ export function remoteConnectionFlow(locale: Locale = "zh-CN"): UiFlow {
         await ctx.event("service.error", { provider: p.provider });
         await ctx.ui.click(button(t("diagnostics")));
       },
-      actions: [b("close", u("closeDialog"), id("error"))],
+      actions: [b("close", common("done"), id("error"))],
     });
     if (p.id === "lan")
       nodes.push({
@@ -611,7 +613,7 @@ export function remoteConnectionFlow(locale: Locale = "zh-CN"): UiFlow {
         actions: [
           action("link", t("binding"), { role: "textbox", name: t("binding") }),
           b("export", t("bindExport")),
-          b("close", u("closeDialog")),
+          b("close", common("cancel")),
         ],
       });
   }

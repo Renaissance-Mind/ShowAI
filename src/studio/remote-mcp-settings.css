@@ -1,5 +1,5 @@
 .remote-settings {
-  --rm-control-height: 38px;
+  --rm-control-height: var(--field-height, 32px);
   font-size: 13px;
   line-height: 1.5;
 }
@@ -194,10 +194,10 @@
   box-sizing: border-box;
   min-width: 0;
   width: 100%;
-  min-height: var(--rm-control-height, 38px);
-  padding: 9px 12px;
+  min-height: var(--rm-control-height, 32px);
+  padding: 4px var(--field-pad);
   border: 1px solid var(--line);
-  border-radius: 6px;
+  border-radius: var(--field-radius);
   color: var(--text);
   background: var(--paper);
   font: inherit;
@@ -222,10 +222,10 @@
   appearance: none;
   min-width: 0;
   width: 100%;
-  min-height: 38px;
-  padding: 9px 12px;
+  min-height: var(--field-height);
+  padding: 4px var(--field-pad);
   border: 1px solid var(--line);
-  border-radius: 6px;
+  border-radius: var(--field-radius);
   background: var(--paper);
   color: var(--text);
   font: inherit;
@@ -287,7 +287,6 @@
   gap: 10px;
   padding-top: 22px;
   margin-top: 4px;
-  border-top: 1px solid var(--line);
 }
 .rm-copy-field {
   display: flex;
@@ -606,20 +605,6 @@
     12px/1.6 ui-monospace,
     monospace;
 }
-.rm-exported {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 12px;
-  border: 1px solid var(--line);
-  border-radius: 6px;
-  margin-top: 20px;
-  font-size: 12px;
-}
-.rm-exported code {
-  overflow-wrap: anywhere;
-  min-width: 0;
-}
 .rm-spin {
   animation: rm-spin 1.2s linear infinite;
 }
@@ -761,7 +746,7 @@
 }
 
 .rm-input-action > .rm-button {
-  min-height: 38px;
+  min-height: var(--rm-control-height);
 }
 
 .rm-route-actions {

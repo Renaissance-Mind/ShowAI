@@ -17,7 +17,11 @@ interface Listing {
   path: string;
   parent: string;
   separator: string;
-  shortcuts: { id?: "home" | "library" | "downloads"; name: string; path: string }[];
+  shortcuts: {
+    id?: "home" | "library" | "downloads";
+    name: string;
+    path: string;
+  }[];
   entries: Entry[];
 }
 export interface FileDialogOptions {
@@ -141,7 +145,6 @@ function FileDialog({
   return (
     <Dialog
       title={options.title}
-      icon={Folder}
       onClose={cancel}
       wide
       className="local-file-dialog"

@@ -2,7 +2,6 @@ import {
   Check,
   FilePlus2,
   FileText,
-  Folder,
   LayoutTemplate,
   MoreHorizontal,
   Pin,
@@ -13,7 +12,7 @@ import { getLocale } from "../../i18n";
 import { useTranslator } from "../../i18n/react";
 import navigationMessages from "../../i18n/messages/navigation";
 import studioMessages from "../../i18n/messages/studio";
-import PageIcon from "../../components/PageIcon";
+import DirectoryEntryButton from "./DirectoryEntryButton";
 import type { LibraryMenuPoint } from "../LibraryNavigation";
 import PageThumbnail from "../PageThumbnail";
 import FolderThumbnail from "../FolderThumbnail";
@@ -170,8 +169,15 @@ export function DirectoryView({
                     entries={folderThumbnailEntries(target.id)}
                   />
                 ))}
-              <button
-                className="studio-page-list-open"
+              <DirectoryEntryButton
+                title={target.title}
+                icon={
+                  target.kind === "page" || target.kind === "folder"
+                    ? target.icon
+                    : undefined
+                }
+                folder={target.kind === "folder"}
+                thumbnail={directoryView !== "list"}
                 data-open-page={target.kind === "page" ? target.id : undefined}
                 data-open-project={
                   target.kind === "page" ? target.projectId : undefined
@@ -185,27 +191,9 @@ export function DirectoryView({
                   if (event.button === 1) openTargetClick(target, event);
                 }}
               >
-                {directoryView !== "list" && (
-                  <span className="studio-thumbnail-space" />
-                )}
-                <span className="studio-page-list-icon">
-                  {target.kind === "folder" ? (
-                    <PageIcon
-                      value={target.icon}
-                      size={19}
-                      fallback={<Folder size={19} />}
-                    />
-                  ) : (
-                    <PageIcon
-                      value={target.kind === "page" ? target.icon : ""}
-                      size={19}
-                    />
-                  )}
-                </span>
-                <strong>{target.title}</strong>
                 {target.pinned && <Pin size={12} aria-label={t("pinned")} />}
                 <time>{shortDate(updatedAt)}</time>
-              </button>
+              </DirectoryEntryButton>
               <button
                 className="studio-icon studio-row-menu"
                 aria-label={t("itemActions", {

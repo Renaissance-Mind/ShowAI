@@ -1,3 +1,4 @@
+import { ToastContext } from "../problems/toast-context";
 import { browserSearch, codexWorkbench } from "../browser/codex-workbench";
 import { useCodexReferenceLabel } from "./shell/useCodexReferenceLabel";
 import RemoteMcpApprovalDialog from "./RemoteMcpApprovalDialog";
@@ -442,7 +443,7 @@ export default function Studio() {
     router,
     edits,
   });
-  return (
+  const workbenchView = (
     <ComponentLibraryContext.Provider value={pickerLibrary}>
       <div
         ref={studioRoot}
@@ -760,4 +761,5 @@ export default function Studio() {
       </div>
     </ComponentLibraryContext.Provider>
   );
+  return <ToastContext.Provider value={toasts.show}>{workbenchView}</ToastContext.Provider>;
 }

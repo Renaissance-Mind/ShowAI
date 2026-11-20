@@ -51,6 +51,8 @@ npm test        # Vitest 单元与集成测试
 
 常规控件使用原生元素和 `showai-select`、`showai-input`、`showai-textarea`、`showai-checkbox`、`showai-radio`、`showai-range` 或 `showai-button` 类。桌面、阅读器和嵌入组件共用这套 daisyUI 样式。调整 `src/design/controls.source.css` 后运行 `npm run controls:generate`。紧凑下拉框可设置 `--select-arrow-inset` 和 `--select-arrow-size`。
 
+表单和确认弹窗复用 `Dialog`。标题简短，说明居中，按钮区用留白分隔。设置操作通过 `useNotify()` 显示限时结果，可附撤销动作。输入错误紧邻对应字段，需要排查的失败提供详情。
+
 各任务可复制[独立界面验收模板](../../examples/ui-acceptance/README.zh-CN.md)，在自己的预览中提供控件编号、可点操作与能直接进入实际状态的流程树。需要在 ShowAI 工作台长期复用的场景见 [UI Lab 手册](ui-lab.zh-CN.md)。
 
 按改动范围运行相关测试：

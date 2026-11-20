@@ -147,8 +147,7 @@ try {
           .locator(".component-card-metadata")
           .getByText(scope, { exact: true }),
       });
-  const closeDialog = () =>
-    page.getByRole("button", { name: "关闭弹窗", exact: true }).click();
+  const closeDialog = () => page.keyboard.press("Escape");
   await invoke("组件");
   await componentCard("数据图表", "内置").click();
   let dialog = page.getByRole("dialog", { name: "数据图表", exact: true });

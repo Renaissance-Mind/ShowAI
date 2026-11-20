@@ -1,3 +1,4 @@
+import { useNotify } from "../problems/toast-context";
 import { useMemo, useRef, useState } from "react";
 import * as icons from "../ui/icons";
 import {
@@ -76,7 +77,7 @@ export default function IconViewer() {
   const [narrowView, setNarrowView] = useState<"catalog" | "detail">("catalog");
   const selectedTile = useRef<HTMLButtonElement>(null);
   const backButton = useRef<HTMLButtonElement>(null);
-  const [notice, setNotice] = useState("");
+  const notify = useNotify();
   const [error, setError] = useState("");
   const specimen = useRef<HTMLDivElement>(null);
   const visible = useMemo(
@@ -104,11 +105,10 @@ export default function IconViewer() {
     return element.outerHTML;
   };
   const copy = async (text: string, message: string) => {
-    setNotice("");
     setError("");
     try {
       await navigator.clipboard.writeText(text);
-      setNotice(message);
+      notify(message);
     } catch (reason) {
       setError(
         t("copyFailed", {
@@ -126,7 +126,7 @@ export default function IconViewer() {
     link.download = `${current.name}.svg`;
     link.click();
     setError("");
-    setNotice(t("downloadedSvg"));
+    notify(t("downloadedSvg"));
     setTimeout(() => URL.revokeObjectURL(url), 1000);
   };
   return (
@@ -185,7 +185,7 @@ export default function IconViewer() {
                   setNarrowView("detail");
                   requestAnimationFrame(() => backButton.current?.focus());
                 }
-                setNotice("");
+
                 setError("");
               }}
             >
@@ -251,7 +251,7 @@ export default function IconViewer() {
                 className="settings-button"
                 onClick={() => {
                   setPreview(defaults);
-                  setNotice(t("previewReset"));
+                  notify(t("previewReset"));
                   setError("");
                 }}
               >
@@ -357,9 +357,6 @@ export default function IconViewer() {
                 <Download size={14} />
                 {t("downloadSvg")}
               </button>
-            </div>
-            <div role="status" className="icon-viewer-status">
-              {notice}
             </div>
             <code className="icon-viewer-source">src/ui/icons.ts</code>
           </aside>

@@ -64,8 +64,12 @@
     color: var(--text, #222);
   }
   :is(.showai-input, .showai-select, .showai-textarea) {
+    --radius-field: var(--field-radius, 5px);
+    --size-field: 3.2px;
     width: auto;
     min-width: 0;
+    padding-inline: var(--field-pad, 8px);
+    padding-block: 4px;
     font-size: inherit;
     border-color: color-mix(
       in srgb,

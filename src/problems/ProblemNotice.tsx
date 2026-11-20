@@ -6,6 +6,8 @@ import {
   type ReactElement,
   type ReactNode,
 } from "react";
+import Dialog from "../ui/Dialog";
+import commonMessages from "../i18n/messages/common";
 import { problemReportText } from "./report-text";
 import { useTranslator } from "../i18n/react";
 import messages from "../i18n/messages/errors";
@@ -289,6 +291,7 @@ export interface ToastItem {
   message: string;
   kind: ToastKind;
   action?: { label: string; onSelect: () => void };
+  details?: string;
 }
 
 export function ToastViewport({
@@ -299,41 +302,87 @@ export function ToastViewport({
   onDismiss: (id: number) => void;
 }) {
   const t = useTranslator(messages);
-  if (!toasts.length) return null;
+  const common = useTranslator(commonMessages);
+  const [details, setDetails] = useState<{
+    title: string;
+    text: string;
+  } | null>(null);
+  if (!toasts.length && !details) return null;
+  const firstLine = details?.text.trim().split("\n", 1)[0] ?? "";
+  const summary =
+    firstLine.length > 120 ? firstLine.slice(0, 119) + "…" : firstLine;
   return (
-    <div className="studio-toast-stack">
-      {toasts.map((toast) => (
-        <div
-          key={toast.id}
-          className={`studio-toast is-${toast.kind}`}
-          role={toast.kind === "warning" ? "alert" : "status"}
-        >
-          <span className="studio-toast-icon">
-            <ToneIcon tone={toast.kind} size={14} />
-          </span>
-          <span className="studio-toast-message">{toast.message}</span>
-          {toast.action && (
-            <button
-              className="studio-toast-action"
-              onClick={() => {
-                toast.action!.onSelect();
-                onDismiss(toast.id);
-              }}
+    <>
+      {toasts.length > 0 && (
+        <div className="studio-toast-stack">
+          {toasts.map((toast) => (
+            <div
+              key={toast.id}
+              className={`studio-toast is-${toast.kind}`}
+              role={toast.kind === "warning" ? "alert" : "status"}
             >
-              {toast.action.label}
-            </button>
-          )}
-          {toast.kind === "warning" && (
-            <button
-              className="studio-toast-close"
-              aria-label={t("dismiss")}
-              onClick={() => onDismiss(toast.id)}
-            >
-              <X size={13} />
-            </button>
-          )}
+              <span className="studio-toast-icon">
+                <ToneIcon tone={toast.kind} size={14} />
+              </span>
+              <span className="studio-toast-message">{toast.message}</span>
+              {toast.action && (
+                <button
+                  className="studio-toast-action"
+                  onClick={() => {
+                    toast.action!.onSelect();
+                    onDismiss(toast.id);
+                  }}
+                >
+                  {toast.action.label}
+                </button>
+              )}
+              {toast.details && (
+                <button
+                  className="studio-toast-action"
+                  onClick={() => {
+                    setDetails({ title: toast.message, text: toast.details! });
+                    onDismiss(toast.id);
+                  }}
+                >
+                  {common("details")}
+                </button>
+              )}
+              {toast.kind === "warning" && (
+                <button
+                  className="studio-toast-close"
+                  aria-label={t("dismiss")}
+                  onClick={() => onDismiss(toast.id)}
+                >
+                  <X size={13} />
+                </button>
+              )}
+            </div>
+          ))}
         </div>
-      ))}
-    </div>
+      )}
+      {details && (
+        <Dialog title={details.title} onClose={() => setDetails(null)}>
+          <div className="studio-dialog-body">
+            <p className="studio-failure-details" role="alert">
+              {summary}
+            </p>
+            {details.text.trim() !== summary && (
+              <details className="studio-failure-diagnostics">
+                <summary>{common("details")}</summary>
+                <pre>{details.text}</pre>
+              </details>
+            )}
+            <div className="studio-dialog-actions">
+              <button
+                className="settings-button"
+                onClick={() => setDetails(null)}
+              >
+                {common("done")}
+              </button>
+            </div>
+          </div>
+        </Dialog>
+      )}
+    </>
   );
 }

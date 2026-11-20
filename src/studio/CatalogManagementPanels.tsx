@@ -1,3 +1,4 @@
+import { useNotify } from "../problems/toast-context";
 import {
   useEffect,
   useId,
@@ -6,10 +7,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import type {
-  EditablePackage,
-  PackageMergePreview,
-} from "../contract/types";
+import type { EditablePackage, PackageMergePreview } from "../contract/types";
 import { useTranslator } from "../i18n/react";
 import messages from "../i18n/messages/catalogManagement";
 import catalogMessages from "../i18n/messages/catalog";
@@ -269,7 +267,7 @@ export function PublishDialog({
   const t = useTranslator(messages);
   const [prepared, setPrepared] = useState<PreparedPublication | null>(null);
   const [url, setUrl] = useState("");
-  const [verified, setVerified] = useState<number | null>(null);
+  const notify = useNotify();
   const { busy, error, run } = useBusy();
   return (
     <Dialog
@@ -327,7 +325,7 @@ export function PublishDialog({
               onSubmit={(event) => {
                 event.preventDefault();
                 if (busy) return;
-                setVerified(null);
+
                 void run(async () => {
                   const result = await manager.invoke<VerifiedPublication>(
                     "catalog:verifyPublish",
@@ -336,8 +334,11 @@ export function PublishDialog({
                       ...(owner ? { projectId: owner } : {}),
                     },
                   );
-                  setVerified(
-                    (result.packages ?? prepared.manifest.packages).length,
+                  notify(
+                    t("verified", {
+                      count: (result.packages ?? prepared.manifest.packages)
+                        .length,
+                    }),
                   );
                   await manager.changed();
                 });
@@ -353,7 +354,6 @@ export function PublishDialog({
                   placeholder="https://…/manifest.json"
                   onChange={(event) => {
                     setUrl(event.target.value);
-                    setVerified(null);
                   }}
                 />
               </label>
@@ -366,11 +366,6 @@ export function PublishDialog({
                 {t("verify")}
               </button>
             </form>
-            {verified !== null && (
-              <p className="catalog-action-status" role="status">
-                {t("verified", { count: verified })}
-              </p>
-            )}
             <footer>
               <button
                 type="button"
@@ -1008,11 +1003,13 @@ export function ImportComponentDialog({
   const [projectId, setProjectId] = useState(
     manager.projectId ?? manager.projects[0]?.id ?? "",
   );
+  const notify = useNotify();
   const [result, setResult] = useState<Listed | null>(null);
   const { busy, error, run } = useBusy();
   const finish = async (component: RevisionItem | null) => {
     if (!component) return;
     setResult({ ...component, projectId });
+    notify(t("imported", { name: component.name, version: component.version }));
     await manager.changed();
   };
   return (
@@ -1041,11 +1038,6 @@ export function ImportComponentDialog({
           }}
         />
         <ErrorLine text={error} />
-        {result && (
-          <p className="catalog-action-status" role="status">
-            {t("imported", { name: result.name, version: result.version })}
-          </p>
-        )}
         <footer>
           <button
             type="button"
@@ -1117,6 +1109,7 @@ export function SaveTemplateDialog({
   const [name, setName] = useState(""),
     [description, setDescription] = useState(""),
     [version, setVersion] = useState("1.0.0");
+  const notify = useNotify();
   const [saved, setSaved] = useState<Listed | null>(null);
   const { busy, error, setError, run } = useBusy();
   useEffect(() => {
@@ -1182,6 +1175,12 @@ export function SaveTemplateDialog({
               ...(templateId ? { id: templateId } : {}),
             });
             setSaved({ ...result, projectId });
+            notify(
+              t("savedTemplate", {
+                name: result.name,
+                version: result.version,
+              }),
+            );
             await manager.changed();
           });
         }}
@@ -1275,11 +1274,6 @@ export function SaveTemplateDialog({
           />
         </label>
         <ErrorLine text={error} />
-        {saved && (
-          <p className="catalog-action-status" role="status">
-            {t("savedTemplate", { name: saved.name, version: saved.version })}
-          </p>
-        )}
         <footer>
           <button type="button" className="studio-button" onClick={onClose}>
             {t("close")}

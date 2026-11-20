@@ -46,7 +46,12 @@ export function useProblemQueue() {
   const [problems, setProblems] = useState<QueuedProblem[]>([]);
   const next = useRef(0);
   const report = useCallback((error: unknown, options: ReportOptions = {}) => {
-    const { key: explicit, retry, handlers, ...context } = {
+    const {
+      key: explicit,
+      retry,
+      handlers,
+      ...context
+    } = {
       ...attachedOptions(error),
       ...options,
     };
@@ -88,6 +93,7 @@ export function useProblemQueue() {
 export interface ToastOptions {
   kind?: ToastKind;
   action?: ToastItem["action"];
+  details?: string;
   duration?: number;
 }
 
@@ -114,14 +120,24 @@ export function useToasts() {
             clearTimeout(timers.current.get(item.id));
             timers.current.delete(item.id);
           }
-        return [...kept, { id, message, kind, action: options.action }].slice(
-          -MAX_TOASTS,
-        );
+        return [
+          ...kept,
+          {
+            id,
+            message,
+            kind,
+            action: options.action,
+            details: options.details,
+          },
+        ].slice(-MAX_TOASTS);
       });
       const duration =
         options.duration ?? (kind === "warning" ? undefined : DEFAULT_DURATION);
       if (duration !== undefined)
-        timers.current.set(id, setTimeout(() => dismiss(id), duration));
+        timers.current.set(
+          id,
+          setTimeout(() => dismiss(id), duration),
+        );
       return id;
     },
     [dismiss],

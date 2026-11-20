@@ -1,12 +1,5 @@
 import { useEffect, useState, type ReactNode } from "react";
-import {
-  Folder,
-  FolderInput,
-  Loader2,
-  Pencil,
-  Plus,
-  Trash2,
-} from "../../ui/icons";
+import { Folder, Loader2, Plus } from "../../ui/icons";
 import type { ProjectGroup, ProjectSummary } from "../../core/model";
 import type { LibraryTarget } from "../LibraryNavigation";
 import Dialog from "../../ui/Dialog";
@@ -38,7 +31,7 @@ export function MoveProjectDialog({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   return (
-    <Dialog title={t("moveToGroupTitle")} icon={FolderInput} onClose={onClose}>
+    <Dialog title={t("moveToGroupTitle")} onClose={onClose}>
       <form
         className="studio-form"
         onSubmit={(event) => {
@@ -108,7 +101,7 @@ export function NameDialog({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   return (
-    <Dialog title={title} icon={Pencil} onClose={onClose}>
+    <Dialog title={title} onClose={onClose}>
       <form
         className="studio-form"
         onSubmit={(event) => {
@@ -177,7 +170,7 @@ export function DeleteDialog({
             ? "deleteFolder"
             : "deletePage",
       )}
-      icon={Trash2}
+      showTitle={false}
       tone="danger"
       onClose={onClose}
     >
@@ -332,7 +325,7 @@ function DirectoryDialog({
     [error, setError] = useState("");
   return (
     <>
-      <Dialog title={title} icon={Folder} onClose={onClose}>
+      <Dialog title={title} onClose={onClose}>
         <form
           className="studio-form"
           onSubmit={(event) => {
