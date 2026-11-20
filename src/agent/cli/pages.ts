@@ -258,7 +258,12 @@ export const pageCommands: CommandDeclaration[] = [
     command: "pages",
     actions: ["save"],
     operation: pageSave,
-    options: { input: text, "base-hash": text, "base-revision": text },
+    options: {
+      input: text,
+      "base-hash": text,
+      "base-revision": text,
+      response: text,
+    },
     fields: {
       pageId: "PAGE",
       baseHash: "--base-hash",
@@ -291,7 +296,12 @@ export const pageCommands: CommandDeclaration[] = [
     command: "pages",
     actions: ["apply"],
     operation: pageApply,
-    options: { input: text, "base-hash": text, "base-revision": text },
+    options: {
+      input: text,
+      "base-hash": text,
+      "base-revision": text,
+      response: text,
+    },
     fields: {
       pageId: "PAGE",
       baseHash: "--base-hash",

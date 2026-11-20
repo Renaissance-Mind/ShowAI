@@ -84,6 +84,21 @@ test("a command rejects an option it does not declare and names itself", () => {
   );
   check(["--home", "/tmp/x", "pages", "read", "PAGE", "--view", "image", "--json"]);
   check(["mcp", "--home", "/tmp/x", "--project", "p", "--templates", "t"]);
+  check(["datasets", "transform", "--dry-run"]);
+  check(["import", "notes.zip", "--dry-run"]);
+  check(["workspace", "merge", "PAGE", "--revision", "r"]);
+  check(["export", "--revision", "r"]);
+  check(["pages", "save", "PAGE", "--response", "full"]);
+  check(["pages", "apply", "PAGE", "--response", "source"]);
+  expect(() => check(["pages", "create", "--dry-run"])).toThrow(
+    "showai pages create does not take --dry-run.",
+  );
+  expect(() => check(["pages", "read", "PAGE", "--response", "source"])).toThrow(
+    "showai pages read does not take --response.",
+  );
+  expect(() => check(["pages", "save", "PAGE", "--revision", "r"])).toThrow(
+    "showai pages save does not take --revision.",
+  );
   expect(() => parseArguments(["pages", "list", "--from", "x"])).toThrow(
     "Unknown option --from. Run showai --help.",
   );

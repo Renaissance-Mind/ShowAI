@@ -3,7 +3,7 @@
   "profile": "claude",
   "declaredHostDisplay": "model-html",
   "commonVersion": "0.29.3",
-  "commonSha256": "898fba2cdf3c9deb0ac6e8fb0c6b7c1bc1fb4cdf85c9d94e99a10d6f83b1bde3",
+  "commonSha256": "422f6f86e5ebf6f95317ba1c210227f6d6128e39ff8ac5bb304bc7be8c119410",
   "commonFiles": {
     "collaborate-canvas/SKILL.md": "66c1a67e75c0a7cdaa749ad63231f933d8c406095afcda033790220a7c820eea",
     "create-component/references/component-authoring.md": "3debe9a4e5ca925c9336b9c296abd55c65bffdd38a1a7027bc99baaab7c4e037",
@@ -37,7 +37,7 @@
     "use-showai/references/formats/whiteboard.json": "b55528af26186934dd6a7c3e426ad9ef0e88ad1fb62c950c28fb6cff62221a02",
     "use-showai/references/host-display.md": "0793be814472e8e4d509661e53cf0ec48db7a11db0f04dd579b0fd02bf51ca98",
     "use-showai/references/import.md": "85db66e3c7a8abe16599e638e3caea53e666c85d72630ef23095d722d065a51c",
-    "use-showai/references/integration.md": "74271aa503e7cc2c56a3975c7d7bece7a38b470df1ed3754c8888e73c5d1eaca",
+    "use-showai/references/integration.md": "41e626d35f93a297961db5d59cc862238232933a2d90b88187a4a105c66a5a98",
     "use-showai/references/page-reading.md": "8dcd64578d5a0f8917dede99b8d96b03f990490d61fd443b5ec3fae6b1651291",
     "use-showai/references/runtime.md": "cf2323aac232a7bf24465e233f6e8e901123584ea4330b12ff05ee63ba49363a",
     "use-showai/references/shared-data.md": "3417936f34ef95c46f3c21536ea60a863e999e9338bb066a2ef6fbe8389bbdaf",

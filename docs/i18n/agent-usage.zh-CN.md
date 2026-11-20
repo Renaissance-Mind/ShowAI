@@ -19,6 +19,8 @@ showai guide catalog --json
 
 指南还包含 `workspace`、`containers`、`whiteboard`、`document`、`templates`、`versions`、`export` 和 `publish`。以当前运行时返回的操作形状和限制为准。JSON 成功返回 `{ "ok": true, "data": ... }`；失败返回 `ok:false`、错误码与原因并以非零状态退出，页面冲突退出码为 3。
 
+只有 `import` 和 `datasets transform` 支持 `--dry-run`。CLI 会在打开内容库之前拒绝未知选项和当前命令不支持的选项。使用 `--json` 时，这些错误也按上述 JSON 格式返回。
+
 ## 项目与页面
 
 用户指定的项目优先。`projects list` 是只读发现；`projects current` 会解析或创建宿主目录所属项目，不能用它代替只读查找。`--source-directory` 明确提供宿主目录；否则使用最近 Git 根目录或当前目录。路径会解析到真实绝对位置。

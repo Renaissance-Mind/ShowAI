@@ -67,7 +67,10 @@ async function runCliCommand(
 }
 
 export async function runCli(argv: string[]): Promise<unknown> {
-  const args = parseArguments(argv);
+  return runParsedCli(parseArguments(argv));
+}
+
+async function runParsedCli(args: Arguments): Promise<unknown> {
   const declaration = findCommand(args.positional);
   if (declaration) checkOptions(args, declaration);
   const context = commandContext(args);
@@ -144,8 +147,8 @@ function printHuman(value: unknown) {
   } else process.stdout.write(JSON.stringify(value, null, 2) + "\n");
 }
 
-function cliOperation(argv: string[]): FailedOperation | undefined {
-  const [command, action] = parseArguments(argv).positional;
+function cliOperation(args: Arguments): FailedOperation | undefined {
+  const [command, action] = args.positional;
   if (command === "export") return "export";
   if (command === "render") return "present";
   return ["save", "apply", "create", "duplicate", "link", "transform", "import"].includes(action)
@@ -154,23 +157,22 @@ function cliOperation(argv: string[]): FailedOperation | undefined {
 }
 
 const json = process.argv.includes("--json");
-let continuous = false;
+let parsed: Arguments | undefined;
 try {
-  continuous = ["serve", "mcp"].includes(
-    parseArguments(process.argv.slice(2)).positional[0],
-  );
-  const result = await runCli(process.argv.slice(2));
+  parsed = parseArguments(process.argv.slice(2));
+  const result = await runParsedCli(parsed);
   if (result !== undefined) {
     if (json)
       process.stdout.write(JSON.stringify({ ok: true, data: result }) + "\n");
     else printHuman(result);
   }
 } catch (error) {
-  const result = errorResult(error, cliOperation(process.argv.slice(2)));
+  const result = errorResult(error, parsed && cliOperation(parsed));
   if (json)
     process.stdout.write(JSON.stringify({ ok: false, error: result }) + "\n");
   else process.stderr.write(`ShowAI: ${result.message}\n`);
   process.exitCode = result.code === "CONFLICT" ? 3 : 1;
 } finally {
-  if (!continuous) await stopSyncManagers();
+  if (!parsed || !["serve", "mcp"].includes(parsed.positional[0]))
+    await stopSyncManagers();
 }
