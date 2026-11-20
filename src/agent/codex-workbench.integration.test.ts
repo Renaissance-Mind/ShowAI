@@ -75,8 +75,10 @@ it("opens both Codex workbench entries and saves into the MCP library", async ()
         .toEqual({ resourceUri: codexWorkbenchCardUri, visibility: ["model", "app"] });
     }
     const cardResource = await client.readResource({ uri: codexWorkbenchCardUri });
-    expect((await client.readResource({ uri: "ui://showai/workbench-card-v6.html" })).contents[0].mimeType)
-      .toBe("text/html;profile=mcp-app");
+    for (const version of [5, 6, 7]) {
+      const previous = await client.readResource({ uri: `ui://showai/workbench-card-v${version}.html` });
+      expect(previous.contents[0].mimeType).toBe("text/html;profile=mcp-app");
+    }
     const [cardContent] = cardResource.contents;
     if (!("text" in cardContent)) throw new Error("Expected a card HTML resource");
     const cardHtml = cardContent.text;
@@ -85,8 +87,6 @@ it("opens both Codex workbench entries and saves into the MCP library", async ()
       expect(cardHtml).toContain(`data-destination="${destination}"`);
     expect(cardHtml).not.toContain("<select");
     expect(cardHtml).not.toContain("__CHATGPT_ICON__");
-    expect((await client.readResource({ uri: "ui://showai/workbench-card-v5.html" })).contents[0].mimeType)
-      .toBe("text/html;profile=mcp-app");
     expect(tools.find(tool => tool.name === "workbench_open_destination")?._meta?.ui)
       .toEqual({ visibility: ["app"] });
     expect(cardResource.contents[0]).toMatchObject({

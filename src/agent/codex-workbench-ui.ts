@@ -12,7 +12,7 @@ export const codexWorkbenchUri = "ui://showai/workbench-v3.html";
 export const codexWorkbenchThreadUri = "ui://showai/workbench-thread-v5.html";
 export const codexWorkbenchFileUri = "ui://showai/workbench-file-v3.html";
 
-export const codexWorkbenchCardUri = "ui://showai/workbench-card-v7.html";
+export const codexWorkbenchCardUri = "ui://showai/workbench-card-v8.html";
 export const codexWorkbenchTargetUri = "ui://showai/workbench-target-v2.html";
 
 export function codexWorkbenchHtml(

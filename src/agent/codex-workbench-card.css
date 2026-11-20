@@ -1,11 +1,11 @@
 .showai-card-list {
-  --showai-card-title-path-gap: 3px;
+  --showai-card-title-path-gap: 0px;
   --showai-card-path-body-gap: 9px;
-  --showai-card-padding-y: 14px;
-  --showai-card-padding-x: 16px;
-  --showai-card-logo-gap: 12px;
-  --showai-card-actions-gap: 12px;
-  --showai-card-stack-gap: 8px;
+  --showai-card-padding-y: 9px;
+  --showai-card-padding-x: 20px;
+  --showai-card-logo-gap: 20px;
+  --showai-card-actions-gap: 10px;
+  --showai-card-stack-gap: 5px;
   --card-ink: var(--color-text-primary, CanvasText);
   --card-muted: var(--color-text-secondary, color-mix(in srgb, CanvasText 63%, Canvas));
   --card-border: var(--color-border-secondary, color-mix(in srgb, CanvasText 15%, Canvas));
