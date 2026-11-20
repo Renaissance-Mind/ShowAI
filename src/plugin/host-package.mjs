@@ -129,7 +129,10 @@ export async function writeHostLauncher(source, target, profile) {
   const cwd = profile === "codex"
     ? "    // Codex can retire the versioned plugin directory while its chat is open.\n" +
       "    ...(launch.env.SHOWAI_CODEX_WORKBENCH_PROFILE && { cwd: home }),\n"
-    : "";
+    : profile === "antigravity"
+      ? "    // Antigravity replaces the plugin directory in place while its MCP server stays open.\n" +
+        "    cwd: (await mkdir(home, { recursive: true }).catch(() => {}), home),\n"
+      : "";
   await writeFile(join(target, "mcp/launch.mjs"), parts.join(cache).replace("__SHOWAI_HOST_CWD__\n", cwd));
 }
 
@@ -337,6 +340,7 @@ export async function stageHostPlugin({ source, target, profile }) {
     } else if (profile === "claude") {
       await rm(join(staging, "mcp.json"), { force: true });
     } else {
+      await writeHostLauncher(source, staging, profile);
       const manifest = JSON.parse(
         await readFile(join(source, "plugin.json"), "utf8"),
       );

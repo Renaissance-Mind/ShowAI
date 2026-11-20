@@ -2,7 +2,7 @@
 import { execFileSync, spawn } from "node:child_process";
 import { timingSafeEqual } from "node:crypto";
 import { existsSync, readFileSync } from "node:fs";
-import { readFile } from "node:fs/promises";
+import { mkdir, readFile } from "node:fs/promises";
 import { createServer, request as httpRequest } from "node:http";
 import { homedir } from "node:os";
 import { dirname, isAbsolute, join, resolve } from "node:path";
@@ -171,8 +171,10 @@ function createBackendManager(env = process.env) {
 
   async function start() {
     const spec = await resolveRuntimeLaunch(env);
+    await mkdir(spec.home, { recursive: true }).catch(() => {});
     return new Promise((done, fail) => {
       const child = spawn(spec.command, spec.args, {
+        cwd: spec.home,
         env: spec.env,
         stdio: ["ignore", "pipe", "pipe"],
       });

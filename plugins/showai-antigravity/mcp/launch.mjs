@@ -487,6 +487,8 @@ try {
 if (launch) {
   const child = spawn(launch.command, launch.args, {
     env: launch.env,
+    // Antigravity replaces the plugin directory in place while its MCP server stays open.
+    cwd: (await mkdir(home, { recursive: true }).catch(() => {}), home),
     stdio: "inherit",
   });
   child.once("error", (error) => {

@@ -1,8 +1,9 @@
-import { execFile } from "node:child_process";
+import { execFile, spawn } from "node:child_process";
 import { createServer } from "node:http";
-import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { cp, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
+import { createInterface } from "node:readline";
 import { pathToFileURL } from "node:url";
 import { promisify } from "node:util";
 import { afterEach, describe, expect, test } from "vitest";
@@ -550,5 +551,85 @@ describe("Antigravity committed package validation", () => {
       },
       findings: [],
     });
+  });
+
+  test("mcp/launch.mjs pins runtime cwd to home so in-place plugin reinstall does not break process.cwd()", async () => {
+    const root = await makeTempDir("showai-ag-cwd-");
+    const home = join(root, "home");
+    const pluginDir = join(root, "plugin");
+    const runtimeEntry = join(root, "fake-cli.mjs");
+    await mkdir(home, { recursive: true });
+    await cp(resolve("plugins/showai-antigravity"), pluginDir, {
+      recursive: true,
+    });
+
+    await writeFile(
+      runtimeEntry,
+      `import { createInterface } from "node:readline";
+import { realpathSync } from "node:fs";
+const args = process.argv.slice(2);
+if (args[0] === "runtime" && args[1] === "info") {
+  process.stdout.write(JSON.stringify({
+    ok: true,
+    data: {
+      version: "0.12.0",
+      home: process.env.SHOWAI_HOME,
+      capabilities: {
+        agentOperations: { protocol: "showai-mcp-v1", toolSurface: "showai-mcp-tools-v2" },
+        templateWorkflow: { protocol: "showai-template-workflow-v3" },
+        componentParameters: { protocol: "showai-component-parameters-v1" },
+      },
+    },
+  }) + "\\n");
+  process.exit(0);
+}
+process.stdout.write(JSON.stringify({ ready: true }) + "\\n");
+for await (const line of createInterface({ input: process.stdin })) {
+  const msg = JSON.parse(line);
+  process.stdout.write(JSON.stringify({ id: msg.id, cwd: realpathSync(process.cwd()) }) + "\\n");
+}
+`,
+      "utf8",
+    );
+
+    await writeFile(
+      join(home, "agent-runtime.json"),
+      JSON.stringify({
+        format: "showai-agent-runtime",
+        protocol: 1,
+        version: "0.12.0",
+        home,
+        launch: {
+          command: process.execPath,
+          args: [runtimeEntry],
+          env: { SHOWAI_HOME: home },
+        },
+        channel: "packaged",
+      }),
+      "utf8",
+    );
+
+    const child = spawn(process.execPath, [join(pluginDir, "mcp/launch.mjs")], {
+      cwd: pluginDir,
+      env: { ...process.env, SHOWAI_HOME: home },
+      stdio: ["pipe", "pipe", "pipe"],
+    });
+
+    const lines = createInterface({ input: child.stdout });
+    const iterator = lines[Symbol.asyncIterator]();
+    try {
+      const first = await iterator.next();
+      expect(JSON.parse(first.value as string)).toEqual({ ready: true });
+
+      // Simulate Antigravity replacing ~/.gemini/config/plugins/showai in place while MCP stays open.
+      await rm(pluginDir, { recursive: true, force: true });
+
+      child.stdin.write(JSON.stringify({ id: 1 }) + "\n");
+      const reply = JSON.parse((await iterator.next()).value as string);
+      expect(reply.id).toBe(1);
+      expect(reply.cwd).toContain("home");
+    } finally {
+      child.kill("SIGTERM");
+    }
   });
 });

@@ -91,6 +91,10 @@ describe("host-specific plugin distributions", () => {
       expect(launcher).not.toContain("__SHOWAI_PROBE_CACHE_PATH__");
       if (profile === "codex")
         expect(launcher).toContain("SHOWAI_CODEX_WORKBENCH_PROFILE");
+      else if (profile === "antigravity")
+        expect(launcher).toContain(
+          "Antigravity replaces the plugin directory in place",
+        );
       else expect(launcher).toBe(sharedLauncher);
       expect(
         Object.fromEntries(

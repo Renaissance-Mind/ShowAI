@@ -69,3 +69,48 @@ test("ordinary browser hosts still register their actual CLI", async () => {
     await rm(home, { recursive: true, force: true });
   }
 });
+
+test("browser hosts launched via Electron preserve ELECTRON_RUN_AS_NODE in registered runtime", async () => {
+  const home = await mkdtemp(
+    join(
+      process.env.SHOWAI_TEST_FIXTURE_ROOT ?? tmpdir(),
+      "paper-runtime-electron-",
+    ),
+  );
+  const cliEntry = resolve("dist-agent/cli.mjs");
+  const webRoot = join(home, "web");
+  await mkdir(webRoot);
+  const descriptor = Object.getOwnPropertyDescriptor(
+    process.versions,
+    "electron",
+  );
+  Object.defineProperty(process.versions, "electron", {
+    value: "44.10.1",
+    configurable: true,
+  });
+  let server: Awaited<ReturnType<typeof startBrowserServer>> | undefined;
+  try {
+    server = await startBrowserServer({
+      home,
+      port: 0,
+      webRoot,
+      cliEntry,
+      settingsPath: join(home, "settings.json"),
+    });
+    const registered = JSON.parse(
+      await readFile(join(home, "agent-runtime.json"), "utf8"),
+    );
+    expect(registered.launch.env).toEqual({
+      SHOWAI_HOME: resolve(home),
+      ELECTRON_RUN_AS_NODE: "1",
+    });
+  } finally {
+    if (descriptor) {
+      Object.defineProperty(process.versions, "electron", descriptor);
+    } else {
+      delete (process.versions as Record<string, unknown>).electron;
+    }
+    await server?.close();
+    await rm(home, { recursive: true, force: true });
+  }
+});

@@ -167,7 +167,10 @@ export async function startBrowserServer(options: BrowserServerOptions) {
     cli: {
       command: process.execPath,
       args: [resolve(options.cliEntry)],
-      env: { SHOWAI_HOME: store.root },
+      env: {
+        SHOWAI_HOME: store.root,
+        ...(process.versions.electron ? { ELECTRON_RUN_AS_NODE: "1" } : {}),
+      },
     },
   });
   type ChangeForClient = (id: string) => DesktopChange | undefined;

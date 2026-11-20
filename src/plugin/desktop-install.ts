@@ -892,8 +892,9 @@ export class DesktopPluginInstaller {
         ...claudeManifest,
         version,
       });
-      if (launch.launcher) {
+      if (launch.launcher || host === "antigravity")
         await writeHostLauncher(this.options.pluginRoot(), staging, host);
+      if (launch.launcher) {
         await writeFile(
           join(staging, "mcp", launch.launcher.name),
           launch.launcher.text,
