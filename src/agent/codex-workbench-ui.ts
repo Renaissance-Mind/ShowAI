@@ -5,7 +5,7 @@ import cardStyles from "./codex-workbench-card.css?raw";
 import cardMarkup from "./codex-workbench-card.html?raw";
 import cardView from "./codex-workbench-card-view.js?raw";
 import cardSpacingEditor from "./codex-workbench-card-spacing.js?raw";
-import chatgptMark from "../studio/assets/agent-brands/openai.svg?raw";
+import chatgptMark from "../design/brands/openai.svg?raw";
 
 export type CodexWorkbenchMode = "global" | "thread";
 export const codexWorkbenchUri = "ui://showai/workbench-v3.html";

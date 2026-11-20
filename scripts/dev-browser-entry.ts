@@ -1,6 +1,6 @@
 import { join } from "node:path";
 import { startBrowserServer } from "../src/browser/server";
-import { openSystemUrl } from "../src/browser/system";
+import { openSystemUrl } from "../src/host/local-system";
 
 const runtime = process.env.SHOWAI_DEV_RUNTIME!;
 const server = await startBrowserServer({

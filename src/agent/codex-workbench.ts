@@ -5,7 +5,7 @@ import lightLogo from "../../plugins/showai/assets/logo.svg?raw";
 import darkLogo from "../../plugins/showai/assets/logo-dark.svg?raw";
 import { workbenchRoutes, type CodexWorkbenchTransport } from "../host/codex-workbench-transport";
 import { mcpFailure, mcpSuccess } from "./presentation-tools";
-import { openSystemUrl } from "../browser/system";
+import { openSystemUrl } from "../host/local-system";
 import { pageLink } from "../document/page-link.mjs";
 import type { AgentService } from "./service";
 import {
