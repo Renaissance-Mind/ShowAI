@@ -442,7 +442,7 @@ export async function renderComponents(
     );
   if (blocks.some((block) => block.kind === "page" || block.kind === "board"))
     throw new Error(
-      "Page and Board use saved documents. Save the Page and follow the installed host adapter for delivery.",
+      "Page and Board use saved documents. Deliver the saved Page using the installed host adapter, or use page_present for a reading preview.",
     );
   const rendered = await renderDocumentArtifacts(
     blocksDocument(blocks, input.title ?? ""),
