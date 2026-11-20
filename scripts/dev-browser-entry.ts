@@ -1,6 +1,6 @@
 import { join } from "node:path";
 import { startBrowserServer } from "../src/browser/server";
-import { openBrowser } from "../src/browser/system";
+import { openSystemUrl } from "../src/browser/system";
 
 const runtime = process.env.SHOWAI_DEV_RUNTIME!;
 const server = await startBrowserServer({
@@ -26,7 +26,7 @@ async function stop() {
 process.on("message", (message) => {
   if (message === "showai:development-quit") void stop();
   if (message === "showai:development-open")
-    void openBrowser(server.url).catch((error) => {
+    void openSystemUrl(server.url).catch((error) => {
       console.error(
         `无法自动打开浏览器：${error.message}\n请打开 ${server.url}`,
       );

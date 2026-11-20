@@ -5,6 +5,12 @@ export const TOOL_CHANGES: {
   now: string;
 }[] = [
   {
+    date: "2026-11-20",
+    version: "0.12.0",
+    before: "Local Codex card_present targets used projectId, pageId and optional blockId.",
+    now: "Each target also accepts an optional description. The result includes the Page breadcrumb. Existing single and grouped calls retain their targets and order.",
+  },
+  {
     date: "2026-11-17",
     version: "0.12.0",
     before: "guide MCP tool and mandatory guide-first discovery",

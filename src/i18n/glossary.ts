@@ -90,6 +90,7 @@ export const englishInChinese: readonly string[] = [
   "Diagram Design",
   "Apple Pencil",
   "Wi-Fi",
+  "ShowAI App",
   "ShowAI Cloud",
   "API Key",
   "LLM API",

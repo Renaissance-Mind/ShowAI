@@ -20,7 +20,7 @@ export async function openLocalPath(
   } else await run("xdg-open", [reveal ? dirname(path) : path]);
 }
 
-export async function openBrowser(url: string): Promise<void> {
+export async function openSystemUrl(url: string): Promise<void> {
   if (process.platform === "win32")
     await run("rundll32.exe", ["url.dll,FileProtocolHandler", url]);
   else await openLocalPath(url);

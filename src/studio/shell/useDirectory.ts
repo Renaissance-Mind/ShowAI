@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import type { FolderMetadata } from "../../core/model";
+import { folderBreadcrumb } from "../../core/folder-breadcrumb";
 import {
   directoryEntries,
   sortDirectoryItems,
@@ -146,17 +146,7 @@ export function useDirectory({
   const selectedPageTargets = visibleEntries
     .filter((item) => pageSelection.ids.includes(item.id))
     .map((item) => item.target);
-  const breadcrumbFolders: FolderMetadata[] = [];
-  let breadcrumbFolder = currentFolder;
-  while (
-    breadcrumbFolder &&
-    !breadcrumbFolders.some((item) => item.id === breadcrumbFolder!.id)
-  ) {
-    breadcrumbFolders.unshift(breadcrumbFolder);
-    breadcrumbFolder = folders.find(
-      (item) => item.id === breadcrumbFolder!.parentId,
-    );
-  }
+  const breadcrumbFolders = folderBreadcrumb(folders, selectedFolder);
   return {
     syncReadOnly,
     selectedMarker,

@@ -5,11 +5,15 @@ import lightLogo from "../../plugins/showai/assets/logo.svg?raw";
 import darkLogo from "../../plugins/showai/assets/logo-dark.svg?raw";
 import { workbenchRoutes, type CodexWorkbenchTransport } from "../host/codex-workbench-transport";
 import { mcpFailure, mcpSuccess } from "./presentation-tools";
+import { openSystemUrl } from "../browser/system";
+import { pageLink } from "../document/page-link.mjs";
 import type { AgentService } from "./service";
 import {
   codexPageIdentity,
   codexPageTarget,
-  type CodexPageTarget,
+  codexCardTarget,
+  codexWorkbenchPageLink,
+  type CodexCardTarget,
   codexPageReferenceExtension,
   codexPageReferenceMaxLength,
   resolveCodexPageReference,
@@ -101,6 +105,7 @@ function registerCodexWorkbench(
     ...views,
     { mode: "thread", name: "workbench_file", uri: codexWorkbenchFileUri, entrypoint: "file" },
     { mode: "thread", name: "workbench_page_card", uri: codexWorkbenchCardUri, entrypoint: "card" },
+    { mode: "thread", name: "workbench_page_card_v5", uri: "ui://showai/workbench-card-v5.html", entrypoint: "card" },
     { mode: "thread", name: "workbench_page_card_v4", uri: "ui://showai/workbench-card-v4.html", entrypoint: "card" },
     { mode: "thread", name: "workbench_page_target", uri: codexWorkbenchTargetUri, entrypoint: "open" },
     { mode: "thread", name: "workbench_page_target_v1", uri: "ui://showai/workbench-target-v1.html", entrypoint: "open" },
@@ -124,7 +129,7 @@ function registerCodexWorkbench(
         contents: [{
           uri,
           mimeType,
-          text: codexWorkbenchHtml(mode, entrypoint, codexWorkbenchIcons[0].src, globalEntrypoint),
+          text: codexWorkbenchHtml(mode, entrypoint, codexWorkbenchIcons[0].src, !!globalEntrypoint),
           _meta: {
             ui: {
               csp: {
@@ -194,7 +199,7 @@ function registerCodexWorkbench(
     _meta: { ui: { resourceUri: codexWorkbenchCardUri, visibility: ["model", "app"] } },
   };
   async function presentPageCard(
-    target: CodexPageTarget,
+    target: CodexCardTarget,
     meta?: Record<string, unknown>,
   ) {
     try {
@@ -210,10 +215,10 @@ function registerCodexWorkbench(
   server.registerTool("card_present", {
     ...cardTool,
     title: "Show saved ShowAI cards",
-    description: "Show a clickable card for the saved Page or its blockId from page_read. To show several cards together in chat, pass the remaining targets in additionalTargets in this same call.",
+    description: "Show a card for a saved Page or a blockId from page_read. Each target can have its own task-specific description. Put the remaining targets in additionalTargets to display multiple cards together in order. The user can open each target beside the chat, in Workbench, or in the ShowAI app.",
     inputSchema: {
-      ...codexPageTarget,
-      additionalTargets: z.array(z.object(codexPageTarget)).optional(),
+      ...codexCardTarget,
+      additionalTargets: z.array(z.object(codexCardTarget)).optional(),
     },
   }, async ({ additionalTargets, ...first }, extra) => {
     if (!additionalTargets?.length) return presentPageCard(first, extra._meta);
@@ -227,6 +232,28 @@ function registerCodexWorkbench(
           showaiNavigationScope: navigation.scope(extra._meta),
         },
       };
+    } catch (error) {
+      return mcpFailure(error);
+    }
+  });
+  server.registerTool("workbench_open_destination", {
+    title: "Open a ShowAI page",
+    description: "Open the selected saved Page or component in Codex Workbench or the ShowAI app using its registered desktop link.",
+    inputSchema: { ...codexPageTarget, destination: z.enum(["workbench", "desktop"]) },
+    annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: true },
+    _meta: appOnly,
+  }, async ({ destination, ...target }) => {
+    try {
+      await readCodexPageTarget(service, target);
+      let url: string;
+      if (destination === "workbench") {
+        if (!globalEntrypoint) throw new Error("This installation has no Codex Workbench entrypoint.");
+        url = codexWorkbenchPageLink(globalEntrypoint, target);
+      } else {
+        url = pageLink({ ...target, blockIds: target.blockId ? [target.blockId] : [] });
+      }
+      await openSystemUrl(url);
+      return { content: [], _meta: { showaiWorkbenchData: { url } } };
     } catch (error) {
       return mcpFailure(error);
     }

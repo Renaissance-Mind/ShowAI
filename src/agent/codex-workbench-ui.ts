@@ -1,31 +1,38 @@
 import messages from "../i18n/messages/codex-workbench";
 import { workbenchChunkBytes } from "../host/codex-workbench-transport";
 import { codexPageReferenceMaxLength } from "./codex-page-reference";
+import cardStyles from "./codex-workbench-card.css?raw";
 
 export type CodexWorkbenchMode = "global" | "thread";
 export const codexWorkbenchUri = "ui://showai/workbench-v3.html";
 export const codexWorkbenchThreadUri = "ui://showai/workbench-thread-v5.html";
 export const codexWorkbenchFileUri = "ui://showai/workbench-file-v3.html";
 
-export const codexWorkbenchCardUri = "ui://showai/workbench-card-v5.html";
+export const codexWorkbenchCardUri = "ui://showai/workbench-card-v6.html";
 export const codexWorkbenchTargetUri = "ui://showai/workbench-target-v2.html";
 
 export function codexWorkbenchHtml(
   mode?: CodexWorkbenchMode,
   entrypoint?: "file" | "card" | "open",
   icon?: string,
-  globalEntrypoint?: string,
+  hasGlobalEntrypoint = false,
 ) {
   const useCard = entrypoint === "card" || entrypoint === "open";
   const card = useCard
     ? `<section id="showai-page-card" aria-label="ShowAI" hidden></section>
       <template id="showai-card-template"><article class="showai-card">
-        <img src="${icon ?? ""}" alt="" width="34" height="34">
-        <div class="showai-card-content">
-          <strong></strong>
-          <div class="showai-card-kind"></div>
+        <span class="showai-card-icon"><img src="${icon ?? ""}" alt="" width="23" height="23"></span>
+        <header class="showai-card-heading"><h2 class="showai-card-title"></h2><p class="showai-card-path" hidden></p></header>
+        <div class="showai-card-actions">
+          <button type="button" class="showai-button showai-card-open" disabled></button>
+          <span class="showai-card-choices"><select class="showai-select" disabled>
+            <option value="" hidden selected></option>
+            <option value="workbench"></option>
+            <option value="desktop"></option>
+          </select></span>
         </div>
-        <button type="button" disabled></button>
+        <p class="showai-card-body" hidden></p>
+        <p class="showai-card-error" role="status" hidden></p>
       </article></template>`
     : "";
   return `<!doctype html>
@@ -33,21 +40,8 @@ export function codexWorkbenchHtml(
 <style>
 :root { color-scheme: light dark; font: 14px system-ui }
 body { margin: 0 }
-#showai-page-card { display: grid; gap: 8px; padding: 8px 0 }
-.showai-card {
-  display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center;
-  gap: 14px; padding: 14px 16px;
-  border: 1px solid color-mix(in srgb, CanvasText 16%, Canvas);
-  border-left: 3px solid color-mix(in srgb, CanvasText 58%, Canvas); border-radius: 10px;
-}
-#showai-page-card[hidden], #root[hidden] { display: none }
-#showai-page-card img { background: white; padding: 3px; border-radius: 6px; box-sizing: border-box }
-.showai-card-content { min-width: 0; overflow-wrap: anywhere }
-.showai-card-kind { margin-top: 3px; opacity: 0.7 }
-.showai-card button { padding: 7px 12px; border: 1px solid color-mix(in srgb, CanvasText 20%, Canvas);
-  border-radius: 6px; background: Canvas; color: CanvasText; font: inherit; cursor: pointer }
-.showai-card button:disabled { opacity: 0.6; cursor: default }
-.showai-card button:focus-visible { outline: 2px solid Highlight; outline-offset: 2px }
+${useCard ? cardStyles : ""}
+#root[hidden] { display: none }
 #showai-launch { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 16px }
 #showai-launch[hidden], #showai-launch button[hidden] { display: none }
 </style></head><body>
@@ -57,7 +51,7 @@ ${card}
 <script>
 (() => {
   const translations = ${JSON.stringify(messages.catalogs)};
-  const globalEntrypoint = ${JSON.stringify(globalEntrypoint ?? null)};
+  const hasGlobalEntrypoint = ${hasGlobalEntrypoint};
   const chunkBytes = ${workbenchChunkBytes};
   const useFileEntrypoint = ${entrypoint === "file"};
   const usePageCard = ${useCard};
@@ -147,18 +141,18 @@ ${card}
     return request("ui/open-link", { url });
   }
 
-  async function openWorkbench(projectId, pageId) {
-    const url = new URL(globalEntrypoint);
-    url.searchParams.set("path", "/?" + new URLSearchParams({ project: projectId, page: pageId }));
-    const result = await openLink(url.href);
-    if (result?.isError) throw new Error(t("cannotOpenWorkbench"));
+  async function openWorkbench(projectId, pageId, blockId) {
+    if (!hasGlobalEntrypoint) throw new Error(t("cannotOpenWorkbench"));
+    return callWorkbench("workbench_open_destination", {
+      destination: "workbench", projectId, pageId, ...(blockId && { blockId }),
+    });
   }
 
-  async function openPageTab(target) {
+  async function openPageTab({ projectId, pageId, blockId }) {
     if (!capabilities.experimental?.["openai/files"] || !capabilities.serverTools)
       throw new Error(t("cannotOpenPageTab"));
     const result = resultPayload(await request("tools/call", {
-      name: "workbench_page_reference", arguments: target,
+      name: "workbench_page_reference", arguments: { projectId, pageId, ...(blockId && { blockId }) },
     }));
     const path = result?.structuredContent?.data?.path;
     if (result?.isError || typeof path !== "string")
@@ -313,12 +307,19 @@ ${card}
   function showPageCard() {
     if (!pageCards.length || (ready && !root.hidden) || refreshing) return;
     for (let i = 0; i < pageCards.length; i++) {
-      const target = pageCards[i];
       const row = card.children[i];
-      row.querySelector(".showai-card-kind").textContent = target.blockId ? target.title : t("pageCardKind");
       const button = row.querySelector("button");
-      button.textContent = t(target.blockId ? "locateComponent" : "openOriginalPage");
+      button.textContent = t("openPage");
       button.disabled = !initialized || openingCard;
+      const choices = row.querySelector("select");
+      choices.setAttribute("aria-label", t("openOptions"));
+      choices.title = t("openOptions");
+      choices.options[0].textContent = t("openOptions");
+      choices.options[1].textContent = t("cardWorkbench");
+      choices.options[1].disabled = !hasGlobalEntrypoint;
+      choices.options[2].textContent = t("cardDesktop");
+      choices.options[2].disabled = !capabilities.serverTools;
+      choices.disabled = button.disabled || !capabilities.serverTools;
     }
     card.hidden = false;
   }
@@ -370,17 +371,22 @@ ${card}
     }
   }
 
-  async function openPageCard(index) {
+  async function openPageCard(index, destination = "panel") {
     const pageCard = pageCards[index];
     if (!initialized || !pageCard || openingCard) return;
+    const { projectId, pageId, blockId } = pageCard;
+    const target = { projectId, pageId, ...(blockId && { blockId }) };
+    const errorMessage = card.children[index].querySelector(".showai-card-error");
+    errorMessage.hidden = true;
     openingCard = true;
     showPageCard();
     status.hidden = true;
     try {
+      if (destination !== "panel")
+        return await callWorkbench("workbench_open_destination", { ...target, destination });
       if (capabilities.serverTools) {
-        const { projectId, pageId, blockId } = pageCard;
         const reply = resultPayload(await request("tools/call", {
-          name: "card_navigate", arguments: { projectId, pageId, ...(blockId && { blockId }) },
+          name: "card_navigate", arguments: target,
           ...(navigationScope && { _meta: { "showai/navigationScope": navigationScope } }),
         }));
         if (reply?.isError) throw new Error(reply.structuredContent?.error?.message ?? t("unavailable"));
@@ -399,9 +405,10 @@ ${card}
         // A separately mounted editor receives the selection. Keep its originating group clickable.
         if (cardGroup && context.displayMode !== "fullscreen") return;
       }
-      await showCardEditor(pageCard);
+      await showCardEditor(target);
     } catch (error) {
-      show("failed", error.message);
+      errorMessage.textContent = [t("cannotOpenTarget"), error.message].filter(Boolean).join(" · ");
+      errorMessage.hidden = false;
     } finally {
       openingCard = false;
       showPageCard();
@@ -423,18 +430,32 @@ ${card}
       const targets = group?.cards ?? (target?.pageId ? [target] : undefined);
       if (!targets?.length) return;
       navigationScope ??= meta?.showaiNavigationScope;
-      const singleChanged = !group && ["projectId", "pageId", "blockId", "title", "blockTitle"]
-        .some(key => pageCards[0]?.[key] !== target?.[key]);
+      const singleChanged = !group && (["projectId", "pageId", "blockId", "title", "blockTitle", "description"]
+        .some(key => pageCards[0]?.[key] !== target?.[key]) ||
+        JSON.stringify(pageCards[0]?.breadcrumb) !== JSON.stringify(target?.breadcrumb));
       if (!pageCards.length || group?.id !== cardGroup || singleChanged) {
         cardGroup = group?.id;
         selectedIndex = undefined;
         pageCards = targets;
         card.replaceChildren(...targets.map((item, index) => {
           const row = cardTemplate.content.firstElementChild.cloneNode(true);
-          const title = item.blockTitle || item.title;
-          row.setAttribute("aria-label", title);
-          row.querySelector("strong").textContent = title;
+          const title = row.querySelector(".showai-card-title");
+          title.textContent = item.title;
+          title.id = "showai-card-title-" + index;
+          row.setAttribute("aria-labelledby", title.id);
+          const path = row.querySelector(".showai-card-path");
+          path.textContent = Array.isArray(item.breadcrumb) ? item.breadcrumb.join(" / ") : "";
+          path.hidden = !path.textContent;
+          const body = row.querySelector(".showai-card-body");
+          body.textContent = item.description || item.blockTitle || "";
+          body.hidden = !body.textContent;
           row.querySelector("button").addEventListener("click", () => openPageCard(index));
+          const choices = row.querySelector("select");
+          choices.addEventListener("change", () => {
+            const destination = choices.value;
+            choices.value = "";
+            if (destination) void openPageCard(index, destination);
+          });
           return row;
         }));
       }
@@ -530,7 +551,7 @@ ${card}
         attachReference,
         canReference,
         openLink,
-        ...(globalEntrypoint && { openWorkbench }),
+        ...(hasGlobalEntrypoint && { openWorkbench }),
         openPageTab,
         importAsset,
         readMedia,

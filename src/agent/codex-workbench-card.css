@@ -1,0 +1,108 @@
+#showai-page-card {
+  --card-ink: var(--color-text-primary, CanvasText);
+  --card-muted: var(--color-text-secondary, color-mix(in srgb, CanvasText 63%, Canvas));
+  --card-border: var(--color-border-secondary, color-mix(in srgb, CanvasText 16%, Canvas));
+  --card-fill: var(--color-background-primary, Canvas);
+  --card-hover: var(--color-background-secondary, color-mix(in srgb, CanvasText 6%, Canvas));
+  display: grid;
+  gap: 8px;
+  padding: 3px 2px;
+  color: var(--card-ink);
+}
+
+.showai-card {
+  display: grid;
+  grid-template-columns: 32px minmax(0, 1fr) auto;
+  column-gap: 12px;
+  align-items: start;
+  padding: 14px 16px;
+  border: 1px solid var(--card-border);
+  border-radius: 13px;
+  background: var(--card-fill);
+}
+
+.showai-card-icon {
+  display: grid;
+  width: 32px;
+  height: 32px;
+  place-items: center;
+  border-radius: 8px;
+  background: #f3f4f6;
+}
+
+.showai-card-icon img { display: block; width: 23px; height: 23px }
+.showai-card-heading { min-width: 0; overflow-wrap: anywhere }
+.showai-card-title { margin: 0; font: 600 15px/1.35 system-ui, sans-serif }
+.showai-card-path { margin: 3px 0 0; color: var(--card-muted); font-size: 12px; line-height: 1.45 }
+.showai-card-body, .showai-card-error {
+  grid-column: 2 / -1;
+  margin: 9px 0 0;
+  font-size: 13px;
+  line-height: 1.55;
+  overflow-wrap: anywhere;
+  white-space: pre-line;
+}
+.showai-card-error { color: var(--color-text-danger, light-dark(#9d2828, #ffaba4)) }
+
+.showai-card-actions {
+  display: inline-flex;
+  align-self: start;
+  border: 1px solid var(--card-border);
+  border-radius: 8px;
+  background: var(--card-fill);
+  color: var(--card-ink);
+}
+.showai-card-open, .showai-card-choices { box-sizing: border-box; height: 30px }
+.showai-card-open {
+  display: block;
+  min-height: 0;
+  padding: 0 9px;
+  border: 0;
+  border-radius: 7px 0 0 7px;
+  background: transparent;
+  color: inherit;
+  font: 500 13px/1 system-ui, sans-serif;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.showai-card-choices {
+  display: grid;
+  width: 28px;
+  place-items: center;
+  position: relative;
+  border-inline-start: 1px solid var(--card-border);
+  border-radius: 0 7px 7px 0;
+}
+.showai-card-choices::after {
+  content: "";
+  width: 5px;
+  height: 5px;
+  border: solid currentColor;
+  border-width: 0 1.5px 1.5px 0;
+  transform: translateY(-1px) rotate(45deg);
+  pointer-events: none;
+}
+.showai-card-choices select {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+.showai-card-open:hover:enabled, .showai-card-choices:hover { background: var(--card-hover) }
+.showai-card-open:focus-visible, .showai-card-choices:has(select:focus-visible) {
+  outline: 2px solid Highlight;
+  outline-offset: 2px;
+}
+.showai-card-open:disabled, .showai-card-choices:has(select:disabled) { opacity: .5; cursor: default }
+#showai-page-card[hidden], #showai-page-card [hidden] { display: none }
+@media (max-width: 360px) {
+  .showai-card { grid-template-columns: 26px minmax(0, 1fr); column-gap: 8px; padding: 12px }
+  .showai-card-icon { width: 26px; height: 26px }
+  .showai-card-icon img { width: 20px; height: 20px }
+  .showai-card-actions { grid-area: 4 / 2; justify-self: end; margin-top: 10px }
+  .showai-card-body { grid-row: 2 }
+  .showai-card-error { grid-row: 3 }
+}

@@ -8,10 +8,21 @@ import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
 import { expect, it } from "vitest";
 import { codexWorkbenchUri, codexWorkbenchThreadUri, codexWorkbenchFileUri, codexWorkbenchCardUri, codexWorkbenchTargetUri } from "./codex-workbench-ui";
-import { codexPageReferenceExtension, type CodexPageTarget } from "./codex-page-reference";
+import { codexPageReferenceExtension, codexWorkbenchPageLink, type CodexPageTarget } from "./codex-page-reference";
 import type { ShowDocument } from "../types";
 
 type SavedPage = { document: ShowDocument; hash: string; revision?: string };
+
+it("addresses the installed global Workbench with the Page and optional component in its relative path", () => {
+  const entry = "codex://plugins/showai-workbench-test@showai-workbench-test/app/workbench_open_global";
+  const page = { projectId: "project-1", pageId: "page-2" };
+  for (const blockId of [undefined, "block-3"]) {
+    const url = new URL(codexWorkbenchPageLink(entry, { ...page, blockId }));
+    expect(url.href.split("?")[0]).toBe(entry);
+    expect(url.searchParams.size).toBe(1);
+    expect(url.searchParams.get("path")).toBe("/?project=project-1&page=page-2" + (blockId ? "&blocks=block-3" : ""));
+  }
+});
 
 async function workbenchTool<T>(client: Client, name: string, args: Record<string, unknown>) {
   const result = await client.callTool({ name, arguments: args });
@@ -64,6 +75,10 @@ it("opens both Codex workbench entries and saves into the MCP library", async ()
         .toEqual({ resourceUri: codexWorkbenchCardUri, visibility: ["model", "app"] });
     }
     const cardResource = await client.readResource({ uri: codexWorkbenchCardUri });
+    expect((await client.readResource({ uri: "ui://showai/workbench-card-v5.html" })).contents[0].mimeType)
+      .toBe("text/html;profile=mcp-app");
+    expect(tools.find(tool => tool.name === "workbench_open_destination")?._meta?.ui)
+      .toEqual({ visibility: ["app"] });
     expect(cardResource.contents[0]).toMatchObject({
       mimeType: "text/html;profile=mcp-app",
       text: expect.stringContaining('id="showai-page-card"'),
@@ -73,7 +88,7 @@ it("opens both Codex workbench entries and saves into the MCP library", async ()
       "text", expect.stringContaining('"ui/request-display-mode"'),
     );
     expect(cardResource.contents[0]).toHaveProperty("text", expect.stringContaining(
-      "codex://plugins/showai-workbench-test@showai-workbench-test/app/workbench_open_global",
+      "const hasGlobalEntrypoint = true",
     ));
     const direct = await client.readResource({ uri: codexWorkbenchTargetUri });
     expect(direct.contents[0]._meta?.["openai/ui"]).toMatchObject({ preferredDisplayMode: "fullscreen" });
@@ -167,7 +182,9 @@ it("opens both Codex workbench entries and saves into the MCP library", async ()
     const project = await client.callTool({ name: "project_create", arguments: { name: "Codex Workbench" } });
     expect(project.isError, JSON.stringify(project.content)).not.toBe(true);
     const { id: projectId } = (project.structuredContent as { data: { id: string } }).data;
-    const page = await invoke<SavedPage>("pages:create", { projectId, title: "Architecture" });
+    const folder = await invoke<{ id: string }>("folders:create", { projectId, name: "Plans" });
+    const nested = await invoke<{ id: string }>("folders:create", { projectId, name: "Details", parentId: folder.id });
+    const page = await invoke<SavedPage>("pages:create", { projectId, title: "Architecture", parentId: nested.id });
     const pageId = page.document.id;
     const savedResult = await workbenchTool<DesktopResponse<SavedPage>>(client, "workbench_request", {
       route: "invoke", client: "codex-workbench-test",
@@ -227,13 +244,24 @@ it("opens both Codex workbench entries and saves into the MCP library", async ()
     });
     const card = await client.callTool({ name: "card_present", arguments: { projectId, pageId } });
     expect(card.isError).not.toBe(true);
+    const breadcrumb = ["Codex Workbench", "Plans", "Details", data.title];
     expect(card.structuredContent).toEqual({
-      ok: true, data: { projectId, pageId, title: data.title },
+      ok: true, data: { projectId, pageId, title: data.title, breadcrumb },
     });
-    expect(card._meta?.showaiPageCard).toEqual({ projectId, pageId, title: data.title });
+    expect(card._meta?.showaiPageCard).toEqual({ projectId, pageId, title: data.title, breadcrumb });
     expect(card.content).toHaveLength(1);
     const blockId = saved.document.content.attrs!.id as string;
     const component = { projectId, pageId, blockId };
+    const annotated = await client.callTool({
+      name: "card_present", arguments: { ...component, description: "  Compare the two dates  " },
+    });
+    expect(annotated._meta?.showaiPageCard).toMatchObject({
+      title: data.title, breadcrumb, blockId, blockTitle: expect.any(String), description: "Compare the two dates",
+    });
+    const missingDesktop = await client.callTool({
+      name: "workbench_open_destination", arguments: { ...component, destination: "desktop", blockId: "deleted-block" },
+    });
+    expect(missingDesktop.isError).toBe(true);
     const anchored = await client.callTool({ name: "workbench_page_reference", arguments: component });
     const anchoredData = anchored._meta!.showaiPageCard as { path: string };
     const anchorFile = await readFile(anchoredData.path, "utf8");
@@ -249,13 +277,19 @@ it("opens both Codex workbench entries and saves into the MCP library", async ()
     const otherPage = { projectId, pageId: other.document.id };
     const grouped = await client.callTool({
       name: "card_present",
-      arguments: { projectId, pageId, additionalTargets: [component, otherPage] },
+      arguments: { projectId, pageId, description: "This week's agenda",
+        additionalTargets: [component, { ...otherPage, description: "Next steps" }] },
     });
     expect(grouped.isError).not.toBe(true);
     const group = grouped._meta!.showaiCardGroup as { id: string; cards: CodexPageTarget[] };
     expect(grouped.structuredContent).toEqual({ ok: true, data: group });
     expect(group.cards).toHaveLength(3);
-    expect(group.cards).toMatchObject([{ projectId, pageId }, component, otherPage]);
+    expect(group.cards).toMatchObject([
+      { projectId, pageId, breadcrumb, description: "This week's agenda" },
+      { ...component, title: data.title, breadcrumb, blockTitle: expect.any(String) },
+      { ...otherPage, breadcrumb: ["Codex Workbench", "A separate Codex tab"], description: "Next steps" },
+    ]);
+    expect(group.cards[1]).not.toHaveProperty("description");
     expect(group.cards[0]).not.toHaveProperty("blockId");
     const choice = { groupId: group.id };
     expect(await workbenchTool(client, "workbench_card_choice", choice)).toBeNull();

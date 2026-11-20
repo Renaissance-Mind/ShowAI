@@ -4,7 +4,7 @@ import { fileURLToPath } from "node:url";
 import { access } from "node:fs/promises";
 import { startBrowserServer } from "./server";
 import { workbenchAssets } from "./workbench-assets";
-import { openBrowser } from "./system";
+import { openSystemUrl } from "./system";
 import { translator } from "../i18n";
 import messages from "../i18n/messages/workbench";
 
@@ -86,7 +86,7 @@ export async function runBrowser(options: {
   process.on("SIGINT", stop);
   process.on("SIGTERM", stop);
   if (options.open)
-    await openBrowser(server.url).catch((error: Error) => {
+    await openSystemUrl(server.url).catch((error: Error) => {
       process.stderr.write(
         t("openBrowserFailed", { message: error.message, url: server.url }) +
           "\n",
