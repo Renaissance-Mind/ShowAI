@@ -32,8 +32,10 @@ import {
 } from "node:path";
 import { FileStore } from "../core/store";
 import { resolveDocumentComponents } from "../core/catalog";
-import { resolvePublishedComponents } from "../core/publication";
-import { publicationRefKey } from "../portable/remote.mjs";
+import {
+  planComponentDelivery,
+  type ComponentDelivery,
+} from "../core/publication";
 import type { PublishedComponentLocator } from "../portable/publication-types";
 import type { CompiledComponent } from "../contract/types";
 import { externalResourceUrls } from "../portable/assets.mjs";
@@ -91,7 +93,7 @@ export interface ExportOptions {
   revision?: string;
   importedSnapshot?: { importId: string; snapshotId: string };
   overwrite?: boolean;
-  components?: "bundled" | "remote";
+  components?: ComponentDelivery;
   presentation?: "spatial" | "reading";
   reader?: ReaderMode;
   packaging?: PackagingDecisions;
@@ -106,7 +108,7 @@ export interface ExportResult {
   path: string;
   sourcePaths: string[];
   bytes: number;
-  components: "bundled" | "remote";
+  components: "bundled" | "remote" | "mixed";
   reader: ReaderMode;
   readerReason?: ReaderReason;
   requiresNetwork: boolean;
@@ -577,8 +579,8 @@ export async function exportPage(
   const presentation =
     options.presentation ?? (selection ? "reading" : "spatial");
   const componentMode = options.components ?? "bundled";
-  if (!["bundled", "remote"].includes(componentMode))
-    throw new Error("Choose bundled or remote components.");
+  if (!["bundled", "remote", "prefer-published"].includes(componentMode))
+    throw new Error("Unsupported component delivery mode.");
   if (options.format === "inline" && componentMode === "remote")
     throw new Error(
       "Inline exports must bundle components because the conversation host blocks remote requests.",
@@ -594,6 +596,8 @@ export async function exportPage(
     );
   await assertExportDestination(store.root, options.projectId, out);
   if (options.format !== "site") {
+    if (componentMode === "prefer-published")
+      throw new Error("Only site exports can prefer published components.");
     if (!options.pageId)
       throw new Error("A page id is required for html or inline export.");
     const { plan, packaged, bindings } = await packagePage(store, {
@@ -621,15 +625,8 @@ export async function exportPage(
       options.projectId,
     );
     const document = lockedDocument(sourceDocument, components);
-    const remoteComponents =
-      componentMode === "remote"
-        ? await resolvePublishedComponents(
-            store.root,
-            document,
-            options.projectId,
-          )
-        : [];
-    const bundledComponents = componentMode === "bundled" ? components : [];
+    const [{ components: bundledComponents, remoteComponents }] =
+      await planComponentDelivery(store.root, [components], componentMode);
     const references = await referenceSnapshot(
       store.root,
       options.projectId,
@@ -779,25 +776,20 @@ export async function exportPage(
   documents = documents.map((document, index) =>
     lockedDocument(document, pageComponents[index]),
   );
-  const allRemote =
-    componentMode === "remote"
-      ? await resolvePublishedComponents(
-          store.root,
-          {
-            ...documents[0],
-            content: {
-              type: "doc",
-              content: documents.flatMap(
-                (document) => document.content.content ?? [],
-              ),
-            },
-          },
-          options.projectId,
-        )
-      : [];
-  const remoteByRef = new Map(
-    allRemote.map((locator) => [publicationRefKey(locator.ref), locator]),
+  const deliveries = await planComponentDelivery(
+    store.root,
+    pageComponents,
+    componentMode,
   );
+  const requiresNetwork = deliveries.some(
+    (page) => page.remoteComponents.length > 0,
+  );
+  let siteComponents: ExportResult["components"] =
+    componentMode === "remote" ? "remote" : "bundled";
+  if (componentMode === "prefer-published" && requiresNetwork)
+    siteComponents = deliveries.some((page) => page.components.length > 0)
+      ? "mixed"
+      : "remote";
   let previousRoutes: { id: string; file: string }[] = [];
   if (await exists(out)) {
     if (!(await stat(out)).isDirectory())
@@ -863,20 +855,7 @@ export async function exportPage(
   const sourcePaths: string[] = [];
   let bytes = 0;
   for (const [index, document] of documents.entries()) {
-    const components = componentMode === "bundled" ? pageComponents[index] : [];
-    const remoteComponents =
-      componentMode === "remote"
-        ? pageComponents[index].map((component) =>
-            remoteByRef.get(
-              publicationRefKey({
-                kind: "component",
-                id: component.id,
-                version: component.version,
-                integrity: component.integrity,
-              }),
-            )!,
-          )
-        : [];
+    const { components, remoteComponents } = deliveries[index];
     const references = await referenceSnapshot(
       store.root,
       options.projectId,
@@ -990,8 +969,8 @@ export async function exportPage(
         version: 1,
         projectId: options.projectId,
         pages: routes,
-        components: componentMode,
-        requiresNetwork: allRemote.length > 0,
+        components: siteComponents,
+        requiresNetwork,
       },
       null,
       2,
@@ -1004,9 +983,9 @@ export async function exportPage(
     path: join(out, "index.html"),
     sourcePaths,
     bytes,
-    components: componentMode,
+    components: siteComponents,
     reader: "bundled",
-    requiresNetwork: allRemote.length > 0,
+    requiresNetwork,
     ...(externalSnapshots.datasets.length ? { externalSnapshots } : {}),
     ...resourceReport(
       documents,

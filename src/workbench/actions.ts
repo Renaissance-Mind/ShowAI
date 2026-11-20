@@ -1967,7 +1967,9 @@ export function createWorkbench(
           root: store.root,
           projectId: id,
           format: "site",
-          components: componentDelivery(args),
+          components: args.components === "prefer-published"
+            ? "prefer-published"
+            : componentDelivery(args),
           ...packaging(args),
           out: selection.filePaths[0],
           overwrite: true,

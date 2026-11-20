@@ -26,15 +26,15 @@ import {
 import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import {
   importPublishedBundle,
-  resolveDocumentComponents,
+  packageRevisionRef,
   resolvePackageBundle,
   validatePackageBundle,
 } from "./catalog";
 import type {
+  CompiledComponent,
   PackageBundle,
   PackageRevisionRef,
 } from "../contract/types";
-import type { ShowDocument } from "../types";
 import type {
   PreparedPublication,
   PublicationManifest,
@@ -506,40 +506,50 @@ export async function listPublishedComponents(
   );
 }
 
-export async function resolvePublishedComponents(
+export type ComponentDelivery = "bundled" | "remote" | "prefer-published";
+
+export async function planComponentDelivery(
   home: string,
-  document: ShowDocument,
-  projectId?: string,
-): Promise<PublishedComponentLocator[]> {
-  const dependencies = await resolveDocumentComponents(
-    home,
-    document,
-    projectId,
-  );
+  dependenciesByPage: CompiledComponent[][],
+  mode: ComponentDelivery,
+): Promise<
+  {
+    components: CompiledComponent[];
+    remoteComponents: PublishedComponentLocator[];
+  }[]
+> {
+  if (mode === "bundled")
+    return dependenciesByPage.map((components) => ({
+      components,
+      remoteComponents: [],
+    }));
   const published = new Map(
     (await listPublishedComponents(home)).map((locator) => [
       publicationRefKey(locator.ref),
       locator,
     ]),
   );
-  const missing: string[] = [];
-  const resolved: PublishedComponentLocator[] = [];
-  for (const component of dependencies) {
-    const key = publicationRefKey({
-      kind: "component",
-      id: component.id,
-      version: component.version,
-      integrity: component.integrity,
-    });
-    const locator = published.get(key);
-    if (locator) resolved.push(locator);
-    else missing.push(key);
-  }
-  if (missing.length)
+  const missing = new Set<string>();
+  const pages = dependenciesByPage.map((dependencies) => {
+    const components: CompiledComponent[] = [];
+    const remoteComponents: PublishedComponentLocator[] = [];
+    const seen = new Set<string>();
+    for (const component of dependencies) {
+      const key = publicationRefKey(packageRevisionRef("component", component));
+      if (seen.has(key)) continue;
+      seen.add(key);
+      const locator = published.get(key);
+      if (locator) remoteComponents.push(locator);
+      else if (mode === "remote") missing.add(key);
+      else components.push(component);
+    }
+    return { components, remoteComponents };
+  });
+  if (missing.size)
     throw new Error(
-      `Remote export requires verified immutable publications. Unpublished dependencies:\n${missing.map((ref) => `- ${ref}`).join("\n")}`,
+      `Remote export requires verified immutable publications. Unpublished dependencies:\n${[...missing].map((ref) => `- ${ref}`).join("\n")}`,
     );
-  return resolved;
+  return pages;
 }
 
 export function verifyPublication(

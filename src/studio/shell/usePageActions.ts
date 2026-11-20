@@ -8,6 +8,7 @@ import {
 import type { ProjectSummary, FolderMetadata } from "../../core/model";
 import type { TemplateMetadata } from "../../contract/types";
 import type { ImportReport } from "../../agent/import-service";
+import type { ExportResult } from "../../agent/exporter";
 import type { AgentTarget } from "../../agent-host/types";
 import {
   formatReference,
@@ -547,7 +548,9 @@ export function usePageActions({
       setBusy(false);
     }
   }
-  async function exportSite(components: "bundled" | "remote" = "bundled") {
+  async function exportSite(
+    components: "bundled" | "prefer-published" = "bundled",
+  ) {
     if (!selectedProject) return;
     setBusy(true);
     try {
@@ -559,23 +562,23 @@ export function usePageActions({
         "site",
       );
       if (packaging === null) return;
-      const result = await desktop.invoke<{ path: string } | null>(
-        "export:site",
-        {
-          projectId: selectedProject,
-          components,
-          ...(packaging ? { packaging } : {}),
-        },
-      );
+      const result = await desktop.invoke<ExportResult | null>("export:site", {
+        projectId: selectedProject,
+        components,
+        ...(packaging ? { packaging } : {}),
+      });
       resolveProblem(operation("op.exportSite"));
-      if (result)
+      if (result) {
+        const messages = {
+          bundled: "siteExportedBundled",
+          remote: "siteExportedRemote",
+          mixed: "siteExportedMixed",
+        } as const;
         setExportReceipt({
-          message:
-            components === "remote"
-              ? t("siteExportedRemote")
-              : t("siteExportedBundled"),
+          message: t(messages[result.components]),
           path: result.path,
         });
+      }
     } catch (reason) {
       report(reason, {
         action: operation("op.exportSite"),

@@ -127,8 +127,9 @@ export function StudioMenus({
             },
             {
               label: t("exportOnline"),
+              description: t("exportOnlineSiteDetail"),
               icon: <Globe size={15} />,
-              onSelect: () => void exportSite("remote"),
+              onSelect: () => void exportSite("prefer-published"),
             },
           ]}
         />

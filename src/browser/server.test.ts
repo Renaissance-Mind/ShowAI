@@ -31,7 +31,8 @@ import { ContentLibrary as GitLibrary } from "../core/content-library";
 import type { LibraryStorage } from "../core/library-maintenance";
 import type { DesktopInfo, DesktopResponse } from "../host/protocol";
 import type { LoadedPage } from "../studio/usePage";
-import { blankDocument } from "../core/catalog";
+import { blankDocument, componentWidgetData } from "../core/catalog";
+import { parseArtifact } from "../portable/validation.mjs";
 import type { CompiledComponent } from "../contract/types";
 import type { ProjectMetadata } from "../core/model";
 import type { ConnectorSettings } from "../agent-host/remote-connector";
@@ -589,11 +590,9 @@ test("real component compilation, templates, source import and HTML/site export 
   const project = await invoke<{ id: string }>("projects:create", {
     name: "Exports",
   });
-  const component = await invoke<{
-    id: string;
-    version: string;
-    integrity: string;
-  }>("components:createExample", { projectId: project.id });
+  const component = await invoke<CompiledComponent>("components:createExample", {
+    projectId: project.id,
+  });
   const source = await invoke("components:source", {
     projectId: project.id,
     id: component.id,
@@ -656,6 +655,36 @@ test("real component compilation, templates, source import and HTML/site export 
   expect(await readFile(join(home, "site/index.html"), "utf8")).toContain(
     "Exported",
   );
+  const document = blankDocument();
+  document.content.content = [
+    {
+      type: "widget",
+      attrs: { kind: "custom", data: componentWidgetData(component) },
+    },
+  ];
+  const customPage = await invoke<LoadedPage>("pages:create", {
+    projectId: project.id,
+    document,
+  });
+  const online = await invoke("export:site", {
+    projectId: project.id,
+    components: "prefer-published",
+    selectedPath: join(home, "site"),
+  });
+  expect(online).toMatchObject({
+    components: "bundled",
+    requiresNetwork: false,
+  });
+  const artifact = parseArtifact(
+    await readFile(
+      join(home, "site/sources", `${customPage.document.id}.showai.json`),
+      "utf8",
+    ),
+  );
+  expect(artifact.components?.map((item) => item.integrity)).toEqual([
+    component.integrity,
+  ]);
+  expect(artifact.remoteComponents).toBeUndefined();
 }, 30000);
 
 test("local media plays only through grants minted by the authenticated workbench", async () => {

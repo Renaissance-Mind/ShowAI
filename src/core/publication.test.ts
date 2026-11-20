@@ -9,7 +9,7 @@ import {
   writeFile,
 } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join, resolve, sep } from "node:path";
+import { extname, join, resolve, sep } from "node:path";
 import { pathToFileURL } from "node:url";
 import { chromium } from "playwright-core";
 import { createServer as createViteServer } from "vite";
@@ -30,6 +30,7 @@ import {
   verifyPublication,
 } from "./publication";
 import { assertExportDestination, exportPage } from "../agent/exporter";
+import { htmlArtifactSource } from "./importers/html-artifact";
 import { parseArtifact } from "../portable/validation.mjs";
 import { publicationUrl } from "../portable/remote.mjs";
 import type { PackageRevisionRef } from "../contract/types";
@@ -108,6 +109,11 @@ async function fixture(versioned = false) {
 }
 
 async function serve(directory: string) {
+  const types: Record<string, string> = {
+    ".html": "text/html",
+    ".js": "text/javascript",
+    ".css": "text/css",
+  };
   const state = {
     cors: true,
     requests: [] as { path: string; cookie?: string; authorization?: string }[],
@@ -135,7 +141,7 @@ async function serve(directory: string) {
       return;
     }
     response.writeHead(200, {
-      "Content-Type": "application/json",
+      "Content-Type": types[extname(target)] ?? "application/json",
       "Cache-Control": "no-store",
       ...(state.cors ? { "Access-Control-Allow-Origin": "*" } : {}),
     });
@@ -296,16 +302,20 @@ describe("publication and component delivery", () => {
     expect((await loadRemoteComponents(verified.components))[0].integrity).toBe(
       f.component.integrity,
     );
-    const site = await exportPage({
-      root: f.home,
-      projectId: f.project.id,
-      format: "site",
-      components: "remote",
-      out: join(f.root, "site"),
-    });
-    const source = parseArtifact(await readFile(site.sourcePaths[0], "utf8"));
-    expect(source.remoteComponents).toHaveLength(1);
-    expect(source).not.toHaveProperty("templates");
+    for (const components of ["remote", "prefer-published"] as const) {
+      const site = await exportPage({
+        root: f.home,
+        projectId: f.project.id,
+        format: "site",
+        components,
+        out: join(f.root, components),
+      });
+      expect(site).toMatchObject({ components: "remote", requiresNetwork: true });
+      const source = parseArtifact(await readFile(site.sourcePaths[0], "utf8"));
+      expect(source.remoteComponents).toEqual(verified.components);
+      expect(source.components).toBeUndefined();
+      expect(source).not.toHaveProperty("templates");
+    }
     const textTemplate = await saveTemplate(
       f.home,
       {
@@ -344,6 +354,108 @@ describe("publication and component delivery", () => {
       ),
     ).toBe(true);
   });
+
+  it("bundles only unpublished fingerprints on each page of an online site", async () => {
+    const f = await fixture();
+    const project = await f.store.createProject({ name: "Site" });
+    const source = await readComponentSource(
+      f.home,
+      f.ref.id,
+      f.ref.version,
+      f.project.id,
+    );
+    const local = await saveComponent(
+      f.home,
+      {
+        ...source,
+        manifest: { ...source.manifest, name: "Site counter" },
+        source: source.source.replace("value+1", "value+2"),
+      },
+      project.id,
+    );
+    expect(local.integrity).not.toBe(f.ref.integrity);
+    const release = await preparePublication(f.home, {
+      refs: [f.ref],
+      projectId: f.project.id,
+      out: join(f.root, "release"),
+    });
+    const server = await serve(release.path);
+    const verified = await verifyPublication(f.home, {
+      manifestUrl: server.origin + "/manifest.json",
+    });
+    const document = blankDocument();
+    document.content.content = [
+      {
+        type: "widget",
+        attrs: { kind: "custom", data: componentWidgetData(local) },
+      },
+    ];
+    const localPage = await f.store.createPage(project.id, { document });
+    document.content.content.push({
+      type: "widget",
+      attrs: { kind: "custom", data: componentWidgetData(f.component) },
+    });
+    const mixedPage = await f.store.createPage(project.id, { document });
+    const out = join(f.root, "site");
+    const options = {
+      root: f.home,
+      projectId: project.id,
+      format: "site" as const,
+      out,
+    };
+    await expect(
+      exportPage({ ...options, components: "remote" }),
+    ).rejects.toThrow(local.integrity);
+    const site = await exportPage({
+      ...options,
+      components: "prefer-published",
+    });
+    expect(site).toMatchObject({ components: "mixed", requiresNetwork: true });
+    const manifest: { pages: { id: string; file: string }[] } = JSON.parse(
+      await readFile(join(out, "showai-site.json"), "utf8"),
+    );
+    expect(manifest).toMatchObject({
+      components: "mixed",
+      requiresNetwork: true,
+    });
+    expect(site.pageIds.sort()).toEqual(
+      [localPage.document.id, mixedPage.document.id].sort(),
+    );
+    for (const route of manifest.pages) {
+      const artifact = parseArtifact(
+        await readFile(join(out, "sources", `${route.id}.showai.json`), "utf8"),
+      );
+      expect(artifact.components?.map((item) => item.integrity)).toEqual([
+        local.integrity,
+      ]);
+      expect(artifact.remoteComponents).toEqual(
+        route.id === mixedPage.document.id ? verified.components : undefined,
+      );
+      const html = await readFile(join(out, route.file), "utf8");
+      expect(parseArtifact(htmlArtifactSource(html))).toEqual(artifact);
+    }
+    const route = manifest.pages.find(
+      (page) => page.id === mixedPage.document.id,
+    )!;
+    const siteServer = await serve(out);
+    const browser = await chromium.launch({ headless: true });
+    try {
+      const page = await browser.newPage();
+      await page.goto(siteServer.origin + "/" + route.file);
+      for (const [name, value] of [
+        ["Site counter", 2],
+        ["Published counter", 1],
+      ]) {
+        const button = page
+          .frameLocator(`iframe[title="${name}"]`)
+          .getByRole("button", { name: "Increase count" });
+        await button.click();
+        expect(await button.innerText()).toBe(`Count: ${value}`);
+      }
+    } finally {
+      await browser.close();
+    }
+  }, 60000);
 
   it("lists every unpublished dependency instead of silently substituting another revision", async () => {
     const f = await fixture();

@@ -229,6 +229,8 @@ After creating or organizing a new ShowAI page, MCP Agents save it and call page
 
 Bundled is the default. The reader, content and exact custom runtimes travel together; raster images must be embedded for offline delivery. HTML and inline exports also save editable source JSON. A static site includes relative navigation, source files and shared reader assets, and is intended for HTTP/static hosting. Whole-project export omits archived pages.
 
+In the workbench, **Export site → Online site** links each component to its verified release when the version and fingerprint match. It bundles the remaining components with the pages that use them. Explicit remote component export through the CLI or MCP requires a verified release for every component.
+
 ### ShowAI workbench in Codex desktop
 
 On supported Codex desktop installations, the ShowAI sidebar entry opens the project workbench. The ShowAI tab beside a chat opens the same Page and Board editor. In that editor, **Reference in Codex chat** attaches a versioned reference to a selection. Codex uses ShowAI MCP to read the referenced objects and checks their version before writing to the original page.
