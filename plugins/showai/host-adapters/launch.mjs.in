@@ -487,6 +487,7 @@ try {
 if (launch) {
   const child = spawn(launch.command, launch.args, {
     env: launch.env,
+__SHOWAI_HOST_CWD__
     stdio: "inherit",
   });
   child.once("error", (error) => {

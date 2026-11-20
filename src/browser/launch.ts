@@ -4,7 +4,7 @@ import { fileURLToPath } from "node:url";
 import { access } from "node:fs/promises";
 import { startBrowserServer } from "./server";
 import { workbenchAssets } from "./workbench-assets";
-import { openSystemUrl } from "./system";
+import { openSystemUrl } from "../host/local-system";
 import { translator } from "../i18n";
 import messages from "../i18n/messages/workbench";
 

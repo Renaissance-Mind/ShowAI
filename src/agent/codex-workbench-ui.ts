@@ -2,13 +2,17 @@ import messages from "../i18n/messages/codex-workbench";
 import { workbenchChunkBytes } from "../host/codex-workbench-transport";
 import { codexPageReferenceMaxLength } from "./codex-page-reference";
 import cardStyles from "./codex-workbench-card.css?raw";
+import cardMarkup from "./codex-workbench-card.html?raw";
+import cardView from "./codex-workbench-card-view.js?raw";
+import cardSpacingEditor from "./codex-workbench-card-spacing.js?raw";
+import chatgptMark from "../design/brands/openai.svg?raw";
 
 export type CodexWorkbenchMode = "global" | "thread";
 export const codexWorkbenchUri = "ui://showai/workbench-v3.html";
 export const codexWorkbenchThreadUri = "ui://showai/workbench-thread-v5.html";
 export const codexWorkbenchFileUri = "ui://showai/workbench-file-v3.html";
 
-export const codexWorkbenchCardUri = "ui://showai/workbench-card-v6.html";
+export const codexWorkbenchCardUri = "ui://showai/workbench-card-v8.html";
 export const codexWorkbenchTargetUri = "ui://showai/workbench-target-v2.html";
 
 export function codexWorkbenchHtml(
@@ -19,21 +23,10 @@ export function codexWorkbenchHtml(
 ) {
   const useCard = entrypoint === "card" || entrypoint === "open";
   const card = useCard
-    ? `<section id="showai-page-card" aria-label="ShowAI" hidden></section>
-      <template id="showai-card-template"><article class="showai-card">
-        <span class="showai-card-icon"><img src="${icon ?? ""}" alt="" width="23" height="23"></span>
-        <header class="showai-card-heading"><h2 class="showai-card-title"></h2><p class="showai-card-path" hidden></p></header>
-        <div class="showai-card-actions">
-          <button type="button" class="showai-button showai-card-open" disabled></button>
-          <span class="showai-card-choices"><select class="showai-select" disabled>
-            <option value="" hidden selected></option>
-            <option value="workbench"></option>
-            <option value="desktop"></option>
-          </select></span>
-        </div>
-        <p class="showai-card-body" hidden></p>
-        <p class="showai-card-error" role="status" hidden></p>
-      </article></template>`
+    ? `<section id="showai-page-card" class="showai-card-list" aria-label="ShowAI" hidden></section>
+      <template id="showai-card-template">${cardMarkup.replaceAll("__SHOWAI_ICON__", icon ?? "")
+        .replaceAll("__CHATGPT_ICON__", "data:image/svg+xml;base64," + Buffer.from(chatgptMark).toString("base64"))}</template>
+      <section id="showai-card-spacing" class="showai-spacing-editor" hidden></section>`
     : "";
   return `<!doctype html>
 <html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
@@ -50,11 +43,14 @@ ${card}
 <div id="root" hidden></div>
 <script>
 (() => {
+  ${useCard ? cardView : ""}
+  ${entrypoint === "card" ? cardSpacingEditor : ""}
   const translations = ${JSON.stringify(messages.catalogs)};
   const hasGlobalEntrypoint = ${hasGlobalEntrypoint};
   const chunkBytes = ${workbenchChunkBytes};
   const useFileEntrypoint = ${entrypoint === "file"};
   const usePageCard = ${useCard};
+  const directEditor = ${entrypoint === "open"};
   const referenceLimit = ${codexPageReferenceMaxLength};
   let mode = ${JSON.stringify(mode) ?? "null"};
   const status = document.getElementById("showai-launch");
@@ -64,7 +60,10 @@ ${card}
   const root = document.getElementById("root");
   const card = document.getElementById("showai-page-card");
   const cardTemplate = document.getElementById("showai-card-template");
-  let pageCards = [], cardGroup, selectedIndex, restoringChoice = false, openingCard = false;
+  const cards = card ? createShowaiCardView(card, cardTemplate, openPageCard) : null;
+  const spacingForm = document.getElementById("showai-card-spacing");
+  let adjustSpacing = false, spacingEditor;
+  let pageCards = [], cardGroup, openingCard = false;
   let navigationScope, activePage, acknowledgedNavigation;
   const pending = new Map();
   let locale = navigator.language.startsWith("zh") ? "zh-CN" : "en";
@@ -151,12 +150,8 @@ ${card}
   async function openPageTab({ projectId, pageId, blockId }) {
     if (!capabilities.experimental?.["openai/files"] || !capabilities.serverTools)
       throw new Error(t("cannotOpenPageTab"));
-    const result = resultPayload(await request("tools/call", {
-      name: "workbench_page_reference", arguments: { projectId, pageId, ...(blockId && { blockId }) },
-    }));
-    const path = result?.structuredContent?.data?.path;
-    if (result?.isError || typeof path !== "string")
-      throw new Error(result?.structuredContent?.error?.message ?? t("cannotOpenPageTab"));
+    const path = await callWorkbench("workbench_side_file", { projectId, pageId, ...(blockId && { blockId }) });
+    if (typeof path !== "string") throw new Error(t("cannotOpenPageTab"));
     const opened = await request("openai/files/open", { path });
     if (opened?.isError) throw new Error(t("cannotOpenPageTab"));
   }
@@ -306,22 +301,27 @@ ${card}
 
   function showPageCard() {
     if (!pageCards.length || (ready && !root.hidden) || refreshing) return;
-    for (let i = 0; i < pageCards.length; i++) {
-      const row = card.children[i];
-      const button = row.querySelector("button");
-      button.textContent = t("openPage");
-      button.disabled = !initialized || openingCard;
-      const choices = row.querySelector("select");
-      choices.setAttribute("aria-label", t("openOptions"));
-      choices.title = t("openOptions");
-      choices.options[0].textContent = t("openOptions");
-      choices.options[1].textContent = t("cardWorkbench");
-      choices.options[1].disabled = !hasGlobalEntrypoint;
-      choices.options[2].textContent = t("cardDesktop");
-      choices.options[2].disabled = !capabilities.serverTools;
-      choices.disabled = button.disabled || !capabilities.serverTools;
-    }
+    cards.updateActions(t, { busy: !initialized || openingCard,
+      workbench: hasGlobalEntrypoint && !!capabilities.serverTools, desktop: !!capabilities.serverTools });
     card.hidden = false;
+    if (initialized && adjustSpacing && !spacingEditor) {
+      spacingEditor = createShowaiSpacingEditor(spacingForm, card, t, {
+        restore: () => window.openai?.widgetState?.showaiCardSpacing,
+        save: values => window.openai?.setWidgetState?.({ ...window.openai.widgetState, showaiCardSpacing: values }),
+        submit: async prompt => {
+          if (capabilities.message) {
+            const params = { role: "user", content: [{ type: "text", text: prompt }] };
+            if (capabilities.experimental?.["openai/message"])
+              params._meta = { "openai/message": { target: "active", send: true } };
+            return !(await request("ui/message", params))?.isError;
+          }
+          if (!window.openai?.sendFollowUpMessage) return false;
+          await window.openai.sendFollowUpMessage({ prompt });
+          return true;
+        },
+      });
+    }
+    spacingForm.hidden = !spacingEditor || !adjustSpacing;
   }
 
   async function showCardEditor(target) {
@@ -330,6 +330,7 @@ ${card}
       return;
     }
     referencePage = target;
+    cards?.closeMenu();
     card.hidden = true;
     if (ready) {
       root.hidden = false;
@@ -341,33 +342,20 @@ ${card}
   }
 
   async function presentPageCard() {
-    if (!initialized || openingCard || restoringChoice || !pageCards.length) return;
-    if (context.displayMode !== "fullscreen") {
-      if (ready && context.displayMode === "inline") {
+    if (!initialized || openingCard || !pageCards.length) return;
+    if (!directEditor || context.displayMode !== "fullscreen") {
+      if (directEditor && ready && context.displayMode === "inline") {
         root.hidden = true;
         referencePage = undefined;
       }
       showPageCard();
-      return;
-    }
-    if (referencePage) return;
-    restoringChoice = true;
-    try {
-      const group = cardGroup;
-      let index = group ? selectedIndex : 0;
-      if (group && index === undefined) {
-        const saved = window.openai?.widgetState?.showaiCardChoice;
-        if (capabilities.serverTools) index = await callWorkbench("workbench_card_choice", { groupId: group });
-        index ??= saved?.group === group ? saved.index : undefined;
+    } else if (!referencePage) {
+      try {
+        await showCardEditor(pageCards[0]);
+      } catch (error) {
+        show("failed", error.message);
+        showPageCard();
       }
-      if (group !== cardGroup || context.displayMode !== "fullscreen" || openingCard || referencePage) return;
-      if (Number.isInteger(index) && pageCards[index]) await showCardEditor(pageCards[index]);
-      else showPageCard();
-    } catch (error) {
-      show("failed", error.message);
-      showPageCard();
-    } finally {
-      restoringChoice = false;
     }
   }
 
@@ -393,19 +381,7 @@ ${card}
         const status = reply?.structuredContent?.data?.status;
         if (status === "accepted" || status === "superseded") return;
       }
-      selectedIndex = index;
-      if (context.displayMode !== "fullscreen") {
-        if (cardGroup) {
-          if (capabilities.serverTools) await callWorkbench("workbench_card_choice", { groupId: cardGroup, index });
-          window.openai?.setWidgetState?.({ ...window.openai.widgetState, showaiCardChoice: { group: cardGroup, index } });
-        }
-        const modeResult = await request("ui/request-display-mode", { mode: "fullscreen" });
-        if ((modeResult?.mode ?? context.displayMode) !== "fullscreen")
-          throw new Error(t("cannotExpandCard"));
-        // A separately mounted editor receives the selection. Keep its originating group clickable.
-        if (cardGroup && context.displayMode !== "fullscreen") return;
-      }
-      await showCardEditor(target);
+      await openPageTab(target);
     } catch (error) {
       errorMessage.textContent = [t("cannotOpenTarget"), error.message].filter(Boolean).join(" · ");
       errorMessage.hidden = false;
@@ -429,35 +405,15 @@ ${card}
       const target = meta?.showaiPageCard ?? data;
       const targets = group?.cards ?? (target?.pageId ? [target] : undefined);
       if (!targets?.length) return;
+      adjustSpacing = !directEditor && (group ?? target)?.adjustSpacing === true;
       navigationScope ??= meta?.showaiNavigationScope;
       const singleChanged = !group && (["projectId", "pageId", "blockId", "title", "blockTitle", "description"]
         .some(key => pageCards[0]?.[key] !== target?.[key]) ||
         JSON.stringify(pageCards[0]?.breadcrumb) !== JSON.stringify(target?.breadcrumb));
       if (!pageCards.length || group?.id !== cardGroup || singleChanged) {
         cardGroup = group?.id;
-        selectedIndex = undefined;
         pageCards = targets;
-        card.replaceChildren(...targets.map((item, index) => {
-          const row = cardTemplate.content.firstElementChild.cloneNode(true);
-          const title = row.querySelector(".showai-card-title");
-          title.textContent = item.title;
-          title.id = "showai-card-title-" + index;
-          row.setAttribute("aria-labelledby", title.id);
-          const path = row.querySelector(".showai-card-path");
-          path.textContent = Array.isArray(item.breadcrumb) ? item.breadcrumb.join(" / ") : "";
-          path.hidden = !path.textContent;
-          const body = row.querySelector(".showai-card-body");
-          body.textContent = item.description || item.blockTitle || "";
-          body.hidden = !body.textContent;
-          row.querySelector("button").addEventListener("click", () => openPageCard(index));
-          const choices = row.querySelector("select");
-          choices.addEventListener("change", () => {
-            const destination = choices.value;
-            choices.value = "";
-            if (destination) void openPageCard(index, destination);
-          });
-          return row;
-        }));
+        cards.render(targets);
       }
       status.hidden = true;
       showPageCard();
@@ -603,7 +559,8 @@ ${card}
     let reportedHeight;
     const observer = new ResizeObserver(() => {
       if (!initialized || card.hidden || context.displayMode === "fullscreen") return;
-      const height = Math.ceil(card.getBoundingClientRect().height + status.getBoundingClientRect().height);
+      const height = Math.ceil(card.getBoundingClientRect().height + spacingForm.getBoundingClientRect().height +
+        status.getBoundingClientRect().height);
       if (height === reportedHeight) return;
       reportedHeight = height;
       parent.postMessage({ jsonrpc: "2.0", method: "ui/notifications/size-changed", params: {
@@ -611,6 +568,7 @@ ${card}
       } }, "*");
     });
     observer.observe(card);
+    observer.observe(spacingForm);
     observer.observe(status);
   }
   retry.addEventListener("click", () => {
@@ -651,6 +609,7 @@ ${card}
   });
 
   addEventListener("openai:set_globals", event => {
+    spacingEditor?.restoreValues(event.detail?.globals?.widgetState?.showaiCardSpacing);
     receiveFileInput(event.detail?.globals?.toolInput);
     fromResult(event.detail?.globals?.toolResponseMetadata);
   });
@@ -659,7 +618,7 @@ ${card}
   fromResult(window.openai?.toolResponseMetadata);
   request("ui/initialize", {
     appInfo: { name: "ShowAI", version: "1.0.0" },
-    appCapabilities: usePageCard ? { availableDisplayModes: ["inline", "fullscreen"] } : {},
+    appCapabilities: usePageCard ? { availableDisplayModes: directEditor ? ["inline", "fullscreen"] : ["inline"] } : {},
     protocolVersion: "2026-01-26",
   }).then(result => {
     capabilities = result?.hostCapabilities || {};

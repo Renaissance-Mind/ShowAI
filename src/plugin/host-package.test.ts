@@ -145,6 +145,7 @@ describe("host-specific plugin distributions", () => {
         "utf8",
       );
       expect(entrySkill.includes("## Codex 工作台")).toBe(profile === "codex");
+      expect(entrySkill.includes("`card_present`")).toBe(profile === "codex");
       expect(entrySkill.includes("## Antigravity 侧栏工作台与自动预览")).toBe(
         profile === "antigravity",
       );

@@ -51,7 +51,7 @@ import {
 } from "../workbench/actions";
 import type { DesktopChange, DesktopInfo, DesktopResponse } from "../host/protocol";
 import { workbenchChunkBytes, type WorkbenchRoute } from "../host/codex-workbench-transport";
-import { openLocalPath, systemVersion } from "./system";
+import { openLocalPath, systemVersion } from "../host/local-system";
 import { localMediaResponse } from "../workbench/local-media";
 import { windowQuery } from "../workbench/window-target";
 

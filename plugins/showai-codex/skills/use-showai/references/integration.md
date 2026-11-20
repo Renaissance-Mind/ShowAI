@@ -11,7 +11,7 @@
 3. 创作任务按 [show-document](../../show-document/SKILL.md) 的制作流程进行；选用模板时调用一次 template_context，固定本轮模板并读入它的全部指南。本机启动绑定与网页显式引用使用同一协议。
 4. 续改用 `page_read` 取得完整内容与 hash/revision；新建遵循 [show-document](../../show-document/SKILL.md) 的选择：匹配模板用 `template_apply`，明确从空白开始或无匹配结构时用 `page_create`。
 5. `page_apply` / `page_save` 提交变更，检查保存及同步回执。
-6. 需要展示时 `page_present({projectId,pageId,blockIds?})`，依据宿主能力交付。
+6. 保存成功后按[当前宿主适配](host-adapter.md)交付原页。需要在对话里阅读已保存内容时，用 `page_present({projectId,pageId,blockIds?})` 生成阅读预览。
 
 正式内容默认保存到已选项目。只想在对话里看一眼的可视化走 [show-visual](../../show-visual/SKILL.md)：读所选组件的 guide 后调用 `show_component`，不需要项目，公共连接同样可用。用户要一份完整独立文件、又不入库时，查询 `public_catalog_list/describe`，使用 `render_document`。两者都不保存个人项目，persistence 明确返回 false。连接或保存失败不能自动触发这两条不保存的路径。
 

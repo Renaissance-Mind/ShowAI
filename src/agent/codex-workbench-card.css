@@ -1,108 +1,190 @@
-#showai-page-card {
+.showai-card-list {
+  --showai-card-title-path-gap: 0px;
+  --showai-card-path-body-gap: 9px;
+  --showai-card-padding-y: 9px;
+  --showai-card-padding-x: 20px;
+  --showai-card-logo-gap: 20px;
+  --showai-card-actions-gap: 10px;
+  --showai-card-stack-gap: 5px;
   --card-ink: var(--color-text-primary, CanvasText);
   --card-muted: var(--color-text-secondary, color-mix(in srgb, CanvasText 63%, Canvas));
-  --card-border: var(--color-border-secondary, color-mix(in srgb, CanvasText 16%, Canvas));
+  --card-border: var(--color-border-secondary, color-mix(in srgb, CanvasText 15%, Canvas));
   --card-fill: var(--color-background-primary, Canvas);
-  --card-hover: var(--color-background-secondary, color-mix(in srgb, CanvasText 6%, Canvas));
+  --card-hover: var(--color-background-secondary, color-mix(in srgb, CanvasText 7%, Canvas));
+  --card-focus: color-mix(in srgb, CanvasText 55%, Canvas);
+  position: relative;
   display: grid;
-  gap: 8px;
-  padding: 3px 2px;
+  align-content: start;
+  gap: var(--showai-card-stack-gap);
+  padding: 3px 2px calc(3px + var(--showai-card-menu-room, 0px));
   color: var(--card-ink);
+  font: 14px/1.4 system-ui, sans-serif;
 }
 
-.showai-card {
+.showai-card-list[hidden], .showai-card-list [hidden] { display: none }
+.showai-card-list .showai-card {
+  box-sizing: border-box;
   display: grid;
-  grid-template-columns: 32px minmax(0, 1fr) auto;
-  column-gap: 12px;
-  align-items: start;
-  padding: 14px 16px;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  padding: var(--showai-card-padding-y) var(--showai-card-padding-x);
   border: 1px solid var(--card-border);
   border-radius: 13px;
   background: var(--card-fill);
+  color: var(--card-ink);
 }
-
 .showai-card-icon {
   display: grid;
-  width: 32px;
-  height: 32px;
+  inline-size: 32px;
+  block-size: 32px;
+  margin-inline-end: var(--showai-card-logo-gap);
   place-items: center;
   border-radius: 8px;
   background: #f3f4f6;
 }
-
 .showai-card-icon img { display: block; width: 23px; height: 23px }
-.showai-card-heading { min-width: 0; overflow-wrap: anywhere }
-.showai-card-title { margin: 0; font: 600 15px/1.35 system-ui, sans-serif }
-.showai-card-path { margin: 3px 0 0; color: var(--card-muted); font-size: 12px; line-height: 1.45 }
-.showai-card-body, .showai-card-error {
-  grid-column: 2 / -1;
-  margin: 9px 0 0;
-  font-size: 13px;
-  line-height: 1.55;
-  overflow-wrap: anywhere;
+.showai-card-content { min-width: 0; overflow-wrap: anywhere }
+.showai-card-content > .showai-card-title { margin: 0; font: 600 15px/1.35 system-ui, sans-serif }
+.showai-card-content > .showai-card-path {
+  margin: var(--showai-card-title-path-gap) 0 0;
+  color: var(--card-muted);
+  font: 400 12px/1.45 system-ui, sans-serif;
+}
+.showai-card-content > :is(.showai-card-body, .showai-card-error) {
+  margin: var(--showai-card-path-body-gap) 0 0;
+  font: 400 13px/1.55 system-ui, sans-serif;
   white-space: pre-line;
 }
 .showai-card-error { color: var(--color-text-danger, light-dark(#9d2828, #ffaba4)) }
-
 .showai-card-actions {
+  position: relative;
   display: inline-flex;
-  align-self: start;
+  align-items: stretch;
+  margin-inline-start: var(--showai-card-actions-gap);
   border: 1px solid var(--card-border);
-  border-radius: 8px;
+  border-radius: 10px;
   background: var(--card-fill);
-  color: var(--card-ink);
 }
-.showai-card-open, .showai-card-choices { box-sizing: border-box; height: 30px }
-.showai-card-open {
-  display: block;
+.showai-card-actions button {
+  box-sizing: border-box;
+  appearance: none;
   min-height: 0;
-  padding: 0 9px;
   border: 0;
-  border-radius: 7px 0 0 7px;
+  margin: 0;
+  box-shadow: none;
   background: transparent;
   color: inherit;
-  font: 500 13px/1 system-ui, sans-serif;
-  white-space: nowrap;
+  font: 500 13px/1.25 system-ui, sans-serif;
   cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
 }
-.showai-card-choices {
+.showai-card-actions > button { height: 30px }
+.showai-card-actions > .showai-card-open {
+  padding: 0 9px;
+  border-radius: 9px 0 0 9px;
+  white-space: nowrap;
+}
+.showai-card-actions > .showai-card-toggle {
   display: grid;
-  width: 28px;
+  width: 27px;
+  padding: 0;
   place-items: center;
-  position: relative;
-  border-inline-start: 1px solid var(--card-border);
-  border-radius: 0 7px 7px 0;
+  color: var(--card-muted);
+  border-radius: 0 9px 9px 0;
 }
-.showai-card-choices::after {
+.showai-card-toggle::after {
   content: "";
   width: 5px;
   height: 5px;
   border: solid currentColor;
   border-width: 0 1.5px 1.5px 0;
   transform: translateY(-1px) rotate(45deg);
-  pointer-events: none;
 }
-.showai-card-choices select {
+.showai-card-actions button:focus { outline: none; box-shadow: none }
+.showai-card-actions > button:focus-visible { outline: 2px solid var(--card-focus); outline-offset: -2px }
+.showai-card-actions button:disabled { opacity: .45; cursor: default }
+.showai-card-actions > button:active:enabled,
+.showai-card-actions > .showai-card-toggle[aria-expanded="true"] { background: var(--card-hover) }
+
+.showai-card-menu {
+  --card-menu-offset: 5px;
   position: absolute;
-  inset: 0;
+  z-index: 2;
+  inset-inline-end: -1px;
+  top: calc(100% + var(--card-menu-offset));
+  display: grid;
+  box-sizing: border-box;
+  width: max-content;
+  min-width: min(184px, calc(100vw - 26px));
+  max-width: calc(100vw - 26px);
+  padding: 5px;
+  border: 1px solid var(--card-border);
+  border-radius: 15px;
+  background: var(--card-fill);
+  box-shadow: 0 3px 14px light-dark(rgb(0 0 0 / 8%), rgb(0 0 0 / 28%));
+}
+.showai-card-menu[data-above] { top: auto; bottom: calc(100% + var(--card-menu-offset)) }
+.showai-card-menu button {
+  display: flex;
   width: 100%;
-  height: 100%;
-  margin: 0;
-  opacity: 0;
-  cursor: pointer;
+  min-height: 35px;
+  align-items: center;
+  gap: 9px;
+  padding: 5px 9px;
+  border-radius: 9px;
+  text-align: start;
+  font-weight: 400;
 }
-.showai-card-open:hover:enabled, .showai-card-choices:hover { background: var(--card-hover) }
-.showai-card-open:focus-visible, .showai-card-choices:has(select:focus-visible) {
-  outline: 2px solid Highlight;
-  outline-offset: 2px;
+.showai-card-menu button > span:last-child { white-space: nowrap }
+@media (max-width: 220px) {
+  .showai-card-menu button > span:last-child { white-space: normal }
 }
-.showai-card-open:disabled, .showai-card-choices:has(select:disabled) { opacity: .5; cursor: default }
-#showai-page-card[hidden], #showai-page-card [hidden] { display: none }
-@media (max-width: 360px) {
-  .showai-card { grid-template-columns: 26px minmax(0, 1fr); column-gap: 8px; padding: 12px }
-  .showai-card-icon { width: 26px; height: 26px }
-  .showai-card-icon img { width: 20px; height: 20px }
-  .showai-card-actions { grid-area: 4 / 2; justify-self: end; margin-top: 10px }
-  .showai-card-body { grid-row: 2 }
-  .showai-card-error { grid-row: 3 }
+.showai-card-menu button:focus-visible { background: var(--card-hover); outline: 1px solid var(--card-focus); outline-offset: -1px }
+@media (hover: hover) {
+  .showai-card-actions button:hover:enabled { background: var(--card-hover) }
 }
+.showai-card-app-icon {
+  display: grid;
+  width: 18px;
+  height: 18px;
+  flex: 0 0 auto;
+  place-items: center;
+  overflow: hidden;
+  border-radius: 4px;
+}
+.showai-card-app-icon img { display: block; width: 100%; height: 100% }
+.showai-card-app-icon.is-chatgpt {
+  background: linear-gradient(#fff, #edf0f2);
+  box-shadow: inset 0 0 0 1px rgb(0 0 0 / 10%);
+}
+.showai-card-app-icon.is-chatgpt img { width: 14px; height: 14px; opacity: .78 }
+@media (pointer: coarse) {
+  .showai-card-actions > button, .showai-card-menu button { min-height: 44px }
+  .showai-card-actions > .showai-card-toggle { width: 44px }
+}
+@media (forced-colors: active) {
+  .showai-card-actions > button:focus-visible, .showai-card-menu button:focus-visible { outline: 2px solid Highlight }
+}
+
+.showai-spacing-editor {
+  font: 14px/1.4 system-ui, sans-serif;
+  padding: 14px 2px 5px;
+  color: CanvasText;
+}
+.showai-spacing-editor[hidden], .showai-spacing-editor [hidden] { display: none }
+.showai-spacing-fields {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 200px), 1fr));
+  gap: 12px 22px;
+  margin-bottom: 14px;
+}
+.showai-spacing-fields label { display: grid; min-width: 0; gap: 4px }
+.showai-spacing-fields label > span { display: flex; gap: 8px; justify-content: space-between; align-items: baseline }
+.showai-spacing-fields output { color: color-mix(in srgb, CanvasText 65%, Canvas); font-variant-numeric: tabular-nums }
+.showai-spacing-fields input[type=range] { width: 100%; margin: 0; accent-color: CanvasText }
+.showai-spacing-apply {
+  border: 1px solid color-mix(in srgb, CanvasText 22%, Canvas); border-radius: 8px;
+  background: Canvas; color: CanvasText; padding: 6px 10px; font: inherit; cursor: pointer;
+}
+.showai-spacing-editor p { font-size: 13px; margin: 8px 0 0 }
+.showai-spacing-editor textarea { box-sizing: border-box; width: 100%; margin-top: 6px; font: inherit }

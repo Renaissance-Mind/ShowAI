@@ -25,7 +25,7 @@ A request for a plan or design stops at that record and delivers it. A request f
 
 Read the installed `use-showai` Skill for the shared entrypoint. Query `showai_capabilities` when connection information is unknown or changes; reuse its capability facts within that connection. Use `project_context` or `projects_list` for the required project identity. A local library connection can resolve a trusted host directory for new formal work. HTTP clients use authorized project identities. Read-only discovery does not create a project.
 
-Read the current Page before editing; keep its hash, revision and stable IDs. Save formal work before `page_present`. Explicit standalone/file-only requests can use `render_document`. Report connection, save or display failures with their actual retained state.
+Read the current Page before editing; keep its hash, revision and stable IDs. Deliver formal work through the installed host adapter after a successful save. Explicit standalone/file-only requests can use `render_document`. Report connection, save or display failures with their actual retained state.
 
 ## Templates and components
 
@@ -41,6 +41,6 @@ Components own their schema and versioned usage/development documentation. Query
 
 Source inspection, screenshots, interaction checks and reader trials establish different evidence. Check factual support, reading order, important states, narrow layouts and static/export behavior as relevant; report untested scope.
 
-`page_present` captures one saved revision and returns full HTML/source. `blockIds` selects the conversation preview while retaining the complete delivery. Use meaningful excerpts if the inline budget is exceeded. See [Conversation display](../plugins/showai/skills/use-showai/references/host-display.md).
+In Codex, temporary components stay inline. A successful Page creation or edit ends with an original-Page card when the connection offers `card_present`. For a reading preview, `page_present` captures one saved revision and returns full HTML/source. `blockIds` selects the conversation preview while retaining the complete delivery. Use meaningful excerpts if the inline budget is exceeded. See [Conversation display](../plugins/showai/skills/use-showai/references/host-display.md).
 
 Plugin installation, host capability refresh and current-conversation guidance loading are separate checks. Local and remote clients read the same installed Skills and bundled operation formats. Updating Skills does not upgrade an already running application or MCP server.

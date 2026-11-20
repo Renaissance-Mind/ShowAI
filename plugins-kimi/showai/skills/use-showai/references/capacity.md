@@ -31,6 +31,6 @@ MiB 为 1,048,576 bytes。除与宿主和同步对象对齐的边界外，这些
 
 页面中的图片以 base64 data URI 保存，体积比原文件多约三分之一，并且全部计入聊天预览：十几张普通截图（每张约 100 KB）就会超过 1,000,000 bytes。模型自己把片段写进回复的宿主（`SHOWAI_HOST_DISPLAY=model-html`，例如 Claude Code）另有 32 KB 的片段上限，片段包含页面数据，一张嵌入图片或一篇长文就会超过；这类宿主上整页通常只能给链接，对话里只展示几个关键块；长文按节拆成多个 text 块，才能单独选出来展示。插入图片前就按当前宿主的预算决定展示方式，不要等展示失败后再删图。
 
-正式页面先保存，需要展示时再调用 `page_present`。其完整 HTML 和 source 按文件预算生成，`blockIds` 仅控制 inline。聊天超限不会降低页面保存或完整文件预算；根据真实节点 ID 选择独立可读的区域。单个选中节点仍超限时交付完整文件；当前 blockIds 仅选择节点，不提供替换素材的专用预览参数。文件自身超限时减少嵌入依赖；明确导出文件时可用 `page_export` 的 `reader:"cdn"` 写出从 CDN 加载阅读器的在线页（打开需联网），或 `components:"remote"`（需要已验证的组件地址）；本机连接也可按用户要求导出网站，远程 page_export 只支持 html/inline；不能用局部源内容覆盖完整 Page。
+正式页面先保存。需要阅读预览时调用 `page_present`。其完整 HTML 和 source 按文件预算生成，`blockIds` 仅控制 inline。聊天超限不会降低页面保存或完整文件预算；根据真实节点 ID 选择独立可读的区域。单个选中节点仍超限时交付完整文件；当前 blockIds 仅选择节点，不提供替换素材的专用预览参数。文件自身超限时减少嵌入依赖；明确导出文件时可用 `page_export` 的 `reader:"cdn"` 写出从 CDN 加载阅读器的在线页（打开需联网），或 `components:"remote"`（需要已验证的组件地址）；本机连接也可按用户要求导出网站，远程 page_export 只支持 html/inline；不能用局部源内容覆盖完整 Page。
 
 本机连接中，大参数可以改从文件读取（page_apply 的 operationsFile、dataset_write 的 valueFile/operationsFile、component_save 的 directory），大结果可以写入文件（page_read、page_diff 的 out，catalog_describe view:"source" 的 out），文件按上表的同一预算检查，避免整段数据经过对话和宿主消息。stdio 服务端同样接受 256 MiB 创作请求。客户端与宿主还可能有独立的消息缓冲预算（MCP SDK 默认 10 MiB）；返回的文本与 structuredContent 也会占用消息空间。读取大量资源时优先使用 outline、blockIds、单文件源码与完整交付路径；完整大消息需要客户端相应配置 maxBufferSize 或使用 HTTP MCP。运行时预算不代表宿主已放宽自己的消息预算。

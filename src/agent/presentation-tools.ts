@@ -819,7 +819,7 @@ export function registerPresentationTools(
             files: mode === "fragment-file" ? "preview-directory" : "none",
           },
           ...(warnings.length ? { warnings } : {}),
-          next: "To keep it, save the same blocks with page_create({projectId,blocks}) or page_apply component.insert in an authorized project, then page_present.",
+          next: "If the user asks to keep these components, save the same blocks with page_create({projectId,blocks}) or page_apply component.insert in the chosen project. Deliver the saved Page using the installed host adapter. Use page_present for a reading preview.",
         });
         return {
           ...result,

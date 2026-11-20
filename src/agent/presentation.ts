@@ -442,7 +442,7 @@ export async function renderComponents(
     );
   if (blocks.some((block) => block.kind === "page" || block.kind === "board"))
     throw new Error(
-      "Page and Board are documents, not conversation components. Save a Page and use page_present.",
+      "Page and Board use saved documents. Save the Page and follow the installed host adapter for delivery.",
     );
   const rendered = await renderDocumentArtifacts(
     blocksDocument(blocks, input.title ?? ""),

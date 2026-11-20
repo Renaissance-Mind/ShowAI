@@ -98,6 +98,8 @@ showai template apply TEMPLATE_ID --project PROJECT --version VERSION --title "�
 
 ## 导出与发布准备
 
+新建或修改页面并保存成功后，按当前宿主适配交付。在提供 `card_present` 的 Codex 连接中，临时组件用 `show_component` 在聊天里展示，本轮创建、续改的页面默认用一组原页卡片交付。用户明确要求在对话中阅读正文或片段时，使用 `page_present`。其余连接按各自的宿主交付约定执行。
+
 ```sh
 showai export --project PROJECT --page PAGE --format html --components bundled --out ./report.html --json
 showai export --project PROJECT --page PAGE --format inline --components bundled --out ./report-inline.html --json
@@ -152,7 +154,7 @@ CLI：`showai pages read PAGE --project PROJECT --view image --capture viewport 
 
 Codex 插件声明 `SHOWAI_HOST_DISPLAY=mcp-app`。`show_component` 的 `delivery:"auto"` 使用原生视图；内容分批到达时加 `live:true`，先展示第一批有效内容，再更新同一显示区。小任务一次给完，正式页面创作流程保持不变。旧安装若仍声明 `codex-visualize`，可在支持 MCP Apps 的 Codex 中显式使用 `delivery:"mcp-app"`；旧声明仍保留文件式交付含义。
 
-页面创作继续使用 page_create、page_apply、page_save 与 page_present。会话可用 `show_component({kind,data,live:true,delivery:"mcp-app"})` 创建一个可持续更新的 MCP Apps 显示区。先查 `showai_capabilities.presentation.liveUpdates`，并确认宿主提供 serverTools；文件片段展示不代表支持持续更新。当前句柄属于原本机 MCP 连接，30 分钟未访问后过期，重连后不恢复；最多 32 份，每份源内容最多 16 MiB。
+页面创作使用 page_create、page_apply、page_save，保存后的交付入口由当前宿主适配决定。会话可用 `show_component({kind,data,live:true,delivery:"mcp-app"})` 创建一个可持续更新的 MCP Apps 显示区。先查 `showai_capabilities.presentation.liveUpdates`，并确认宿主提供 serverTools；文件片段展示不代表支持持续更新。当前句柄属于原本机 MCP 连接，30 分钟未访问后过期，重连后不恢复；最多 32 份，每份源内容最多 16 MiB。
 
 保留回执 live.viewId、live.revision 和 blocks[].id。后续 `show_component_update({viewId,operationId,baseRevision,operations,complete?})` 沿用 page_apply 的稳定节点操作。每批应形成合法组件数据，相关字段一起更新；无效批次保留旧内容与版本。最近一次完全相同的请求可重试；CONFLICT 时先读回当前内容并比较，不盲目替换基线。最后带 complete:true，可用空 operations 结束，完成后只读。
 
