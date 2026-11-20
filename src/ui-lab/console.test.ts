@@ -121,6 +121,25 @@ test("simple dialogs dismiss on the backdrop and return keyboard focus", async (
     expect(await opener.evaluate((el) => el === document.activeElement)).toBe(
       true,
     );
+    const reports = review.getByRole("button", {
+      name: "检查结果",
+      exact: true,
+    });
+    await reports.click();
+    const resultsDialog = review.getByRole("dialog", {
+      name: "检查结果",
+      exact: true,
+    });
+    await resultsDialog
+      .getByRole("button", { name: "完成", exact: true })
+      .waitFor();
+    await review
+      .locator(".studio-modal-shade")
+      .click({ position: { x: 4, y: 4 } });
+    await resultsDialog.waitFor({ state: "detached" });
+    expect(await reports.evaluate((el) => el === document.activeElement)).toBe(
+      true,
+    );
   } finally {
     await review.close();
   }

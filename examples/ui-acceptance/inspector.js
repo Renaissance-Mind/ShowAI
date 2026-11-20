@@ -207,11 +207,33 @@
   const checksTitle = el("h2", "", t.checks);
   checksTitle.id = "review-checks-title";
   checksDialog.setAttribute("aria-labelledby", checksTitle.id);
-  const checksSymbol = el("span", "rv-check-symbol");
-  checksSymbol.setAttribute("aria-hidden", "true");
-  const closeChecks = button("×", () => checksDialog.close(), "rv-check-close");
-  closeChecks.setAttribute("aria-label", t.close);
-  checksHead.append(checksSymbol, checksTitle, closeChecks);
+  checksHead.append(checksTitle);
+  const closeChecks = button(
+    t.close,
+    () => checksDialog.close(),
+    "rv-check-close",
+  );
+  const outsideChecks = (event) => {
+    const box = checksDialog.getBoundingClientRect();
+    return (
+      event.target === checksDialog &&
+      (event.clientX < box.left ||
+        event.clientX >= box.right ||
+        event.clientY < box.top ||
+        event.clientY >= box.bottom)
+    );
+  };
+  let pressedOutside = false;
+  checksDialog.addEventListener("pointerdown", (event) => {
+    pressedOutside = event.button === 0 && outsideChecks(event);
+  });
+  checksDialog.addEventListener("pointercancel", () => {
+    pressedOutside = false;
+  });
+  checksDialog.addEventListener("click", (event) => {
+    if (pressedOutside && outsideChecks(event)) checksDialog.close();
+    pressedOutside = false;
+  });
   const checksSummary = el("div", "rv-check-summary");
   const checksStatus = el("p", "rv-check-status");
   checksStatus.setAttribute("role", "status");
@@ -219,8 +241,10 @@
   checksProgress.setAttribute("aria-label", t.checks);
   const checksList = el("ol", "rv-check-results");
   const stopChecks = button(t.stop, () => checkController?.abort());
-  checksSummary.append(checksStatus, stopChecks, checksProgress);
-  checksDialog.append(checksHead, checksSummary, checksList);
+  checksSummary.append(checksStatus, checksProgress);
+  const checkActions = el("footer", "rv-check-actions");
+  checkActions.append(stopChecks, closeChecks);
+  checksDialog.append(checksHead, checksSummary, checksList, checkActions);
   root.append(checksDialog);
 
   const motion = el("details", "rv-motion");

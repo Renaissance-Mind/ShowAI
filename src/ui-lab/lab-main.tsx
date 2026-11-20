@@ -1,9 +1,12 @@
 import { createRoot } from "react-dom/client";
 import { useEffect, useRef, useState } from "react";
+import Dialog from "../ui/Dialog";
+import commonMessages from "../i18n/messages/common";
 import labMessages from "../i18n/messages/uiLab";
 import flowMessages from "../i18n/messages/uiFlow";
 import { messages, motionSummary } from "./messages";
 import type { LabSession, MotionObservation } from "./types";
+import "../design/tokens.css";
 import "../design/controls.css";
 import "./lab.css";
 const t = messages(labMessages, "zh-CN"),
@@ -461,77 +464,69 @@ function Lab() {
         </section>
       </div>
       {resultsOpen && (
-        <div
-          className="flow-result-shade"
-          role="dialog"
-          aria-modal="true"
-          aria-label={f("details")}
+        <Dialog
+          title={f("details")}
+          className="flow-results"
+          initialFocus="container"
+          onClose={() => setResultsOpen(false)}
         >
-          <section className="flow-results">
-            <header>
-              <h2>{f("details")}</h2>
-              <button
-                aria-label={t("closeDialog")}
-                onClick={() => setResultsOpen(false)}
-              >
-                ×
-              </button>
-            </header>
-            <div className="flow-results-body">
-              {!runs.length && <p>{t("noResults")}</p>}
-              {runs.map((run) => (
-                <details key={run.id}>
-                  <summary>
-                    {run.passed ? t("passed") : t("failed")} · {run.id}
-                  </summary>
-                  <a
-                    href={`/__ui-lab/results/${run.id}/index.html`}
-                    target="_blank"
-                    rel="noreferrer"
-                  >
-                    {t("report")}
-                  </a>
-                  {run.results.map((result, index) => (
-                    <section key={index}>
-                      <h3>{result.title}</h3>
-                      {result.error && <pre>{result.error}</pre>}
-                      <div className="ui-lab-shots">
-                        {result.checkpoints.map((point) => (
-                          <a
-                            key={point.file}
-                            href={`/__ui-lab/results/${run.id}/${point.file}`}
-                            target="_blank"
-                            rel="noreferrer"
-                          >
-                            <img
-                              loading="lazy"
-                              src={`/__ui-lab/results/${run.id}/${point.file}`}
-                              alt={point.title}
-                            />
-                            <span>
-                              {point.title} ·{" "}
-                              {point.visual.state === "unreviewed" ||
-                              point.visual.state === "missing"
-                                ? t("visualNew")
-                                : point.visual.state === "passed"
-                                  ? t("visualPassed")
-                                  : t("visualChanged")}
-                            </span>
-                            {point.motion && (
-                              <span>
-                                {motionSummary(point.motion, "zh-CN")}
-                              </span>
-                            )}
-                          </a>
-                        ))}
-                      </div>
-                    </section>
-                  ))}
-                </details>
-              ))}
-            </div>
-          </section>
-        </div>
+          <div className="flow-results-body">
+            {!runs.length && <p>{t("noResults")}</p>}
+            {runs.map((run) => (
+              <details key={run.id}>
+                <summary>
+                  {run.passed ? t("passed") : t("failed")} · {run.id}
+                </summary>
+                <a
+                  href={`/__ui-lab/results/${run.id}/index.html`}
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  {t("report")}
+                </a>
+                {run.results.map((result, index) => (
+                  <section key={index}>
+                    <h3>{result.title}</h3>
+                    {result.error && <pre>{result.error}</pre>}
+                    <div className="ui-lab-shots">
+                      {result.checkpoints.map((point) => (
+                        <a
+                          key={point.file}
+                          href={`/__ui-lab/results/${run.id}/${point.file}`}
+                          target="_blank"
+                          rel="noreferrer"
+                        >
+                          <img
+                            loading="lazy"
+                            src={`/__ui-lab/results/${run.id}/${point.file}`}
+                            alt={point.title}
+                          />
+                          <span>
+                            {point.title} ·{" "}
+                            {point.visual.state === "unreviewed" ||
+                            point.visual.state === "missing"
+                              ? t("visualNew")
+                              : point.visual.state === "passed"
+                                ? t("visualPassed")
+                                : t("visualChanged")}
+                          </span>
+                          {point.motion && (
+                            <span>{motionSummary(point.motion, "zh-CN")}</span>
+                          )}
+                        </a>
+                      ))}
+                    </div>
+                  </section>
+                ))}
+              </details>
+            ))}
+          </div>
+          <footer className="flow-results-actions">
+            <button type="button" onClick={() => setResultsOpen(false)}>
+              {messages(commonMessages, "zh-CN")("done")}
+            </button>
+          </footer>
+        </Dialog>
       )}
     </div>
   );
