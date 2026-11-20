@@ -6,7 +6,7 @@ import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { ContentLibrary as GitLibrary } from "../core/content-library";
 import { LibraryOperations } from "../core/library-operations";
-import { encodeFile, decodeFile } from "../core/history-codec";
+import { encodeFile, decodeFile, sameFileContents } from "../core/history-codec";
 import type {
   HistoryEntry,
   FileChanges,
@@ -84,7 +84,7 @@ export function remapProjectFiles(
         ...variant,
         path: variant.path.replace(prefix, `projects/${to}/`),
       }));
-      result.set(target, Buffer.from(JSON.stringify(record, null, 2)));
+      result.set(target, Buffer.from(JSON.stringify(record, null, 2) + "\n"));
     } else result.set(target, bytes);
   }
   return result;
@@ -352,8 +352,6 @@ export function mergeProjectFiles(
 ) {
   const merged = new Map<string, Buffer>(),
     conflicts: FileConflict[] = [];
-  const equal = (a?: Buffer, b?: Buffer) =>
-    a === undefined ? b === undefined : b !== undefined && a.equals(b);
   for (const path of new Set([
     ...base.keys(),
     ...local.keys(),
@@ -362,11 +360,11 @@ export function mergeProjectFiles(
     const a = base.get(path),
       b = local.get(path),
       c = remote.get(path);
-    if (equal(b, c) || equal(a, c)) {
+    if (sameFileContents(path, b, c) || sameFileContents(path, a, c)) {
       if (b) merged.set(path, b);
       continue;
     }
-    if (equal(a, b)) {
+    if (sameFileContents(path, a, b)) {
       if (c) merged.set(path, c);
       continue;
     }
@@ -791,7 +789,9 @@ async function replayProjectHistory(
 export function sameFiles(one: Map<string, Buffer>, two: Map<string, Buffer>) {
   return (
     one.size === two.size &&
-    [...one].every(([path, bytes]) => two.get(path)?.equals(bytes))
+    [...one].every(([path, bytes]) =>
+      sameFileContents(path, bytes, two.get(path)),
+    )
   );
 }
 

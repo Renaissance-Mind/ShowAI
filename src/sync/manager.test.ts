@@ -102,6 +102,53 @@ async function fixture() {
   await bob.manager.stop();
   return { directory, server, alice, bob, project, page };
 }
+type SyncClient = Awaited<ReturnType<typeof fixture>>["alice"];
+
+async function renamePage(
+  client: SyncClient,
+  projectId: string,
+  pageId: string,
+  title: string,
+) {
+  const current = await client.store.readPage(projectId, pageId);
+  return client.store.savePage(
+    projectId,
+    pageId,
+    { ...current.document, title },
+    current.hash,
+    current.revision,
+  );
+}
+
+async function writeLegacyPendingImport(
+  client: SyncClient,
+  projectId: string,
+  originalHead: string | null,
+  remoteHead: string,
+  files: Map<string, Buffer>,
+) {
+  const directory = join(client.home, "local/sync");
+  await mkdir(join(directory, "objects"), { recursive: true });
+  await mkdir(join(directory, "pending-imports"), { recursive: true });
+  const references: Record<string, string> = {};
+  for (const [path, bytes] of files) {
+    const digest = createHash("sha256").update(bytes).digest("hex");
+    references[path] = digest;
+    await writeFile(join(directory, "objects", digest), bytes);
+  }
+  await writeFile(
+    join(directory, "pending-imports", projectId + ".json"),
+    JSON.stringify({
+      serverId: client.connection.serverId,
+      remoteHead,
+      originalHead,
+      localBranch: null,
+      needsPublish: false,
+      files: references,
+    }),
+  );
+}
+
 describe("project synchronization between independent real content libraries", () => {
   it("syncs sorting and manual order per directory and merges independent offline folder changes", async () => {
     const { alice, bob, project, page } = await fixture();
@@ -217,7 +264,7 @@ describe("project synchronization between independent real content libraries", (
     ).json();
     expect(
       Object.keys(snapshot.snapshot.files).some((path) =>
-        /runtimes\/|reader\.json|\/history\//.test(path),
+        /runtimes\/|reader\.json|\/history\/|\/\.sync\//.test(path),
       ),
     ).toBe(false);
     const roots = await readdir(
@@ -410,6 +457,150 @@ describe("project synchronization between independent real content libraries", (
     expect(
       (await bob.store.readPage(project.id, page.document.id)).document.title,
     ).toBe("Shared-home edit 5");
+  });
+
+  it.each(["current", "legacy"])(
+    "keeps later edits when restarting after a %s import was applied locally",
+    async (format) => {
+      const { alice, bob, project, page } = await fixture();
+      const configPath = join(alice.home, "local/sync/config.json");
+      const checkpoint = await readFile(configPath);
+      const originalHead = await alice.library.head();
+      await renamePage(bob, project.id, page.document.id, "Incoming title");
+      await bob.manager.run(project.id);
+      await alice.manager.run(project.id);
+      expect(
+        (await alice.store.readPage(project.id, page.document.id)).document
+          .title,
+      ).toBe("Incoming title");
+      if (format === "legacy") {
+        const imported = await new LibraryOperations(
+          alice.home,
+          project.id,
+        ).projectFiles(project.id, (await alice.library.head())!);
+        await writeLegacyPendingImport(
+          alice,
+          project.id,
+          originalHead,
+          (await alice.manager.status()).projects[0].remoteHead!,
+          imported,
+        );
+        await alice.library.writeFiles(
+          new Map([[`projects/${project.id}/.sync/current-import.json`, null]]),
+          {
+            actor: { kind: "system" },
+            channel: "system",
+            message: "Use a pre-checkpoint library",
+          },
+        );
+      }
+      await renamePage(alice, project.id, page.document.id, "Local edit after import");
+      const extra = await bob.store.createPage(project.id, {
+        title: "Another change",
+      });
+      await bob.manager.run(project.id);
+      await writeFile(configPath, checkpoint);
+      const restarted = new SyncManager(alice.home);
+      actions.push(() => restarted.stop());
+      await restarted.run(project.id);
+      await bob.manager.run(project.id);
+      await restarted.run(project.id);
+      for (const client of [alice, bob]) {
+        expect((await client.manager.status()).projects[0].status).toBe(
+          "synced",
+        );
+        expect(
+          (await client.store.readPage(project.id, page.document.id)).document
+            .title,
+        ).toBe("Local edit after import");
+        expect(
+          (await client.store.readPage(project.id, extra.document.id)).document
+            .title,
+        ).toBe("Another change");
+        expect(await client.store.listPages(project.id)).toHaveLength(2);
+        expect(await client.manager.retainedConflicts(project.id)).toHaveLength(
+          0,
+        );
+      }
+    },
+  );
+
+  it("keeps both genuine edits when a legacy import never reached the library", async () => {
+    const { alice, bob, project, page } = await fixture();
+    const before = await alice.library.head();
+    await renamePage(bob, project.id, page.document.id, "Incoming change");
+    await bob.manager.run(project.id);
+    const incoming = await new LibraryOperations(
+      bob.home,
+      project.id,
+    ).projectFiles(project.id, (await bob.library.head())!);
+    await writeLegacyPendingImport(
+      alice,
+      project.id,
+      before,
+      (await bob.manager.status()).projects[0].remoteHead!,
+      incoming,
+    );
+    await renamePage(alice, project.id, page.document.id, "New local change");
+    const cacheRoot = join(alice.home, "local/sync/current-snapshots");
+    const projectCache = join(cacheRoot, (await readdir(cacheRoot))[0]);
+    await rm(projectCache, { recursive: true });
+    await alice.manager.run(project.id);
+    await bob.manager.run(project.id);
+    await alice.manager.run(project.id);
+    for (const client of [alice, bob]) {
+      const pages = await client.store.listPages(project.id);
+      expect(pages).toHaveLength(2);
+      expect(
+        pages.some((item) => item.title.startsWith("New local change")),
+      ).toBe(true);
+      expect(
+        pages.some((item) => item.title.startsWith("Incoming change")),
+      ).toBe(true);
+      expect(await client.manager.retainedConflicts(project.id)).toHaveLength(
+        1,
+      );
+    }
+  });
+
+  it("recognizes its own uploaded merge after losing the acknowledgment even when the imported change came from another device", async () => {
+    const { alice, bob, project, page } = await fixture();
+    const configPath = join(alice.home, "local/sync/config.json");
+    const checkpoint = await readFile(configPath);
+    const b = await bob.store.readPage(project.id, page.document.id);
+    await renamePage(alice, project.id, page.document.id, "My first title");
+    await bob.store.savePage(
+      project.id,
+      b.document.id,
+      applyOperations(b.document, [
+        {
+          type: "block.text.set",
+          blockId: b.document.content.content![0].attrs!.id,
+          text: "Remote paragraph",
+        },
+      ]),
+      b.hash,
+      b.revision,
+    );
+    await bob.manager.run(project.id);
+    await alice.manager.run(project.id);
+    const merged = await alice.store.readPage(project.id, page.document.id);
+    expect(plainText(merged.document.content.content![0])).toBe(
+      "Remote paragraph",
+    );
+    await renamePage(alice, project.id, page.document.id, "My latest title");
+    await writeFile(configPath, checkpoint);
+    const restarted = new SyncManager(alice.home);
+    actions.push(() => restarted.stop());
+    await restarted.run(project.id);
+    await bob.manager.run(project.id);
+    const current = await bob.store.readPage(project.id, b.document.id);
+    expect(current.document.title).toBe("My latest title");
+    expect(plainText(current.document.content.content![0])).toBe(
+      "Remote paragraph",
+    );
+    expect(await alice.manager.retainedConflicts(project.id)).toHaveLength(0);
+    expect(await bob.store.listPages(project.id)).toHaveLength(1);
   });
 
   it("does not publish an unresolved same-device file save conflict", async () => {

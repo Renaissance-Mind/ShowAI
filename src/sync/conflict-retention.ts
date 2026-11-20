@@ -2,6 +2,10 @@ import { createHash } from "node:crypto";
 import { Buffer } from "node:buffer";
 import { parseArtifact, serializeArtifact } from "../portable/validation.mjs";
 import { readerBindingPath } from "../core/archived-reader";
+import { CoreError } from "../core/model";
+import { canonicalJson } from "../core/canonical";
+import { translator } from "../i18n";
+import syncEngineMessages from "../i18n/messages/syncEngine";
 import type { ShowDocument } from "../types";
 import type { FileConflict } from "./transfer";
 
@@ -30,6 +34,7 @@ export interface RetainedConflict {
 }
 const hash = (bytes: Buffer | string) =>
   createHash("sha256").update(bytes).digest("hex");
+const t = translator(syncEngineMessages);
 const uuid = (seed: string) => {
   const value = hash(seed);
   return `${value.slice(0, 8)}-${value.slice(8, 12)}-5${value.slice(13, 16)}-a${value.slice(17, 20)}-${value.slice(20, 32)}`;
@@ -62,6 +67,18 @@ function note(id: string, title: string, text: string): ShowDocument {
     comments: [],
   };
 }
+function retainedInputs(record: RetainedConflict) {
+  return canonicalJson([
+    record.originalPath,
+    record.originalPageId,
+    record.variants.map(({ pageId, path, deleted, hash }) => [
+      pageId,
+      path,
+      deleted,
+      hash,
+    ]),
+  ]);
+}
 export function retainSyncConflicts(input: {
   projectId: string;
   files: Map<string, Buffer>;
@@ -81,6 +98,38 @@ export function retainSyncConflicts(input: {
     )
     .map(([, bytes]) => JSON.parse(bytes.toString()) as RetainedConflict);
   for (const conflict of input.conflicts) {
+    const archive =
+      conflict.path.startsWith(prefix) &&
+      /^conflicts\/([a-f0-9]{64})\/(record\.json|(?:local|remote)\.input)$/.exec(
+        conflict.path.slice(prefix.length),
+      );
+    if (archive) {
+      const local = input.localFiles.get(conflict.path);
+      const remote = input.remoteFiles.get(conflict.path);
+      if (local && remote && !local.equals(remote)) {
+        if (archive[2] !== "record.json")
+          throw new CoreError("INVALID_DATA", t("cache.retainedCorrupt"));
+        const one = JSON.parse(local.toString()) as RetainedConflict;
+        const two = JSON.parse(remote.toString()) as RetainedConflict;
+        if (
+          one.format !== "showai-retained-sync-conflict" ||
+          two.format !== one.format ||
+          one.version !== 1 ||
+          two.version !== one.version ||
+          one.id !== archive[1] ||
+          two.id !== archive[1] ||
+          !Array.isArray(one.variants) ||
+          one.variants.length !== 2 ||
+          !Array.isArray(two.variants) ||
+          two.variants.length !== 2 ||
+          retainedInputs(one) !== retainedInputs(two)
+        )
+          throw new CoreError("INVALID_DATA", t("cache.retainedCorrupt"));
+      }
+      const retained = remote ?? local;
+      if (retained) files.set(conflict.path, retained);
+      continue;
+    }
     const localBytes =
       conflict.local === null ? null : Buffer.from(conflict.local, "base64");
     const localHash = localBytes && hash(localBytes);
@@ -136,7 +185,7 @@ export function retainSyncConflicts(input: {
             `${conflict.fields?.length ? `共享数据中的以下字段在两处被改成了不同的值，当前保留另一来源的值；其余修改已合并：${conflict.fields.join("、")}\n` : ""}${bytes ? "此文件的合并失败，原始内容已完整保留。" : "此来源删除了文件；另一来源的修改也已保留。"}\n原文件：${conflict.path}\n来源：${label(source)}\n来源版本：${source.revision ?? "未知"}\n记录：${root}record.json\n${bytes ? `原始内容：${preservedPath}` : ""}`, // i18n-exempt: retained conflict note saved into the project
           );
       const path = `${prefix}pages/${pageId}.json`;
-      files.set(path, Buffer.from(serializeArtifact(document)));
+      files.set(path, Buffer.from(serializeArtifact(document) + "\n"));
       if (originalPageId && bytes) {
         const binding = input[
           (side + "Files") as "localFiles" | "remoteFiles"
@@ -159,7 +208,7 @@ export function retainSyncConflicts(input: {
     }
     files.set(
       root + "record.json",
-      Buffer.from(JSON.stringify(record, null, 2)),
+      Buffer.from(JSON.stringify(record, null, 2) + "\n"),
     );
     records.push(record);
   }

@@ -86,7 +86,9 @@ Default storage is 1 GiB/project, 2 GiB/account and 64 GiB/service. Daily upload
 
 Reservations include unfinished writes. Quota failure preserves local edits. Server maintenance reconciles reservations and verified unreachable objects; application budgets do not impose a provider invoice cap. Request/read budgets are documented in [Server operations](server-operations.md).
 
-Before importing remote changes, the client retains complete recovery inputs and digests. Independent fields merge; incompatible cross-device edits preserve both versions as source-labeled normal Pages and continue sync. `sync retained PROJECT --json` lists records. Delete/edit conflicts retain the edit and deletion origin; non-Page conflicts retain raw inputs and an explanatory Page. Repeated identical conflicts do not create duplicates.
+The client commits imported changes and the remote snapshot they incorporate in one local transaction. If an acknowledgment is interrupted, the next sync uses that snapshot as its merge base and keeps edits made since the import. Older pending drafts are checked against local import receipts during recovery.
+
+Independent fields merge automatically. Incompatible cross-device edits preserve both versions as source-labeled normal Pages. `sync retained PROJECT --json` lists their origins. Delete/edit conflicts retain the edited version and the deletion origin. Conflicts in other project files retain the exact inputs and explanatory Pages. Stored JSON is compared by value, so a difference in formatting alone does not create a copy.
 
 Same-device stale writes fail with `CONFLICT`, saveFailed and recovery/nextStep information. Compare and resolve while retaining the draft; simply refreshing the base token is unsafe. Unresolved local file conflicts pause publication with `save-failed`. App/CLI share project-level synchronization locking and reconcile interrupted upload acknowledgments before continuing.
 

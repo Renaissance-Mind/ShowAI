@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import { isDeepStrictEqual } from "node:util";
 import { CoreError } from "./model";
 import type { FileChanges } from "./history-model";
 import type { JSONContent } from "@tiptap/core";
@@ -27,6 +28,16 @@ function jsonEnvelope(path: string): boolean {
   return (
     path.endsWith(".json") &&
     (!/\/components\//.test(path) || path.endsWith("/compiled.json"))
+  );
+}
+
+export function sameFileContents(path: string, left?: Buffer, right?: Buffer) {
+  if (left === right) return true;
+  if (!left || !right) return false;
+  if (left.equals(right)) return true;
+  return (
+    jsonEnvelope(path) &&
+    isDeepStrictEqual(JSON.parse(left.toString()), JSON.parse(right.toString()))
   );
 }
 

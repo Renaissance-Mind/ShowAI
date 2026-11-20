@@ -10,6 +10,8 @@ import { ContentLibrary as GitLibrary } from "../core/content-library";
 import { FileStore, CoreError, assertId } from "../core/store";
 import { isId } from "../core/identifier";
 import { LibraryOperations } from "../core/library-operations";
+import type { HistoryEntry } from "../core/history-model";
+import { sameFileContents } from "../core/history-codec";
 import { WorkspaceProtection } from "../core/workspace-conflicts";
 import { serverBaseUrl, serverEndpoint, invitationBaseUrl } from "./server-url";
 import { cacheDownload, retainCachedObject } from "./object-cache";
@@ -83,6 +85,12 @@ interface PendingImport {
   localHistoryRevision?: string | null;
   files: Record<string, string>;
   needsPublish: boolean;
+}
+interface AppliedImport {
+  serverId: string;
+  previousRemoteHead: string | null;
+  remote: SnapshotRecord;
+  recoveredDraft?: string;
 }
 const hash = (bytes: Buffer | string) =>
   createHash("sha256").update(bytes).digest("hex");
@@ -1918,29 +1926,6 @@ export class SyncManager {
   private pendingPath(projectId: string) {
     return join(this.root, "pending-imports", `${assertId(projectId)}.json`);
   }
-  private async savePendingImport(
-    projectId: string,
-    pending: Omit<PendingImport, "files">,
-    files: Map<string, Buffer>,
-  ) {
-    const references: Record<string, string> = {};
-    for (const [path, bytes] of files) {
-      const digest = hash(bytes);
-      references[path] = digest;
-      const cached = await readLibraryBytes(this.home, this.objectPath(digest));
-      if (cached && hash(cached) !== digest)
-        throw new CoreError("INVALID_DATA", t("cache.retainedCorrupt"));
-      if (!cached)
-        await atomicLibraryFile(this.home, this.objectPath(digest), bytes);
-    }
-    const saved = { ...pending, files: references };
-    await atomicLibraryFile(
-      this.home,
-      this.pendingPath(projectId),
-      Buffer.from(JSON.stringify(saved)),
-    );
-    return saved;
-  }
   private async pendingFiles(pending: PendingImport) {
     const files = new Map<string, Buffer>();
     for (const [path, digest] of Object.entries(pending.files)) {
@@ -1950,6 +1935,35 @@ export class SyncManager {
       files.set(path, bytes);
     }
     return files;
+  }
+  private async legacyImportApplied(
+    project: ProjectConnection,
+    pending: PendingImport,
+  ) {
+    if (pending.appliedHead) return true;
+    const directory = join(this.home, "local", "receipts");
+    const names = await readdir(directory).catch(
+      (error: NodeJS.ErrnoException) => {
+        if (error.code === "ENOENT") return [];
+        throw error;
+      },
+    );
+    for (const name of names) {
+      if (!/^[a-f0-9]{64}\.json$/.test(name)) continue;
+      const entry = await readJson<HistoryEntry>(join(directory, name));
+      const origin = entry?.syncOrigin;
+      if (
+        entry &&
+        entry.channel === "system" &&
+        origin?.serverId === pending.serverId &&
+        (origin.projectId === project.projectId ||
+          origin.projectId === project.remoteProjectId) &&
+        origin.revision === pending.remoteHead &&
+        (entry.parents[0] ?? null) === pending.originalHead
+      )
+        return true;
+    }
+    return false;
   }
   async conflict(projectId: string) {
     return (await readJson<SyncConflict>(this.conflictPath(projectId))) ?? null;
@@ -2056,12 +2070,33 @@ export class SyncManager {
         role: created.role,
       });
     }
+    const pushed = this.pushed.get(connection.id);
+    const hint =
+      suppliedRemote && pushed?.get(project.remoteProjectId) === suppliedRemote;
+    const announced =
+      hint && suppliedRemote.head
+        ? this.announced.get(
+            this.announcedKey(
+              connection,
+              project.remoteProjectId,
+              suppliedRemote.head,
+            ),
+          )
+        : undefined;
+    const verifyHint =
+      hint &&
+      (project.status === "pending" ||
+        (suppliedRemote.head !== project.remoteHead &&
+          announced?.previous !== project.remoteHead));
     const remote =
-      suppliedRemote ??
-      (await this.request<SyncProject>(
-        connection,
-        `/api/projects/${project.remoteProjectId}`,
-      ));
+      suppliedRemote && !verifyHint
+        ? suppliedRemote
+        : await this.request<SyncProject>(
+            connection,
+            `/api/projects/${project.remoteProjectId}`,
+          );
+    if (verifyHint && pushed?.get(project.remoteProjectId) === suppliedRemote)
+      pushed.set(project.remoteProjectId, remote);
     if (project.role !== remote.role)
       await this.state(project.projectId, { role: remote.role });
     project.role = remote.role;
@@ -2069,21 +2104,33 @@ export class SyncManager {
     await library.recover();
     if (project.role !== "viewer")
       await this.refreshBundles(library, project.projectId, true);
-    const localHead = await library.head();
-    const localExists = !!(
-      await library.treeEntries(
-        { paths: [`projects/${project.projectId}/project.json`] },
-        localHead ?? undefined,
-      )
-    ).length;
-    let localFiles =
-      localExists && localHead
-        ? await new LibraryOperations(
-            this.home,
-            project.projectId,
-          ).projectFiles(project.projectId, localHead)
-        : new Map<string, Buffer>();
-    const actual = localFiles;
+    const projectPath = `projects/${project.projectId}/project.json`;
+    const importPath = `projects/${project.projectId}/.sync/current-import.json`;
+    const { localHead, localEntry, localExists, actual, checkpoint } =
+      await library.readSnapshot(async (localHead) => {
+        const entries = await library.treeEntries(
+          { paths: [projectPath, importPath] },
+          localHead ?? undefined,
+        );
+        const localExists = entries.some((entry) => entry.path === projectPath);
+        const checkpoint: AppliedImport | undefined = entries.some(
+          (entry) => entry.path === importPath,
+        )
+          ? JSON.parse(
+              (await library.readFile(importPath, localHead!)).toString(),
+            )
+          : undefined;
+        const actual =
+          localExists && localHead
+            ? await new LibraryOperations(
+                this.home,
+                project.projectId,
+              ).projectFiles(project.projectId, localHead)
+            : new Map<string, Buffer>();
+        const localEntry = localHead ? await library.entryAt(localHead) : null;
+        return { localHead, localEntry, localExists, actual, checkpoint };
+      });
+    let localFiles = actual;
     this.trace("local-files-read", phaseStarted);
     const unfinishedSave = (await new WorkspaceProtection(library).list()).find(
       (item) =>
@@ -2107,36 +2154,72 @@ export class SyncManager {
     );
     if (pending && pending.serverId !== connection.serverId)
       throw new CoreError("CONFLICT", t("draft.otherServer"));
-    let baseline = project.remoteHead
-      ? await this.files(
-          connection,
-          project,
-          await this.record(connection, project, project.remoteHead),
-        )
-      : new Map<string, Buffer>();
-    if (pending) {
+    const applied =
+      checkpoint?.serverId === connection.serverId &&
+      checkpoint.remote.snapshot.projectId === project.remoteProjectId
+        ? checkpoint
+        : undefined;
+    const importBase =
+      applied?.previousRemoteHead === project.remoteHead
+        ? applied.remote
+        : undefined;
+    const draftHash = pending && hash(JSON.stringify(pending));
+    const recoverDraft = pending && draftHash !== applied?.recoveredDraft;
+    let baseRecord = importBase;
+    let baseline: Map<string, Buffer> | undefined;
+    if (pending && recoverDraft) {
+      const availableRecord = (revision: string) =>
+        remote.head === revision
+          ? this.record(connection, project, revision)
+          : this.cachedRecord(connection, project, revision);
+      const previous = project.remoteHead
+        ? await availableRecord(project.remoteHead)
+        : undefined;
       const saved = await this.pendingFiles(pending);
-      const blend = mergeProjectFiles(baseline, localFiles, saved);
-      localFiles = blend.conflicts.length
-        ? retainSyncConflicts({
-            projectId: project.projectId,
-            files: blend.files,
-            conflicts: blend.conflicts,
-            localFiles,
-            remoteFiles: saved,
-            local: {
-              account: connection.user.name,
-              deviceId,
-              revision: localHead,
-            },
-            remote: {
-              account: "保留的同步草稿", // i18n-exempt: source label written into retained conflict pages
-              deviceId: "unknown",
-              revision: pending.remoteHead,
-            },
-          }).files
-        : blend.files;
+      if (localHead === pending.originalHead) {
+        localFiles = saved;
+      } else if (
+        !sameFiles(actual, saved) &&
+        !(await this.legacyImportApplied(project, pending))
+      ) {
+        const anchor = previous
+          ? await this.files(connection, project, previous)
+          : new Map<string, Buffer>();
+        const blend = mergeProjectFiles(anchor, saved, actual);
+        localFiles = blend.conflicts.length
+          ? retainSyncConflicts({
+              projectId: project.projectId,
+              files: blend.files,
+              conflicts: blend.conflicts,
+              localFiles: saved,
+              remoteFiles: actual,
+              remote: {
+                account: connection.user.name,
+                deviceId,
+                revision: localHead,
+              },
+              local: {
+                account: "保留的同步草稿", // i18n-exempt: source label written into retained conflict pages
+                deviceId: "unknown",
+                revision: pending.remoteHead,
+              },
+            }).files
+          : blend.files;
+      }
+      baseRecord = pending.remoteHead
+        ? await availableRecord(pending.remoteHead)
+        : undefined;
+      if (!baseRecord && !pending.needsPublish) baseline = saved;
+      else if (!baseRecord) {
+        baseRecord = previous;
+        if (!previous) baseline = new Map();
+      }
     }
+    if (!baseRecord && !baseline && project.remoteHead)
+      baseRecord = await this.record(connection, project, project.remoteHead);
+    baseline ??= baseRecord
+      ? await this.files(connection, project, baseRecord)
+      : new Map<string, Buffer>();
     const uploadReceipt = await readJson<{
       revision: string;
       revisions?: string[];
@@ -2144,20 +2227,22 @@ export class SyncManager {
     let remoteFiles = baseline;
     let remoteRecord: SnapshotRecord | undefined;
     if (remote.head) {
-      remoteRecord = await this.record(connection, project, remote.head);
+      remoteRecord =
+        baseRecord?.revision === remote.head
+          ? baseRecord
+          : await this.record(connection, project, remote.head);
       remoteFiles =
-        remote.head === project.remoteHead
+        remote.head === baseRecord?.revision
           ? baseline
           : await this.files(connection, project, remoteRecord);
       if (
-        remoteRecord.snapshot.change.deviceId === deviceId &&
         (
           uploadReceipt?.revisions ??
           (uploadReceipt ? [uploadReceipt.revision] : [])
         ).includes(remote.head)
       )
         baseline = remoteFiles;
-      if (remote.head !== project.remoteHead) {
+      if (remote.head !== baseRecord?.revision) {
         const merge = !localExists
           ? { files: remoteFiles, conflicts: [] as FileConflict[] }
           : mergeProjectFiles(baseline, localFiles, remoteFiles);
@@ -2181,32 +2266,31 @@ export class SyncManager {
             }).files
           : merge.files;
       }
-    } else if (project.remoteHead) {
+    } else if (project.remoteHead || pending?.remoteHead || importBase) {
       throw new CoreError("CONFLICT", t("server.contentMissing"));
     }
     const changes = new Map<string, Buffer | null>(
       [...localFiles].filter(
-        ([path, bytes]) => !actual.get(path)?.equals(bytes),
+        ([path, bytes]) => !sameFileContents(path, actual.get(path), bytes),
       ),
     );
     for (const path of actual.keys())
       if (!localFiles.has(path)) changes.set(path, null);
     if (remoteRecord)
       await this.receiveBundles(connection, project, remoteRecord);
+    if (remoteRecord && (changes.size || recoverDraft)) {
+      const imported: AppliedImport = {
+        serverId: connection.serverId,
+        previousRemoteHead: project.remoteHead,
+        remote: remoteRecord,
+        ...(draftHash ? { recoveredDraft: draftHash } : {}),
+      };
+      changes.set(importPath, Buffer.from(JSON.stringify(imported)));
+    }
+    let mergedEntry = localEntry;
     if (changes.size) {
       await this.checkTransfer(connection, project);
-      await this.savePendingImport(
-        project.projectId,
-        {
-          serverId: connection.serverId,
-          remoteHead: remote.head ?? "",
-          originalHead: localHead,
-          localBranch: null,
-          needsPublish: !sameFiles(localFiles, remoteFiles),
-        },
-        localFiles,
-      );
-      await library.transaction(
+      const imported = await library.transaction(
         {
           actor: { kind: "system" },
           channel: "system",
@@ -2231,8 +2315,9 @@ export class SyncManager {
           await library.stageFiles(changes);
         },
       );
+      mergedEntry = imported.entry ?? localEntry;
     }
-    const mergedHead = await library.head();
+    const mergedHead = mergedEntry?.revision ?? null;
     if (remote.role === "viewer" && !sameFiles(localFiles, remoteFiles)) {
       await this.state(project.projectId, {
         status: "revoked",
@@ -2241,16 +2326,16 @@ export class SyncManager {
       return;
     }
     if (remote.role !== "viewer" && !sameFiles(localFiles, remoteFiles)) {
-      if (!mergedHead)
+      if (!mergedEntry)
         throw new CoreError("NOT_FOUND", t("project.contentMissing"));
       const captured = await captureProject(
         this.home,
         project.projectId,
-        await library.entryAt(mergedHead),
+        mergedEntry,
         remote.head ? [remote.head] : [],
         project.remoteProjectId,
         deviceId,
-        mergedHead === localHead ? actual : undefined,
+        localFiles,
       );
       const result = await this.upload(
         connection,

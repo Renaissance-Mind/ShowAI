@@ -2,6 +2,7 @@ export const syncProtocol = "showai-project-sync-v2";
 export const legacySyncProtocol = "showai-project-sync-v1";
 export const isCurrentSyncPath = (path: string): boolean =>
   !path.startsWith("runtimes/") &&
+  !path.includes("/.sync/") &&
   !path.includes("/history/") &&
   !/\/reader\.json$|\.reader\.json$/.test(path);
 export type ProjectRole = "admin" | "editor" | "viewer";
