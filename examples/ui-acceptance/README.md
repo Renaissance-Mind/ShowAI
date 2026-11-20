@@ -2,7 +2,9 @@
 
 [简体中文](README.zh-CN.md)
 
-Copy the folder and open [preview.html](preview.html). Numbers identify controls on the current screen. The inspector offers actions, state shortcuts and an expandable flow tree. A node opens a working state where the reviewer can continue. Use `#state=ID` to open a state directly and `?marks=0` to start a visual review with the markers hidden. Each task builds and delivers its own HTML file.
+Copy the folder and open [preview.html](preview.html). Numbers identify controls on the current screen. The inspector offers actions, state shortcuts and an expandable flow tree. A node opens a working state where the reviewer can continue. Use `#state=ID` to open a state directly and `?marks=0` to start a visual review with the markers hidden.
+
+The GitHub repository can include review tools, reusable regression scenarios and generic examples. Keep each task’s review page, action history, screenshots, logs and check reports in its local task directory.
 
 ```text
 Use the independent UI acceptance template for this change. Use real controls and identify any simulated data or services.
