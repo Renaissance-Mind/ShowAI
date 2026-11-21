@@ -59,11 +59,8 @@ test("direct HTML stays selectable, isolated and interactive, then registers and
     const call = async (name: string, args: Record<string, unknown>) => {
       const result = await client.callTool({ name, arguments: args });
       expect(result.isError, JSON.stringify(result.content)).not.toBe(true);
-      return {
-        ...result,
-        data: (result.structuredContent as { data: Record<string, unknown> })
-          .data,
-      };
+      const structuredContent = result.structuredContent as { data: Record<string, unknown> };
+      return { _meta: result._meta, structuredContent, data: structuredContent.data };
     };
     const page = await browser.newPage({
       viewport: { width: 480, height: 600 },
