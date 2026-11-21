@@ -10,7 +10,7 @@ export const HOST_GUIDE: string;
 export const DELIVERY_WORKFLOWS: readonly string[];
 export function workflowWithHostDelivery(file: string, workflow: string, adapter: string): string;
 export const ANTIGRAVITY_EAGER_TOOLS: Record<
-  "public_catalog_list" | "public_catalog_describe" | "show_component",
+  "show_component",
   { eager: true }
 >;
 export function bindWorkflowDelivery(

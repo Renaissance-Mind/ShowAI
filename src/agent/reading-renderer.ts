@@ -89,13 +89,24 @@ export async function readingBrowserExecutable(): Promise<string> {
       : "Rendered Page reading needs Chrome, Edge or Chromium. Install a browser or set SHOWAI_BROWSER_EXECUTABLE to its executable. Structured reading with --rendered false remains available.",
   );
 }
-async function frameBlock(frame: Frame): Promise<string | undefined> {
-  if (!frame.parentFrame()) return undefined;
+async function frameOwner(frame: Frame): Promise<{ blockId?: string; html: boolean }> {
+  const parent = frame.parentFrame();
+  if (!parent) return { html: false };
   const element = await frame.frameElement();
-  return element.evaluate(
-    (el) =>
-      (el as Element).closest<HTMLElement>("[data-block-id]")?.dataset.blockId,
-  );
+  const owner = await element.evaluate(node => {
+    const html = node instanceof Element && node.hasAttribute("data-showai-html-frame");
+    let current: Element | null = node as Element;
+    while (current) {
+      const blockId = current.closest<HTMLElement>("[data-block-id]")?.dataset.blockId;
+      if (blockId) return { html, blockId };
+      const root = current.getRootNode();
+      current = root instanceof ShadowRoot ? root.host : null;
+    }
+    return { html, blockId: undefined };
+  });
+  await element.dispose();
+  if (owner.html && !owner.blockId) owner.blockId = (await frameOwner(parent)).blockId;
+  return owner;
 }
 async function actionTarget(
   page: Page,
@@ -103,6 +114,9 @@ async function actionTarget(
 ): Promise<Locator> {
   let scope: Page | Frame = page;
   let block: Locator | undefined;
+  const locate = (owner: Page | Frame | Locator) => action.selector
+    ? owner.locator(action.selector)
+    : owner.getByRole(action.role!, { name: action.name!, exact: true });
   if (action.blockId) {
     block = page.locator(
       `[data-block-id=${JSON.stringify(action.blockId)}],[data-surface-id=${JSON.stringify(action.blockId)}]`,
@@ -111,17 +125,21 @@ async function actionTarget(
       throw new Error(
         `Action block is missing or ambiguous: ${action.blockId}`,
       );
-    for (const frame of page.frames())
-      if ((await frameBlock(frame)) === action.blockId) {
+    for (const frame of page.frames()) {
+      const owner = await frameOwner(frame);
+      if (owner.blockId !== action.blockId) continue;
+      if (block) {
         scope = frame;
         block = undefined;
+      }
+      if (owner.html && await locate(frame).count()) {
+        scope = frame;
         break;
       }
+    }
   }
   const owner = block ?? scope;
-  let target = action.selector
-    ? owner.locator(action.selector)
-    : owner.getByRole(action.role!, { name: action.name!, exact: true });
+  let target = locate(owner);
   const message = `Action target is missing or ambiguous: ${action.selector ?? `${action.role} ${action.name}`}. Read the HTML view and specify its blockId.`;
   let matches = await target.count();
   if (matches === 0 && !action.selector) {
@@ -218,7 +236,7 @@ async function settleComponents(page: Page): Promise<void> {
     if (!timedOut) continue;
     const pending = new Set<string>();
     for (const owner of page.frames()) {
-      const frameId = await frameBlock(owner);
+      const { blockId: frameId } = await frameOwner(owner);
       const ids = await owner.evaluate(
         (selector) =>
           Array.from(document.querySelectorAll(selector), (node) => {
@@ -310,10 +328,7 @@ export async function renderReading(
       });
     for (const frame of page.frames()) {
       if (!frame.parentFrame()) continue;
-      const element = await frame.frameElement();
-      const isHtmlVisual = await element.evaluate(node => node instanceof Element && node.hasAttribute("data-showai-html-frame"));
-      await element.dispose();
-      if (isHtmlVisual) {
+      if ((await frameOwner(frame)).html) {
         await frame.waitForFunction(() => document.documentElement.dataset.showaiHtmlReady === "true");
         continue;
       }
@@ -377,7 +392,7 @@ export async function renderReading(
     const dom: ReadingCapture["dom"] = [];
     const components: ComponentReading[] = [];
     for (const frame of page.frames()) {
-      const blockId = await frameBlock(frame);
+      const { blockId } = await frameOwner(frame);
       dom.push({
         ...(blockId ? { blockId } : {}),
         url: frame.parentFrame() ? "component-sandbox" : frame.url(),
