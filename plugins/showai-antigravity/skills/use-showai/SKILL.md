@@ -1,6 +1,6 @@
 ---
 name: use-showai
-description: 连接 ShowAI 或通过 MCP 管理内容、确定项目、续改作品、制作组件或模板的入口。本机专用包自带 MCP 配置，通用包按 ChatGPT、Grok Bot 或其他客户端逐步引导手动连接。在聊天里看可视化时直接使用 show-visual。
+description: 连接 ShowAI 或通过 MCP 管理内容、确定项目、续改作品、制作组件或模板的入口。使用随包或宿主已有的 MCP 连接，需要配置时按 ChatGPT、Grok Bot 或其他宿主引导。在聊天里看可视化时直接使用 show-visual。
 ---
 
 # 使用 ShowAI

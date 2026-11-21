@@ -14,7 +14,7 @@
 
 ### ChatGPT 网页
 
-- 已识别为 ChatGPT 云端时，直接问「你已经有 ShowAI 的公网 HTTPS MCP 地址了吗？」已有地址就进入注册；还没有则请用户在运行 ShowAI 的电脑打开「设置 → 远程连接 → 公网入口」。
+- 需要新建连接且公网地址未知时，问「你已经有 ShowAI 的公网 HTTPS MCP 地址了吗？」已有地址就进入注册；还没有则请用户在运行 ShowAI 的电脑打开「设置 → 远程连接 → 公网入口」。
 - 临时试用可选 Cloudflare 临时域名。长期使用可配置 Cloudflare 固定域名，或已开通的 Tailscale **Funnel** 公网入口。保持电脑在线、ShowAI 运行，在 App 检查通过后复制以 `/mcp` 结尾的 HTTPS 地址。ChatGPT 的云端无法直连用户的 localhost、家庭局域网或仅 tailnet 可达的 Serve 地址。
 - 在 [ChatGPT 插件设置](https://chatgpt.com/plugins) 点击加号 → Add custom MCP server，选 Server URL，填写地址，选择 OAuth 和动态客户端注册（DCR），再点 Create as a plugin。要求开发者模式时在设置中启用；受组织管理时由有权限的管理员添加。打开连接，在 ShowAI 对照连接编号批准，再返回 ChatGPT 完成授权。用户已经注册过服务时从原条目继续。
 - 连接已授权且工具已加载时，通用 Skills 可复用该连接。希望把 Skills 明确关联到这个 ChatGPT 连接时，在 ShowAI 的对应公网入口选择 ChatGPT，使用「导出 ChatGPT 插件」并填写已注册连接的插件页链接，再按宿主支持的方式导入 ShowAI Personal。
@@ -27,7 +27,7 @@
 
 ### 其他 Agent
 
-已明确 ShowAI 和 Agent 在同一台电脑时，直接使用宿主的设置。Qoder 在「扩展 → 插件」检查插件是否启用，在「扩展 → 连接器」看 ShowAI 的连接状态，含本机配置的 ZIP 会带 `.mcp.json`。WorkBuddy 在「连接器 → 自定义连接器」检查工具或添加本机配置。Cursor 在「Customize → MCPs」管理连接。修复连接后新建本机对话验证工具，再继续原任务。
+已明确 ShowAI 和 Agent 在同一台电脑时，直接使用宿主的设置。Qoder 在「扩展 → 插件」检查插件是否启用，在「扩展 → 连接器」看 ShowAI 的连接状态，含本机配置的 ZIP 会带 `.mcp.json`。WorkBuddy 在「连接器 → 自定义连接器」检查工具或添加本机配置。Cursor 在「Customize → MCPs」管理连接。修复后在同一客户端刷新并验证工具，必要时新建本机对话。连通后沿用原任务的项目和材料。
 
 运行位置仍不明确时，先问「MCP 客户端运行在 ShowAI 这台电脑、同一网络的另一台设备，还是云端？」再看该宿主接受远程 URL 还是本机命令。
 

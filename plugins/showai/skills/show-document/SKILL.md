@@ -179,7 +179,7 @@ description: 创作或修改要保存的作品：可交互报告、讲解页面�
 
 <!-- showai-host-delivery:start -->
 
-- 通用插件复用宿主中手动配置的 ShowAI MCP。支持 MCP Apps 的客户端用 `show_component` 的 `delivery:"auto"` 呈现附带的 `mcp-app` 视图。文本客户端给出结果和可访问的页面或文件链接。
+- 通用插件使用随包或宿主已配置的 ShowAI MCP。支持 MCP Apps 的客户端用 `show_component` 的 `delivery:"auto"` 呈现附带的 `mcp-app` 视图。文本客户端给出结果和可访问的页面或文件链接。
 - 新作品保存后用 `page_present` 展示。续改说明改动、所在项目和可用的原页链接。用户要求在聊天里阅读原页或片段时用 `page_present`。
 - 视图出现后只补充必要解释。出现 `inlineError` 或视图加载失败时查完整宿主适配。
 
