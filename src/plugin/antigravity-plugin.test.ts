@@ -20,7 +20,11 @@ interface HookModule {
 }
 
 interface SidecarModule {
-  isAllowedSidecarOrigin(origin: string, sidecarPort: number): boolean;
+  isAllowedSidecarOrigin(
+    origin: string,
+    sidecarPort: number,
+    options?: { pathname?: string; authenticated?: boolean },
+  ): boolean;
   startAntigravitySidecar(options: {
     port?: number;
     token?: string;
@@ -334,43 +338,85 @@ describe("Antigravity sidecar workbench proxy", () => {
     });
 
     try {
-      const pluginOrigin = `plugin://showai--workbench-${sidecar.port}`;
-      expect(isAllowedSidecarOrigin(pluginOrigin, sidecar.port)).toBe(true);
+      // Antigravity's sidecar gateway listens on its own loopback port (e.g. sidecar.port + 3)
+      // and loads the webview from plugin://showai--workbench-<gatewayPort>.
+      const gatewayPort = (sidecar.port % 60000) + 3;
+      const gatewayPluginOrigin = `plugin://showai--workbench-${gatewayPort}`;
+      const gatewayLoopbackOrigin = `http://127.0.0.1:${gatewayPort}`;
+
+      expect(isAllowedSidecarOrigin(gatewayPluginOrigin, sidecar.port)).toBe(true);
       expect(
         isAllowedSidecarOrigin(`http://127.0.0.1:${sidecar.port}`, sidecar.port),
       ).toBe(true);
       expect(
-        isAllowedSidecarOrigin(`plugin://showai--workbench-${sidecar.port + 1}`, sidecar.port),
+        isAllowedSidecarOrigin(gatewayLoopbackOrigin, sidecar.port, {
+          pathname: "/assets/index.js",
+        }),
+      ).toBe(true);
+      expect(
+        isAllowedSidecarOrigin(gatewayLoopbackOrigin, sidecar.port, {
+          pathname: "/",
+          authenticated: false,
+        }),
       ).toBe(false);
       expect(
-        isAllowedSidecarOrigin(`plugin://other--workbench-${sidecar.port}`, sidecar.port),
+        isAllowedSidecarOrigin(gatewayLoopbackOrigin, sidecar.port, {
+          pathname: "/",
+          authenticated: true,
+        }),
+      ).toBe(true);
+      expect(
+        isAllowedSidecarOrigin(`plugin://other--workbench-${gatewayPort}`, sidecar.port),
+      ).toBe(false);
+      expect(
+        isAllowedSidecarOrigin("plugin://showai--workbench-70000", sidecar.port),
       ).toBe(false);
       expect(isAllowedSidecarOrigin("https://evil.example", sidecar.port)).toBe(false);
 
-      // Module asset request with Antigravity desktop plugin:// origin succeeds and strips X-Frame-Options.
+      // Module asset request with Antigravity desktop plugin:// gateway origin succeeds and strips X-Frame-Options.
       const assetRes = await fetch(`${sidecar.url}/assets/index.js`, {
-        headers: { Origin: pluginOrigin },
+        headers: { Origin: gatewayPluginOrigin },
       });
       expect(assetRes.status).toBe(200);
-      expect(assetRes.headers.get("access-control-allow-origin")).toBe(pluginOrigin);
+      expect(assetRes.headers.get("access-control-allow-origin")).toBe(gatewayPluginOrigin);
+      expect(assetRes.headers.get("access-control-allow-credentials")).toBe("true");
       expect(assetRes.headers.get("x-frame-options")).toBeNull();
       expect(await assetRes.text()).toContain("export const ok = true;");
 
-      // Preflight OPTIONS from plugin:// origin succeeds.
+      // Asset request via loopback HTTP gateway port succeeds, while unauthenticated root HTML read from another port is blocked.
+      const gwAssetRes = await fetch(`${sidecar.url}/assets/index.js`, {
+        headers: { Origin: gatewayLoopbackOrigin },
+      });
+      expect(gwAssetRes.status).toBe(200);
+
+      const unauthRoot = await fetch(`${sidecar.url}/`, {
+        headers: { Origin: gatewayLoopbackOrigin },
+      });
+      expect(unauthRoot.status).toBe(403);
+
+      const authRoot = await fetch(`${sidecar.url}/`, {
+        headers: {
+          Origin: gatewayLoopbackOrigin,
+          "X-Sidecar-Token": "origin-test-token",
+        },
+      });
+      expect(authRoot.status).toBe(200);
+
+      // Preflight OPTIONS from plugin:// gateway origin succeeds.
       const preflight = await fetch(`${sidecar.url}/api/invoke`, {
         method: "OPTIONS",
-        headers: { Origin: pluginOrigin },
+        headers: { Origin: gatewayPluginOrigin },
       });
       expect(preflight.status).toBe(204);
-      expect(preflight.headers.get("access-control-allow-origin")).toBe(pluginOrigin);
+      expect(preflight.headers.get("access-control-allow-origin")).toBe(gatewayPluginOrigin);
 
       // Foreign origins are rejected with 403 before reaching upstream.
       const hitsBeforeReject = upstreamHits;
       for (const badOrigin of [
         "https://evil.example",
-        `http://127.0.0.1:${sidecar.port + 1}`,
         `plugin://other--workbench-${sidecar.port}`,
-        `plugin://showai--workbench-${sidecar.port + 1}`,
+        `plugin://other--workbench-${gatewayPort}`,
+        "plugin://showai--workbench-70000",
       ]) {
         const blocked = await fetch(`${sidecar.url}/assets/index.js`, {
           headers: { Origin: badOrigin },
@@ -385,14 +431,17 @@ describe("Antigravity sidecar workbench proxy", () => {
     }
   });
 
-  test("injects preload + bridge scripts, relaxes frame-ancestors, proxies API/SSE, and enforces sidecar token", async () => {
+  test("injects preload + bridge scripts, adapts CSP for plugin:// + blob workers, proxies API/SSE, and enforces sidecar token", async () => {
     const upstream = createServer((req, res) => {
       if (req.url?.startsWith("/api/events")) {
+        const reqUrl = new URL(req.url, "http://127.0.0.1");
         res.writeHead(200, {
           "Content-Type": "text/event-stream",
           "Cache-Control": "no-cache",
         });
-        res.write("data: {\"type\":\"ready\"}\n\n");
+        res.write(
+          `data: ${JSON.stringify({ type: "ready", token: reqUrl.searchParams.get("token") })}\n\n`,
+        );
         res.end();
         return;
       }
@@ -405,6 +454,7 @@ describe("Antigravity sidecar workbench proxy", () => {
             JSON.stringify({
               ok: true,
               auth: req.headers.authorization,
+              leakedSidecarToken: req.headers["x-sidecar-token"] ?? null,
               echo: JSON.parse(body),
             }),
           );
@@ -413,11 +463,12 @@ describe("Antigravity sidecar workbench proxy", () => {
       }
       res.writeHead(200, {
         "Content-Type": "text/html; charset=utf-8",
+        "Referrer-Policy": "no-referrer",
         "Content-Security-Policy":
-          "default-src 'self'; frame-ancestors 'none'; object-src 'none'",
+          "default-src 'self'; script-src 'self' 'unsafe-inline'; worker-src 'self'; connect-src 'self'; frame-ancestors 'none'; object-src 'none'",
       });
       res.end(
-        '<!doctype html><html><head><title>ShowAI</title><script>window.__SHOWAI_LOCAL__={"token":"abc"}</script></head><body><div id="root"></div></body></html>',
+        '<!doctype html><html><head><title>ShowAI</title><script>window.__SHOWAI_LOCAL__={"token":"abc"}</script><script type="module" crossorigin src="./assets/index.js"></script><link rel="modulepreload" crossorigin href="./assets/vendor.js"><link rel="stylesheet" crossorigin href="./assets/index.css"></head><body><div id="root"></div></body></html>',
       );
     });
     await new Promise<void>((done) => upstream.listen(0, "127.0.0.1", done));
@@ -445,13 +496,18 @@ describe("Antigravity sidecar workbench proxy", () => {
     try {
       const rootRes = await fetch(`${sidecar.url}/?project=p1&page=pg1`);
       expect(rootRes.status).toBe(200);
-      expect(rootRes.headers.get("content-security-policy")).toContain(
-        "frame-ancestors *",
-      );
+      const csp = rootRes.headers.get("content-security-policy") ?? "";
+      expect(csp).toContain("frame-ancestors *");
+      expect(csp).toContain("default-src 'self' plugin:");
+      expect(csp).toContain("script-src 'self' plugin: 'unsafe-inline' blob:");
+      expect(csp).toContain("worker-src 'self' plugin: blob:");
+      expect(csp).toContain("connect-src 'self' plugin: data: blob:");
+      expect(rootRes.headers.get("referrer-policy")).toBeNull();
       const html = await rootRes.text();
       expect(html).toContain(
-        '<head><script src="/preload.js"></script><script src="/_antigravity/bridge.js"></script>',
+        '<script src="/preload.js"></script><script src="/_antigravity/bridge.js"></script>',
       );
+      expect(html).not.toContain("crossorigin");
       expect(html).toContain("window.__SHOWAI_LOCAL__");
 
       const bridgeRes = await fetch(`${sidecar.url}/_antigravity/bridge.js`);
@@ -459,7 +515,8 @@ describe("Antigravity sidecar workbench proxy", () => {
       const bridgeJs = await bridgeRes.text();
       expect(bridgeJs).toContain("__SHOWAI_ANTIGRAVITY_HOST__");
       expect(bridgeJs).toContain("addArtifactComment");
-      expect(bridgeJs).toContain("/api/invoke");
+      expect(bridgeJs).toContain("X-Sidecar-Token");
+      expect(bridgeJs).toContain("showai_token");
 
       const healthRes = await fetch(`${sidecar.url}/_antigravity/health`);
       expect(await healthRes.json()).toMatchObject({
@@ -472,18 +529,22 @@ describe("Antigravity sidecar workbench proxy", () => {
         headers: {
           "Content-Type": "application/json",
           Authorization: "Bearer test-token",
+          "X-Sidecar-Token": "secret-sidecar-token",
         },
         body: JSON.stringify({ action: "projects:list", args: {} }),
       });
       expect(await apiRes.json()).toEqual({
         ok: true,
         auth: "Bearer test-token",
+        leakedSidecarToken: null,
         echo: { action: "projects:list", args: {} },
       });
 
-      const sseRes = await fetch(`${sidecar.url}/api/events`);
+      const sseRes = await fetch(
+        `${sidecar.url}/api/events?showai_token=real-showai-tok&token=secret-sidecar-token`,
+      );
       expect(sseRes.headers.get("content-type")).toContain("text/event-stream");
-      expect(await sseRes.text()).toContain('"type":"ready"');
+      expect(await sseRes.text()).toContain('"token":"real-showai-tok"');
 
       // Sidecar agent API requires valid token.
       const unauth = await fetch(`${sidecar.url}/_sidecar/send-message`, {

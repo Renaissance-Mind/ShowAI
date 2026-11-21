@@ -321,9 +321,21 @@ async function install(executable) {
     join(plugin, "hooks.json"),
     antigravityHookConfig({ command: binding.launch.command, env: serverEnv }),
   );
+  const sidecarRevision = createHash("sha256")
+    .update(
+      JSON.stringify([
+        await readFile(join(plugin, "sidecars/workbench/main.mjs"), "utf8"),
+        await readFile(join(plugin, "sidecars/workbench/bridge.js"), "utf8"),
+      ]),
+    )
+    .digest("hex")
+    .slice(0, 12);
   await writeJson(
     join(plugin, "sidecars/workbench/sidecar.json"),
-    antigravitySidecarConfig({ command: binding.launch.command, env: serverEnv }),
+    antigravitySidecarConfig({
+      command: binding.launch.command,
+      env: { ...serverEnv, SHOWAI_SIDECAR_REVISION: sidecarRevision },
+    }),
   );
 
   await agy(executable, ["install", plugin]);

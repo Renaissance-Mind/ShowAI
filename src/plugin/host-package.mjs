@@ -235,6 +235,7 @@ export function antigravitySidecarConfig(launch) {
     "SHOWAI_HOME",
     "SHOWAI_RUNTIME_CONFIG",
     "SHOWAI_PRESENTATION_DIR",
+    "SHOWAI_SIDECAR_REVISION",
   ]) {
     if (typeof launch?.env?.[key] === "string") env[key] = launch.env[key];
   }
@@ -285,9 +286,28 @@ export async function writeAntigravityAssets({
     join(target, "hooks.json"),
     JSON.stringify(antigravityHookConfig(launch), null, 2) + "\n",
   );
+  const sidecarRevision = launch
+    ? hash(
+        JSON.stringify([
+          await readFile(join(assetsRoot, "sidecars/workbench/main.mjs")),
+          await readFile(join(assetsRoot, "sidecars/workbench/bridge.js")),
+        ]),
+      ).slice(0, 12)
+    : undefined;
   await writeFile(
     join(target, "sidecars/workbench/sidecar.json"),
-    JSON.stringify(antigravitySidecarConfig(launch), null, 2) + "\n",
+    JSON.stringify(
+      antigravitySidecarConfig(
+        launch
+          ? {
+              ...launch,
+              env: { ...launch.env, SHOWAI_SIDECAR_REVISION: sidecarRevision },
+            }
+          : undefined,
+      ),
+      null,
+      2,
+    ) + "\n",
   );
 }
 

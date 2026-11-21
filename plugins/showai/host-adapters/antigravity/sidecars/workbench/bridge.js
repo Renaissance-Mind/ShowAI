@@ -1,6 +1,9 @@
 (function () {
   "use strict";
 
+  const initialParams = new URLSearchParams(window.location.search);
+  const sidecarToken = initialParams.get("token") || "";
+
   function parseColor(value) {
     if (!value || typeof value !== "string") return null;
     const s = value.trim();
@@ -19,18 +22,53 @@
         parseInt(raw.slice(4, 6), 16),
       ];
     }
-    const rgb = s.match(/rgba?\(\s*(\d+)[,\s]+(\d+)[,\s]+(\d+)/i);
+    const srgb = s.match(/^color\(\s*srgb\s+([\d.]+)\s+([\d.]+)\s+([\d.]+)/i);
+    if (srgb) {
+      return [
+        Number(srgb[1]) * 255,
+        Number(srgb[2]) * 255,
+        Number(srgb[3]) * 255,
+      ];
+    }
+    const rgb = s.match(/rgba?\(\s*([\d.]+)[,\s]+([\d.]+)[,\s]+([\d.]+)/i);
     return rgb ? [Number(rgb[1]), Number(rgb[2]), Number(rgb[3])] : null;
   }
 
-  function applyThemeFromVars(vars) {
-    if (!vars || typeof vars !== "object") return;
-    const rgb = parseColor(vars["--background"] || vars["--content"]);
+  function resolveComputedBackgroundRgb() {
+    if (!document.documentElement) return null;
+    try {
+      const probe = document.createElement("span");
+      probe.style.cssText =
+        "position:absolute;visibility:hidden;pointer-events:none;color:var(--background, var(--content, #f7f8f5))";
+      document.documentElement.appendChild(probe);
+      const computed = getComputedStyle(probe).color;
+      probe.remove();
+      return parseColor(computed);
+    } catch {
+      return null;
+    }
+  }
+
+  function applyResolvedTheme(rgb) {
     if (!rgb) return;
     const luminance = (0.2126 * rgb[0] + 0.7152 * rgb[1] + 0.0722 * rgb[2]) / 255;
     const mode = luminance < 0.5 ? "dark" : "light";
-    document.documentElement.dataset.theme = mode;
+    if (document.documentElement.dataset.theme !== mode) {
+      document.documentElement.dataset.theme = mode;
+    }
     document.documentElement.style.colorScheme = mode;
+    if (document.body) {
+      document.body.style.background = "var(--paper)";
+      document.body.style.color = "var(--text)";
+    }
+  }
+
+  function applyThemeFromVars(vars) {
+    const direct =
+      vars && typeof vars === "object"
+        ? parseColor(vars["--background"] || vars["--content"])
+        : null;
+    applyResolvedTheme(direct || resolveComputedBackgroundRgb());
   }
 
   window.addEventListener("message", (event) => {
@@ -39,14 +77,108 @@
     }
   });
 
+  if (typeof MutationObserver === "function" && document.documentElement) {
+    new MutationObserver(() => {
+      applyResolvedTheme(resolveComputedBackgroundRgb());
+    }).observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ["style"],
+    });
+  }
+
+  const syncBodyColors = () => {
+    if (document.body) {
+      document.body.style.background = "var(--paper)";
+      document.body.style.color = "var(--text)";
+    }
+    applyResolvedTheme(resolveComputedBackgroundRgb());
+  };
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", syncBodyColors, { once: true });
+  } else {
+    syncBodyColors();
+  }
+
+  function isSameOriginUrl(rawUrl) {
+    try {
+      const resolved = new URL(String(rawUrl), window.location.href);
+      return resolved.origin === window.location.origin;
+    } catch {
+      return false;
+    }
+  }
+
+  if (sidecarToken && typeof window.fetch === "function") {
+    const nativeFetch = window.fetch.bind(window);
+    window.fetch = function (input, init) {
+      const url =
+        typeof input === "string"
+          ? input
+          : typeof URL !== "undefined" && input instanceof URL
+            ? input.href
+            : input && typeof input.url === "string"
+              ? input.url
+              : "";
+      if (url && isSameOriginUrl(url)) {
+        const headers = new Headers(
+          (init && init.headers) ||
+            (typeof Request !== "undefined" && input instanceof Request
+              ? input.headers
+              : undefined),
+        );
+        if (!headers.has("X-Sidecar-Token")) {
+          headers.set("X-Sidecar-Token", sidecarToken);
+        }
+        return nativeFetch(input, Object.assign({}, init, { headers }));
+      }
+      return nativeFetch(input, init);
+    };
+  }
+
+  if (sidecarToken && typeof window.EventSource === "function") {
+    const NativeEventSource = window.EventSource;
+    const PatchedEventSource = function (url, eventSourceInitDict) {
+      let targetUrl = url;
+      try {
+        const resolved = new URL(String(url), window.location.href);
+        if (
+          resolved.origin === window.location.origin &&
+          resolved.pathname === "/api/events" &&
+          resolved.searchParams.has("token") &&
+          !resolved.searchParams.has("showai_token")
+        ) {
+          resolved.searchParams.set(
+            "showai_token",
+            resolved.searchParams.get("token") || "",
+          );
+          resolved.searchParams.set("token", sidecarToken);
+          targetUrl = resolved.pathname + resolved.search;
+        }
+      } catch {
+        // Keep original URL if parsing fails.
+      }
+      return new NativeEventSource(targetUrl, eventSourceInitDict);
+    };
+    PatchedEventSource.prototype = NativeEventSource.prototype;
+    PatchedEventSource.CONNECTING = NativeEventSource.CONNECTING;
+    PatchedEventSource.OPEN = NativeEventSource.OPEN;
+    PatchedEventSource.CLOSED = NativeEventSource.CLOSED;
+    window.EventSource = PatchedEventSource;
+  }
+
   function buildShowaiUri(reference) {
-    const projectId = reference && reference.projectId ? encodeURIComponent(reference.projectId) : "";
-    const pageId = reference && reference.pageId ? encodeURIComponent(reference.pageId) : "";
-    let uri = projectId && pageId
-      ? "showai://project/" + projectId + "/page/" + pageId
-      : window.location.href;
+    const projectId =
+      reference && reference.projectId ? encodeURIComponent(reference.projectId) : "";
+    const pageId =
+      reference && reference.pageId ? encodeURIComponent(reference.pageId) : "";
+    let uri =
+      projectId && pageId
+        ? "showai://project/" + projectId + "/page/" + pageId
+        : window.location.href;
     const blockIds =
-      reference && Array.isArray(reference.blockIds) ? reference.blockIds.filter(Boolean) : [];
+      reference && Array.isArray(reference.blockIds)
+        ? reference.blockIds.filter(Boolean)
+        : [];
     if (blockIds.length) {
       uri += "#block=" + encodeURIComponent(blockIds[0]);
     }
@@ -158,7 +290,7 @@
       // Ignore restricted sessionStorage.
     }
     try {
-      const res = await fetch("/api/invoke", {
+      const res = await window.fetch("/api/invoke", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
