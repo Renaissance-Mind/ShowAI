@@ -210,12 +210,8 @@ export function DataEmptyState({
         {entry ? <LevelIcon level={entry.level} /> : null}
         {entry?.title ?? t("emptyTitle")}
       </strong>
-      {entry?.dataset && (
-        <span className="dataset-warning-meta">
-          {entry.datasetId
-            ? t("sourceLabel", { name: entry.dataset })
-            : entry.dataset}
-        </span>
+      {entry?.dataset && !entry.datasetId && (
+        <span className="dataset-warning-meta">{entry.dataset}</span>
       )}
       {entry?.detail && entry.detail !== entry.title && allActions && (
         <span className="dataset-warning-detail">{entry.detail}</span>

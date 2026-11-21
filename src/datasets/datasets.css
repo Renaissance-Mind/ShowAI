@@ -1,7 +1,7 @@
 .dataset-bound {
   position: relative;
 }
-.dataset-source {
+.dataset-status-row {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -11,25 +11,6 @@
   color: var(--muted);
   font-size: 12px;
   line-height: 18px;
-}
-.dataset-source-name {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-}
-.dataset-source-button {
-  border: 0;
-  padding: 1px 6px 1px 2px;
-  border-radius: var(--radius-control);
-  background: transparent;
-  color: inherit;
-  font: inherit;
-  cursor: pointer;
-}
-.dataset-source-button:hover,
-.dataset-source-button:focus-visible {
-  background: var(--hover);
-  color: var(--text);
 }
 .dataset-state {
   color: var(--subtle);

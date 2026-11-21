@@ -438,10 +438,6 @@ export function BoundWidget({
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [dataStatus, locked, canonicalJson(blockEditable), ownDataset],
   );
-  const openSettings =
-    scope && !scope.readOnly && onChange
-      ? () => scope.openDialog({ kind, data, apply: onChange })
-      : undefined;
   const issues = resolved && "issues" in resolved ? resolved.issues : [];
   const translate = useCallback(
     (key: string, values?: Record<string, unknown>) =>
@@ -472,7 +468,9 @@ export function BoundWidget({
               "open-file": !!scope,
               "ask-agent": pageEditable,
               packaging:
-                !!openSettings &&
+                !!scope &&
+                !scope.readOnly &&
+                !!onChange &&
                 !!snapshot.source &&
                 snapshot.source.kind !== "url",
             },
@@ -537,12 +535,6 @@ export function BoundWidget({
   const actionLabels = assistant
     ? undefined
     : { "ask-agent": t("action.copy-request") };
-  const label = (
-    <span className="dataset-source-name">
-      <Database size={13} aria-hidden="true" />
-      {t("sourceLabel", { name: snapshot?.name ?? compiled?.dataset ?? "" })}
-    </span>
-  );
   let body: ReactNode;
   if (invalid)
     body = (
@@ -651,6 +643,16 @@ export function BoundWidget({
       </BlockItemSources.Provider>
     );
   const conflicts = snapshot?.conflicts ?? [];
+  const saveStatus = snapshot?.saving
+    ? t("saving")
+    : snapshot?.dirty && !snapshot.error
+      ? t("unsaved")
+      : null;
+  const hasStatus =
+    saveStatus ||
+    entries.length > 0 ||
+    dataStatus === "stale" ||
+    conflicts.length > 0;
   return (
     <div
       className="dataset-bound"
@@ -658,44 +660,34 @@ export function BoundWidget({
       data-dataset-id={compiled?.dataset}
       data-data-status={snapshot?.dataStatus}
     >
-      <div className="dataset-source" role="group" aria-label={t("shared")}>
-        {openSettings ? (
-          <button
-            type="button"
-            className="dataset-source-button"
-            onClick={openSettings}
-            title={t("openSettings")}
-          >
-            {label}
-          </button>
-        ) : (
-          label
-        )}
-        {snapshot?.saving ? (
-          <span className="dataset-state">{t("saving")}</span>
-        ) : snapshot?.dirty && !snapshot.error ? (
-          <span className="dataset-state">{t("unsaved")}</span>
-        ) : null}
-        <DataWarningBadge
-          entries={entries}
-          stale={dataStatus === "stale"}
-          readOnlyLabel={
-            dataState.editable === false ? t("readOnly") : t("partlyReadOnly")
-          }
-          run={run}
-          labels={actionLabels}
-        />
-        {conflicts.length > 0 && (
-          <button
-            type="button"
-            className="dataset-conflict-toggle"
-            aria-expanded={expanded}
-            onClick={() => setExpanded(!expanded)}
-          >
-            {t("conflicts", { count: conflicts.length })}
-          </button>
-        )}
-      </div>
+      {hasStatus && (
+        <div
+          className="dataset-status-row"
+          role="group"
+          aria-label={t("shared")}
+        >
+          {saveStatus && <span className="dataset-state">{saveStatus}</span>}
+          <DataWarningBadge
+            entries={entries}
+            stale={dataStatus === "stale"}
+            readOnlyLabel={
+              dataState.editable === false ? t("readOnly") : t("partlyReadOnly")
+            }
+            run={run}
+            labels={actionLabels}
+          />
+          {conflicts.length > 0 && (
+            <button
+              type="button"
+              className="dataset-conflict-toggle"
+              aria-expanded={expanded}
+              onClick={() => setExpanded(!expanded)}
+            >
+              {t("conflicts", { count: conflicts.length })}
+            </button>
+          )}
+        </div>
+      )}
       {snapshot?.error && snapshot.status === "ready" && (
         <p className="dataset-message" role="alert">
           {t("saveFailed", { error: snapshot.error })}
