@@ -190,6 +190,13 @@ describe.skipIf(!output || !config)(
           await readFile(join(changed.installedPath, manifestName), "utf8"),
         );
         const server = manifest.mcpServers.showai;
+        if (host === "antigravity") {
+          expect(server.tools).toEqual({
+            public_catalog_list: { eager: true },
+            public_catalog_describe: { eager: true },
+            show_component: { eager: true },
+          });
+        } else expect(server.tools).toBeUndefined();
         expect(
           await readFile(join(changed.installedPath, "mcp/launch.mjs"), "utf8"),
         ).toBe(
@@ -370,8 +377,17 @@ describe.skipIf(!output || !config)(
               arguments: { viewId: initial.live.viewId },
             });
           } else if (host === "antigravity") {
-            expect(delivery.mode).toBe("fragment-file");
-            expect(await readFile(delivery.inline, "utf8")).toContain("<");
+            expect(delivery.mode).toBe("mcp-app");
+            expect(
+              tools.tools.some(
+                (item: { name?: string }) => item.name === "card_present",
+              ),
+            ).toBe(true);
+            expect(
+              tools.tools.some(
+                (item: { name?: string }) => item.name === "card_navigate",
+              ),
+            ).toBe(true);
           } else if (delivery.mode === "compact")
             expect(delivery.compact).toContain("<");
           else {

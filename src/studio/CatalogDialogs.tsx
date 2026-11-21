@@ -1,7 +1,8 @@
-import { useId, useState } from "react";
+import { useId, useMemo, useState } from "react";
 import { BuiltinPreview } from "../components/BuiltinPreview";
 import { CustomComponentsProvider } from "../components/custom/CustomBlock";
-import { componentWidgetData } from "../contract/contract";
+import { componentWidgetData, readCustomBlockData } from "../contract/contract";
+import type { BlockData } from "../components/blocks/types";
 import type {
   BuiltinComponentMetadata,
   CompiledComponent,
@@ -17,6 +18,7 @@ import ComponentAdjustmentSummary from "./ComponentAdjustmentSummary";
 import ComponentParameterFacts from "./ComponentParameterFacts";
 import ComponentParameterSummary from "./ComponentParameterSummary";
 import ComponentDocumentationView from "./ComponentDocumentationView";
+import ComponentExampleData from "./ComponentExampleData";
 import TemplateWorkflowView from "./TemplateWorkflowView";
 import CatalogTabs from "./CatalogTabs";
 import CatalogPreview from "./CatalogPreview";
@@ -352,10 +354,7 @@ export function TemplateDialog({
 export function ComponentDialog({
   builtin,
   custom,
-  canInsert,
-  insertPageTitle,
-  insertUnavailable,
-  onInsert,
+  insertTarget,
   onClose,
   loadSource,
   manager,
@@ -363,10 +362,10 @@ export function ComponentDialog({
 }: {
   builtin?: BuiltinComponentMetadata;
   custom?: CompiledComponent;
-  canInsert: boolean;
-  insertPageTitle?: string;
-  insertUnavailable?: boolean;
-  onInsert: (kind: string, data: Record<string, unknown>) => Promise<void>;
+  insertTarget?: {
+    title: string;
+    insert: (kind: string, data: BlockData) => Promise<void>;
+  };
   onClose: () => void;
   loadSource?: () => Promise<ComponentSource>;
   manager?: CatalogManager;
@@ -387,15 +386,33 @@ export function ComponentDialog({
   );
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  const [drafts, setDrafts] = useState<Record<number, BlockData>>({});
+  const [resetCount, setResetCount] = useState(0);
   const examples = item.examples ?? [];
-  const data = examples[example]?.data ?? item.defaultData;
+  const data = drafts[example] ?? examples[example]?.data ?? item.defaultData;
+  const widgetData = useMemo(
+    () => (custom ? componentWidgetData(custom, data) : data),
+    [custom, data],
+  );
+  const changeExample = (next: BlockData) =>
+    setDrafts((current) => ({ ...current, [example]: next }));
+  const resetExample = () => {
+    setDrafts((current) => {
+      const next = { ...current };
+      delete next[example];
+      return next;
+    });
+    setResetCount((count) => count + 1);
+  };
+  const exampleKey = `${example}:${resetCount}`;
   const insert = async () => {
+    if (!insertTarget) return;
     setBusy(true);
     setError("");
     try {
-      await onInsert(
+      await insertTarget.insert(
         builtin?.kind ?? "custom",
-        builtin ? structuredClone(data) : componentWidgetData(custom!, data),
+        structuredClone(widgetData),
       );
     } catch (reason) {
       setError(errorMessage(reason));
@@ -431,33 +448,24 @@ export function ComponentDialog({
         />
       }
       headerActions={
-        (canInsert || insertUnavailable || manage) && (
+        (insertTarget || manage) && (
           <>
-            {(canInsert || insertUnavailable) && (
-              <>
-                {!canInsert && (
-                  <span className="catalog-action-reason">
-                    {t("insertNeedsPage")}
-                  </span>
-                )}
-                <button
-                  type="button"
-                  className="studio-text-button"
-                  disabled={busy || !canInsert}
-                  title={canInsert ? undefined : t("insertNeedsPage")}
-                  onClick={() => void insert()}
-                >
-                  <Plus size={16} />
-                  {canInsert && insertPageTitle
-                    ? t("insertIntoNamedPage", {
-                        title:
-                          insertPageTitle.length > 14
-                            ? `${insertPageTitle.slice(0, 13)}…`
-                            : insertPageTitle,
-                      })
-                    : t("insertIntoPage")}
-                </button>
-              </>
+            {insertTarget && (
+              <button
+                type="button"
+                className="studio-text-button"
+                disabled={busy}
+                title={insertTarget.title}
+                onClick={() => void insert()}
+              >
+                <Plus size={16} />
+                {t("insertIntoNamedPage", {
+                  title:
+                    insertTarget.title.length > 14
+                      ? `${insertTarget.title.slice(0, 13)}…`
+                      : insertTarget.title,
+                })}
+              </button>
             )}
             {manage && (
               <PackageActions
@@ -524,9 +532,10 @@ export function ComponentDialog({
                 label={t("componentPreviewCanvas")}
                 width={960}
                 minHeight={builtin?.kind === "text" ? 620 : undefined}
-                resetKey={example}
+                resetKey={exampleKey}
+                onReset={drafts[example] ? resetExample : undefined}
                 accessory={
-                  examples.length > 0 && (
+                  examples.length > 1 && (
                     <select
                       className="showai-select"
                       aria-label={t("componentExample")}
@@ -545,13 +554,23 @@ export function ComponentDialog({
                 }
               >
                 {builtin ? (
-                  <BuiltinPreview component={builtin} data={data} />
+                  <BuiltinPreview
+                    key={exampleKey}
+                    component={builtin}
+                    data={data}
+                    onChange={changeExample}
+                  />
                 ) : (
-                  <CustomComponentsProvider components={[custom!]}>
+                  <CustomComponentsProvider
+                    key={exampleKey}
+                    components={[custom!]}
+                  >
                     <Widget
                       kind="custom"
-                      data={componentWidgetData(custom!, data)}
-                      readOnly
+                      data={widgetData}
+                      onChange={(next) =>
+                        changeExample(readCustomBlockData(next).props)
+                      }
                     />
                   </CustomComponentsProvider>
                 )}
@@ -564,10 +583,12 @@ export function ComponentDialog({
               <ReferenceSection title={t("adjustable")} icon="effect">
                 <ComponentAdjustmentSummary schema={schema} />
               </ReferenceSection>
-              <details className="catalog-example-data">
-                <summary>{t("exampleData")}</summary>
-                <pre>{JSON.stringify(data, null, 2)}</pre>
-              </details>
+              <ComponentExampleData
+                key={exampleKey}
+                builtin={builtin}
+                data={data}
+                onChange={changeExample}
+              />
             </aside>
           </div>
         )}

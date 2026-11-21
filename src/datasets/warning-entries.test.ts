@@ -189,7 +189,7 @@ describe("warning surface", () => {
       createElement(DataEmptyState, { entry, run }),
     );
     expect(html).toContain("这台设备还没有链接数据文件");
-    expect(html).toContain("共享数据 · 预算");
+    expect(html).not.toContain("dataset-warning-meta");
     expect(html).toContain("链接文件…");
     const copy = renderToStaticMarkup(
       createElement(DataEmptyState, {

@@ -11,7 +11,8 @@ The GitHub repository can include review tools, reusable regression scenarios an
 ```text
 Use the independent UI acceptance template for this change. Use real controls and identify any simulated data or services.
 Make the relevant starting, branching, confirmation, cancellation and recovery states directly reachable. Include numbered controls, the current action list and the navigable flow tree.
-Verify that the actual controls work after a jump and that manual interactions update the active state, available actions and markers.
+Declare the real transitions and include a flow canvas with screenshots of all states and the actions between them.
+Verify that the actual controls work after a jump from either view and that manual interactions update the active state, available actions and markers.
 Return the tested revision, preview, what to try and the observed result in this chat. For failures, include the expectation, observation and evidence.
 ```
 
@@ -21,6 +22,8 @@ A direct jump starts a fresh frame and calls `enter`. The app can read its name 
 
 **Checks.** Set `checkIsolation: true` only when `ui-review-check/<id>` frames use isolated data and preparation has no persistent side effects. The flow check prepares each state in its own frame and reports controls and failures. Expand a successful row to see its controls. Failed rows open with the reason. Mark conditional actions with `optional: true`. Motion observation records the actual system preference, animation events and visible frame intervals. Exercise the interaction under both normal and reduced motion.
 
-**Package.** Bundle the app into self-contained HTML, then run `node pack.mjs app.html preview.html --source <checkout> --title <title> --data <data-description>`. `--source` defaults to the current directory. The packer checks common HTML and CSS external assets and records branch, revision, working-tree status, build time and content fingerprint. Check dynamic runtime requests separately. Alternatively import `buildReview(appHtml, {title, lang, metadata})` from [pack.mjs](pack.mjs). Native apps use their own screen and test tools.
+**Flow canvas.** Enable `checkIsolation` for isolated scenarios and declare `{ from, to, label, kind? }` entries in `reviewScenario.transitions`. Use existing state IDs for both endpoints and the triggering action for the label. The supported kinds are `forward`, `back` and `error`. A scenario with one state can declare an empty array.
 
-**Package the flow canvas.** Enable `checkIsolation` and declare `{ from, to, label, kind? }` entries in `reviewScenario.transitions`. Use existing state IDs for both endpoints and the triggering action for the label. The supported kinds are `forward`, `back` and `error`. Add `--flow` and point `--source` at a ShowAI checkout with dependencies installed. Use `--lang` to select the preview language. The packer prepares every state in an isolated frame with headless Chromium and embeds screenshots in the HTML. Code can call `buildFlowReview(appHtml, { source, title, lang, metadata })`.
+**Package.** Bundle the app into self-contained HTML and run `node pack.mjs app.html preview.html --source <ShowAI checkout> --title <title> --lang en-US --data <data-description>`. The package includes the flow canvas by default. The packer uses the checkout's installed dependencies and headless Chromium to prepare each isolated state and embed its screenshot in the same HTML. `--source` defaults to the current directory. Code can call `buildReview(appHtml, { source, title, lang, metadata })` with the same default.
+
+The packer checks common HTML and CSS external assets and records branch, revision, working-tree status, build time and content fingerprint. Check dynamic runtime requests separately. For an existing scenario that cannot isolate its states, use `--no-flow` or pass `flow: false` in code. Native apps use their own screen and test tools.

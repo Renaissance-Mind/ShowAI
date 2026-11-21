@@ -18,7 +18,7 @@ import { createInterface } from "node:readline";
 import { fileURLToPath } from "node:url";
 import { parseArgs, promisify } from "node:util";
 import {
-  antigravityHookConfig,
+  ANTIGRAVITY_EAGER_TOOLS,
   antigravityManifest,
   antigravitySidecarConfig,
   skillFiles,
@@ -168,6 +168,7 @@ async function handshake(server) {
   return {
     server: init.result?.serverInfo,
     tools: tools.length,
+    toolNames: tools.map((tool) => tool.name),
     capabilities: JSON.parse(text).data,
   };
 }
@@ -307,23 +308,33 @@ async function install(executable) {
     ...binding.launch.env,
     SHOWAI_HOME: binding.home,
     SHOWAI_RUNTIME_CONFIG: record,
-    SHOWAI_HOST_DISPLAY: "fragment-file",
+    SHOWAI_HOST_DISPLAY: "mcp-app",
+    SHOWAI_ANTIGRAVITY_WORKBENCH: "1",
   };
   const server = {
     command: binding.launch.command,
     args: [join(targetInstallPath, "mcp/launch.mjs")],
     env: serverEnv,
+    tools: ANTIGRAVITY_EAGER_TOOLS,
   };
   await writeJson(join(plugin, "mcp_config.json"), {
     mcpServers: { showai: server },
   });
-  await writeJson(
-    join(plugin, "hooks.json"),
-    antigravityHookConfig({ command: binding.launch.command, env: serverEnv }),
-  );
+  const sidecarRevision = createHash("sha256")
+    .update(
+      JSON.stringify([
+        await readFile(join(plugin, "sidecars/workbench/main.mjs"), "utf8"),
+        await readFile(join(plugin, "sidecars/workbench/bridge.js"), "utf8"),
+      ]),
+    )
+    .digest("hex")
+    .slice(0, 12);
   await writeJson(
     join(plugin, "sidecars/workbench/sidecar.json"),
-    antigravitySidecarConfig({ command: binding.launch.command, env: serverEnv }),
+    antigravitySidecarConfig({
+      command: binding.launch.command,
+      env: { ...serverEnv, SHOWAI_SIDECAR_REVISION: sidecarRevision },
+    }),
   );
 
   await agy(executable, ["install", plugin]);
@@ -351,7 +362,6 @@ async function install(executable) {
   if (
     (validation.components?.mcpServers ?? 0) < 1 ||
     (validation.components?.sidecars ?? 0) < 1 ||
-    (validation.components?.hooks ?? 0) < 1 ||
     (validation.findings?.length ?? 0) > 0
   )
     throw new Error(
@@ -360,8 +370,7 @@ async function install(executable) {
   const connection = await handshake(server);
   if (
     connection.capabilities.version !== probe.data.version ||
-    connection.capabilities.presentation?.declaredHostDisplay !==
-      "fragment-file" ||
+    connection.capabilities.presentation?.declaredHostDisplay !== "mcp-app" ||
     connection.tools < 2
   )
     throw new Error(
@@ -385,7 +394,11 @@ async function install(executable) {
     runtime: binding.runtime,
     runtimeVersion: probe.data.version,
     runtimeRecord: record,
-    mcp: { server: connection.server, tools: connection.tools },
+    mcp: {
+      server: connection.server,
+      tools: connection.tools,
+      cardPresent: connection.toolNames.includes("card_present"),
+    },
     hostRefresh:
       "Restart Antigravity or start a new conversation to use the updated plugin.",
   };

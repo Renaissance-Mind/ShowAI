@@ -130,7 +130,7 @@ export function sourceMetadata(directory) {
   };
 }
 
-export async function buildReview(
+async function renderReview(
   appHtml,
   { title, lang = "", revision = "", metadata = {}, flow } = {},
 ) {
@@ -175,15 +175,21 @@ export async function buildReview(
   );
 }
 
-export async function buildFlowReview(
+export async function buildReview(
   appHtml,
-  { source, lang = "en-US", ...options } = {},
+  { source, lang, flow, ...options } = {},
 ) {
+  if (flow !== undefined)
+    return renderReview(appHtml, { ...options, lang, flow });
+
+  const language = lang || "en-US";
   const { captureReviewFlow } = await import("./capture-flow.mjs");
-  const preview = await buildReview(appHtml, { ...options, lang });
-  const flow = await captureReviewFlow(preview, { source, lang });
-  return buildReview(appHtml, { ...options, lang, flow });
+  const preview = await renderReview(appHtml, { ...options, lang: language });
+  const canvas = await captureReviewFlow(preview, { source, lang: language });
+  return renderReview(appHtml, { ...options, lang: language, flow: canvas });
 }
+
+export { buildReview as buildFlowReview };
 
 if (
   process.argv[1] &&
@@ -192,13 +198,13 @@ if (
   const [input, output, ...options] = process.argv.slice(2);
   if (!input || !output || resolve(input) === resolve(output))
     throw new Error(
-      "Usage: node pack.mjs <app.html> <preview.html> [--flow] [--source <checkout>] [--title <title>] [--data <description>] [--lang <locale>]",
+      "Usage: node pack.mjs <app.html> <preview.html> [--no-flow] [--source <checkout>] [--title <title>] [--data <description>] [--lang <locale>]",
     );
   const values = {};
   for (let index = 0; index < options.length; index++) {
     const flag = options[index];
-    if (flag === "--flow") {
-      values[flag] = true;
+    if (flag === "--flow" || flag === "--no-flow") {
+      values.flow = flag === "--flow";
       continue;
     }
     if (
@@ -214,12 +220,12 @@ if (
     generatedAt: new Date().toISOString(),
     dataSource: values["--data"] || "",
   };
-  const build = values["--flow"] ? buildFlowReview : buildReview;
-  const html = await build(await readFile(input, "utf8"), {
+  const html = await buildReview(await readFile(input, "utf8"), {
     source,
     title: values["--title"],
     lang: values["--lang"],
     metadata,
+    flow: values.flow === false ? false : undefined,
   });
   const temporary = resolve(output) + "." + process.pid + ".tmp";
   await writeFile(temporary, html);

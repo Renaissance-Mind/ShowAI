@@ -1,6 +1,6 @@
 ---
 name: use-showai
-description: ShowAI 的总入口，通过 ShowAI MCP 做任何事都先读它。按用户要的结果分流：创作或修改作品（含只要规划、设计稿或评审）、在对话里展示组件、查找阅读与管理已有内容、做组件或模板、多端协作；并给出连接与项目归属、内容模型、保存与冲突的通用规则。查找、引用、共享数据（含外部 JSON/CSV/Excel）、从 Notion/Word/Markdown 导入、草稿和内容库切换的做法在它的参考里。连接或显示异常时保留内容并指向「设置 → 关于与反馈」。
+description: 连接 ShowAI 或通过 MCP 管理内容、确定项目、续改作品、制作组件或模板的入口。本机专用包自带 MCP 配置，通用包按 ChatGPT、Grok Bot 或其他客户端逐步引导手动连接。只想在聊天里看内置组件时直接使用 show-visual。
 ---
 
 # 使用 ShowAI
@@ -8,6 +8,8 @@ description: ShowAI 的总入口，通过 ShowAI MCP 做任何事都先读它。
 Agent 通过 MCP 操作 ShowAI。App、网页、CLI 和 MCP 共用内容核心；CLI 保留服务启动、诊断与脚本用途，不作为 Agent 的另一套创作流程。这份 Skill 是总入口：先按用户要的结果选路径，再按下面的通用规则核对连接、项目与保存。用户只问用法时正常解释，不因本 Skill 自动创建页面。
 
 ## 选择路径
+
+用户要连接 ShowAI、当前会话找不到工具，或已有连接提示未登录时，先走[连接向导](references/connect-mcp.md)。已连通时直接选下表中的任务。
 
 | 用户要的结果 | 典型说法 | 路径 |
 | --- | --- | --- |
@@ -25,7 +27,9 @@ Agent 通过 MCP 操作 ShowAI。App、网页、CLI 和 MCP 共用内容核心�
 
 ## 核对连接和归属
 
-连接信息未知或发生变化时调用一次 `showai_capabilities`，复用当前连接已经核实的结果。它只提供连接、能力、版本与限制；操作方法按本 Skill 和所选工作流读取。工具可能带宿主前缀，使用实际暴露的名称。检查 `agentProtocol`、`transport`、`projects.access`、`projects.available` 和展示能力；HTTP 连接同时检查 `projects.storage`，`local` 表示桌面直接保存。调用 `project_context` 或 `projects_list` 核对目标。不能仅凭“Codex”“ChatGPT”判断连接或显示能力。
+在聊天里一次展示 1–5 个内置组件，直接按 show-visual 选择组件、读 guide、展示。本机和远程连接都可复用已知的宿主交付方式。只需核对显示声明时用 `showai_capabilities({view:"presentation"})` 取声明和组件数上限。项目归属、跨组件事件和持续更新按各自流程核实。
+
+访问项目时，如果连接信息未知或发生变化，调用一次 `showai_capabilities` 取完整报告，复用当前连接已经核实的结果。工具可能带宿主前缀，使用实际暴露的名称。检查 `agentProtocol`、`transport`、`projects.access` 和 `projects.available`；HTTP 连接同时检查 `projects.storage`，`local` 表示桌面直接保存。调用 `project_context` 或 `projects_list` 核对目标。
 
 - **library 本机连接**：`project_context` 返回固定内容库。纯查询用 `projects_list`、`pages_list`、`library_search`，不创建项目。新正式内容未指定项目时，`project_resolve({sourceDirectory})` 使用宿主提供的绝对项目目录；首次映射可创建项目。不要使用插件、预览或临时输出目录。宿主当前工作目录是用户的项目或代码仓库、且内容与之相关时可以作为可信目录；对话整理、与当前目录无关的内容或没有可信目录时询问归属。用户要求独立命名项目时才用 `project_create`。
 - **project 绑定连接**：`project_context` 返回固定项目。沿用它，不能用另一个 projectId 越过绑定。
@@ -43,7 +47,7 @@ Agent 通过 MCP 操作 ShowAI。App、网页、CLI 和 MCP 共用内容核心�
 
 源 Page 包含结构化内容树、稳定节点 ID、布局与组件数据。Page 按顺序阅读，Board 表达空间关系，两者可以嵌套。组件负责把数据渲染成图形与交互；模板提供复用结构。页面引用精确组件版本与指纹。
 
-内容库与代码目录不同。本机默认库是 `~/.showai`，以实际连接为准。HTML 是阅读交付物；HTML 所在目录不证明有无源 Page。正式文档默认在已选项目中保存为一份 Page，保存后按[当前宿主适配](references/host-adapter.md)交付。对话中看一眼的组件用 `show_component`；需要一份完整独立文件但不入库时才用 `render_document`。两者都返回 `savedToProject=false`，必须如实说明。
+内容库与代码目录不同。本机默认库是 `~/.showai`，以实际连接为准。HTML 是阅读交付物；HTML 所在目录不证明有无源 Page。正式文档默认在已选项目中保存为一份 Page，保存后按当前工作流的「当前宿主交付」给出原页入口。对话中看一眼的组件用 `show_component`；需要一份完整独立文件但不入库时才用 `render_document`。两者都返回 `savedToProject=false`，必须如实说明。
 
 ## 保存与冲突
 
@@ -61,7 +65,7 @@ Agent 通过 MCP 操作 ShowAI。App、网页、CLI 和 MCP 共用内容核心�
 - [导入与导入器](references/import.md)：Notion、Word、Markdown 导入的计划与回执，以及新增一种格式的导入器。
 - [扩展点](references/extension-points.md)：快速跳转命令、@ 菜单、数据库字段类型、页面目录和导入器这几个可填入的位置，各由谁提供、填入者声明什么，以及用 `catalog_list({kind:"contribution"})` 一次查出已填入的内容。
 - [共享数据](references/shared-data.md)、[页面与 Board 阅读](references/page-reading.md)、[Board 对象编辑](references/board-authoring.md)、[容量与大文件](references/capacity.md)。
-- [宿主显示](references/host-display.md) 与 [当前宿主适配](references/host-adapter.md)：展示组件和页面前先读。
+- [宿主显示](references/host-display.md) 与 [完整宿主适配](references/host-adapter.md)：回执与工作流不符、显示失败或需要特殊交付时查阅。
 - [连接配置](references/runtime.md) 与 [集成](references/integration.md)：连接、错误码、远程授权与反馈。
 
 ## Codex 工作台

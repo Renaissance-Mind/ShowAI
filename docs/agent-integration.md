@@ -2,7 +2,7 @@
 
 **Language:** English | [简体中文](i18n/agent-integration.zh-CN.md) · [Documentation](README.md)
 
-**Agent document operations use MCP** in every host. Read the installed `use-showai` Skill for task routing and ownership. Query `showai_capabilities` when the connection is unknown or changes, and reuse the result for that connection. It reports runtime capabilities and limits; workflows stay in Skills. Local plugins include a stdio launcher; remote packages provide an HTTP endpoint. CLI examples below configure services or support scripts and operators.
+**Agent document operations use MCP** in every host. Start a public visual with `show-visual`. Use `use-showai` for project ownership and other workflows. Local host plugins ship their stdio launcher and Skills together. The universal plugin uses MCP configured manually in the host, with stdio or a reachable HTTP endpoint.
 
 Local library MCP uses explicit `projectId` per operation. Use `projects_list` for read-only discovery, `project_resolve` with a trusted absolute `sourceDirectory` for new formal content, or a project-bound connection. Save formal work before delivering it through the host adapter. Use `render_document` for explicitly standalone deliverables. **Connection failure** does not change the destination or persistence mode.
 
@@ -20,7 +20,7 @@ The page model, component compiler, authoring service, revision checks, export r
 Find the actual runtime under **Settings → External Agent plugins** (**Registered runtime** and the launch configuration) or in the selected library's `agent-runtime.json`. `showai` below abbreviates that executable and its arguments. Inspect `runtime info --json` and `guide integration --json`.
 
 ```sh
-showai public list --kind component --query chart --json
+showai public list --kind component --view compact --json
 showai public describe chart --view schema --json
 showai public describe explainer --kind template --view source --json
 showai render --input presentation.json --out /absolute/output/page.html --json
@@ -62,6 +62,19 @@ For deployment commands and acceptance gates, see [Cloudflare MCP operations](cl
 
 ### Public and authorized tools
 
+On stdio and HTTP, a public visual uses `public_catalog_list({kind:"component",view:"compact"})`, the selected ID's guide, then `show_component`. Go straight to the guide if you know the ID. A bound display needs no preliminary call. To check an unknown display, `showai_capabilities({view:"presentation"})` returns its declaration and component limit. The default full report covers project access, live updates and other capabilities.
+
+| Client | How the three public visual tools become available |
+| --- | --- |
+| Claude Code | The MCP server marks the three tools with `_meta["anthropic/alwaysLoad"]`. An explicit client setting can override it. [Tool loading](https://code.claude.com/docs/en/mcp#mark-a-tool-to-load-upfront-or-stay-deferred) |
+| Antigravity | The plugin requests eager loading for the three tools in `mcp_config.json`. [Eager tools](https://antigravity.google/docs/mcp#configure-eager-tools) |
+| Codex | Use the registered tools directly when visible. With tool search enabled, search together for the needed names. |
+| Kimi Work | Use the registered tools. In sessions that expose `select_tools`, select the needed names together. |
+| DeepSeek Harness | Its MCP client registers the server's tools at connection time. |
+| ChatGPT MCP Apps and other HTTP clients | The server supplies the same tool schemas through `tools/list`. The client controls discovery and rendering. Clients without installed Skills can follow the tool descriptions. |
+
+ShowAI's built-in Agent receives the compact component index with project scopes, versions and integrity values. It can select a built-in directly from that index. The embedded text view can link the file returned by a local preview.
+
 Public tools are `showai_capabilities`, `public_catalog_list`, `public_catalog_describe`, `render_document`, `show_component` and `presentation_source`. The last tool retrieves editable public render input in text chunks when a host cannot download the HTTP URL; it does not expose private project exports. The catalog includes built-in components and editable starter templates. All public rendering inputs come from the caller; anonymous operations do not read the user's content library.
 
 Private tools retain the existing authoring names, add an explicit `projectId`, and use OAuth. `projects_list` queries current server membership on every call. Selected-project grants remain restricted to their original IDs; account grants include later projects. `project_create` requires account authorization and the separate `projects.create` scope; it creates and synchronizes the project, returns its server ID, and accepts an operationId UUID for retrying the same request. `page_present` supplies the same reader as public rendering. Local path-based import, whole-site publication and local recovery tools stay local; remote component customization uses `component_save` with source. Remote exports use service-owned temporary paths and return downloadable artifacts instead of server filesystem paths.
@@ -94,11 +107,7 @@ MCP Apps resources use `text/html;profile=mcp-app` and `_meta.ui.resourceUri`, w
 
 The same skill source supports local and remote connections. For a remote package:
 
-```sh
-npm run package:plugin -- --mcp-url https://agent.example.com/mcp --out /absolute/new/showai-plugin
-```
-
-The output creates a `showai-cloud` package from the same Skills/assets, with HTTP/OAuth configuration instead of the local launcher. Archive that directory for the target host's plugin upload or public submission. Local installation continues using `npm run plugin:update -- --json`; it does not force every local Agent through a remote service. Public publication, organization verification and review are separate from local or personal-plugin testing.
+Generate an unbound universal package with `npm run package:plugin -- --out NEW_DIRECTORY`, or export the ZIP from desktop Settings → Plugins. Install the six Skills in the host and configure its MCP connection manually. The optional ChatGPT Personal export can reference a connection the user has already registered. A supplied `--mcp-url` is a manual setup hint in the README. See [Set up an agent](https://showai.renaissancemind.ai/doc/agent-hosts).
 
 ## Saved-page presentation contract
 

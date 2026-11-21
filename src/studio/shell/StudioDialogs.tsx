@@ -583,16 +583,18 @@ export function StudioDialogs({
                   )
               : undefined
           }
-          canInsert={
+          insertTarget={
             dialog.custom?.role !== "page-outline" &&
-            !!page.draft &&
+            !contentCreationDisabled &&
+            !page.record?.readOnly &&
+            page.draft &&
+            page.projectId &&
             page.projectId === selectedProject &&
             (dialog.custom?.scope !== "project" ||
               page.projectId === dialog.projectId)
+              ? { title: page.draft.title || tc("untitled"), insert: addBlock }
+              : undefined
           }
-          insertPageTitle={page.draft?.title || tc("untitled")}
-          insertUnavailable={dialog.custom?.role !== "page-outline"}
-          onInsert={addBlock}
           onClose={closeDialog}
           manager={catalogManager}
           owner={dialog.projectId}

@@ -10,6 +10,7 @@ function ContentBlock({
   data,
   onChange,
   readOnly,
+  host,
 }: BlockProps & { kind: string }) {
   validatePrimitiveData(kind, data);
   const node = data.document ? undefined : primitiveContentNode(kind, data);
@@ -20,6 +21,7 @@ function ContentBlock({
         format: "richtext",
       }}
       readOnly={readOnly}
+      host={host}
       onChange={
         onChange
           ? (next) => {

@@ -14,20 +14,27 @@ import { dirname, isAbsolute, join, resolve, relative, sep } from "node:path";
 export const HOST_PROFILES = {
   codex: "mcp-app",
   claude: "model-html",
-  antigravity: "fragment-file",
+  antigravity: "mcp-app",
   deepseek: "fragment-file",
   kimi: "fragment-file",
   "mcp-app": "mcp-app",
 };
 export const HOST_GUIDE = "use-showai/references/host-adapter.md";
+export const DELIVERY_WORKFLOWS = ["show-visual/SKILL.md", "show-document/SKILL.md"];
+export const ANTIGRAVITY_EAGER_TOOLS = {
+  public_catalog_list: { eager: true },
+  public_catalog_describe: { eager: true },
+  show_component: { eager: true },
+};
 const hash = (value) => createHash("sha256").update(value).digest("hex");
 
-export async function skillFiles(root) {
+export async function skillFiles(root, { includeHidden = true } = {}) {
   const files = {};
   async function visit(directory, prefix = "") {
     for (const entry of (
       await readdir(directory, { withFileTypes: true })
     ).sort((a, b) => a.name.localeCompare(b.name))) {
+      if (!includeHidden && entry.name.startsWith(".")) continue;
       const name = prefix + entry.name;
       if (entry.isDirectory())
         await visit(join(directory, entry.name), name + "/");
@@ -38,6 +45,29 @@ export async function skillFiles(root) {
   }
   await visit(root);
   return files;
+}
+
+export function workflowWithHostDelivery(file, workflow, adapter) {
+  const section =
+    /<!-- showai-host-delivery:start -->[\s\S]*?<!-- showai-host-delivery:end -->/;
+  const delivery = adapter.match(section)?.[0];
+  if (!delivery)
+    throw new Error("The host adapter is missing its delivery section.");
+  if (!section.test(workflow))
+    throw new Error(`${file} is missing its host delivery section.`);
+  return workflow.replace(section, () => delivery);
+}
+
+export async function bindWorkflowDelivery(sourceSkills, targetSkills, adapter) {
+  const hashes = {};
+  for (const file of DELIVERY_WORKFLOWS) {
+    const workflow = await readFile(join(sourceSkills, file), "utf8");
+    const bound = workflowWithHostDelivery(file, workflow, adapter);
+    if (sourceSkills !== targetSkills || bound !== workflow)
+      await writeFile(join(targetSkills, file), bound);
+    hashes[file] = hash(bound);
+  }
+  return hashes;
 }
 
 export async function bindHostSkills({ source, target, profile }) {
@@ -62,7 +92,12 @@ export async function bindHostSkills({ source, target, profile }) {
   const commonFiles = Object.fromEntries(
     Object.entries(sourceFiles).filter(([name]) => name !== HOST_GUIDE),
   );
-  const expected = { ...commonFiles };
+  const workflowFiles = await bindWorkflowDelivery(
+    join(source, "skills"),
+    join(target, "skills"),
+    adapter,
+  );
+  const expected = { ...commonFiles, ...workflowFiles };
   const entry = "use-showai/SKILL.md";
   const notePath =
     profile === "codex"
@@ -102,6 +137,7 @@ export async function bindHostSkills({ source, target, profile }) {
     ).version,
     commonSha256: hash(JSON.stringify(commonFiles)),
     commonFiles,
+    workflowFiles,
     adapterSha256: hash(adapter),
     ...(note !== undefined && { entrySha256: expected[entry] }),
   };
@@ -154,30 +190,6 @@ export async function publishPluginDirectory(staging, target) {
   if (moved) await rm(previous, { recursive: true });
 }
 
-function shellQuote(value) {
-  if (process.platform === "win32") {
-    return `"${String(value).replaceAll('"', '""')}"`;
-  }
-  return `'${String(value).replaceAll("'", `'\\''`)}'`;
-}
-
-function antigravityHookCommand(launch) {
-  if (!launch?.command) return "node ./hooks/preview-hook.mjs";
-  const envEntries = Object.entries(launch.env ?? {}).filter(
-    ([key, value]) =>
-      ["ELECTRON_RUN_AS_NODE", "SHOWAI_HOME", "SHOWAI_PRESENTATION_DIR"].includes(key) &&
-      typeof value === "string",
-  );
-  if (process.platform === "win32") {
-    const sets = envEntries.map(([key, value]) => `set "${key}=${value}"`);
-    return [...sets, `${shellQuote(launch.command)} ./hooks/preview-hook.mjs`].join(" && ");
-  }
-  const prefix = envEntries.map(([key, value]) => `${key}=${shellQuote(value)}`).join(" ");
-  return [prefix, shellQuote(launch.command), "./hooks/preview-hook.mjs"]
-    .filter(Boolean)
-    .join(" ");
-}
-
 export function antigravityManifest(manifest, version = manifest.version) {
   return {
     name: manifest.name || "showai",
@@ -200,34 +212,6 @@ export function antigravityManifest(manifest, version = manifest.version) {
   };
 }
 
-export function antigravityHookConfig(launch) {
-  const command = antigravityHookCommand(launch);
-  return {
-    "showai-preview": {
-      PostToolUse: [
-        {
-          matcher:
-            ".*(?:show_component|page_present|render_document).*|call_mcp_tool|mcp_tool",
-          hooks: [
-            {
-              type: "command",
-              command,
-              timeout: 15,
-            },
-          ],
-        },
-      ],
-      PreInvocation: [
-        {
-          type: "command",
-          command,
-          timeout: 10,
-        },
-      ],
-    },
-  };
-}
-
 export function antigravitySidecarConfig(launch) {
   const env = {};
   for (const key of [
@@ -235,6 +219,7 @@ export function antigravitySidecarConfig(launch) {
     "SHOWAI_HOME",
     "SHOWAI_RUNTIME_CONFIG",
     "SHOWAI_PRESENTATION_DIR",
+    "SHOWAI_SIDECAR_REVISION",
   ]) {
     if (typeof launch?.env?.[key] === "string") env[key] = launch.env[key];
   }
@@ -271,9 +256,8 @@ export async function writeAntigravityAssets({
   launch,
 }) {
   const assetsRoot = join(source, "host-adapters/antigravity");
-  await cp(join(assetsRoot, "hooks"), join(target, "hooks"), {
-    recursive: true,
-  });
+  await rm(join(target, "hooks"), { recursive: true, force: true });
+  await rm(join(target, "hooks.json"), { force: true });
   await cp(join(assetsRoot, "sidecars"), join(target, "sidecars"), {
     recursive: true,
   });
@@ -281,13 +265,28 @@ export async function writeAntigravityAssets({
     join(target, "plugin.json"),
     JSON.stringify(antigravityManifest(manifest, version), null, 2) + "\n",
   );
-  await writeFile(
-    join(target, "hooks.json"),
-    JSON.stringify(antigravityHookConfig(launch), null, 2) + "\n",
-  );
+  const sidecarRevision = launch
+    ? hash(
+        JSON.stringify([
+          await readFile(join(assetsRoot, "sidecars/workbench/main.mjs")),
+          await readFile(join(assetsRoot, "sidecars/workbench/bridge.js")),
+        ]),
+      ).slice(0, 12)
+    : undefined;
   await writeFile(
     join(target, "sidecars/workbench/sidecar.json"),
-    JSON.stringify(antigravitySidecarConfig(launch), null, 2) + "\n",
+    JSON.stringify(
+      antigravitySidecarConfig(
+        launch
+          ? {
+              ...launch,
+              env: { ...launch.env, SHOWAI_SIDECAR_REVISION: sidecarRevision },
+            }
+          : undefined,
+      ),
+      null,
+      2,
+    ) + "\n",
   );
 }
 
@@ -361,10 +360,14 @@ export async function stageHostPlugin({ source, target, profile }) {
           {
             mcpServers: {
               showai: {
+                tools: ANTIGRAVITY_EAGER_TOOLS,
                 command: "node",
                 args: ["./mcp/launch.mjs"],
                 cwd: "./",
-                env: { SHOWAI_HOST_DISPLAY: receipt.declaredHostDisplay },
+                env: {
+                  SHOWAI_HOST_DISPLAY: receipt.declaredHostDisplay,
+                  SHOWAI_ANTIGRAVITY_WORKBENCH: "1",
+                },
               },
             },
           },

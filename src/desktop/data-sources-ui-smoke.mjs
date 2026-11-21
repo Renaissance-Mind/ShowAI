@@ -20,6 +20,7 @@ import { _electron } from "playwright-core";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
 import { stopTestProcess } from "../../scripts/stop-test-process.mjs";
+import { walk } from "../document/walk.mjs";
 
 const run = promisify(execFile);
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
@@ -217,12 +218,24 @@ const page = await tool("page_create", {
   title: "数据读取层验收",
   blocks: [
     {
-      kind: "database",
+      kind: "stepper",
       data: {
-        title: "日程",
-        columns: [{ id: "title", name: "事项", type: "text" }],
-        rows: [],
-        view: "table",
+        steps: [
+          {
+            title: "日程表",
+            blocks: [
+              {
+                kind: "database",
+                data: {
+                  title: "日程",
+                  columns: [{ id: "title", name: "事项", type: "text" }],
+                  rows: [],
+                  view: "table",
+                },
+              },
+            ],
+          },
+        ],
       },
     },
     {
@@ -245,10 +258,10 @@ const page = await tool("page_create", {
 });
 const pageId = page.document.id;
 const read = await tool("page_read", { pageId, rendered: false });
-const widget = (kind) =>
-  read.document.content.content.find(
-    (node) => node.type === "widget" && node.attrs.kind === kind,
-  );
+const widgets = new Map();
+walk(read.document.content, (node) => {
+  if (node.type === "widget") widgets.set(node.attrs.kind, node.attrs.id);
+}, { scope: "tree" });
 await tool("page_apply", {
   pageId,
   baseHash: read.hash,
@@ -256,7 +269,7 @@ await tool("page_apply", {
   operations: [
     {
       type: "component.binding.set",
-      blockId: widget("database").attrs.id,
+      blockId: widgets.get("database"),
       binding: {
         dataset: schedule,
         collections: [
@@ -266,7 +279,7 @@ await tool("page_apply", {
     },
     {
       type: "component.binding.set",
-      blockId: widget("chart").attrs.id,
+      blockId: widgets.get("chart"),
       binding: { dataset: monthly, props: { local: ["title", "type", "unit"] } },
     },
   ],
@@ -359,6 +372,24 @@ try {
   check("CSV rows show in the bound database block");
   await waitText("3月");
   check("the transform of the spreadsheet feeds the chart");
+  const boundWidgets = window.locator(".dataset-bound");
+  assert.equal(await boundWidgets.count(), 2);
+  assert.equal(await boundWidgets.getByText(/^共享数据\s*·/).count(), 0);
+  const boundSchedule = window.locator(`.dataset-bound[data-dataset-id="${schedule}"]`);
+  assert.equal(await boundSchedule.count(), 1);
+  const status = boundSchedule.getByRole("group", { name: "共享数据", exact: true });
+  assert.equal(await status.count(), 0);
+  check("bound widgets omit their dataset names and idle editable data has no status row");
+  await boundSchedule.getByRole("textbox", { name: "事项", exact: true }).first().click();
+  await window.getByRole("button", { name: "移动或管理内容块", exact: true }).click();
+  await window.getByRole("button", { name: "共享数据…", exact: true }).click();
+  const settings = window.getByRole("dialog", { name: "共享数据", exact: true });
+  await settings.waitFor();
+  const datasetName = settings.getByRole("textbox", { name: "名称", exact: true });
+  assert.equal(await datasetName.inputValue(), "日程");
+  await window.keyboard.press("Escape");
+  await settings.waitFor({ state: "hidden" });
+  check("the block menu opens the selected nested widget's dataset settings");
 
   const image = await window.waitForFunction(() => {
     const img = document.querySelector(".sb-image img, figure img");

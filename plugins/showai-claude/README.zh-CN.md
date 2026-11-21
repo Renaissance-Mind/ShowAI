@@ -65,7 +65,7 @@ npm run plugin:dsh
 | [create-template](skills/create-template/SKILL.md)       | 可复用模板文件夹与方法                         |
 | [collaborate-canvas](skills/collaborate-canvas/SKILL.md) | 画布协作、多端配对与保存状态                   |
 
-Agent 文档操作使用 MCP，先读取已安装的 use-showai Skill，核对项目；连接信息未知或变化时查询一次 showai_capabilities。正式成果先保存到项目，再按当前宿主适配交付。明确要求独立文件时使用 `render_document`。详细方法由同源 Skill 维护，本页用于安装与接入。
+在任何宿主里展示内置组件都从 show-visual 开始。当前交付方式已知时，直接查轻量目录、读所选 guide、调用 `show_component`。只需核对未知连接的显示方式时，用 `showai_capabilities({view:"presentation"})` 取得显示声明和组件数上限。项目操作从 use-showai 开始，核对项目并保存后交付。明确要求独立文件时用 `render_document`。
 
 ## 运行时与内容库
 
@@ -87,28 +87,23 @@ page_present 返回完整离线 HTML/source 与聊天预览。预览容纳时使
 
 宿主可以显示 MCP Apps、使用返回的 Codex 本机可视化路径，或交付完整 HTML/source。显示能力取决于宿主。路径与 HTTP 预览是快照，项目中源页面持续可编辑。详见[对话展示](skills/use-showai/references/host-display.md)。
 
-## 网页 ChatGPT 与远程包
 
-ChatGPT 网页安装带完整 Skill 的 ShowAI 插件，并连接其中的托管 MCP App。见 [ChatGPT 接入](https://github.com/Renaissance-Mind/ShowAI/blob/main/docs/i18n/chatgpt.zh-CN.md)。
+## 通用插件与手动连接
 
-运营者可以从相同 Skill 生成 HTTP/OAuth 包：
+五个专用包面向同一台电脑上的 Agent 和 ShowAI，一次安装六个 Skills 与本机 MCP 启动配置。DeepSeek Harness 启用 App 准备的插件包，Kimi Work 在宿主里注册并安装本地插件。
 
-```sh
-npm run package:plugin -- --mcp-url HTTPS_MCP_URL --out NEW_DIRECTORY
-```
-
-输出名为 showai-cloud，移除本机 launcher，使用 OAuth DCR。已有 ChatGPT 注册连接可加 --chatgpt-app asdk_app_ID。与本机插件并存安装：
+在其他客户端使用时，可在桌面「设置 → 插件 → 导出通用插件」保存 ZIP，也可从源码生成目录：
 
 ```sh
-node scripts/install-codex-plugin.mjs --remote-url HTTPS_MCP_URL --marketplace-root DIRECTORY
+npm run package:plugin -- --out NEW_DIRECTORY
 ```
 
-安装器使用独立 marketplace 并核验文件，包内不包含凭据。部署与公开提交是独立发行操作。参见 [Agent 接入](https://github.com/Renaissance-Mind/ShowAI/blob/main/docs/i18n/agent-integration.zh-CN.md)。
+通用包提供六个 Skills 和离线[连接向导](skills/use-showai/references/connect-mcp.md)，MCP 在宿主中手动添加。旧命令中的 `--mcp-url` 只把地址写入 README 供手动填写；`--chatgpt-app` 可引用已手动注册的 ChatGPT 连接。
 
-边写边画、位置参考和 iPad/Mac 配对见 [collaborate-canvas](skills/collaborate-canvas/SKILL.md)。
+ChatGPT 网页通过公网 HTTPS 和 OAuth 连接。Grok Bot 可选同一 tailnet 的私网设备授权或公网 HTTPS。其他客户端按运行位置选择本机 stdio、局域网或远程 HTTP。在客户端实际发起只读调用核验，见[在 Agent 中使用](https://showai.renaissancemind.ai/doc/agent-hosts)。
 
 ## 宿主包与公共源码
 
 公共工作流只维护 `plugins/showai/skills`，宿主展示契约分别维护在 `plugins/showai/host-adapters`。运行 `npm run package:plugin` 自动生成 Codex、Claude Code、Antigravity 和 Kimi 的安装内容；DeepSeek 准备插件时绑定自己的适配，远程 MCP Apps 使用原生视图指南。
 
-Codex 市场指向 `plugins/showai-codex`，Claude Code 市场指向 `plugins/showai-claude`，Antigravity 安装包位于 `plugins/showai-antigravity`，插件身份沿用 showai@renaissance-mind。生成目录随仓库提交，供全新克隆直接安装；修改公共内容后重新生成，不手工修改生成副本。各包只替换当前宿主的 host-adapter.md；host-profile.json 记录适配身份、显示声明和公共文件指纹。App 安装入口使用同一套绑定逻辑。Codex 默认使用 MCP Apps 原生视图，宿主缺少原生视图时使用文件式交付。各宿主加载与 MCP 重连分别核验。
+Codex 市场指向 `plugins/showai-codex`，Claude Code 市场指向 `plugins/showai-claude`，Antigravity 安装包位于 `plugins/showai-antigravity`，插件身份沿用 showai@renaissance-mind。生成目录随仓库提交，供全新克隆直接安装。打包时将当前宿主的常规交付步骤写入 show-visual 和 show-document，完整指南放在 host-adapter.md。host-profile.json 记录适配身份、显示声明和文件指纹。App 安装入口使用同一套绑定逻辑。Codex 和 Antigravity 默认使用 MCP Apps 原生视图与原页卡片，宿主缺少原生视图时使用文件式交付。各宿主加载与 MCP 重连分别核验。

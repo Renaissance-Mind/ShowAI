@@ -48,6 +48,8 @@ Select **Copy setup prompt** and send it to your agent. For a manual connection,
 
 ## Connect ChatGPT
 
+To get the six Skills before connecting, choose **Settings → Plugins → Export universal plugin** in the desktop app. Add MCP separately in the host and ask the Agent to help you connect. If you already registered a ChatGPT connection, the optional Personal export below can reference it.
+
 Choose **ChatGPT** after a public connection passes its check. The guide has three steps:
 
 1. **Server**: open ChatGPT Plugins → Add → Add custom MCP server. Enter the name, select Server URL, paste the MCP URL and select OAuth.

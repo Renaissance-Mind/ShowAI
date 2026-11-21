@@ -886,25 +886,21 @@ async function handle(
           args.decision as "allow" | "deny",
         );
       case "remoteMcp:exportPlugin": {
-        const status = await remoteMcp.status(false, args.provider);
-        if (status.phase !== "running" || !status.reachable || !status.url)
-          throw new Error(
-            "Connect the remote service before exporting a plugin.",
-          );
-        const registeredApp = chatgptAppId(
-          String(
-            args.connection ||
-              (status.config.chatgptEndpoint === status.url
-                ? status.config.chatgptAppId
-                : "") ||
-              "",
-          ),
-        );
+        let endpoint: string | undefined;
+        let registeredApp: string | undefined;
+        if (args.universal !== true) {
+          const status = await remoteMcp.status(false, args.provider);
+          if (status.phase !== "running" || !status.reachable || !status.url)
+            throw new Error("Connect the remote service before linking a ChatGPT plugin.");
+          endpoint = status.url;
+          registeredApp = chatgptAppId(String(args.connection ||
+            (status.config.chatgptEndpoint === endpoint ? status.config.chatgptAppId : "") || ""));
+        }
         const bundle = await remotePluginPackage(
           process.env.SHOWAI_DEV_URL
             ? join(process.cwd(), "plugins/showai")
             : join(runtimePath(), "assets/agent-plugin"),
-          status.url,
+          endpoint,
           registeredApp,
         );
         const selection = await dialog.showSaveDialog(window, {
@@ -913,16 +909,13 @@ async function handle(
         });
         if (selection.canceled || !selection.filePath) return null;
         await writeFile(selection.filePath, bundle.bytes, { mode: 0o600 });
-        await remoteMcp.rememberChatgptApp(
-          registeredApp,
-          status.url,
-          args.provider,
-        );
+        if (registeredApp && endpoint)
+          await remoteMcp.rememberChatgptApp(registeredApp, endpoint, args.provider);
         return {
           path: selection.filePath,
           name: bundle.name,
           version: bundle.version,
-          url: bundle.endpoint,
+          ...(bundle.endpoint && { url: bundle.endpoint }),
         };
       }
       case "remoteMcp:pair":

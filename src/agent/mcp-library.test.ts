@@ -55,7 +55,8 @@ test("library discovery is read-only; parallel project calls retain explicit ide
   );
   expect((await call(c, "project_context")).scope).toBe("library");
   expect((await c.listTools()).tools.map((tool) => tool.name)).not.toContain("guide");
-  expect(c.getInstructions()).toContain("Read use-showai Skill");
+  expect(c.getInstructions()).toContain("show-visual");
+  expect(c.getInstructions()).toContain("use-showai");
   const capabilities = await call(c, "showai_capabilities");
   expect(capabilities).not.toHaveProperty("workflow");
   expect(capabilities).not.toHaveProperty("next");
@@ -64,6 +65,13 @@ test("library discovery is read-only; parallel project calls retain explicit ide
   expect(capabilities.datasets).not.toHaveProperty("guide");
   expect(capabilities.authoring.workRecords.available).toBe(true);
   expect(capabilities.presentation.show.maxComponents).toBe(5);
+  expect(await call(c, "showai_capabilities", { view: "presentation" })).toEqual({
+    presentation: {
+      declaredHostDisplay: capabilities.presentation.declaredHostDisplay,
+      show: { maxComponents: capabilities.presentation.show.maxComponents },
+    },
+  });
+  expect(await call(c, "showai_capabilities", { view: "full" })).toEqual(capabilities);
   const removed = await c.callTool({ name: "guide", arguments: {} });
   expect(removed.isError).toBe(true);
   expect((removed.structuredContent as any).error.nextStep).toContain("installed ShowAI Skills");
@@ -212,7 +220,7 @@ test("saved-page presentation keeps full source, selects preview and never mutat
   expect(await readdir(join(root, "local", "presentation-builds"))).toEqual([]);
 });
 
-test("catalog discovery returns all compact entries, with optional pagination beyond 50", async () => {
+test("catalog discovery returns all detailed entries, with optional pagination beyond 50", async () => {
   const client = await connect(createLibraryMcpServer({ root }));
   const project = await call(client, "project_create", {
     name: "Catalog discovery",
@@ -283,6 +291,45 @@ test("catalog discovery returns all compact entries, with optional pagination be
   expect(details.schema.properties.series).toBeDefined();
 });
 
+test("the public compact view fits the complete component index into one small text result", async () => {
+  const client = await connect(createLibraryMcpServer({ root }));
+  const name = "public_catalog_list";
+  const args = { kind: "component", view: "compact" };
+  const result = await client.callTool({ name, arguments: args });
+  expect(result.isError).not.toBe(true);
+  const [{ text }] = result.content as { text: string }[];
+  expect(Buffer.byteLength(text)).toBeLessThan(8 * 1024);
+  const { data } = JSON.parse(text);
+  expect(result.structuredContent).toEqual({ ok: true, data });
+  const detailed = await call(client, name, { kind: "component" });
+  expect(data.columns).toEqual(["id", "name", "scenario"]);
+  expect(data.nextCursor).toBeNull();
+  expect(data.items).toEqual(
+    detailed.items.map((item: { id: string; name: string; scenarios: string[] }) => [
+      item.id, item.name, item.scenarios[0],
+    ]),
+  );
+  const first = await call(client, name, { ...args, limit: 50 });
+  const last = await call(client, name, {
+    ...args, limit: 50, cursor: first.nextCursor,
+  });
+  expect([...first.items, ...last.items]).toEqual(data.items);
+  expect(last.nextCursor).toBeNull();
+  const mismatch = await client.callTool({
+    name,
+    arguments: { kind: "component", cursor: first.nextCursor },
+  });
+  expect(mismatch.isError).toBe(true);
+  const mixed = await call(client, name, { view: "compact" });
+  expect(mixed.columns).toEqual(["kind", "id", "name", "scenario"]);
+  expect(new Set(mixed.items.map(([kind]: string[]) => kind))).toEqual(
+    new Set(["component", "template"]),
+  );
+  const filtered = await call(client, name, { ...args, query: "交互流程图" });
+  expect(filtered.items[0][0]).toBe("flowchart");
+  expect(filtered.total).toBeLessThan(data.total);
+});
+
 test("default component discovery combines built-ins and only the selected project", async () => {
   const client = await connect(createLibraryMcpServer({ root }));
   const project = await call(client, "project_create", {
@@ -311,6 +358,21 @@ test("default component discovery combines built-ins and only the selected proje
   const args = { projectId: project.id, kind: "component" };
   const listing = await call(client, "catalog_list", args);
   expect(listing.total).toBe(listBuiltinComponents().length + 1);
+  const index = await new AgentService({ root }).componentPromptIndex(project.id);
+  expect(index.revision).toBe(listing.revision);
+  expect(index.columns).toEqual(["id", "name", "scenario", "scope", "version", "integrity"]);
+  const expectedRows = listing.items.map((item: {
+    id: string;
+    name: string;
+    scenarios: string[];
+    scope: string;
+    version?: string;
+    integrity?: string;
+  }) => [item.id, item.name, item.scenarios[0], item.scope, item.version ?? null, item.integrity ?? null]);
+  expect(index.items).toEqual(expectedRows);
+  expect(Buffer.byteLength(JSON.stringify(index))).toBeLessThan(
+    Buffer.byteLength(JSON.stringify(listing)) / 4,
+  );
   expect(listing.nextCursor).toBeNull();
   expect(listing.items.filter((item: any) => item.scope === "project")).toEqual(
     [

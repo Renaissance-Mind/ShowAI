@@ -64,6 +64,7 @@ export interface BrowserServerOptions {
   settingsPath: string;
   registerAgentRuntime?: boolean;
   codexWorkbench?: { key: string };
+  antigravityWorkbench?: { key: string };
   additionalActions?: ReadonlySet<string>;
   agentWorkspaceRoot?: string;
   disableNativeDialogs?: boolean;
@@ -110,7 +111,13 @@ export async function startBrowserServer(options: BrowserServerOptions) {
   }
   const fixedHome = options.home ?? process.env.SHOWAI_HOME;
   const embedding = options.codexWorkbench;
-  if (embedding && (!fixedHome || options.development || !/^[0-9a-f]{64}$/.test(embedding.key)))
+  const antigravityEmbedding = options.antigravityWorkbench;
+  const embeddedHost = !!(embedding || antigravityEmbedding);
+  if (
+    (embedding && (!fixedHome || options.development || !/^[0-9a-f]{64}$/.test(embedding.key))) ||
+    (antigravityEmbedding &&
+      (!fixedHome || options.development || !/^[0-9a-f]{64}$/.test(antigravityEmbedding.key)))
+  )
     throw new Error("The embedded workbench requires a fixed library and a private key.");
   let savedHome: string | undefined;
   if (!fixedHome) {
@@ -215,7 +222,7 @@ export async function startBrowserServer(options: BrowserServerOptions) {
         home: root,
       };
     });
-    if (!embedding && !closed && (change.projectIds?.length || change.catalog || change.all))
+    if (!embeddedHost && !closed && (change.projectIds?.length || change.catalog || change.all))
       syncManager(root).wake(
         change.catalog || change.all ? undefined : change.projectIds,
         !!(change.catalog || change.all),
@@ -237,7 +244,7 @@ export async function startBrowserServer(options: BrowserServerOptions) {
     });
   }
   async function useHome(home: string) {
-    if (!embedding) await syncManager(store.root).stop();
+    if (!embeddedHost) await syncManager(store.root).stop();
     await maintenance?.stop();
     store = new FileStore(home);
     ownWrites.clear();
@@ -254,13 +261,13 @@ export async function startBrowserServer(options: BrowserServerOptions) {
       }),
     );
     service = new AgentService({ root: store.root });
-    if (!embedding && options.registerAgentRuntime !== false)
+    if (!embeddedHost && options.registerAgentRuntime !== false)
       await registerRuntimeOnStartup(
         store.root,
         info().cli,
         options.development ? "development" : "packaged",
       );
-    if (!embedding) {
+    if (!embeddedHost) {
       await announce();
       maintenance = new MaintenanceScheduler(store.root).start();
       syncManager(store.root).start();
@@ -335,7 +342,7 @@ export async function startBrowserServer(options: BrowserServerOptions) {
     runtime: () => info(),
     channel: options.development ? "development" : "packaged",
   });
-  const remoteConnector = embedding ? undefined : new RemoteMacConnector(agentHost, () => store.root);
+  const remoteConnector = embeddedHost ? undefined : new RemoteMacConnector(agentHost, () => store.root);
   void remoteConnector
     ?.start()
     .catch((error) => console.error("Remote Agent connector:", error.message));
@@ -356,7 +363,7 @@ export async function startBrowserServer(options: BrowserServerOptions) {
     return resolved;
   }
   async function invoke(action: string, args: Record<string, unknown>) {
-    if (embedding) {
+    if (embeddedHost) {
       if (action === "sync:wake") return { scheduled: false };
       if (desktopPluginActions.has(action) || remoteDeviceActions.has(action))
         throw new CoreError("INVALID_DATA", "Manage plugins and remote devices in the ShowAI app.");
@@ -566,15 +573,20 @@ export async function startBrowserServer(options: BrowserServerOptions) {
       response.setHeader("Referrer-Policy", "no-referrer");
       const requestOrigin = request.headers.origin;
       const codexOrigin = requestOrigin && embedding && allowsCodexOrigin(requestOrigin);
+      const agPreflight =
+        requestOrigin &&
+        antigravityEmbedding &&
+        request.method === "OPTIONS" &&
+        request.headers["access-control-request-private-network"] === "true";
       if (
         request.headers.host !== new URL(origin).host ||
-        (requestOrigin && requestOrigin !== origin && !codexOrigin)
+        (requestOrigin && requestOrigin !== origin && !codexOrigin && !agPreflight)
       ) {
         response.writeHead(403);
         response.end("Forbidden origin");
         return;
       }
-      if (codexOrigin) {
+      if (codexOrigin || agPreflight) {
         response.setHeader("Access-Control-Allow-Origin", requestOrigin);
         response.setHeader("Vary", "Origin");
         if (request.method === "OPTIONS") {
@@ -710,7 +722,7 @@ export async function startBrowserServer(options: BrowserServerOptions) {
             throw new CoreError("INVALID_DATA", "Unknown language.");
           setLocale(input.locale);
           workbenchLocale = input.locale;
-          if (!embedding) await recordAppLanguage(store.root, input.locale);
+          if (!embeddedHost) await recordAppLanguage(store.root, input.locale);
           data = null;
         } else if (url.pathname === "/api/shutdown") {
           data = null;
@@ -764,16 +776,22 @@ export async function startBrowserServer(options: BrowserServerOptions) {
         const embedded = embedding &&
           (url.searchParams.get("codexWorkbench") === embedding.key ||
             (preview && request.headers["sec-fetch-site"] === "same-origin"));
-        if (embedding && !embedded) {
+        const agEmbedded = antigravityEmbedding &&
+          (url.searchParams.get("agWorkbench") === antigravityEmbedding.key ||
+            (preview && request.headers["sec-fetch-site"] === "same-origin"));
+        if ((embedding && !embedded) || (antigravityEmbedding && !agEmbedded)) {
           response.writeHead(403);
           response.end("Forbidden workbench request");
           return;
         }
-        if (embedded) response.removeHeader("X-Frame-Options");
+        if (embedded || agEmbedded) response.removeHeader("X-Frame-Options");
         else if (preview) response.setHeader("X-Frame-Options", "SAMEORIGIN");
-        const ancestors = embedded
-          ? "'self' app: https://chatgpt.com https://*.chatgpt.com https://*.oaiusercontent.com"
-          : preview ? "'self'" : "'none'";
+        if (agEmbedded) response.removeHeader("Referrer-Policy");
+        const ancestors = agEmbedded
+          ? "*"
+          : embedded
+            ? "'self' app: https://chatgpt.com https://*.chatgpt.com https://*.oaiusercontent.com"
+            : preview ? "'self'" : "'none'";
         const config = JSON.stringify({
           token,
           ...(codexOrigin && embedded ? { apiOrigin: origin, search: url.search } : {}),
@@ -789,17 +807,51 @@ export async function startBrowserServer(options: BrowserServerOptions) {
               }
             : {}),
         }).replace(/</g, "\\u003c");
+        const agBridge =
+          agEmbedded && !preview
+            ? `<script>(() => {
+  let seq = 0;
+  const pending = new Map();
+  window.__SHOWAI_ANTIGRAVITY_HOST__ = {
+    canReference() { return window.parent !== window; },
+    attachReference(reference, text, components) {
+      const id = ++seq;
+      return new Promise((resolve, reject) => {
+        const timer = setTimeout(() => { pending.delete(id); reject(new Error("Reference timed out")); }, 8000);
+        pending.set(id, { resolve, reject, timer });
+        window.parent.postMessage({ type: "showai:ag-file-reference", id, reference, text, components }, "*");
+      });
+    },
+  };
+  window.addEventListener("message", (event) => {
+    if (event.source !== window.parent || !event.data || typeof event.data !== "object") return;
+    const msg = event.data;
+    if (msg.type === "showai:ag-file-reference-ack" && pending.has(msg.id)) {
+      const w = pending.get(msg.id);
+      pending.delete(msg.id);
+      clearTimeout(w.timer);
+      msg.error ? w.reject(new Error(msg.error)) : w.resolve();
+    } else if (msg.type === "showai:ag-host-theme" && (msg.theme === "dark" || msg.theme === "light")) {
+      document.documentElement.style.colorScheme = msg.theme;
+      document.documentElement.dataset.theme = msg.theme;
+    } else if (msg.type === "showai:ag-open-page" && msg.detail?.pageId) {
+      window.dispatchEvent(new CustomEvent("showai:open-page", { detail: msg.detail }));
+    }
+  });
+})();</script>`
+            : "";
         const index = await readFile(join(webRoot, "index.html"), "utf8");
         const document = codexOrigin && embedded
           ? index.replaceAll('"./assets/', `"${origin}/assets/`)
           : index;
         const html = document.replace(
           "<head>",
-          `<head><script>window.__SHOWAI_LOCAL__=${config}</script>`,
+          `<head><script>window.__SHOWAI_LOCAL__=${config}</script>${agBridge}`,
         );
+        const scriptBlob = agEmbedded ? " blob:" : "";
         response.setHeader(
           "Content-Security-Policy",
-          `default-src 'self'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https: http:; media-src 'self' data: https: http:; font-src 'self' data:; connect-src 'self'; frame-src 'self' about: data: blob:; frame-ancestors ${ancestors}; object-src 'none'; base-uri 'none'; form-action 'none'; worker-src 'self'`,
+          `default-src 'self'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval'${scriptBlob}; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https: http:; media-src 'self' data: https: http:; font-src 'self' data:; connect-src 'self'; frame-src 'self' about: data: blob:; frame-ancestors ${ancestors}; object-src 'none'; base-uri 'none'; form-action 'none'; worker-src 'self'${scriptBlob}`,
         );
         response.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
         response.end(request.method === "HEAD" ? undefined : html);
@@ -870,7 +922,7 @@ export async function startBrowserServer(options: BrowserServerOptions) {
       await Promise.all(pendingChanges);
       await remoteConnector?.close();
       agentHost.close();
-      if (!embedding) await syncManager(store.root).stop();
+      if (!embeddedHost) await syncManager(store.root).stop();
       await maintenance?.stop();
       await presence?.remove();
       for (const client of clients.keys()) client.end();
@@ -885,7 +937,7 @@ export async function startBrowserServer(options: BrowserServerOptions) {
     throw new Error("Missing local server address.");
   if (!origin) {
     origin = `http://127.0.0.1:${address.port}`;
-    if (!embedding) await announce();
+    if (!embeddedHost) await announce();
   }
   return {
     url: origin + "/",

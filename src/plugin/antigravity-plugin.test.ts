@@ -1,32 +1,38 @@
 import { execFile, spawn } from "node:child_process";
 import { createServer } from "node:http";
-import { cp, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { cp, mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { createInterface } from "node:readline";
-import { pathToFileURL } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { promisify } from "node:util";
+import { Client } from "@modelcontextprotocol/sdk/client/index.js";
+import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { afterEach, describe, expect, test } from "vitest";
-
-interface HookModule {
-  handleHookEvent(
-    payload: Record<string, unknown>,
-    env?: Record<string, string | undefined>,
-  ): Promise<{
-    injectSteps?: { systemMessage?: { systemMessage?: string } }[];
-  }>;
-  isOfflineBundledFragment(html: string): boolean;
-  wrapForAntigravityEmbed(html: string, options?: { title?: string }): string;
-}
+import {
+  antigravityCardUri,
+  antigravityFileUri,
+  antigravityWorkbenchConnection,
+  buildAntigravitySidecarUrl,
+  writeAntigravityNavTarget,
+} from "../agent/antigravity-workbench";
+import { createLibraryMcpServer } from "../agent/mcp-library";
+import { AgentService } from "../agent/service";
+import { openLibrary } from "../core/open-library";
+import { syncManager } from "../sync/manager";
 
 interface SidecarModule {
-  isAllowedSidecarOrigin(origin: string, sidecarPort: number): boolean;
+  isAllowedSidecarOrigin(
+    origin: string,
+    sidecarPort: number,
+    options?: { pathname?: string; authenticated?: boolean },
+  ): boolean;
   startAntigravitySidecar(options: {
     port?: number;
     token?: string;
     env?: Record<string, string | undefined>;
     backend?: {
-      ensure(): Promise<{ url: URL; home: string }>;
+      ensure(): Promise<{ url: URL; home: string; webRoot?: string | null }>;
       stop(): Promise<void>;
       status(): { running: boolean; url: string | null; home: string | null };
     };
@@ -36,16 +42,6 @@ interface SidecarModule {
     close(): Promise<void>;
   }>;
 }
-
-const {
-  handleHookEvent,
-  isOfflineBundledFragment,
-  wrapForAntigravityEmbed,
-} = (await import(
-  pathToFileURL(
-    resolve("plugins/showai/host-adapters/antigravity/hooks/preview-hook.mjs"),
-  ).href
-)) as HookModule;
 
 const { isAllowedSidecarOrigin, startAntigravitySidecar } = (await import(
   pathToFileURL(
@@ -70,217 +66,307 @@ async function makeTempDir(prefix: string) {
   return dir;
 }
 
-describe("Antigravity preview hook", () => {
-  test("wraps bundled inline fragments with Antigravity theme sync and stages via PostToolUse + PreInvocation", async () => {
-    const root = await makeTempDir("showai-ag-hook-");
-    const home = join(root, "home");
-    const previewDir = join(home, "local/agent-previews/abc");
-    const artifactDir = join(root, "artifacts");
-    const transcriptPath = join(root, "transcript.jsonl");
-    await mkdir(previewDir, { recursive: true });
-    await mkdir(artifactDir, { recursive: true });
+describe("Antigravity page cards and live workbench navigation", () => {
+  test("card_present, card_navigate, workbench_open_destination, and sidecar nav-events SSE coordinate end-to-end", async () => {
+    const home = await makeTempDir("showai-ag-cards-");
+    await openLibrary(home);
+    const service = new AgentService({ root: home });
+    const workbench = antigravityWorkbenchConnection(service, async (key) => ({
+      url: "http://127.0.0.1:43210/",
+      localUrl: `http://127.0.0.1:43210/?agWorkbench=${key}`,
+      close: async () => {},
+    }));
+    const server = createLibraryMcpServer({
+      root: home,
+      icons: workbench.icons,
+    });
+    workbench.configure(server);
+    const [left, right] = InMemoryTransport.createLinkedPair();
+    const client = new Client({ name: "antigravity-card-test", version: "1" });
+    await server.connect(right);
+    await client.connect(left);
 
-    const inlineFile = join(previewDir, "page.inline.html");
-    const fragment =
-      '<section id="showai-1" data-showai-inline-root><p>Hello ShowAI</p></section>';
-    await writeFile(inlineFile, fragment, "utf8");
+    const upstream = createServer((_req, res) => {
+      res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
+      res.end("<!doctype html><html><head></head><body>studio</body></html>");
+    });
+    await new Promise<void>((done) => upstream.listen(0, "127.0.0.1", done));
+    const addr = upstream.address();
+    const upstreamPort = typeof addr === "object" && addr ? addr.port : 0;
+    const upstreamUrl = new URL(`http://127.0.0.1:${upstreamPort}/`);
 
-    const toolOutput = {
-      ok: true,
-      data: {
-        title: "架构演进报告",
-        projectId: "proj-1",
-        pageId: "page-2",
-        openUrl: "showai://project/proj-1/page/page-2",
-        display: { reader: "bundled" },
-        delivery: {
-          mode: "fragment-file",
-          inline: inlineFile,
-          html: join(previewDir, "page.html"),
+    const sidecar = await startAntigravitySidecar({
+      port: 0,
+      token: "nav-token",
+      env: { ...process.env, SHOWAI_HOME: home },
+      backend: {
+        ensure: async () => ({ url: upstreamUrl, home }),
+        stop: async () => {},
+        status: () => ({ running: true, url: upstreamUrl.href, home }),
+      },
+    });
+
+    try {
+      const toolList = await client.listTools();
+      const cardPresentMeta = toolList.tools.find(
+        (item) => item.name === "card_present",
+      )?._meta as { ui?: { resourceUri?: string; visibility?: string[] } } | undefined;
+      expect(cardPresentMeta?.ui?.resourceUri).toBe(antigravityCardUri);
+      expect(cardPresentMeta?.ui?.visibility).toEqual(["model", "app"]);
+      const openDestMeta = toolList.tools.find(
+        (item) => item.name === "workbench_open_destination",
+      )?._meta as { ui?: { visibility?: string[] } } | undefined;
+      expect(openDestMeta?.ui?.visibility).toEqual(["app"]);
+      const openFileMeta = toolList.tools.find(
+        (item) => item.name === "workbench_open_file",
+      )?._meta as Record<string, any> | undefined;
+      expect(openFileMeta?.ui?.resourceUri).toBe(antigravityFileUri);
+      expect(openFileMeta?.["com.google.antigravity/ui"]?.entrypoints).toEqual([
+        { type: "file", title: "ShowAI", extensions: [".showai-ref"] },
+      ]);
+
+      const fileViewerRes = await client.readResource({ uri: antigravityFileUri });
+      const fvContent = fileViewerRes.contents[0];
+      expect((fvContent?._meta as any)?.ui?.csp?.frameDomains).toEqual([
+        "http://127.0.0.1:43210",
+      ]);
+
+      const resource = await client.readResource({ uri: antigravityCardUri });
+      expect(resource.contents).toHaveLength(1);
+      const cardContent = resource.contents[0];
+      expect(cardContent?.mimeType).toBe("text/html;profile=mcp-app");
+      const htmlText = cardContent && "text" in cardContent ? cardContent.text : "";
+      expect(htmlText).toContain("showai-page-card");
+      expect(htmlText).toContain("workbench_open_destination");
+
+      const createdProject = await client.callTool({
+        name: "project_create",
+        arguments: { name: "Antigravity 卡片测试" },
+      });
+      const projectId = (createdProject.structuredContent as any).data.id as string;
+
+      const pageOne = await client.callTool({
+        name: "page_create",
+        arguments: {
+          projectId,
+          title: "系统架构总览",
         },
-      },
-    };
-    await writeFile(
-      transcriptPath,
-      JSON.stringify({
-        type: "GENERIC",
-        content: [{ type: "text", text: JSON.stringify(toolOutput) }],
-      }) + "\n",
-      "utf8",
-    );
-
-    const postResult = await handleHookEvent(
-      {
-        hookEventName: "PostToolUse",
-        artifactDirectoryPath: artifactDir,
-        transcriptPath,
-        toolCall: {
-          id: "call_1",
-          name: "mcp_showai_page_present",
-          args: { projectId: "proj-1", pageId: "page-2" },
+      });
+      const pageOneCreated = (pageOne.structuredContent as any).data;
+      const pageOneId = pageOneCreated.document.id as string;
+      const savedPageOne = await client.callTool({
+        name: "page_apply",
+        arguments: {
+          projectId,
+          pageId: pageOneId,
+          baseHash: pageOneCreated.hash,
+          baseRevision: pageOneCreated.revision,
+          operations: [
+            {
+              type: "block.insert",
+              node: {
+                type: "heading",
+                attrs: { id: "blk-hero", level: 2 },
+                content: [{ type: "text", text: "核心模块" }],
+              },
+            },
+          ],
         },
-      },
-      { SHOWAI_HOME: home },
-    );
-    expect(postResult).toEqual({});
+      });
+      expect(savedPageOne.isError, JSON.stringify(savedPageOne.content)).not.toBe(true);
 
-    const preResult = await handleHookEvent({
-      hookEventName: "PreInvocation",
-      artifactDirectoryPath: artifactDir,
-    });
-    const injected =
-      preResult.injectSteps?.[0]?.systemMessage?.systemMessage ?? "";
-    expect(injected).toContain("<agent-embed src=\"file://");
-    expect(injected).toContain(
-      "[在 ShowAI 工作台打开《架构演进报告》](sidecar://showai/workbench/?project=proj-1&page=page-2)",
-    );
-    expect(injected).toContain("Do NOT run `cp` or `write_file`");
-
-    const match = /showai-preview-[0-9a-f]+\.html/.exec(injected);
-    expect(match).toBeTruthy();
-    const stagedHtml = await readFile(join(artifactDir, match![0]), "utf8");
-    expect(stagedHtml).toMatch(/^<!DOCTYPE html>/);
-    expect(stagedHtml).toContain("Hello ShowAI");
-    expect(stagedHtml).toContain('addEventListener("themechange"');
-
-    // Second PreInvocation is a no-op because the pending file was consumed.
-    const secondPre = await handleHookEvent({
-      hookEventName: "PreInvocation",
-      artifactDirectoryPath: artifactDir,
-    });
-    expect(secondPre).toEqual({});
-  });
-
-  test("handles Antigravity lazy MCP call_mcp_tool payload with PascalCase ToolName and timestamped transcript content", async () => {
-    const root = await makeTempDir("showai-ag-hook-lazy-");
-    const home = join(root, "home");
-    const previewDir = join(home, "local/agent-previews/show-components/u1");
-    const artifactDir = join(root, "artifacts");
-    const transcriptPath = join(root, "transcript.jsonl");
-    await mkdir(previewDir, { recursive: true });
-    await mkdir(artifactDir, { recursive: true });
-
-    const inlineFile = join(previewDir, "component.inline.html");
-    await writeFile(
-      inlineFile,
-      '<section id="showai-lazy" data-showai-inline-root><p>Lazy MCP</p></section>',
-      "utf8",
-    );
-
-    const resultPayload = JSON.stringify({
-      ok: true,
-      data: {
-        title: "实时验证",
-        display: { reader: "bundled" },
-        delivery: { mode: "fragment-file", inline: inlineFile },
-      },
-    });
-    await writeFile(
-      transcriptPath,
-      JSON.stringify({
-        step_index: 294,
-        type: "GENERIC",
-        status: "DONE",
-        content: `Created At: 2026-11-20T22:10:12+08:00\nCompleted At: 2026-11-20T22:11:04+08:00\n${resultPayload}`,
-      }) + "\n",
-      "utf8",
-    );
-
-    await handleHookEvent(
-      {
-        hookEventName: "PostToolUse",
-        artifactDirectoryPath: artifactDir,
-        transcriptPath,
-        toolCall: {
-          id: "call_lazy",
-          name: "call_mcp_tool",
-          args: {
-            ServerName: "showai_showai",
-            ToolName: "show_component",
-            Arguments: { kind: "flowchart", delivery: "auto" },
-          },
+      const pageTwo = await client.callTool({
+        name: "page_create",
+        arguments: {
+          projectId,
+          title: "数据流设计",
         },
-      },
-      { SHOWAI_HOME: home },
-    );
+      });
+      const pageTwoId = (pageTwo.structuredContent as any).data.document.id as string;
 
-    const pre = await handleHookEvent({
-      hookEventName: "PreInvocation",
-      artifactDirectoryPath: artifactDir,
-    });
-    const message = pre.injectSteps?.[0]?.systemMessage?.systemMessage ?? "";
-    expect(message).toContain("<agent-embed src=\"file://");
-    expect(message).toContain("showai-preview-");
-  });
+      // Single card presentation
+      const singleCard = await client.callTool({
+        name: "card_present",
+        arguments: {
+          projectId,
+          pageId: pageOneId,
+          blockId: "blk-hero",
+          description: "新增核心模块章节与导航结构。",
+        },
+      });
+      expect(singleCard.isError).not.toBe(true);
+      expect((singleCard.structuredContent as any).data).toMatchObject({
+        projectId,
+        pageId: pageOneId,
+        blockId: "blk-hero",
+        title: "系统架构总览",
+        description: "新增核心模块章节与导航结构。",
+      });
+      expect((singleCard._meta as any).showaiPageCard).toMatchObject({
+        projectId,
+        pageId: pageOneId,
+        blockId: "blk-hero",
+      });
 
-  test("rejects CDN fragments, errored tool calls, and files outside preview roots", async () => {
-    const root = await makeTempDir("showai-ag-hook-guard-");
-    const home = join(root, "home");
-    const previewDir = join(home, "local/agent-previews/cdn");
-    const artifactDir = join(root, "artifacts");
-    const outsideFile = join(root, "secret.inline.html");
-    await mkdir(previewDir, { recursive: true });
-    await mkdir(artifactDir, { recursive: true });
+      // Multi-card group presentation
+      const groupCards = await client.callTool({
+        name: "card_present",
+        arguments: {
+          projectId,
+          pageId: pageOneId,
+          additionalTargets: [{ projectId, pageId: pageTwoId }],
+          adjustSpacing: true,
+        },
+      });
+      expect(groupCards.isError).not.toBe(true);
+      expect((groupCards.structuredContent as any).data.adjustSpacing).toBe(true);
+      expect((groupCards.structuredContent as any).data.cards).toHaveLength(2);
+      expect((groupCards._meta as any).showaiCardGroup.cards).toHaveLength(2);
 
-    const cdnHtml =
-      '<section data-showai-inline-root></section><script src="https://cdn.example.com/reader.js"></script>';
-    expect(isOfflineBundledFragment(cdnHtml)).toBe(false);
-    const cdnFile = join(previewDir, "cdn.inline.html");
-    await writeFile(cdnFile, cdnHtml, "utf8");
-    await writeFile(outsideFile, "<section>outside</section>", "utf8");
-
-    const transcriptOutside = join(root, "outside.jsonl");
-    await writeFile(
-      transcriptOutside,
-      JSON.stringify({
-        content: JSON.stringify({
-          data: {
-            display: { reader: "bundled" },
-            delivery: { inline: outsideFile },
-          },
+      // Before any visible sidecar SSE client connects, workbench_open_destination returns queued + .showai-ref fileUri for toggle-aux-pane
+      const closedPaneOpen = await client.callTool({
+        name: "workbench_open_destination",
+        arguments: {
+          projectId,
+          pageId: pageOneId,
+          blockId: "blk-hero",
+          destination: "workbench",
+        },
+      });
+      const closedData = (closedPaneOpen._meta as any).showaiWorkbenchData;
+      expect(closedData).toMatchObject({
+        status: "queued",
+        sidecarUrl: buildAntigravitySidecarUrl({
+          projectId,
+          pageId: pageOneId,
+          blockId: "blk-hero",
         }),
-      }) + "\n",
-    );
+      });
+      expect(closedData.fileUri).toMatch(/^file:\/\/.*\.showai-ref$/);
+      expect(closedData.launchUrl).toContain("http://127.0.0.1:43210/?agWorkbench=");
+      const refSource = await import("node:fs/promises").then((fs) =>
+        fs.readFile(fileURLToPath(closedData.fileUri), "utf8"),
+      );
+      const resolvedRef = await client.callTool({
+        name: "workbench_resolve_reference",
+        arguments: { source: refSource },
+      });
+      expect((resolvedRef._meta as any).showaiWorkbenchData).toMatchObject({
+        projectId,
+        pageId: pageOneId,
+        blockId: "blk-hero",
+      });
 
-    await handleHookEvent(
-      {
-        hookEventName: "PostToolUse",
-        artifactDirectoryPath: artifactDir,
-        transcriptPath: transcriptOutside,
-        toolCall: { name: "show_component", args: {} },
-      },
-      { SHOWAI_HOME: home },
-    );
-    expect(
-      await handleHookEvent({
-        hookEventName: "PreInvocation",
-        artifactDirectoryPath: artifactDir,
-      }),
-    ).toEqual({});
+      // Connect SSE client initially hidden (collapsed side pane): status stays queued so card still pops open side panel!
+      const abort = new AbortController();
+      const sseRes = await fetch(
+        `${sidecar.url}/_antigravity/nav-events?token=nav-token&clientId=c1&visible=0`,
+        { signal: abort.signal },
+      );
+      expect(sseRes.status).toBe(200);
+      expect(sseRes.headers.get("content-type")).toContain("text/event-stream");
+      const reader = sseRes.body!.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+      const nextNavPayload = async () => {
+        while (true) {
+          const match = /data:\s*(\{[^\n]+\})\n\n/.exec(buffer);
+          if (match) {
+            buffer = buffer.slice(match.index + match[0].length);
+            return JSON.parse(match[1]);
+          }
+          const { value, done } = await reader.read();
+          if (done) throw new Error("SSE stream closed early");
+          buffer += decoder.decode(value, { stream: true });
+        }
+      };
 
-    // Verify fallback scan skips CDN fragments too.
-    await handleHookEvent(
-      {
-        hookEventName: "PostToolUse",
-        artifactDirectoryPath: artifactDir,
-        toolCall: { name: "show_component", args: {} },
-      },
-      { SHOWAI_HOME: home },
-    );
-    expect(
-      await handleHookEvent({
-        hookEventName: "PreInvocation",
-        artifactDirectoryPath: artifactDir,
-      }),
-    ).toEqual({});
-  });
+      const initialDelivered = await nextNavPayload();
+      expect(initialDelivered).toMatchObject({
+        projectId,
+        pageId: pageOneId,
+        blockId: "blk-hero",
+      });
 
-  test("wrapForAntigravityEmbed preserves full HTML documents while adding theme sync", () => {
-    const wrapped = wrapForAntigravityEmbed(
-      "<!DOCTYPE html><html><body><div data-showai-inline-root></div></body></html>",
-    );
-    expect(wrapped).toContain('addEventListener("themechange"');
-    expect(wrapped.match(/<!DOCTYPE html>/gi)?.length).toBe(1);
+      // While clientId=c1 has visible=0, card_navigate still reports queued (no false-positive from hidden background iframe!)
+      const whileHidden = await client.callTool({
+        name: "card_navigate",
+        arguments: { projectId, pageId: pageOneId },
+      });
+      expect((whileHidden.structuredContent as any).data.status).toBe("queued");
+      expect(await nextNavPayload()).toMatchObject({
+        projectId,
+        pageId: pageOneId,
+      });
+
+      // Mark sidecar client visible -> now workbench_open_destination reports accepted!
+      const visRes = await fetch(
+        `${sidecar.url}/_antigravity/client-visibility?token=nav-token`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ clientId: "c1", visible: true }),
+        },
+      );
+      expect(visRes.status).toBe(200);
+
+      // Now that SSE client is active, workbench_open_destination returns accepted and streams live
+      const liveJump = await client.callTool({
+        name: "workbench_open_destination",
+        arguments: {
+          projectId,
+          pageId: pageTwoId,
+          destination: "workbench",
+        },
+      });
+      expect(liveJump.isError).not.toBe(true);
+      expect((liveJump._meta as any).showaiWorkbenchData).toMatchObject({
+        status: "accepted",
+      });
+      const secondDelivered = await nextNavPayload();
+      expect(secondDelivered).toMatchObject({
+        projectId,
+        pageId: pageTwoId,
+      });
+
+      // Direct helper check as well
+      const helperResult = await writeAntigravityNavTarget(home, {
+        projectId,
+        pageId: pageOneId,
+      });
+      expect(helperResult.status).toBe("accepted");
+
+      // Archived (deleted) pages are rejected by card_present and card_navigate
+      const recTwo = await service.store.readPage(projectId, pageTwoId);
+      await service.store.savePage(
+        projectId,
+        pageTwoId,
+        { ...recTwo.document, archived: true },
+        recTwo.hash,
+        recTwo.revision,
+      );
+      const deletedCard = await client.callTool({
+        name: "card_present",
+        arguments: { projectId, pageId: pageTwoId },
+      });
+      expect(deletedCard.isError).toBe(true);
+      expect((deletedCard.structuredContent as any).error.code).toBe("NOT_FOUND");
+      const deletedNav = await client.callTool({
+        name: "card_navigate",
+        arguments: { projectId, pageId: pageTwoId },
+      });
+      expect(deletedNav.isError).toBe(true);
+      expect((deletedNav.structuredContent as any).error.code).toBe("NOT_FOUND");
+
+      abort.abort();
+      await reader.cancel().catch(() => {});
+    } finally {
+      await sidecar.close();
+      await new Promise<void>((done) => upstream.close(() => done()));
+      await client.close();
+      await server.close();
+      await syncManager(home).stop();
+    }
   });
 });
 
@@ -334,43 +420,85 @@ describe("Antigravity sidecar workbench proxy", () => {
     });
 
     try {
-      const pluginOrigin = `plugin://showai--workbench-${sidecar.port}`;
-      expect(isAllowedSidecarOrigin(pluginOrigin, sidecar.port)).toBe(true);
+      // Antigravity's sidecar gateway listens on its own loopback port (e.g. sidecar.port + 3)
+      // and loads the webview from plugin://showai--workbench-<gatewayPort>.
+      const gatewayPort = (sidecar.port % 60000) + 3;
+      const gatewayPluginOrigin = `plugin://showai--workbench-${gatewayPort}`;
+      const gatewayLoopbackOrigin = `http://127.0.0.1:${gatewayPort}`;
+
+      expect(isAllowedSidecarOrigin(gatewayPluginOrigin, sidecar.port)).toBe(true);
       expect(
         isAllowedSidecarOrigin(`http://127.0.0.1:${sidecar.port}`, sidecar.port),
       ).toBe(true);
       expect(
-        isAllowedSidecarOrigin(`plugin://showai--workbench-${sidecar.port + 1}`, sidecar.port),
+        isAllowedSidecarOrigin(gatewayLoopbackOrigin, sidecar.port, {
+          pathname: "/assets/index.js",
+        }),
+      ).toBe(true);
+      expect(
+        isAllowedSidecarOrigin(gatewayLoopbackOrigin, sidecar.port, {
+          pathname: "/",
+          authenticated: false,
+        }),
       ).toBe(false);
       expect(
-        isAllowedSidecarOrigin(`plugin://other--workbench-${sidecar.port}`, sidecar.port),
+        isAllowedSidecarOrigin(gatewayLoopbackOrigin, sidecar.port, {
+          pathname: "/",
+          authenticated: true,
+        }),
+      ).toBe(true);
+      expect(
+        isAllowedSidecarOrigin(`plugin://other--workbench-${gatewayPort}`, sidecar.port),
+      ).toBe(false);
+      expect(
+        isAllowedSidecarOrigin("plugin://showai--workbench-70000", sidecar.port),
       ).toBe(false);
       expect(isAllowedSidecarOrigin("https://evil.example", sidecar.port)).toBe(false);
 
-      // Module asset request with Antigravity desktop plugin:// origin succeeds and strips X-Frame-Options.
+      // Module asset request with Antigravity desktop plugin:// gateway origin succeeds and strips X-Frame-Options.
       const assetRes = await fetch(`${sidecar.url}/assets/index.js`, {
-        headers: { Origin: pluginOrigin },
+        headers: { Origin: gatewayPluginOrigin },
       });
       expect(assetRes.status).toBe(200);
-      expect(assetRes.headers.get("access-control-allow-origin")).toBe(pluginOrigin);
+      expect(assetRes.headers.get("access-control-allow-origin")).toBe(gatewayPluginOrigin);
+      expect(assetRes.headers.get("access-control-allow-credentials")).toBe("true");
       expect(assetRes.headers.get("x-frame-options")).toBeNull();
       expect(await assetRes.text()).toContain("export const ok = true;");
 
-      // Preflight OPTIONS from plugin:// origin succeeds.
+      // Asset request via loopback HTTP gateway port succeeds, while unauthenticated root HTML read from another port is blocked.
+      const gwAssetRes = await fetch(`${sidecar.url}/assets/index.js`, {
+        headers: { Origin: gatewayLoopbackOrigin },
+      });
+      expect(gwAssetRes.status).toBe(200);
+
+      const unauthRoot = await fetch(`${sidecar.url}/`, {
+        headers: { Origin: gatewayLoopbackOrigin },
+      });
+      expect(unauthRoot.status).toBe(403);
+
+      const authRoot = await fetch(`${sidecar.url}/`, {
+        headers: {
+          Origin: gatewayLoopbackOrigin,
+          "X-Sidecar-Token": "origin-test-token",
+        },
+      });
+      expect(authRoot.status).toBe(200);
+
+      // Preflight OPTIONS from plugin:// gateway origin succeeds.
       const preflight = await fetch(`${sidecar.url}/api/invoke`, {
         method: "OPTIONS",
-        headers: { Origin: pluginOrigin },
+        headers: { Origin: gatewayPluginOrigin },
       });
       expect(preflight.status).toBe(204);
-      expect(preflight.headers.get("access-control-allow-origin")).toBe(pluginOrigin);
+      expect(preflight.headers.get("access-control-allow-origin")).toBe(gatewayPluginOrigin);
 
       // Foreign origins are rejected with 403 before reaching upstream.
       const hitsBeforeReject = upstreamHits;
       for (const badOrigin of [
         "https://evil.example",
-        `http://127.0.0.1:${sidecar.port + 1}`,
         `plugin://other--workbench-${sidecar.port}`,
-        `plugin://showai--workbench-${sidecar.port + 1}`,
+        `plugin://other--workbench-${gatewayPort}`,
+        "plugin://showai--workbench-70000",
       ]) {
         const blocked = await fetch(`${sidecar.url}/assets/index.js`, {
           headers: { Origin: badOrigin },
@@ -385,14 +513,17 @@ describe("Antigravity sidecar workbench proxy", () => {
     }
   });
 
-  test("injects preload + bridge scripts, relaxes frame-ancestors, proxies API/SSE, and enforces sidecar token", async () => {
+  test("injects preload + bridge scripts, adapts CSP for plugin:// + blob workers, proxies API/SSE, and enforces sidecar token", async () => {
     const upstream = createServer((req, res) => {
       if (req.url?.startsWith("/api/events")) {
+        const reqUrl = new URL(req.url, "http://127.0.0.1");
         res.writeHead(200, {
           "Content-Type": "text/event-stream",
           "Cache-Control": "no-cache",
         });
-        res.write("data: {\"type\":\"ready\"}\n\n");
+        res.write(
+          `data: ${JSON.stringify({ type: "ready", token: reqUrl.searchParams.get("token") })}\n\n`,
+        );
         res.end();
         return;
       }
@@ -405,6 +536,7 @@ describe("Antigravity sidecar workbench proxy", () => {
             JSON.stringify({
               ok: true,
               auth: req.headers.authorization,
+              leakedSidecarToken: req.headers["x-sidecar-token"] ?? null,
               echo: JSON.parse(body),
             }),
           );
@@ -413,11 +545,12 @@ describe("Antigravity sidecar workbench proxy", () => {
       }
       res.writeHead(200, {
         "Content-Type": "text/html; charset=utf-8",
+        "Referrer-Policy": "no-referrer",
         "Content-Security-Policy":
-          "default-src 'self'; frame-ancestors 'none'; object-src 'none'",
+          "default-src 'self'; script-src 'self' 'unsafe-inline'; worker-src 'self'; connect-src 'self'; frame-ancestors 'none'; object-src 'none'",
       });
       res.end(
-        '<!doctype html><html><head><title>ShowAI</title><script>window.__SHOWAI_LOCAL__={"token":"abc"}</script></head><body><div id="root"></div></body></html>',
+        '<!doctype html><html><head><title>ShowAI</title><script>window.__SHOWAI_LOCAL__={"token":"abc"}</script><script type="module" crossorigin src="./assets/index.js"></script><link rel="modulepreload" crossorigin href="./assets/vendor.js"><link rel="stylesheet" crossorigin href="./assets/index.css"></head><body><div id="root"></div></body></html>',
       );
     });
     await new Promise<void>((done) => upstream.listen(0, "127.0.0.1", done));
@@ -445,13 +578,18 @@ describe("Antigravity sidecar workbench proxy", () => {
     try {
       const rootRes = await fetch(`${sidecar.url}/?project=p1&page=pg1`);
       expect(rootRes.status).toBe(200);
-      expect(rootRes.headers.get("content-security-policy")).toContain(
-        "frame-ancestors *",
-      );
+      const csp = rootRes.headers.get("content-security-policy") ?? "";
+      expect(csp).toContain("frame-ancestors *");
+      expect(csp).toContain("default-src 'self' plugin:");
+      expect(csp).toContain("script-src 'self' plugin: 'unsafe-inline' blob:");
+      expect(csp).toContain("worker-src 'self' plugin: blob:");
+      expect(csp).toContain("connect-src 'self' plugin: data: blob:");
+      expect(rootRes.headers.get("referrer-policy")).toBeNull();
       const html = await rootRes.text();
       expect(html).toContain(
-        '<head><script src="/preload.js"></script><script src="/_antigravity/bridge.js"></script>',
+        '<script src="/preload.js"></script><script src="/_antigravity/bridge.js"></script>',
       );
+      expect(html).not.toContain("crossorigin");
       expect(html).toContain("window.__SHOWAI_LOCAL__");
 
       const bridgeRes = await fetch(`${sidecar.url}/_antigravity/bridge.js`);
@@ -459,7 +597,8 @@ describe("Antigravity sidecar workbench proxy", () => {
       const bridgeJs = await bridgeRes.text();
       expect(bridgeJs).toContain("__SHOWAI_ANTIGRAVITY_HOST__");
       expect(bridgeJs).toContain("addArtifactComment");
-      expect(bridgeJs).toContain("/api/invoke");
+      expect(bridgeJs).toContain("X-Sidecar-Token");
+      expect(bridgeJs).toContain("showai_token");
 
       const healthRes = await fetch(`${sidecar.url}/_antigravity/health`);
       expect(await healthRes.json()).toMatchObject({
@@ -472,18 +611,22 @@ describe("Antigravity sidecar workbench proxy", () => {
         headers: {
           "Content-Type": "application/json",
           Authorization: "Bearer test-token",
+          "X-Sidecar-Token": "secret-sidecar-token",
         },
         body: JSON.stringify({ action: "projects:list", args: {} }),
       });
       expect(await apiRes.json()).toEqual({
         ok: true,
         auth: "Bearer test-token",
+        leakedSidecarToken: null,
         echo: { action: "projects:list", args: {} },
       });
 
-      const sseRes = await fetch(`${sidecar.url}/api/events`);
+      const sseRes = await fetch(
+        `${sidecar.url}/api/events?showai_token=real-showai-tok&token=secret-sidecar-token`,
+      );
       expect(sseRes.headers.get("content-type")).toContain("text/event-stream");
-      expect(await sseRes.text()).toContain('"type":"ready"');
+      expect(await sseRes.text()).toContain('"token":"real-showai-tok"');
 
       // Sidecar agent API requires valid token.
       const unauth = await fetch(`${sidecar.url}/_sidecar/send-message`, {
@@ -520,6 +663,70 @@ describe("Antigravity sidecar workbench proxy", () => {
       await sidecar.close();
     }
   });
+
+  test("compiles multi-chunk ESM workbench entry into a classic IIFE script for plugin:// scheme compatibility", async () => {
+    const webRoot = await makeTempDir("showai-ag-webroot-");
+    await mkdir(join(webRoot, "assets"), { recursive: true });
+    await writeFile(
+      join(webRoot, "assets/lazy.js"),
+      "export const studioLabel = 'ShowAI Studio Ready';\n",
+      "utf8",
+    );
+    await writeFile(
+      join(webRoot, "assets/index-test.js"),
+      `import { studioLabel } from "./lazy.js";
+const assetBase = new URL("./style.css", import.meta.url).href;
+window.__MOUNTED__ = { studioLabel, assetBase, env: import.meta.env };
+`,
+      "utf8",
+    );
+    const indexHtml =
+      '<!doctype html><html><head><script type="module" crossorigin src="./assets/index-test.js"></script><link rel="modulepreload" crossorigin href="./assets/lazy.js"><link rel="stylesheet" crossorigin href="./assets/style.css"></head><body><div id="root"></div></body></html>';
+    await writeFile(join(webRoot, "index.html"), indexHtml, "utf8");
+
+    const upstream = createServer((_req, res) => {
+      res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
+      res.end(indexHtml);
+    });
+    await new Promise<void>((done) => upstream.listen(0, "127.0.0.1", done));
+    const addr = upstream.address();
+    const upstreamPort = typeof addr === "object" && addr ? addr.port : 0;
+    const upstreamUrl = new URL(`http://127.0.0.1:${upstreamPort}/`);
+
+    const sidecar = await startAntigravitySidecar({
+      port: 0,
+      token: "iife-token",
+      backend: {
+        ensure: async () => ({ url: upstreamUrl, home: "/tmp/showai-iife", webRoot }),
+        stop: async () => {},
+        status: () => ({ running: true, url: upstreamUrl.href, home: "/tmp/showai-iife" }),
+      },
+    });
+
+    try {
+      const rootRes = await fetch(`${sidecar.url}/`);
+      expect(rootRes.status).toBe(200);
+      const html = await rootRes.text();
+      expect(html).not.toContain('type="module"');
+      expect(html).not.toContain('rel="modulepreload"');
+      expect(html).toContain('<link rel="stylesheet" href="./assets/style.css">');
+      const bundleMatch = /<script defer src="(\/_antigravity\/workbench\.js\?v=[0-9a-f]+)"><\/script>/.exec(
+        html,
+      );
+      expect(bundleMatch).toBeTruthy();
+
+      const bundleRes = await fetch(`${sidecar.url}${bundleMatch![1]}`);
+      expect(bundleRes.status).toBe(200);
+      expect(bundleRes.headers.get("content-type")).toContain("application/javascript");
+      const bundleJs = await bundleRes.text();
+      expect(bundleJs).toContain("ShowAI Studio Ready");
+      expect(bundleJs).toContain("__SHOWAI_ASSET_URL__");
+      expect(bundleJs).not.toMatch(/\bimport\s*\{/);
+    } finally {
+      await sidecar.close();
+      await new Promise<void>((done) => upstream.close(() => done()));
+    }
+  });
 });
 
 describe("Antigravity committed package validation", () => {
@@ -544,7 +751,7 @@ describe("Antigravity committed package validation", () => {
       name: "showai",
       agentPluginsSpec: false,
       components: {
-        hooks: 1,
+        hooks: 0,
         mcpServers: 1,
         sidecars: 1,
         skills: 6,

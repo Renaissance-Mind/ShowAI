@@ -3,8 +3,6 @@ import { defineMessages } from "../index";
 export default defineMessages("datasets", {
   "zh-CN": {
     shared: "共享数据",
-    sourceLabel: "共享数据 · {name}",
-    openSettings: "共享数据设置",
     menuItem: "共享数据…",
     loading: "正在读取共享数据…",
     saving: "正在保存",
@@ -161,8 +159,6 @@ export default defineMessages("datasets", {
   },
   en: {
     shared: "Shared data",
-    sourceLabel: "Shared data · {name}",
-    openSettings: "Shared data settings",
     menuItem: "Shared data…",
     loading: "Loading shared data…",
     saving: "Saving",

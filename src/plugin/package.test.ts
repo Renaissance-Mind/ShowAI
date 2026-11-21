@@ -61,6 +61,7 @@ async function packageSkill(
     await copyFile(join(root, file), join(fixture, file));
   }
   await symlink(join(root, "node_modules"), join(fixture, "node_modules"), process.platform === "win32" ? "junction" : "dir");
+  await copyFile(join(root, "src/plugin/universal-package.mjs"), join(fixture, "src/plugin/universal-package.mjs"));
   await cp(
     join(root, "plugins/showai/host-adapters"),
     join(fixture, "plugins/showai/host-adapters"),
@@ -94,14 +95,6 @@ async function packageSkill(
     writeFile(
       join(fixture, "plugins/showai/skills/use-showai/SKILL.md"),
       "---\nname: use-showai\ndescription: Connection instructions.\n---\nRead [host](references/host-adapter.md).\n",
-    ),
-    writeFile(
-      join(fixture, "plugins/showai/skills/show-document/SKILL.md"),
-      "---\nname: show-document\ndescription: Foundational presentation instructions.\n---\n<!-- showai-system-workflow:start -->\n<!-- showai-system-workflow:end -->\n",
-    ),
-    writeFile(
-      join(fixture, "plugins/showai/skills/show-visual/SKILL.md"),
-      "---\nname: show-visual\ndescription: Conversation components.\n---\n<!-- showai-visual-principles:start -->\n<!-- showai-visual-principles:end -->\n",
     ),
     writeFile(join(fixture, "src/desktop/assets/icon.svg"), "<svg/>"),
     writeFile(join(fixture, "src/desktop/assets/icon-light.svg"), "<svg/>"),

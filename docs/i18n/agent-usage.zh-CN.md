@@ -43,6 +43,8 @@ showai pages save PAGE --project PROJECT --input revised.showai.json --base-hash
 
 ## 查询目录与参数
 
+在任一宿主展示公共组件都从 show-visual 开始。调用 `public_catalog_list({kind:"component",view:"compact"})`，省略 `limit` 和 `cursor` 即可取全目录，每行给出 ID、名称和使用场景。已知 ID 可直接用 `public_catalog_describe` 的 `view:"guide"` 读用法，再调用 `show_component`。按工作流中的宿主步骤交付。核对未知的显示方式用 `showai_capabilities({view:"presentation"})`，访问项目或持续更新时用完整报告。
+
 ```sh
 showai catalog list --kind component --project PROJECT --json
 showai catalog describe chart --kind component --project PROJECT --view guide --json

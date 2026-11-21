@@ -91,9 +91,10 @@ export function agentSetupPrompt(
       ? `使用私网 OAuth。在同一 tailnet 的设备上将此命令添加为 stdio MCP：${command}。使用本机回环回调并等待我在 ShowAI 允许。`
       : `Use private OAuth. Register this stdio MCP command on your device on the same tailnet: ${command}. Use the local loopback callback and wait for my approval in ShowAI.`;
   } else {
+    const command = `npx -y ${bridge} ${endpoint} --transport http-only`;
     setup = zh
-      ? "配置远程 Streamable HTTP 和 OAuth 自动发现及动态客户端注册，按服务声明完成授权。"
-      : "Configure remote Streamable HTTP with OAuth discovery and dynamic client registration, then complete the advertised authorization flow.";
+      ? `支持 URL 的客户端配置 Streamable HTTP 和 OAuth 动态注册。Grok Bot 或其他仅有 Command / stdio 的入口，可在能打开授权页并接收回环回调的设备运行：${command}。在 ShowAI 对照连接编号批准。若 Grok Bot 无法完成公网 OAuth，询问其设备是否能通过同一 Tailscale 私网连接。`
+      : `For URL clients, use Streamable HTTP and OAuth dynamic registration. In a Command / stdio entry such as Grok Bot, run ${command} on a device that can open the authorization page and receive the loopback callback. Match the connection number in ShowAI before approving. If the bot cannot complete public OAuth, ask whether its device can join the same tailnet.`;
   }
   return zh
     ? `请为你自己接入 ShowAI：${endpoint} 。${setup}复用地址和传输方式都匹配的连接，保留其他连接。配置完成后实际调用 projects_list，等待批准时自动重试，只告诉我项目数量或具体失败原因。`

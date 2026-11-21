@@ -38,13 +38,28 @@ async function expectedWorkflowHashes(
   common: Record<string, string>,
   profile: string,
 ) {
+  const expected = { ...common };
+  const adapter = await readFile(
+    join(source, "host-adapters", profile + ".md"),
+    "utf8",
+  );
+  const slot =
+    /<!-- showai-host-delivery:start -->[\s\S]*?<!-- showai-host-delivery:end -->/;
+  const delivery = adapter.match(slot)?.[0];
+  expect(delivery).toBeTruthy();
+  for (const file of ["show-visual/SKILL.md", "show-document/SKILL.md"]) {
+    const commonWorkflow = await readFile(join(source, "skills", file), "utf8");
+    expect(commonWorkflow).toMatch(slot);
+    const bound = commonWorkflow.replace(slot, () => delivery!);
+    expected[file] = createHash("sha256").update(bound).digest("hex");
+  }
   const noteName =
     profile === "codex"
       ? "codex-entry.md"
       : profile === "antigravity"
         ? "antigravity-entry.md"
         : undefined;
-  if (!noteName) return common;
+  if (!noteName) return expected;
   const entry = "use-showai/SKILL.md";
   const original = await readFile(join(source, "skills", entry), "utf8");
   const note = await readFile(
@@ -53,7 +68,7 @@ async function expectedWorkflowHashes(
   );
   const bound = original.trimEnd() + "\n\n" + note;
   return {
-    ...common,
+    ...expected,
     [entry]: createHash("sha256").update(bound).digest("hex"),
   };
 }
@@ -67,6 +82,14 @@ describe("host-specific plugin distributions", () => {
       "mcp-app",
     );
     expect(HOST_PROFILES.codex).toBe("mcp-app");
+    expect(HOST_PROFILES.antigravity).toBe("mcp-app");
+    const antigravityConfig = JSON.parse(
+      await readFile(resolve("plugins/showai-antigravity/mcp_config.json"), "utf8"),
+    );
+    expect(antigravityConfig.mcpServers.showai.env).toMatchObject({
+      SHOWAI_HOST_DISPLAY: "mcp-app",
+      SHOWAI_ANTIGRAVITY_WORKBENCH: "1",
+    });
     const common = Object.fromEntries(
       Object.entries(await skillFiles(join(source, "skills"))).filter(
         ([name]) => name !== HOST_GUIDE,
@@ -117,7 +140,7 @@ describe("host-specific plugin distributions", () => {
       ).version,
     ).toBe(version);
   });
-  test("all profiles share identical workflows, bind only their own guide and remove stale skills", async () => {
+  test("each profile binds its delivery steps in both workflows and removes stale skills", async () => {
     const target = await directory();
     const original = await skillFiles(join(source, "skills"));
     const common = Object.fromEntries(
@@ -136,6 +159,10 @@ describe("host-specific plugin distributions", () => {
         ),
       ).toEqual(await expectedWorkflowHashes(common, profile));
       expect(receipt.commonFiles).toEqual(common);
+      expect(receipt.workflowFiles).toEqual({
+        "show-document/SKILL.md": actual["show-document/SKILL.md"],
+        "show-visual/SKILL.md": actual["show-visual/SKILL.md"],
+      });
       const adapter = await readFile(
         join(target, "skills", HOST_GUIDE),
         "utf8",
@@ -149,8 +176,10 @@ describe("host-specific plugin distributions", () => {
         "utf8",
       );
       expect(entrySkill.includes("## Codex 工作台")).toBe(profile === "codex");
-      expect(entrySkill.includes("`card_present`")).toBe(profile === "codex");
-      expect(entrySkill.includes("## Antigravity 侧栏工作台与自动预览")).toBe(
+      expect(entrySkill.includes("`card_present`")).toBe(
+        profile === "codex" || profile === "antigravity",
+      );
+      expect(entrySkill.includes("## Antigravity 工作台与页面卡片")).toBe(
         profile === "antigravity",
       );
       if (profile !== "codex") expect(adapter).not.toContain("visualize");
@@ -178,12 +207,23 @@ describe("host-specific plugin distributions", () => {
       const launch = JSON.parse(await readFile(join(target, manifest), "utf8"))
         .mcpServers.showai;
       expect(launch.env.SHOWAI_HOST_DISPLAY).toBe(first.declaredHostDisplay);
+      if (profile === "antigravity") {
+        expect(launch.tools).toEqual({
+          public_catalog_list: { eager: true },
+          public_catalog_describe: { eager: true },
+          show_component: { eager: true },
+        });
+      } else expect(launch.tools).toBeUndefined();
       for (const other of ["mcp.json", ".mcp.json", "mcp_config.json"].filter(
         (name) => name !== manifest,
       ))
         expect(await readdir(target)).not.toContain(other);
       expect(await readdir(target)).not.toContain("host-adapters");
       if (profile === "antigravity") {
+        expect(launch.env.SHOWAI_ANTIGRAVITY_WORKBENCH).toBe("1");
+        const pluginEntries = await readdir(target);
+        expect(pluginEntries).not.toContain("hooks");
+        expect(pluginEntries).not.toContain("hooks.json");
         const pluginManifest = JSON.parse(
           await readFile(join(target, "plugin.json"), "utf8"),
         );
@@ -195,11 +235,6 @@ describe("host-specific plugin distributions", () => {
         expect(pluginManifest.$schema).toBeUndefined();
         expect(pluginManifest.extensions).toBeUndefined();
         expect(pluginManifest.suggestedPrompts).toHaveLength(3);
-        const hooks = JSON.parse(
-          await readFile(join(target, "hooks.json"), "utf8"),
-        );
-        expect(hooks["showai-preview"].PostToolUse).toHaveLength(1);
-        expect(hooks["showai-preview"].PreInvocation).toHaveLength(1);
         const sidecar = JSON.parse(
           await readFile(join(target, "sidecars/workbench/sidecar.json"), "utf8"),
         );

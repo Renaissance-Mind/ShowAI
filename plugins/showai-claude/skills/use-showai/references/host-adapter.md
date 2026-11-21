@@ -1,5 +1,13 @@
 # Claude Code 展示适配
 
+<!-- showai-host-delivery:start -->
+
+- 当前连接的三个公共展示工具标记为预加载。若用户的 Claude Code 设置启用了强制延迟加载，可用 ToolSearch 一次选择所需工具。按当前 HTML 展示工具的调用要求，将 `show_component` 以 `delivery:"auto"` 返回的 `delivery.compact` 原样交给它。
+- 新作品保存后用 `page_present`，按 `conversation.next` 展示 `conversation.fragment`，给出 `openUrl`。续改说明所改内容、项目与原页链接。
+- 收到 `image`、`too-large`、`unavailable` 或阅读器加载失败时查完整宿主适配。
+
+<!-- showai-host-delivery:end -->
+
 此插件声明 `SHOWAI_HOST_DISPLAY=model-html`：用户只能看到模型交给宿主 HTML 展示工具的内容。用户要图、示意图、流程图或其他可视化时，用 show_component 生成，再把返回的片段交给宿主的 HTML 展示工具显示。目录里没有合适的组件时，按 show-visual「选组件」一步的做法处理。首次展示前核对当前会话实际暴露的 HTML 展示工具（例如 show_widget）及其契约，例如它要求先调用的 read_me；不因宿主名称就假设某个工具已经存在。
 
 show_component 使用 `delivery:"auto"`。返回 compact 时，将 `delivery.compact` 的完整片段原样交给 HTML 展示工具，不要把 HTML 当正文发送。片段从公共 CDN 加载阅读器。返回 image 时，图片只在工具结果里，用户不一定能看到：按 warnings 告诉用户这次无法在对话里交互展示及原因（例如运行时没有 CDN 阅读器），用户需要保留时转 show-document 保存后给出 openUrl。

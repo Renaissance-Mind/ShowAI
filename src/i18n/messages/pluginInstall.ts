@@ -115,6 +115,8 @@ export default defineMessages("pluginInstall", {
     noDetectedAgents: "暂未在本机检测到已安装的外部 Agent",
     noDetectedAgentsDetail: "可展开下方支持列表，或为未检测到的客户端手动指定路径。",
     dshStepsButton: "查看安装步骤",
+    exportUniversal: "导出通用插件",
+    universalSaved: "通用插件已保存到 {path}",
   },
   en: {
     "rescanHost": "Check {host} again",
@@ -234,5 +236,7 @@ export default defineMessages("pluginInstall", {
     noDetectedAgents: "No external Agents detected on this computer",
     noDetectedAgentsDetail: "Expand the supported list below or set a CLI path manually.",
     dshStepsButton: "Setup steps",
+    exportUniversal: "Export universal plugin",
+    universalSaved: "Universal plugin saved to {path}",
   },
 });

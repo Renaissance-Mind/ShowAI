@@ -8,6 +8,9 @@
   padding: clamp(10px, 3vmin, 32px);
   background: var(--dialog-scrim, rgb(32 34 47 / 27%));
 }
+.studio:has(.studio-modal-shade) :is(.studio-window-topbar, .studio-topbar) {
+  -webkit-app-region: no-drag;
+}
 .studio-modal {
   --dialog-pad: clamp(14px, 2.5vw, 20px);
   --dialog-ink: var(--dialog-accent, var(--accent));

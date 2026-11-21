@@ -2,7 +2,7 @@
 
 **语言：** [English](../agent-integration.md) | 简体中文 · [文档目录](index.zh-CN.md)
 
-所有宿主的 Agent 文档操作统一使用 MCP，操作方法从已安装的 use-showai Skill 及其参考文件读取。连接信息未知或变化时查询一次 showai_capabilities，复用当前连接的结果；它提供运行时能力和限制，工作流由 Skill 提供。本机插件提供 stdio launcher，远程连接使用 HTTP；CLI 面向服务配置、脚本与运维。
+所有宿主都通过 MCP 操作 ShowAI。展示内置组件直接从 `show-visual` 开始，项目归属和其他工作流从 `use-showai` 开始。本机专用插件随 Skills 提供 stdio 启动配置。通用插件使用宿主里手动添加的本机 stdio 或可达的 HTTP MCP 连接。
 
 正式内容先保存到项目，再按宿主适配交付。明确要求独立文件时使用 render_document。本机 library 连接每次携带 projectId，只读发现用 projects_list，新正式内容可用 project_resolve 与可信宿主绝对目录定位。绑定项目连接沿用其身份。
 
@@ -15,7 +15,7 @@
 ```sh
 showai runtime info --json
 showai guide integration --json
-showai public list --kind component --query chart --json
+showai public list --kind component --view compact --json
 showai public describe chart --view schema --json
 showai render --input presentation.json --out /absolute/output/page.html --json
 showai mcp --public
@@ -52,6 +52,19 @@ showai mcp serve \
 
 ## 工具与授权
 
+本机 stdio 与远程 HTTP 共用三步：用 `public_catalog_list({kind:"component",view:"compact"})` 选组件，读所选 ID 的 guide，调用 `show_component`。已知 ID 可直接读 guide。交付方式已绑定时直接展示。只需核对未知连接的显示方式时，`showai_capabilities({view:"presentation"})` 返回显示声明与组件数上限。项目访问、持续更新等能力见默认的完整报告。
+
+| 客户端 | 三个公共展示工具的加载方式 |
+| --- | --- |
+| Claude Code | 服务端用 `_meta["anthropic/alwaysLoad"]` 标记三个工具，用户显式设置具有优先权。[工具加载说明](https://code.claude.com/docs/en/mcp#mark-a-tool-to-load-upfront-or-stay-deferred) |
+| Antigravity | 安装包在 `mcp_config.json` 为三个工具声明 eager。[预加载说明](https://antigravity.google/docs/mcp#configure-eager-tools) |
+| Codex | 当前可见时直接调用。开启工具搜索时，在一次查询里给出所需工具名。 |
+| Kimi Work | 直接使用已注册的工具。如果会话提供 `select_tools`，可一次选取需要的工具。 |
+| DeepSeek Harness | 自带的 MCP 客户端在连接时注册工具。 |
+| ChatGPT MCP Apps 及其他 HTTP 客户端 | 服务通过 `tools/list` 提供相同的工具声明，加载与显示由客户端控制。未安装 Skill 的客户端可按工具描述执行。 |
+
+ShowAI 内置 Agent 直接收到轻量组件索引，其中保留项目组件的作用域、版本和指纹。可从索引选择内置组件，文字界面可交付本机预览实际返回的文件链接。
+
 公共工具包括 showai_capabilities、public_catalog_list/describe、render_document、show_component、presentation_source。presentation_source 分块取回公共渲染输入，不公开私有页面导出。匿名调用不会读取个人内容库。
 
 HTTP 私有工具沿用项目操作名，显式传 projectId 并检查 OAuth。projects_list 每次读取当前成员权限。项目范围 grant 仅允许原项目；账号范围包含后续项目。project_create 还需 projects.create，创建并同步后返回服务器 ID；同一 operationId UUID 用于同一请求重试。
@@ -78,13 +91,7 @@ OAuth 提供发现、DCR、S256 PKCE、resource 绑定、过期访问 token、�
 
 对话预览优先带压缩本地阅读器；超预算后可使用固定版本的在线阅读器，从 ShowAI reader 源、jsDelivr、unpkg 加载。delivery.compact 面向模型写 HTML 的宿主。reader:bundled 与 SHOWAI_READER_CDN=off 禁止在线回退；reader:cdn 明确联网。预览链接一小时到期，应保存到项目或保留源数据。纯文本宿主可以交付完整 HTML/source 和项目回执。
 
-远程插件包可由以下命令生成：
-
-```sh
-npm run package:plugin -- --mcp-url https://agent.example.com/mcp --out /absolute/new/showai-plugin
-```
-
-生成 showai-cloud，复用相同 Skill 与资源，使用 HTTP/OAuth 替代本机 launcher。ChatGPT 网页安装带完整 Skill 的插件并连接其中的 MCP App。本机安装仍使用 plugin:update；公共提交与组织审核是独立流程。
+可在桌面「设置 → 插件 → 导出通用插件」取得 ZIP，也可以用 `npm run package:plugin -- --out NEW_DIRECTORY` 生成目录。安装六个 Skills 后，在宿主手动添加 MCP。可选的 ChatGPT Personal 导出可引用已经注册的连接。旧命令提供的 `--mcp-url` 仅写入 README 供手动填写。见[在 Agent 中使用](https://showai.renaissancemind.ai/doc/agent-hosts)。
 
 ## 已保存页面的展示约定
 

@@ -1,7 +1,6 @@
 import {
   access,
   copyFile,
-  cp,
   mkdir,
   readFile,
   readdir,
@@ -14,9 +13,11 @@ import { parseTemplateReadme } from "../src/portable/template-bundle.mjs";
 import { packageSkillFormats } from "./package-skill-formats.mjs";
 import {
   bindHostSkills,
+  bindWorkflowDelivery,
   stageHostPlugin,
   writeHostLauncher,
 } from "../src/plugin/host-package.mjs";
+import { universalPluginFiles } from "../src/plugin/universal-package.mjs";
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const plugin = join(root, "plugins/showai");
 await packageSkillFormats();
@@ -35,7 +36,7 @@ for (let i = 0; i < args.length; i += 2) {
     !args[i + 1]
   )
     throw new Error(
-      "Usage: package-plugin.mjs [--mcp-url HTTPS_MCP_URL --out NEW_PACKAGE_DIRECTORY [--name PLUGIN_NAME] [--display-name NAME] [--chatgpt-app asdk_app_ID]]",
+      "Usage: package-plugin.mjs [--out NEW_PACKAGE_DIRECTORY [--mcp-url MANUAL_SETUP_HINT] [--name PLUGIN_NAME] [--display-name NAME] [--chatgpt-app asdk_app_ID]]",
     );
   settings[args[i]] = args[i + 1];
 }
@@ -56,6 +57,11 @@ const manifest = JSON.parse(
 await copyFile(
   join(plugin, "host-adapters/mcp-app.md"),
   join(plugin, "skills/use-showai/references/host-adapter.md"),
+);
+await bindWorkflowDelivery(
+  join(plugin, "skills"),
+  join(plugin, "skills"),
+  await readFile(join(plugin, "host-adapters/mcp-app.md"), "utf8"),
 );
 const workflowSource = await readFile(
   join(root, "resources/templates/system-presentation/README.md"),
@@ -145,8 +151,7 @@ await writeFile(
     2,
   ) + "\n",
 );
-if (manifest.apps)
-  throw new Error("Use an explicit MCP URL when packaging remote connections.");
+
 await mkdir(join(plugin, "assets"), { recursive: true });
 for (const [source, target] of [
   ["icon.svg", "logo.svg"],
@@ -222,124 +227,30 @@ await bindHostSkills({ source: plugin, target: kimi, profile: "kimi" });
 await mkdir(join(kimi, "mcp"), { recursive: true });
 await copyFile(join(plugin, "mcp/launch.mjs"), join(kimi, "mcp/launch.mjs"));
 await validateGuidanceLinks(join(kimi, "skills"), kimi);
-if (settings["--mcp-url"] || settings["--out"]) {
-  if (!settings["--mcp-url"] || !settings["--out"])
-    throw new Error("Remote packaging requires both --mcp-url and --out.");
-  const url = new URL(settings["--mcp-url"]);
-  if (
-    url.protocol !== "https:" ||
-    url.username ||
-    url.password ||
-    url.search ||
-    url.hash
-  )
-    throw new Error(
-      "Use a public HTTPS MCP URL without credentials or query parameters.",
-    );
+if (Object.keys(settings).length) {
+  if (!settings["--out"]) throw new Error("Use --out NEW_DIRECTORY for a universal plugin.");
   const destination = resolve(settings["--out"]);
   const relativeDestination = relative(plugin, destination);
-  if (
-    !relativeDestination ||
-    (!isAbsolute(relativeDestination) &&
-      relativeDestination !== ".." &&
-      !relativeDestination.startsWith(".." + sep))
-  )
+  if (!relativeDestination || (!isAbsolute(relativeDestination) &&
+      relativeDestination !== ".." && !relativeDestination.startsWith(".." + sep)))
     throw new Error("Package outside the source plugin.");
-  const name = settings["--name"] ?? `${manifest.name}-cloud`;
-  if (!/^[a-z0-9][a-z0-9_-]*$/.test(name))
-    throw new Error("Use a lowercase plugin name such as showai-cloud.");
-  const app = settings["--chatgpt-app"];
-  if (app !== undefined && !/^asdk_app_[A-Za-z0-9]+$/.test(app))
-    throw new Error(
-      "--chatgpt-app takes the asdk_app_… ID of the ChatGPT connection.",
-    );
+  const { name, files } = await universalPluginFiles(plugin, {
+    name: settings["--name"] ?? (settings["--mcp-url"] ? "showai-cloud" : "showai-universal"),
+    displayName: settings["--display-name"],
+    appId: settings["--chatgpt-app"],
+    setupUrl: settings["--mcp-url"],
+  });
   await mkdir(destination, { recursive: false });
-  await cp(plugin, destination, {
-    recursive: true,
-    errorOnExist: true,
-    filter: (source) =>
-      !["mcp", "host-adapters"].includes(
-        relative(plugin, source).split(sep)[0],
-      ),
-  });
-  await bindHostSkills({
-    source: plugin,
-    target: destination,
-    profile: "mcp-app",
-  });
-  const remote = structuredClone(manifest);
-  remote.name = name;
-  const openai = remote.extensions["com.openai"];
-  Object.assign(openai.interface, {
-    displayName:
-      settings["--display-name"] ?? `${openai.interface.displayName} Cloud`,
-    shortDescription: "Create and present ShowAI pages in your cloud projects",
-    longDescription:
-      "Operate ShowAI through its remote MCP server. Sign in with a ShowAI Server account to read, create and present pages in authorized cloud projects; public components, templates and standalone rendering need no account.",
-  });
-  await rm(join(destination, "mcp.json"));
-  if (app) {
-    openai.apps = "./.app.json";
-    await writeFile(
-      join(destination, ".app.json"),
-      JSON.stringify({ apps: { [name]: { id: app } } }, null, 2) + "\n",
-    );
-  } else
-    await writeFile(
-      join(destination, "mcp.json"),
-      JSON.stringify(
-        {
-          $schema: "https://agent-plugins.org/schemas/1.0.0/mcp.schema.json",
-          mcpServers: {
-            showai: {
-              type: "streamable-http",
-              url: url.href,
-              extensions: {
-                "com.openai": {
-                  auth: { type: "mixed", client: { mode: "dcr" } },
-                },
-              },
-            },
-          },
-        },
-        null,
-        2,
-      ) + "\n",
-    );
-  await writeFile(
-    join(destination, "plugin.json"),
-    JSON.stringify(remote, null, 2) + "\n",
-  );
-  await writeFile(
-    join(destination, "README.md"),
-    `# ShowAI Cloud plugin
-
-This package connects the ShowAI skills to the remote MCP server at ${url.href}. It has no local launcher and reads no content library on this computer.
-
-Public components, templates and standalone rendering work without an account. Private projects require signing in with an existing ShowAI Server account (GitHub, Google or account password) and granting access to one project or to every project the account can reach. Projects created on a computer appear here after they synchronize to the same server account.
-
-${app ? `ChatGPT reaches the server through its registered connection \`${app}\`.` : "Hosts connect to the server directly and use OAuth with dynamic client registration."} Read [use-showai](skills/use-showai/SKILL.md) for connection identity, project selection and task routing; the remote rules are in [connection setup](skills/use-showai/references/runtime.md#远程). No credentials enter the bundle.
-`,
-  );
-  if (app) {
-    await rm(join(destination, ".claude-plugin"), { recursive: true });
-    await rm(join(destination, ".mcp.json"));
-  } else {
-    const claude = JSON.parse(
-      await readFile(join(destination, ".claude-plugin/plugin.json"), "utf8"),
-    );
-    await writeFile(
-      join(destination, ".claude-plugin/plugin.json"),
-      JSON.stringify({ ...claude, name }, null, 2) + "\n",
-    );
-    await writeFile(
-      join(destination, ".mcp.json"),
-      JSON.stringify(
-        { mcpServers: { showai: { type: "http", url: url.href } } },
-        null,
-        2,
-      ) + "\n",
-    );
+  try {
+    for (const [file, contents] of files) {
+      const path = join(destination, file);
+      await mkdir(dirname(path), { recursive: true });
+      await writeFile(path, contents);
+    }
+    await validateGuidanceLinks(join(destination, "skills"), destination);
+  } catch (error) {
+    await rm(destination, { recursive: true, force: true });
+    throw error;
   }
-  console.log(`Prepared remote plugin from the same skills: ${destination}`);
+  console.log(`Prepared ${name} in ${destination}. Configure the MCP connection in the host.`);
 }

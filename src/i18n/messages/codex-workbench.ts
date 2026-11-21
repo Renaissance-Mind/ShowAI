@@ -39,6 +39,7 @@ export default defineMessages("codex-workbench", {
     antigravityReference: "引用到 Antigravity 对话",
     antigravityReferenced: "已添加到 Antigravity 对话 · {version}",
     antigravityUnavailable: "当前 Antigravity 宿主未提供对话引用接口",
+    antigravityQueued: "已在工作台定位，点击右侧工具栏 ShowAI 图标即可查看",
   },
   en: {
     loading: "Opening ShowAI…",
@@ -78,5 +79,6 @@ export default defineMessages("codex-workbench", {
     antigravityReference: "Reference in Antigravity chat",
     antigravityReferenced: "Added to Antigravity chat · {version}",
     antigravityUnavailable: "This Antigravity host does not provide conversation references",
+    antigravityQueued: "Queued in Workbench — click the ShowAI icon in the right toolbar to view",
   },
 });

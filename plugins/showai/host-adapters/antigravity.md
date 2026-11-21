@@ -1,37 +1,48 @@
 # Antigravity 展示适配
 
-此插件面向 Antigravity 2.0，声明 `SHOWAI_HOST_DISPLAY=fragment-file`，同时内置 **ShowAI 侧栏工作台 Sidecar**（`sidecar://showai/workbench/`）与 **预览自动暂存 Hook**。
+<!-- showai-host-delivery:start -->
 
-## 1. 侧栏实时工作台（推荐用于已保存页面与深度编辑）
+- 临时组件用 `show_component` 的 `delivery:"auto"` 在 MCP Apps 原生视图直接展示。视图已挂在工具调用处，回复只补充图中的结论，**不要再输出 `<agent-embed>` 或复制 `.inline.html`**。
+- 新建或续改保存成功后，用最终回执的项目和页面 ID 调用 `card_present` 交付原页卡片；同一页只交付一次，多页放入同一次调用的 `additionalTargets`。
+- 用户明确要求在消息里阅读原页或片段时用 `page_present`（按需传 `blockIds`）；要求在右侧/侧栏工作台打开页面或跳到某组件时用 `card_navigate`。缺少卡片工具或原生视图未出现时查完整宿主适配。
 
-ShowAI 在 Antigravity 右侧 Auxiliary Pane 运行完整实时工作台，支持直接编辑、浏览项目、自动关联当前打开的代码仓库，并支持把选区或组件一键「引用到 Antigravity 对话」。
+<!-- showai-host-delivery:end -->
 
-- **新建或修改已保存页面后**：在回复中给出侧栏直达胶囊（指向当前保存的 `projectId` 与 `pageId`，定位到具体块时附加 `&block=<blockId>`），同时给出项目名称与 `openUrl`：
+## 本轮结果怎样交付
 
-  ```markdown
-  [在 ShowAI 工作台打开《页面标题》](sidecar://showai/workbench/?project=<projectId>&page=<pageId>)
-  ```
+本机 Antigravity 插件声明 `SHOWAI_HOST_DISPLAY=mcp-app` 与 `SHOWAI_ANTIGRAVITY_WORKBENCH=1`，并在右侧 Auxiliary Pane 内置实时 **ShowAI 工作台 Sidecar**（`sidecar://showai/workbench/`）。以下调用以当前连接实际提供的工具为准。
 
-- **用户要求“打开 ShowAI”“打开这页”“跳到那个组件”时**：直接输出对应的 `sidecar://showai/workbench/...` 胶囊（未指定页面时用 `[打开 ShowAI 工作台](sidecar://showai/workbench/)`）。
-- **收到用户从侧栏发来的引用（Artifact Comment / `showai.reference`）时**：按 [用户引用](user-references.md) 提取其中的 `projectId`、`pageId`、`blockIds` 与版本基线，调用 `page_read` 核对后再执行修改或回答。
+| 用户要的结果 | 在 Antigravity 中的交付 |
+| --- | --- |
+| 在聊天里看图、比较或试用组件 | 按 show-visual 用 `show_component`（`delivery:"auto"`）在 MCP Apps 原生视图内嵌展示，临时展示无需建页。 |
+| 新建作品、修改已有页，或把刚才的组件保存成页 | 从本轮最终保存回执核对项目和原页，保存成功后用同一连接调用一次 `card_present` 交付原页卡片。 |
+| 在右侧打开已保存页面或跳转到某个组件 | 调用 `card_navigate`；面板未打开返回 `queued` 时附上 `sidecar://showai/workbench/...` 胶囊。 |
+| 明确要在消息里阅读已保存页面的正文或片段 | 用 `page_present` 的 MCP Apps 阅读器，看指定片段时传对应的 `blockIds`。用户同时要卡片和预览时再交付两者。 |
+| 只要文件 | 导出已保存的作品用 `page_export`；直接生成完整独立文件且无需入库时用 `render_document`。 |
 
-## 2. 对话内嵌视图（`<agent-embed>`）
+**避免重复展示**：Antigravity 原生渲染附带 `ui://` 资源的 MCP 工具调用（`show_component`、`card_present`、`page_present`、`render_document`）。当回执 `delivery.mode === "mcp-app"` 时，视图已经在工具调用步骤显示，**禁止再把 `.inline.html` 复制到 Artifact 目录，也禁止再输出 `<agent-embed>`**，否则同一视图会在消息前后出现两次。
 
-Antigravity 对话内嵌视图禁止加载外部公共 CDN，只能呈现 `display.reader` 为 `bundled` 的自包含离线 HTML，且文件必须位于当前会话的 Artifact 目录（`<Artifact Directory>`）。
+连接缺少 `card_present`（例如旧版运行时）时，新建或续改保存成功后给出侧栏工作台直达胶囊 `[在 ShowAI 工作台打开《页面标题》](sidecar://showai/workbench/?project=<projectId>&page=<pageId>)`、项目名称与 `openUrl`。
 
-### 自动暂存（默认路径）
+## 页面卡片与侧栏实时工作台
 
-调用 `show_component`（`delivery:"auto"`）、`page_present` 或 `render_document` 后，插件内置 Hook 会自动检测 `bundled` 预览片段，将其包装为带 Antigravity 亮暗主题同步（`themechange`）的完整离线 HTML，写入 `<Artifact Directory>`，并在下一轮回复前把可直接使用的 `<agent-embed src="file:///..."></agent-embed>` 路径注入系统消息。
+交付已保存的作品，或用户索取指定页面或组件的卡片时，调用 `card_present({projectId, pageId, blockId?, description?, additionalTargets?, adjustSpacing?})`：
 
-- **收到 Hook 注入的暂存路径时**：直接在回复中单独一行输出该 `<agent-embed>`，**不要再调用 `run_command` 执行 `cp`，也不要用 `read_file` / `write_file` 逐字转写**。
-- **内嵌与侧栏的分工**：
-  - **紧凑可视化**（`show_component` 1–5 个组件，或高度约 `<= 450px` 的局部高亮）：用 `<agent-embed>` 内嵌在对话中，方便直接查看与交互。
-  - **完整长文档 / 多章节已保存页面**（`page_present`）：优先给出 `sidecar://showai/workbench/?project=<projectId>&page=<pageId>` 侧栏工作台胶囊与 `openUrl`；仅在页面本身很紧凑，或需要展示其中 1–3 个关键块（传 `blockIds`）时才在对话里叠加 `<agent-embed>`，避免把整份长文塞进窄小的滚动框。
-  - `render_document` 额外给出完整离线文件 `delivery.html` 路径。
+- 卡片默认展示页面标题、项目与目录路径。可用可选的 `description` 总结新页看点或本轮改动（最多 1000 个字符）。
+- 需要直达具体组件时，通过 `page_read`（`detail:"outline"`，仅靠大纲不足以区分块语义时用 `rendered:false, response:"source"`）核实真实的 `blockId` 传入；省略 `description` 时组件卡片正文显示组件标题。
+- 同一页在一轮里保存多次只交付最终结果的一张卡片；一轮完成多页或需并列交付多张卡片时，第一张放在顶层，其余按顺序放入同一次调用的 `additionalTargets`（每项含 `{projectId, pageId, blockId?, description?}`）。
+- 用户要求手动调节卡片间距时，在顶层传 `adjustSpacing:true`；普通卡片使用默认布局。
+- 点击卡片上的「侧边打开」（或下拉菜单中的「从工作台打开」），右侧已打开的 ShowAI 工作台会通过实时事件原地跳转到该页面或组件；下拉菜单中的「从 ShowAI App 打开」会在桌面端 ShowAI App 打开对应页面与组件。
 
-### 回退路径（未触发 Hook 或超出内联预算时）
+用户说「帮我在右侧打开这页」「跳到那个组件」时，调用 `card_navigate({projectId, pageId, blockId?})`（无需再额外调用 `card_present`）：
 
-- **Hook 未暂存但 `display.reader === "bundled"`**：用 `cp` 将 `delivery.inline` 原样复制到 `<Artifact Directory>/showai-preview.html`，再输出 `<agent-embed src="file:///实际复制后的Artifact绝对路径"></agent-embed>`。
-- **`display.reader === "cdn"` 或存在 `inlineError`**：说明内联片段超出离线阅读器预算（常见原因是嵌入大图），`<agent-embed>` 无法联网加载阅读器。已保存页面直接给出 `sidecar://showai/workbench/?project=<projectId>&page=<pageId>` 胶囊（侧栏工作台无内联体积限制，可完整交互查看）、`openUrl` 与 `delivery.html`；确需对话内嵌摘要时，用 `page_read`（`detail:"outline"`）选 1–3 个不含大图的关键块带 `blockIds` 再调一次 `page_present`。
+- 返回 `status: "accepted"` 表示右侧已打开的 ShowAI 工作台已即时接收跳转，直接回复确认即可。
+- 返回 `status: "queued"` 表示右侧工作台面板当前未展开，跳转目标已暂存；此时在回复中附上侧栏胶囊 `[在 ShowAI 工作台打开《页面标题》](sidecar://showai/workbench/?project=<projectId>&page=<pageId>)`（定位块时附加 `&block=<blockId>`；未指定页面仅需打开工作台时用 `[打开 ShowAI 工作台](sidecar://showai/workbench/)`），用户点击胶囊展开侧栏后即自动落到目标位置。
 
-不要手写或改写 ShowAI 生成的 HTML，不把未经暂存到 Artifact 目录的临时路径直接写进 `<agent-embed>`，也不输出其他宿主的展示指令。工具调用、文件暂存与实际显示分别核对；正文只补充必要结论。
+收到用户从右侧工作台点击「引用到 Antigravity 对话」发来的引用（Artifact Comment / `showai.reference`）时，按[用户引用](user-references.md)提取其中的 `projectId`、`pageId`、`blockIds` 与版本基线，调用 `page_read` 核对后再执行修改或回答。
+
+## 分批生成与回退路径
+
+- **分批持续更新**：用户要求边生成边看或内容分批到达时，按 show-visual 的持续更新流程调用 `show_component({kind, data, live:true, delivery:"mcp-app"})`，后续用同一 `viewId` 调用 `show_component_update`，最后传 `complete:true`。内容已齐的小任务直接一次展示。
+- **超出内联预算**：当 `page_present` 出现 `inlineError` 或页面过大时，优先交付 `card_present`（侧栏工作台无内联体积限制，可完整交互查看与编辑）；确需在对话内嵌局部摘要时，用 `page_read`（`detail:"outline"`）选 1–3 个不含大图的关键块传 `blockIds` 再调 `page_present`。
+- **仅当宿主明确无法显示 MCP Apps 或用户点名要求独立 Artifact 嵌入文件时**：才显式传 `delivery:"fragment-file"`，在确认 `display.reader === "bundled"` 后将 `delivery.inline` 复制到当前会话 `<Artifact Directory>` 下再输出 `<agent-embed src="file:///..."></agent-embed>`；不要手写或改写 ShowAI 生成的 HTML。

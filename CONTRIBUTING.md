@@ -53,7 +53,7 @@ Use native elements with `showai-select`, `showai-input`, `showai-textarea`, `sh
 
 Use the shared `Dialog` for dismissible forms and confirmations. Keep the title short, center explanatory copy and use spacing before the actions. Settings actions use `useNotify()` for short-lived results and optional undo. Keep input errors with their field and offer details when recovery needs them.
 
-Copy the [independent UI acceptance template](examples/ui-acceptance/README.md) for a task-owned preview with numbered controls, an action list and a flow tree that opens working states. For reusable ShowAI workbench scenarios, see [UI Lab](docs/ui-lab.md).
+Copy the [independent UI acceptance template](examples/ui-acceptance/README.md) for a task-owned preview with numbered controls, an action list, a flow tree and a screenshot flow canvas. Select a state in either view to open it and continue interacting. For reusable ShowAI workbench scenarios, see [UI Lab](docs/ui-lab.md).
 
 Run the tests of the area you changed:
 

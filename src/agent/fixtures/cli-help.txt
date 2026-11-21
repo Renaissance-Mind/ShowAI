@@ -4,7 +4,7 @@ Local browser workbench (same files as the desktop app and CLI):
   serve [--home PATH] [--port PORT] [--no-open]
 
 Independent presentation (no personal project or synchronization required):
-  public list [--kind component|template] [--query TEXT]
+  public list [--kind component|template] [--query TEXT] [--view compact|detailed]
   public describe ID [--kind component|template] [--view guide|schema|examples|source]
   render --input INPUT_JSON --out PAGE.html [--overwrite]
   render --template TEMPLATE_ID --title TITLE --out PAGE.html

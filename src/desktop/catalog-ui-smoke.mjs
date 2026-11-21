@@ -149,8 +149,16 @@ try {
       });
   const closeDialog = () => page.keyboard.press("Escape");
   await invoke("组件");
+  const dragRegions = () =>
+    page
+      .locator(".studio-window-topbar,.studio-topbar")
+      .evaluateAll((elements) =>
+        elements.map((el) => getComputedStyle(el).webkitAppRegion),
+      );
+  assert.ok((await dragRegions()).includes("drag"));
   await componentCard("数据图表", "内置").click();
   let dialog = page.getByRole("dialog", { name: "数据图表", exact: true });
+  assert.ok((await dragRegions()).every((region) => region === "no-drag"));
   await dialog
     .getByRole("region", { name: "组件示例预览", exact: true })
     .waitFor();
@@ -162,8 +170,18 @@ try {
     name: "插入到页面",
     exact: true,
   });
-  assert.equal(await insert.isEnabled(), false);
-  await dialog.getByText("先打开一个页面", { exact: true }).waitFor();
+  assert.equal(await insert.count(), 0);
+  assert.equal(
+    await dialog.getByText("先打开一个页面", { exact: true }).count(),
+    0,
+  );
+  await dialog.getByRole("button", { name: "柱状图", exact: true }).click();
+  await dialog.getByRole("button", { name: "编辑组件", exact: true }).click();
+  await dialog.getByLabel("标题", { exact: true }).fill("调整后的图表");
+  await dialog.getByRole("button", { name: "应用数据", exact: true }).click();
+  await dialog
+    .getByRole("region", { name: "调整后的图表", exact: true })
+    .waitFor();
   await page.screenshot({
     path: join(output, "chart-overview.png"),
     fullPage: true,
@@ -175,12 +193,51 @@ try {
     (await dialog.locator(".catalog-component-guide h3").count()) >= 2,
     "builtin chart documentation lists its sections",
   );
+  const parameters = dialog.getByRole("tab", { name: "参数", exact: true });
+  await parameters.click();
+  await dialog
+    .getByRole("tabpanel", { name: "参数", exact: true })
+    .getByRole("table")
+    .waitFor();
+  await parameters.press("ArrowLeft");
+  await dialog
+    .getByRole("tabpanel", { name: "使用说明", exact: true })
+    .waitFor();
+  await dialog
+    .getByRole("tab", { name: "使用说明", exact: true })
+    .press("Home");
+  await dialog
+    .getByRole("region", { name: "调整后的图表", exact: true })
+    .waitFor();
+  assert.equal(
+    await dialog
+      .getByRole("button", { name: "柱状图", exact: true })
+      .getAttribute("class"),
+    "is-active",
+  );
+  await dialog.getByRole("button", { name: "还原示例", exact: true }).click();
+  await dialog.getByRole("region", { name: "y = x", exact: true }).waitFor();
   await closeDialog();
+  await dialog.waitFor({ state: "detached" });
+  await poll(
+    dragRegions,
+    (regions) => regions.includes("drag"),
+    "window drag regions restored after closing the dialog",
+  );
   await componentCard("富文本", "内置").click();
   dialog = page.getByRole("dialog", { name: "富文本", exact: true });
   await dialog
     .getByRole("heading", { name: "让内容更容易理解", exact: true })
     .waitFor();
+  await dialog
+    .locator(".sb-text [contenteditable=true] [data-block-id]")
+    .first()
+    .waitFor();
+  assert.equal(
+    await dialog.getByRole("button", { name: "还原示例" }).count(),
+    0,
+    "opening a rich-text sample does not count editor initialization as an edit",
+  );
   await page.screenshot({
     path: join(output, "text-overview.png"),
     fullPage: true,
@@ -190,6 +247,19 @@ try {
   await dialog
     .locator(".sb-text p")
     .filter({ hasText: "记录一个想法。" })
+    .waitFor();
+  const textEditor = dialog
+    .locator('.sb-text [contenteditable="true"]')
+    .first();
+  await textEditor.fill("预览中的便笺");
+  await dialog.getByLabel("组件示例", { exact: true }).selectOption("1");
+  await dialog
+    .getByRole("heading", { name: "让内容更容易理解", exact: true })
+    .waitFor();
+  await dialog.getByLabel("组件示例", { exact: true }).selectOption("2");
+  await dialog
+    .locator(".sb-text p")
+    .filter({ hasText: "预览中的便笺" })
     .waitFor();
   await page.setViewportSize({ width: 700, height: 850 });
   const previewBox = await dialog
@@ -206,11 +276,39 @@ try {
     fullPage: true,
     animations: "disabled",
   });
+  await dialog.getByRole("tab", { name: "参数", exact: true }).click();
+  await dialog
+    .getByRole("tabpanel", { name: "参数", exact: true })
+    .getByRole("table")
+    .waitFor();
+  await dialog.getByRole("tab", { name: "预览", exact: true }).click();
+  await dialog
+    .locator(".sb-text p")
+    .filter({ hasText: "预览中的便笺" })
+    .waitFor();
   await page.setViewportSize({ width: 1280, height: 960 });
   await closeDialog();
   result.checks.push(
-    "builtin chart and text details share one responsive preview with scenarios and documentation; insertion stays disabled until a page is open",
+    "chart and text previews accept local edits, retain each edited example across tabs and examples, and reset; usage and parameters respond to mouse and keyboard, and insertion is hidden without a page",
   );
+
+  await componentCard("页面", "内置").click();
+  dialog = page.getByRole("dialog", { name: "页面", exact: true });
+  await dialog.getByText("编辑示例数据", { exact: true }).click();
+  const sampleInput = dialog.getByRole("textbox", {
+    name: "示例数据",
+    exact: true,
+  });
+  await sampleInput.fill('{"unsupported":true}');
+  await dialog.getByRole("button", { name: "应用到预览", exact: true }).click();
+  await dialog.getByRole("alert").waitFor();
+  await sampleInput.fill('{"title":"试用页面容器"}');
+  await dialog.getByRole("button", { name: "应用到预览", exact: true }).click();
+  await dialog
+    .getByRole("heading", { name: "试用页面容器", exact: true })
+    .waitFor();
+  await noAlerts();
+  await closeDialog();
 
   const text = await api("components:get", { id: "text", scope: "builtin" });
   const customText = await api("components:save", {
@@ -273,11 +371,35 @@ try {
     .frameLocator('iframe[title="计数器"]')
     .getByRole("status")
     .waitFor();
+  const counter = dialog
+    .frameLocator('iframe[title="计数器"]')
+    .getByRole("status");
+  const initialCount = Number(await counter.innerText());
+  await clickEmbeddedControl('iframe[title="计数器"]', "增加");
+  await poll(
+    () => counter.innerText(),
+    (value) => Number(value) === initialCount + 1,
+    "interactive catalog counter",
+  );
+  await dialog.getByRole("tab", { name: "参数", exact: true }).click();
+  await dialog.getByRole("tab", { name: "预览", exact: true }).click();
+  await poll(
+    () => counter.innerText(),
+    (value) => Number(value) === initialCount + 1,
+    "custom preview retains its edited props",
+  );
   await page.screenshot({
     path: join(output, "global-immutable.png"),
     fullPage: true,
     animations: "disabled",
   });
+  await closeDialog();
+  await componentCard("计数器", "全局").click();
+  await poll(
+    () => counter.innerText(),
+    (value) => Number(value) === initialCount,
+    "reopening loads the original example",
+  );
   await closeDialog();
   await componentCard("Project B counter", "项目").click();
   dialog = page.getByRole("dialog", { name: "Project B counter", exact: true });
@@ -438,13 +560,16 @@ try {
   await page
     .getByRole("heading", { name: "Nested evidence", exact: true })
     .waitFor();
-  const frame = page.frameLocator('iframe[title="Project B counter"]');
+  await dialog.waitFor({ state: "detached" });
+  const frameSelector =
+    '#studio-tab-panel iframe[title="Project B counter"]:visible';
+  const frame = page.frameLocator(frameSelector);
   await poll(
     () => frame.getByRole("status").innerText(),
     (value) => value === "7",
     "nested exact component initial props",
   );
-  await clickEmbeddedControl('iframe[title="Project B counter"]', "增加");
+  await clickEmbeddedControl(frameSelector, "增加");
   await poll(
     () => frame.getByRole("status").innerText(),
     (value) => value === "8",
@@ -686,6 +811,56 @@ try {
   result.checks.push(
     "code composition renders builtin text and an exact custom child in one sandbox; child edits save to parent props and offline HTML export succeeds",
   );
+  await invoke("组件");
+  await componentCard("数据图表", "内置").click();
+  dialog = page.getByRole("dialog", { name: "数据图表", exact: true });
+  await dialog.getByRole("button", { name: "柱状图", exact: true }).click();
+  await dialog.getByRole("button", { name: /^插入到「/ }).click();
+  await poll(
+    async () =>
+      (await api("pages:get", { projectId: a.id, pageId: createdId })).document
+        .content.content,
+    (nodes) =>
+      nodes.some(
+        (node) =>
+          node.attrs?.kind === "chart" && node.attrs.data.type === "bar",
+      ),
+    "inserted chart uses the edited example data",
+  );
+  result.checks.push(
+    "the available insert action writes the edited chart to the open page",
+  );
+
+  await invoke("组件");
+  await page.getByLabel("目录项目", { exact: true }).selectOption(a.id);
+  await componentCard("计数器", "项目").click();
+  dialog = page.getByRole("dialog", { name: "计数器", exact: true });
+  const previewFrame = '.catalog-component-dialog iframe[title="计数器"]';
+  const previewCount = page.frameLocator(previewFrame).getByRole("status");
+  const editedCount = Number(await previewCount.innerText()) + 1;
+  await clickEmbeddedControl(previewFrame, "增加");
+  await poll(
+    () => previewCount.innerText(),
+    (value) => Number(value) === editedCount,
+    "edited project counter",
+  );
+  await dialog.getByRole("button", { name: /^插入到「/ }).click();
+  await poll(
+    async () =>
+      (await api("pages:get", { projectId: a.id, pageId: createdId })).document
+        .content.content,
+    (nodes) =>
+      nodes.some(
+        (node) =>
+          node.attrs?.data?.integrity === original.integrity &&
+          node.attrs.data.props.value === editedCount,
+      ),
+    "inserted project counter keeps its package identity and edited props",
+  );
+  result.checks.push(
+    "inserting an edited custom example preserves its exact version and props",
+  );
+
   assert.deepEqual(result.rendererErrors, []);
   assert.equal(await digest(), result.runtimeHash);
   result.passed = true;

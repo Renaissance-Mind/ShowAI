@@ -204,11 +204,17 @@ test("recap summarises finished turns for agents without session resume", () => 
 
 test("a conversation streams, persists and resumes the same Claude session", async () => {
   const project = await library.createProject({ name: "Conversation test" });
-  const page = await library.createPage(project.id, { title: "Notes" });
+  const guide = await readFile(new URL("../../docs/agent-usage.md", import.meta.url), "utf8");
+  const selectedText = guide.slice(0, 4_000);
+  const page = await new AgentService({ root: library.root }).createPage(project.id, {
+    title: "Notes",
+    blocks: [{ kind: "text", data: { format: "plain", content: selectedText } }],
+  });
+  const blockId = page.document.content.content![0].attrs!.id;
   const first = await host.send({
     projectId: project.id,
-    prompt: "Explain this block",
-    target: { kind: "blocks", pageId: page.document.id, blockIds: ["b1"] },
+    prompt: `Explain the selected passage using the following reference.\n${guide.slice(4_000, 27_500)}`,
+    target: { kind: "text", pageId: page.document.id, blockIds: [blockId], text: selectedText },
   });
   const done = await settled(project.id, first.id);
   const [turn] = done.turns;
@@ -233,6 +239,7 @@ test("a conversation streams, persists and resumes the same Claude session", asy
   const calls = (await readFile(log, "utf8"))
     .trim()
     .split("\n")
+    .slice(-2)
     .map((line) => JSON.parse(line) as { args: string[]; prompt: string });
   const sessionId = calls[0].args[calls[0].args.indexOf("--session-id") + 1];
   expect(sessionId).toBe(done.threadId);

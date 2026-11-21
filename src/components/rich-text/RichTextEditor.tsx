@@ -116,7 +116,7 @@ import {
 } from "../../ui/icons";
 import { TableControls } from "./TableControls";
 import { FormatControls } from "./FormatControls";
-import { createExtensions } from "./extensions";
+import { blockIdPluginKey, createExtensions } from "./extensions";
 import {
   NOTE_MAX,
   annotateLatex,
@@ -136,6 +136,7 @@ export interface RichTextEditorProps {
   minimal?: boolean;
   additionalExtensions?: Extensions;
   trailingNode?: boolean;
+  emitInitialUpdate?: boolean;
   retentionKey?: string;
   onEditorReady?: (editor: Editor) => void;
   onInsertNative?: (
@@ -259,6 +260,7 @@ export default function RichTextEditor({
   onDetachBlock,
   additionalExtensions,
   trailingNode = true,
+  emitInitialUpdate = true,
   retentionKey,
 }: RichTextEditorProps) {
   const content = useMemo(() => readContentTree(source), [source]);
@@ -487,11 +489,13 @@ export default function RichTextEditor({
         return true;
       },
     },
-    onUpdate: ({ editor: current, transaction }) =>
+    onUpdate: ({ editor: current, transaction }) => {
+      if (!emitInitialUpdate && transaction.getMeta(blockIdPluginKey)) return;
       latestOnChange.current(editorNodeJSON(current.state.doc), {
         separateHistory: Boolean(transaction.getMeta(documentTableActionMeta)),
         historyGroup: transaction.getMeta(textRangeEditMeta),
-      }),
+      });
+    },
   });
 
   useEffect(

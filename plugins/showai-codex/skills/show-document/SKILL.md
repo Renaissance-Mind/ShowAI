@@ -5,7 +5,9 @@ description: 创作或修改要保存的作品：可交互报告、讲解页面�
 
 # 创作与修改作品
 
-正式页面沿本技能的规划、制作、评审和保存流程完成。使用 page_create / page_apply / page_save 写入作品，确认保存后按[当前宿主适配](../use-showai/references/host-adapter.md)交付。用户要求先看并逐步补充临时组件时，按 show-visual 的分批展示流程处理。续改正式 Page 时沿用原页面身份与保存基线。
+通用插件缺少 MCP 连接时，先按[连接向导](../use-showai/references/connect-mcp.md)完成手动接入并核对项目，再继续原任务。
+
+正式页面沿本技能的规划、制作、评审和保存流程完成。使用 page_create / page_apply / page_save 写入作品，确认保存后按下文「当前宿主交付」交付。用户要求先看并逐步补充临时组件时，按 show-visual 的分批展示流程处理。续改正式 Page 时沿用原页面身份与保存基线。
 
 这份 Skill 是制作作品的完整流程，开头一次读完，不用再读其他流程 Skill。还没读过 [use-showai](../use-showai/SKILL.md) 时先读它，核对连接、项目归属和保存规则。用户只要对话讨论时直接回答；只想在对话里看一两个图表、示意或模拟时用 [show-visual](../show-visual/SKILL.md)。用户只要规划或设计稿时，做到相应环节为止，不实现成品：记录照常写进记录文件夹（presentation-plan.json 顶层写 title，以后没有 pageId 也能按标题找到），在对话里给出读者简报、规划与设计稿的可读版本，并告诉用户记录文件夹的位置；之后要实现时沿用这份记录。用户要求评审已有页面时，读回页面后直接进入评审环节。
 
@@ -171,7 +173,19 @@ description: 创作或修改要保存的作品：可交互报告、讲解页面�
 
 用了模板时用 `template_apply` 建页；不用模板时用 `page_create` 建页再用 `page_apply` 逐幕插入。具体写入写法见 [写入页面的操作](../use-showai/references/authoring.md)；确认的组件缺口进入 [create-component](../create-component/SKILL.md)；大量图片或视频先看 [容量与大文件](../use-showai/references/capacity.md)。
 
-新建或续改作品后，根据本轮成功的保存回执，在同一轮按[当前宿主适配](../use-showai/references/host-adapter.md)选择原页的交付方式。当前连接没有专用入口时，执行[通用交付](../use-showai/references/host-display.md#通用交付)。导出文件、多页网站和本机文件打包的做法见[写入页面的操作](../use-showai/references/authoring.md#展示与导出)。
+### 当前宿主交付
+
+新建或续改作品后，根据本轮最终保存回执，在同一轮给出原页入口。用户指定只保存、只导出或直接打开时按其要求交付。
+
+<!-- showai-host-delivery:start -->
+
+- 临时组件用 `show_component` 的 `delivery:"auto"` 在 MCP Apps 视图显示。Codex 延迟加载工具时，在同一次工具发现中查询本次需要的 `public_catalog_list`、`public_catalog_describe`、`show_component`。
+- 新建或续改保存成功后，用最终回执的项目和页面 ID 调用 `card_present`。同一页只交付一次，多页放进同一次调用的 `additionalTargets`。
+- 用户明确要在聊天里读原页或片段时用 `page_present`。缺少卡片工具、原生视图未出现或用户要求直接打开时查完整宿主适配。
+
+<!-- showai-host-delivery:end -->
+
+异常和回退见[完整宿主适配](../use-showai/references/host-adapter.md)。当前连接没有专用入口时，执行[通用交付](../use-showai/references/host-display.md#通用交付)。导出文件、多页网站和本机文件打包的做法见[写入页面的操作](../use-showai/references/authoring.md#展示与导出)。
 
 ## 从对话展示升级
 

@@ -57,6 +57,8 @@ Ordinary research, comparison and report tasks default to **one resource Page**.
 
 ## Discover resources, then request one view
 
+For public visuals on any host, start with show-visual. Call `public_catalog_list({kind:"component",view:"compact"})` once with no limit or cursor. Each row gives an ID, name and use case. If you know the ID, go straight to `public_catalog_describe` with `view:"guide"`, then call `show_component`. Follow the host's delivery steps in the workflow. To check an unknown display use `showai_capabilities({view:"presentation"})`. Use the full report for project access or live updates.
+
 Read the full accessible catalog of names, descriptions, scenarios and one-line component signatures before inspecting individual resources:
 
 ```sh

@@ -1,6 +1,7 @@
 import { useContext, useState } from "react";
 import { BlockMenuExtensionContext } from "./environment";
 import type { Editor } from "@tiptap/core";
+import { NodeSelection } from "@tiptap/pm/state";
 import { useTranslator } from "../../i18n/react";
 import messages from "../../i18n/messages/primitives";
 import { Database } from "../../ui/icons";
@@ -67,12 +68,18 @@ export function ContentNodeActions({
     else next[key] = value;
     update("componentStyle", next);
   };
-  if (
-    type === "widget" &&
-    node.attrs.kind !== "text" &&
-    sharedDataAvailable()
-  ) {
-    const id = node.attrs.id;
+  const selection = editor.state.selection;
+  const selectedWidget =
+    selection instanceof NodeSelection &&
+    selection.node.type.name === "widget" &&
+    selection.from > position &&
+    selection.to < position + node.nodeSize
+      ? selection.node
+      : null;
+  const widget = type === "widget" ? node : selectedWidget;
+  let sharedDataAction = null;
+  if (widget && widget.attrs.kind !== "text" && sharedDataAvailable()) {
+    const id = widget.attrs.id;
     const apply = (data: Record<string, unknown>) => {
       let at = -1;
       editor.state.doc.descendants((child, offset) => {
@@ -84,14 +91,14 @@ export function ContentNodeActions({
           editor.state.tr.setNodeAttribute(at, "data", data),
         );
     };
-    return (
+    sharedDataAction = (
       <button
         type="button"
         onClick={() => {
           window.dispatchEvent(
             new CustomEvent(SHARED_DATA_EVENT, {
               cancelable: true,
-              detail: { kind: node.attrs.kind, data: node.attrs.data, apply },
+              detail: { kind: widget.attrs.kind, data: widget.attrs.data, apply },
             }),
           );
           onDone?.();
@@ -102,8 +109,10 @@ export function ContentNodeActions({
       </button>
     );
   }
+  if (type === "widget" && sharedDataAction) return sharedDataAction;
   return (
     <div className="content-node-fields">
+      {sharedDataAction}
       {typeof node.attrs.id === "string" && hostActions?.(node.attrs.id, () => onDone?.())}
       {type === "image" && (
         <>

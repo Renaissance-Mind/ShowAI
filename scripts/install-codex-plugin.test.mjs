@@ -41,11 +41,11 @@ test(
       await remote("host-a", a, endpoint);
       const first = await remote("host-b", b, endpoint);
       const manifest = join(first.sourcePath, "plugin.json");
-      const server = join(first.sourcePath, "mcp.json");
+      const instructions = join(first.sourcePath, "README.md");
       const listing = join(b, ".agents/plugins/marketplace.json");
       const snapshot = () =>
         Promise.all(
-          [manifest, server, listing].map((file) => readFile(file, "utf8")),
+          [manifest, instructions, listing].map((file) => readFile(file, "utf8")),
         );
       const before = await snapshot();
       await assert.rejects(
@@ -58,10 +58,11 @@ test(
       const updated = await remote("host-b", b, endpoint);
       assert.equal(updated.treeSha256, first.treeSha256);
       const switched = await remote("host-b", b, endpoint + "/next");
-      const config = JSON.parse(
-        await readFile(join(switched.installedPath, "mcp.json"), "utf8"),
-      );
-      assert.equal(Object.values(config.mcpServers)[0].url, endpoint + "/next");
+      assert.ok((await readFile(join(switched.installedPath, "README.md"), "utf8")).includes(endpoint + "/next"));
+      await assert.rejects(readFile(join(switched.installedPath, "mcp.json")), { code: "ENOENT" });
+      const generic = await install("host-universal", "--marketplace-root", join(dir, "market-universal"));
+      assert.equal(JSON.parse(await readFile(join(generic.installedPath, "plugin.json"), "utf8")).name, "showai-universal");
+      await assert.rejects(readFile(join(generic.installedPath, ".app.json")), { code: "ENOENT" });
     }),
 );
 

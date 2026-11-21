@@ -53,25 +53,40 @@ try {
   const builtinItems = await api("components:list", { scope: "builtin" });
   assert.equal(
     builtinItems.find((item) => item.kind === "text").name,
-    "Markdown",
+    "富文本",
   );
-  for (const kind of ["callout", "divider", "code"]) {
-    assert.equal(
-      builtinItems.some((item) => item.kind === kind),
-      false,
-    );
-    assert.equal(
-      (await api("components:get", { id: kind, scope: "builtin" })).replacedBy,
-      "text",
-    );
-  }
-  for (const kind of ["image", "table", "toggle"])
+  for (const kind of ["image", "table", "toggle", "callout", "divider", "code"])
     assert.ok(builtinItems.some((item) => item.kind === kind));
-  const builtinCount = builtinItems.length;
   const a = await api("projects:create", { name: "项目 A" }),
     b = await api("projects:create", { name: "项目 B" });
   const ca = await api("components:createExample", { projectId: a.id });
   await api("components:createExample", { projectId: b.id });
+  const catalogCount = (items) =>
+    new Set(
+      items.map((item) =>
+        "kind" in item ? item.kind : item.scope + "/" + item.id,
+      ),
+    ).size;
+  const shared = await api("components:list", { scope: "all" });
+  const sharedCount = catalogCount(shared);
+  const sharedCustomCount = catalogCount(
+    shared.filter((item) => !("kind" in item)),
+  );
+  const { projects } = await api("projects:scan");
+  const localCounts = await Promise.all(
+    projects.map(async (project) =>
+      catalogCount(
+        await api("components:list", {
+          scope: "project",
+          projectId: project.id,
+        }),
+      ),
+    ),
+  );
+  const allProjectCount = localCounts.reduce(
+    (total, count) => total + count,
+    0,
+  );
   await page
     .getByRole("navigation", { name: "主要导航" })
     .getByRole("button", { name: "组件", exact: true })
@@ -83,11 +98,11 @@ try {
   await page.waitForFunction(
     (expected) =>
       document.querySelectorAll(".studio-component-card").length === expected,
-    builtinCount + 2,
+    sharedCount + allProjectCount,
   );
   const picker = await page.locator(".component-project-picker").boundingBox();
   const button = await page
-    .getByRole("button", { name: "导入组件", exact: true })
+    .getByRole("button", { name: "导入组件…", exact: true })
     .boundingBox();
   assert.ok(
     picker.x + picker.width <= button.x &&
@@ -96,45 +111,31 @@ try {
   );
   assert.equal(await page.locator(".catalog-scope-controls").count(), 0);
   assert.equal(await page.locator(".studio-component-card footer").count(), 0);
-  await page.waitForFunction(
-    () =>
-      document.querySelectorAll(".component-preview-error").length > 0 ||
-      document.querySelectorAll(
-        '.component-category[aria-label="文本组件"] .component-card-preview img',
-      ).length === 3,
-    {},
-    { timeout: 60000 },
-  );
-  assert.equal(
-    await page.locator(".component-preview-error").count(),
-    0,
-    JSON.stringify(
-      await page
-        .locator(".component-preview-error")
-        .evaluateAll((els) => els.map((el) => el.title)),
-    ),
-  );
+  const card = (name, owner) => {
+    const items = page
+      .locator(".studio-component-card")
+      .filter({ has: page.getByRole("heading", { name, exact: true }) });
+    return owner
+      ? items.filter({ has: page.getByText(owner, { exact: true }) })
+      : items;
+  };
+  await card("富文本")
+    .locator(".component-card-preview img")
+    .waitFor({ timeout: 60000 });
   await page.screenshot({
     path: join(output, "gallery-overview.png"),
     fullPage: true,
     animations: "disabled",
   });
-  await page
-    .locator(".studio-component-card")
-    .filter({
-      has: page.getByRole("heading", { name: "Markdown 内置", exact: true }),
-    })
-    .click();
+  await card("富文本").click();
   const markdownDialog = page.getByRole("dialog", {
-    name: "Markdown",
+    name: "富文本",
     exact: true,
   });
   await markdownDialog
     .getByLabel("组件示例", { exact: true })
     .selectOption({ label: "代码与分隔线" });
-  await markdownDialog
-    .locator(".sb-text pre code.language-javascript")
-    .waitFor();
+  await markdownDialog.locator(".sb-text pre code").waitFor();
   assert.equal(await markdownDialog.locator(".sb-text hr").count(), 1);
   await markdownDialog
     .getByLabel("组件示例", { exact: true })
@@ -145,39 +146,38 @@ try {
   );
   await markdownDialog.press("Escape");
   const nav = page.getByRole("navigation", { name: "组件类型" });
-  for (const label of ["页面与白板", "图片", "表格", "数据", "流程", "其他"]) {
+  let checked = 0;
+  for (const label of [
+    "文本",
+    "页面与白板",
+    "图片",
+    "表格",
+    "数据",
+    "流程",
+    "其他",
+  ]) {
     await nav.getByRole("button", { name: label, exact: true }).click();
-    await page.waitForFunction(
-      (label) => {
-        const section = document.querySelector(
-          `.component-category[aria-label="${label}组件"]`,
-        );
-        return (
-          section &&
-          section.querySelectorAll(".component-card-preview img").length ===
-            section.querySelectorAll(".studio-component-card").length
-        );
-      },
-      label,
-      { timeout: 60000 },
-    );
+    const cards = page
+      .getByRole("region", { name: label + "组件", exact: true })
+      .locator(".studio-component-card");
+    await cards.first().waitFor();
+    for (const item of await cards.all()) {
+      await item.scrollIntoViewIfNeeded();
+      await item
+        .locator(".component-card-preview img")
+        .waitFor({ timeout: 60000 });
+      checked++;
+    }
+    await cards.first().scrollIntoViewIfNeeded();
     await page.screenshot({
       path: join(output, `gallery-${label}.png`),
-      fullPage: true,
       animations: "disabled",
     });
   }
-  assert.equal(
-    await page.locator(".component-card-preview img").count(),
-    builtinCount + 2,
-  );
+  assert.equal(checked, sharedCount + allProjectCount);
+  await nav.getByRole("button", { name: "页面与白板", exact: true }).click();
   for (const name of ["页面", "白板"]) {
-    await page
-      .locator(".studio-component-card")
-      .filter({
-        has: page.getByRole("heading", { name: name + " 内置", exact: true }),
-      })
-      .click();
+    await card(name).click();
     const nativeDialog = page.getByRole("dialog", { name, exact: true });
     await nativeDialog
       .locator(".native-component-preview .container-workspace")
@@ -197,7 +197,7 @@ try {
     await page.screenshot({
       path: join(
         output,
-        name.startsWith("Page") ? "page-detail.png" : "board-detail.png",
+        name === "页面" ? "page-detail.png" : "board-detail.png",
       ),
       animations: "disabled",
     });
@@ -258,55 +258,56 @@ try {
     .getByRole("button", { name: "设置", exact: true })
     .click();
   await page.getByRole("button", { name: "外观", exact: true }).click();
-  await page.getByLabel("主题", { exact: true }).selectOption("dark");
+  await page.getByText("深色", { exact: true }).click();
+  await page.waitForFunction(
+    () => document.documentElement.dataset.theme === "dark",
+  );
   await page
     .getByRole("navigation", { name: "主要导航" })
     .getByRole("button", { name: "组件", exact: true })
     .click();
-  await page
-    .locator(".studio-component-card")
-    .filter({
-      has: page.getByRole("heading", { name: "Markdown 内置", exact: true }),
-    })
-    .click();
+  await nav.getByRole("button", { name: "文本", exact: true }).click();
+  await card("富文本").click();
   assert.equal(
     await page
-      .locator(".catalog-preview-stage .sb-text")
+      .locator(".catalog-preview-content .sb-text")
       .evaluate((el) => getComputedStyle(el).color),
-    "rgb(247, 247, 247)",
-    "Markdown examples use readable dark text tokens",
+    await page
+      .getByRole("dialog", { name: "富文本" })
+      .evaluate((el) => getComputedStyle(el).color),
+    "rich text follows the catalog's dark foreground",
   );
   await page.screenshot({
     path: join(output, "markdown-dark.png"),
     animations: "disabled",
   });
   await page.keyboard.press("Escape");
-  await page
-    .locator(".studio-component-card")
-    .filter({
-      has: page.getByRole("heading", { name: "计数器 项目 B", exact: true }),
-    })
-    .click();
+  await nav.getByRole("button", { name: "全部", exact: true }).click();
+  await card("计数器", "项目 B").click();
   let dialog = page.getByRole("dialog");
-  const sandbox = page.frameLocator(".catalog-preview-stage iframe");
+  const sandbox = page.frameLocator(".catalog-preview-content iframe");
   await sandbox.locator('html[data-theme="dark"]').waitFor();
   assert.equal(
     await sandbox.locator("body").evaluate((el) => getComputedStyle(el).color),
     "rgb(247, 247, 247)",
     "custom preview receives host theme and tokens",
   );
-  await dialog.getByRole("button", { name: "定制组件", exact: true }).click();
-  await dialog
-    .getByLabel("组件说明", { exact: true })
-    .fill("项目 B 的真实组件预览");
-  await dialog
-    .getByRole("button", { name: "保存项目新版本", exact: true })
+  await dialog.getByRole("button", { name: "版本操作", exact: true }).click();
+  await page
+    .getByRole("menuitem", { name: "复制到项目…", exact: true })
     .click();
+  const fork = page.getByRole("dialog", { name: /复制.*计数器.*到项目/ });
+  assert.equal(
+    await fork.getByRole("combobox").inputValue(),
+    b.id,
+  );
+  await fork.getByLabel("名称", { exact: true }).fill("项目 B 的计数器");
+  await fork.getByRole("button", { name: "复制", exact: true }).click();
   await page.waitForFunction(
     () =>
       document
         .querySelector(".catalog-component-version")
-        ?.textContent.trim() === "1.0.1",
+        ?.textContent.trim() === "v1.0.1",
   );
   assert.equal(
     (await api("components:list", { projectId: a.id, scope: "project" }))
@@ -325,24 +326,30 @@ try {
   await page.waitForFunction(
     (expected) =>
       document.querySelectorAll(".studio-component-card").length === expected,
-    builtinCount + 1,
+    sharedCount + 1,
   );
   await page
     .getByRole("navigation", { name: "组件来源" })
     .getByRole("button", { name: "自定义", exact: true })
     .click();
-  assert.equal(await page.locator(".studio-component-card").count(), 1);
-  await page.locator(".studio-component-card").click();
-  dialog = page.getByRole("dialog");
-  await dialog.getByRole("button", { name: "定制组件", exact: true }).click();
   assert.equal(
-    await dialog.getByLabel("组件说明", { exact: true }).inputValue(),
-    ca.description,
+    await page.locator(".studio-component-card").count(),
+    sharedCustomCount + 1,
   );
+  await card("计数器").click();
+  dialog = page.getByRole("dialog");
+  await dialog.getByRole("tab", { name: "版本", exact: true }).click();
+  await dialog
+    .getByRole("tabpanel", { name: "版本", exact: true })
+    .getByText(ca.version, { exact: false })
+    .first()
+    .waitFor();
   await page.keyboard.press("Escape");
   await page.getByLabel("目录项目", { exact: true }).selectOption("all");
   await page.waitForFunction(
-    () => document.querySelectorAll(".studio-component-card").length === 3,
+    (expected) =>
+      document.querySelectorAll(".studio-component-card").length === expected,
+    sharedCustomCount + allProjectCount,
   );
   await page
     .getByRole("navigation", { name: "组件来源" })
