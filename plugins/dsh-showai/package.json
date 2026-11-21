@@ -1,9 +1,9 @@
 {
   "name": "@showai/dsh-showai",
-  "version": "0.2.1",
+  "version": "0.3.0",
   "private": true,
   "type": "module",
-  "description": "ShowAI for DeepSeek Harness: MCP tools, agent Skills and inline page previews.",
+  "description": "ShowAI MCP, Skills, inline previews, session sidebar and editable library workbench for DeepSeek Harness.",
   "scripts": {
     "test": "node --test"
   },
@@ -24,6 +24,8 @@
   },
   "files": [
     "index.js",
+    "workbench.js",
+    "workbench-binding.json",
     "skills.js",
     "client.js",
     "cordis.patch.yml",

@@ -48,8 +48,8 @@ async function loadClient({ uiConversation } = {}) {
     },
     locale: { register: () => () => {} },
     slots: {
-      inject(_name, register) {
-        register();
+      inject(name, register) {
+        if (name in SLOT_KINDS) register();
       },
       register(spec, component) {
         assertHostRegistration(spec, registrations);

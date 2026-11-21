@@ -240,6 +240,29 @@ let bundle: string,
   token: string;
 let server: Awaited<ReturnType<typeof startBrowserServer>>;
 
+test.each(["http://127.0.0.1:48362", "dsh-app://app"])("Harness scopes the bound editor to %s and its session", async (parentOrigin) => {
+  await server.close();
+  const key = "3".repeat(64);
+  server = await startBrowserServer({
+    home, webRoot: join(bundle, "web"), cliEntry: cli, settingsPath,
+    dshWorkbench: { key, parentOrigin },
+  });
+  expect((await fetch(server.url)).status).toBe(403);
+  const editor = new URL(server.url);
+  editor.searchParams.set("codexWorkbench", key);
+  expect((await fetch(editor)).status).toBe(403);
+  editor.search = new URLSearchParams({ dshWorkbench: key, dshSession: "1", dshInstance: "session-a/tab-3" }).toString();
+  const page = await fetch(editor);
+  expect(page.status).toBe(200);
+  expect(page.headers.get("content-security-policy")).toContain(`frame-ancestors 'self' ${parentOrigin};`);
+  expect(page.headers.get("x-frame-options")).toBeNull();
+  const html = await page.text();
+  expect(html).toContain('"instance":"session-a/tab-3"');
+  expect(html).toContain('"session":true');
+  expect(pageToken(html)).toMatch(/^[0-9a-f]{64}$/);
+  expect((await fetch(editor, { headers: { Origin: "https://chatgpt.com" } })).status).toBe(403);
+});
+
 beforeAll(async () => {
   await mkdir(join(repository, "node_modules/.cache"), { recursive: true });
   bundle = await mkdtemp(

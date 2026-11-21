@@ -51,6 +51,7 @@ declare global {
     __SHOWAI_LOCAL__?: {
       token: string;
       codexWorkbench?: CodexWorkbenchConnection;
+      dshWorkbench?: { parentOrigin: string; session: boolean; instance: string };
       apiOrigin?: string;
       search?: string;
     };

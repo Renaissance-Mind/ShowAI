@@ -29,7 +29,7 @@ const log = (message) =>
 
 if (flags.has("--help")) {
   log(
-    "Usage: node scripts/install-dsh-plugin.mjs [--out DIRECTORY] [--json]\nStages the complete ShowAI bundle for DeepSeek Harness (MCP tools, Skills, inline previews) bound to the runtime registered in SHOWAI_HOME/agent-runtime.json. Default directory: $DSH_HOME/plugins/showai. Harness installs it: Plugins → Add plugin → the directory, then Enable.",
+    "Usage: node scripts/install-dsh-plugin.mjs [--out DIRECTORY] [--json]\nStages the complete ShowAI bundle for DeepSeek Harness (MCP tools, Skills, inline previews and editable workbench) bound to the runtime registered in SHOWAI_HOME/agent-runtime.json. Default directory: $DSH_HOME/plugins/showai. Harness installs it: Plugins → Add plugin → the directory, then Enable.",
   );
   process.exit(0);
 }
@@ -60,7 +60,10 @@ const receipt = await stageDshBundle({
   target,
   bundleRoot: join(root, "plugins/dsh-showai"),
   pluginRoot,
-  runtime: { command: config.launch.command, env: config.launch.env ?? {} },
+  runtime: { command: config.launch.command, env: {
+    ...config.launch.env,
+    ...(process.env.SHOWAI_RUNTIME_CONFIG ? { SHOWAI_RUNTIME_CONFIG: resolve(process.env.SHOWAI_RUNTIME_CONFIG) } : {}),
+  } },
   home,
 });
 const state = await inspectDshProfile({

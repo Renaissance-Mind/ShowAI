@@ -10,7 +10,7 @@ One Harness bundle supplies everything ShowAI needs in DeepSeek Harness:
 | --- | --- | --- |
 | `showai-mcp` | `@deepseek-ai/dsh-mcp-client` | The ShowAI MCP tools (`mcp__showai__*`), started through the bundled launcher with this machine's ShowAI runtime and library. |
 | `showai-skills` | `@showai/dsh-showai/skills` | The ShowAI agent Skills from [plugins/showai](../showai/README.md), published at the Harness bundled-skill rank. |
-| `showai-preview` | `@showai/dsh-showai` | Renders a presented ShowAI page inside the conversation. |
+| `showai-preview` | `@showai/dsh-showai` | Shows inline previews and opens the editable library in a session sidebar tab or the global ShowAI panel. |
 
 This directory is the bundle **source**. The MCP row needs absolute paths, so it
 is installed from a **staged** copy that adds the Skills, the MCP launcher and
@@ -31,6 +31,14 @@ ShowAI Skill folders copied into `$DSH_HOME/skills`, which rank above bundled
 Skills and would shadow them. The installer lists whichever of these it finds.
 
 ## Inline page preview
+
+| Surface | Open it | What you can do |
+| --- | --- | --- |
+| Conversation | Ask for a visual or present a saved Page | Use the interactive preview in the tool result or at the end of the turn. |
+| Session sidebar | Open the right sidebar and select ShowAI, or choose **Edit in sidebar** on a saved Page preview | Edit the original Page alongside chat. The Page or selection menu can append a versioned reference to this conversation's draft. Harness owns the tab's split, fullscreen and floating controls. |
+| Main workbench | Select **ShowAI** in the left navigation | Browse projects and edit Pages in the bound library. Select the conversation to return. |
+
+The graphical surfaces use the Harness Web UI that ships in the desktop app and the local Web profile. The editor starts on demand from the same registered ShowAI runtime as MCP. The local Harness origin and a private editor URL scope each connection. A terminal-only profile can use the MCP tools and file links.
 
 The preview row renders a presented ShowAI page **inside the conversation**
 instead of collapsing it into the generic JSON tool card.
@@ -110,15 +118,17 @@ npm test
 
 ## 简体中文
 
+在聊天中看图时，工具结果和回合末尾都提供交互预览。已保存的页面带有「在侧栏编辑」，可以边聊边改原页，还能把页面或选区引用放进当前对话草稿。也可以从右侧栏的新标签打开 ShowAI，再用宿主的全屏、分栏或浮动控件调整空间。左侧导航的 ShowAI 打开全局工作台，可以浏览项目、创建或修改页面。三个入口共用安装时绑定的本机内容库。
+
 此 Harness bundle 提供 ShowAI 在 DeepSeek Harness 中所需的全部内容：`showai-mcp` 行通过 bundle 内的启动器连接本机 ShowAI 运行时与内容库，提供 `mcp__showai__*` 工具；`showai-skills` 行以 Harness 内置 Skill 的优先级发布 [plugins/showai](../showai/README.md) 的 Skill；`showai-preview` 行在对话中显示页面。
 
 本目录是 bundle 源码。MCP 行需要绝对路径，因此安装的是准备后的副本，其中加入 Skill、MCP 启动器与 `showai-mcp` 行：ShowAI App 中使用「设置 → 插件 → DeepSeek Harness → 准备插件」，源码方式执行 `npm run plugin:dsh`（默认目录 `$DSH_HOME/plugins/showai`，`$DSH_HOME` 未设置时为 `~/.dsh`）。随后在 DeepSeek Harness 中执行一次「插件 → 添加插件」，粘贴该路径，选择「立即启用」并重启。Harness 记录指向该目录的 `link:`，更新 ShowAI、切换内容库或登记的运行时变化后再准备一次，会原地重写，重启即可加载。先移除旧的手动配置：`@showai/dsh-showai-preview` bundle（Harness「插件」中打开它并卸载）、`$DSH_HOME/profiles/desktop/cordis.patch.yml` 中手写的 `mcp-showai` 行，以及复制到 `$DSH_HOME/skills` 的 ShowAI Skill 文件夹（其优先级高于 bundle，会覆盖 bundle 的 Skill）。安装器会列出发现的这些项目。
 
-预览行将 ShowAI page_present 与 render_document 的结果呈现在对话中，提供刷新、展开、新标签页与完整 HTML 操作。
+预览行将 show_component、page_present 和 render_document 的结果呈现在对话中，提供刷新、展开、新标签页与完整 HTML 操作。
 
 ShowAI 返回 delivery.inline/html 文件路径与 MCP _meta.showai.inline。Harness 桥保留文字但不传递 _meta，因此本 bundle 在工具结果完成后把 HTML 保存到 $DSH_HOME/cache/showai-page/。较长或带特殊字符的调用 ID 使用 SHA-256 缓存键。插件从独立的本机 HTTP 地址提供预览。该 origin 无法读取 Harness DOM、会话或 /api，同时可使用自己的存储与 worker。
 
-delivery.html 已是完整文件，按原字节保存；delivery.inline 通常是供宿主嵌入的阅读器片段，缓存会补上 doctype、head 与 body 外壳。直接以片段作为文档加载会进入 quirks mode，导致 KaTeX 停用并改变布局；旧缓存片段在读取时也会补外壳。client.js 为两个工具注册 tool.call.toolview，使用 sandbox iframe 显示；可用性探测会短暂重试，因为宿主在结果之后异步写入缓存。预览用 delivery.inline，而“打开完整 HTML”使用 delivery.html；“局部”标签只在调用确实带 blockIds 选择时出现。缓存保留最近 40 页，进程重启后旧对话仍可读取。
+delivery.html 已是完整文件，按原字节保存；delivery.inline 通常是供宿主嵌入的阅读器片段，缓存会补上 doctype、head 与 body 外壳。直接以片段作为文档加载会进入 quirks mode，导致 KaTeX 停用并改变布局；旧缓存片段在读取时也会补外壳。client.js 为三个工具注册 tool.call.toolview，使用 sandbox iframe 显示；可用性探测会短暂重试，因为宿主在结果之后异步写入缓存。预览用 delivery.inline，而“打开完整 HTML”使用 delivery.html；“局部”标签只在调用确实带 blockIds 选择时出现。缓存保留最近 40 页，进程重启后旧对话仍可读取。
 
 bundle 无需构建或额外依赖；Harness 内的 Agent 也可用 `plugin_manager install_bundle target=<路径>` 安装准备好的目录。准备时 MCP 行绑定一个 ShowAI 内容库与运行时命令，切换内容库、移动 App 或登记的运行时变化后需重新准备。预览需要 profile 的 webServer；超过 12 MiB 的预览不缓存，退回文件操作。Host 代码更新需新进程，client.js 可由 HMR 更新。
 

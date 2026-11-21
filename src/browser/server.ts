@@ -65,6 +65,7 @@ export interface BrowserServerOptions {
   registerAgentRuntime?: boolean;
   codexWorkbench?: { key: string };
   antigravityWorkbench?: { key: string };
+  dshWorkbench?: { key: string; parentOrigin: string };
   additionalActions?: ReadonlySet<string>;
   agentWorkspaceRoot?: string;
   disableNativeDialogs?: boolean;
@@ -110,7 +111,16 @@ export async function startBrowserServer(options: BrowserServerOptions) {
       );
   }
   const fixedHome = options.home ?? process.env.SHOWAI_HOME;
-  const embedding = options.codexWorkbench;
+  const dsh = options.dshWorkbench;
+  const embedding = dsh ?? options.codexWorkbench;
+  if (dsh) {
+    const parent = URL.parse(dsh.parentOrigin);
+    const localWeb = !!parent && parent.origin === dsh.parentOrigin &&
+      ["http:", "https:"].includes(parent.protocol) && ["127.0.0.1", "localhost", "[::1]"].includes(parent.hostname);
+    if (options.codexWorkbench || options.antigravityWorkbench || (!localWeb && dsh.parentOrigin !== "dsh-app://app"))
+      throw new Error("The Harness workbench requires a local Harness origin.");
+  }
+  const workbenchParameter = dsh ? "dshWorkbench" : "codexWorkbench";
   const antigravityEmbedding = options.antigravityWorkbench;
   const embeddedHost = !!(embedding || antigravityEmbedding);
   if (
@@ -190,7 +200,7 @@ export async function startBrowserServer(options: BrowserServerOptions) {
       const update = changeForClient(id);
       if (update) client.write(`data: ${JSON.stringify(update)}\n\n`);
     }
-    if (embedding) {
+    if (options.codexWorkbench) {
       workbenchChanges.push(changeForClient);
       if (workbenchChanges.length > 160) workbenchChanges.shift();
       workbenchCursor++;
@@ -485,7 +495,7 @@ export async function startBrowserServer(options: BrowserServerOptions) {
   }
   function workbenchParams(target: Parameters<typeof windowQuery>[0]) {
     const params = new URLSearchParams(windowQuery(target));
-    if (embedding) params.set("codexWorkbench", embedding.key);
+    if (embedding) params.set(workbenchParameter, embedding.key);
     return params;
   }
 
@@ -572,7 +582,7 @@ export async function startBrowserServer(options: BrowserServerOptions) {
       response.setHeader("X-Frame-Options", "DENY");
       response.setHeader("Referrer-Policy", "no-referrer");
       const requestOrigin = request.headers.origin;
-      const codexOrigin = requestOrigin && embedding && allowsCodexOrigin(requestOrigin);
+      const codexOrigin = requestOrigin && options.codexWorkbench && allowsCodexOrigin(requestOrigin);
       const agPreflight =
         requestOrigin &&
         antigravityEmbedding &&
@@ -774,7 +784,7 @@ export async function startBrowserServer(options: BrowserServerOptions) {
       if (url.pathname === "/") {
         const preview = url.searchParams.has("componentPreview");
         const embedded = embedding &&
-          (url.searchParams.get("codexWorkbench") === embedding.key ||
+          (url.searchParams.get(workbenchParameter) === embedding.key ||
             (preview && request.headers["sec-fetch-site"] === "same-origin"));
         const agEmbedded = antigravityEmbedding &&
           (url.searchParams.get("agWorkbench") === antigravityEmbedding.key ||
@@ -789,13 +799,21 @@ export async function startBrowserServer(options: BrowserServerOptions) {
         if (agEmbedded) response.removeHeader("Referrer-Policy");
         const ancestors = agEmbedded
           ? "*"
+          : embedded && dsh ? `'self' ${dsh.parentOrigin}`
           : embedded
             ? "'self' app: https://chatgpt.com https://*.chatgpt.com https://*.oaiusercontent.com"
             : preview ? "'self'" : "'none'";
         const config = JSON.stringify({
           token,
           ...(codexOrigin && embedded ? { apiOrigin: origin, search: url.search } : {}),
-          ...(embedded && !preview
+          ...(embedded && dsh && !preview ? {
+            dshWorkbench: {
+              parentOrigin: dsh.parentOrigin,
+              session: url.searchParams.get("dshSession") === "1",
+              instance: url.searchParams.get("dshInstance")?.slice(0, 320) || "global",
+            },
+          } : {}),
+          ...(embedded && options.codexWorkbench && !preview
             ? {
                 codexWorkbench: {
                   key: embedding.key,

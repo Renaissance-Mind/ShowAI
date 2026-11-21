@@ -70,7 +70,7 @@ On stdio and HTTP, a public visual uses `public_catalog_list({kind:"component",v
 | Antigravity | The plugin requests eager loading for the three tools in `mcp_config.json`. [Eager tools](https://antigravity.google/docs/mcp#configure-eager-tools) |
 | Codex | Use the registered tools directly when visible. With tool search enabled, search together for the needed names. |
 | Kimi Work | Use the registered tools. In sessions that expose `select_tools`, select the needed names together. |
-| DeepSeek Harness | Its MCP client registers the server's tools at connection time. |
+| DeepSeek Harness | Its MCP client registers tools at connection time. The desktop and local Web UI show inline previews, a session sidebar for editing and quoting a Page into the draft, and a global workbench in the left navigation. |
 | ChatGPT MCP Apps and other HTTP clients | The server supplies the same tool schemas through `tools/list`. The client controls discovery and rendering. Clients without installed Skills can follow the tool descriptions. |
 
 ShowAI's built-in Agent receives the compact component index with project scopes, versions and integrity values. It can select a built-in directly from that index. The embedded text view can link the file returned by a local preview.

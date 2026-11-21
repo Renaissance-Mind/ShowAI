@@ -60,7 +60,7 @@ showai mcp serve \
 | Antigravity | 安装包在 `mcp_config.json` 为三个工具声明 eager。[预加载说明](https://antigravity.google/docs/mcp#configure-eager-tools) |
 | Codex | 当前可见时直接调用。开启工具搜索时，在一次查询里给出所需工具名。 |
 | Kimi Work | 直接使用已注册的工具。如果会话提供 `select_tools`，可一次选取需要的工具。 |
-| DeepSeek Harness | 自带的 MCP 客户端在连接时注册工具。 |
+| DeepSeek Harness | 自带的 MCP 客户端在连接时注册工具。本机图形界面支持对话内预览、右侧会话标签页编辑并引用到草稿、左侧导航打开全局工作台。 |
 | ChatGPT MCP Apps 及其他 HTTP 客户端 | 服务通过 `tools/list` 提供相同的工具声明，加载与显示由客户端控制。未安装 Skill 的客户端可按工具描述执行。 |
 
 ShowAI 内置 Agent 直接收到轻量组件索引，其中保留项目组件的作用域、版本和指纹。可从索引选择内置组件，文字界面可交付本机预览实际返回的文件链接。

@@ -17,6 +17,7 @@ import { FIND_COMPONENT_EVENT } from "../../components/blocks/ComponentStatus";
 import {
   NAVIGATE_EVENT,
   parsePageLink,
+  requestNavigation,
   type NavigationDetail,
   type NavigationModifiers,
   type NavigationTarget,
@@ -248,6 +249,19 @@ export function useStudioRouter({
       document.removeEventListener("auxclick", click, true);
     };
   });
+  useEffect(() => {
+    const host = window.__SHOWAI_LOCAL__?.dshWorkbench;
+    if (!host?.session || window.parent === window) return;
+    const open = (event: MessageEvent) => {
+      if (event.source !== window.parent || event.origin !== host.parentOrigin ||
+          event.data?.type !== "showai:open-page") return;
+      const target = parsePageLink(event.data.href);
+      if (target) requestNavigation(window, target);
+    };
+    window.addEventListener("message", open);
+    window.parent.postMessage({ type: "showai:editor-ready" }, host.parentOrigin);
+    return () => window.removeEventListener("message", open);
+  }, []);
   useEffect(() => {
     const find = (event: Event) => {
       const query = (event as CustomEvent<{ query?: string }>).detail?.query;

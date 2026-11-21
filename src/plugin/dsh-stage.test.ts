@@ -43,6 +43,9 @@ test("stages the bundle with Skills, the launcher and a literal MCP row", async 
   const skills = (await readdir(resolve("plugins/showai/skills"))).sort();
   expect((await readdir(join(target, "skills"))).sort()).toEqual(skills);
   await stat(join(target, "mcp/launch.mjs"));
+  expect(JSON.parse(await readFile(join(target, "workbench-binding.json"), "utf8"))).toEqual({
+    home: receipt.home, runtimeConfig: join(receipt.home, "agent-runtime.json"),
+  });
   expect(
     JSON.parse(await readFile(join(target, "host-profile.json"), "utf8"))
       .profile,

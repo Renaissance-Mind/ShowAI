@@ -3,6 +3,7 @@ import { createServer } from "node:http";
 import { mkdir, readFile, readdir, rename, rm, stat, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join } from "node:path";
+import { registerWorkbench } from "./workbench.js";
 
 export const PREVIEW_ROUTE = "/showai-page-preview";
 const PRESENTATION_TOOL = /^mcp__showai__(?:page_present|render_document|show_component)$/;
@@ -170,6 +171,7 @@ export const inject = ["webServer"];
 
 export function apply(ctx) {
   const log = ctx.logger;
+  ctx.effect(() => registerWorkbench(ctx), "showai: workbench");
   const root = cacheRoot();
   const ready = (async () => {
     await mkdir(root, { recursive: true });
