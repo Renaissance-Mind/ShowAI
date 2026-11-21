@@ -43,8 +43,6 @@ const listing = async (client: Client) => {
   expect(client.getInstructions()).toContain("show-visual");
   const upfront = tools.filter((tool) => tool._meta?.["anthropic/alwaysLoad"] === true);
   expect(upfront.map((tool) => tool.name).sort()).toEqual([
-    "public_catalog_describe",
-    "public_catalog_list",
     "show_component",
   ]);
   return JSON.stringify(tools, null, 2) + "\n";

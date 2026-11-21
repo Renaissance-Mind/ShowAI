@@ -789,14 +789,12 @@ export class AgentHost {
     projectId: string,
     focus: string,
     workspace: string,
-    componentCatalog: Awaited<ReturnType<AgentService["componentPromptIndex"]>>,
   ) {
     return [
       `You are working inside ShowAI. The host has supplied these verified selections: projectId=${projectId}${focus}. Operate only that project${focus ? " and focused page" : ""}.`,
-      "Choose a component from the supplied index using its column names. For a public visual, read the selected built-in's guide with public_catalog_describe, then call show_component with delivery=fragment-file. This host displays text and file links. Link delivery.inline when the returned local file is accessible. Follow the actual delivery mode on fallback.",
-      `For project work use project_context with knownCatalogRevision=${componentCatalog.revision} to confirm the binding, then read the chosen page. Use the connected ShowAI MCP tools for all library reads and writes. Do not invoke authoring CLI commands or switch connections if MCP fails. Read current hash/revision before saving and preserve conflicting drafts. Do not edit raw library files. Work files belong in ${workspace}.`,
+      "For a conversation visual, write original HTML and pass it to show_component with delivery=fragment-file. Use the catalog for chat visuals only when the user explicitly asks for existing components. This host displays text and file links. Link delivery.inline when accessible. Register a visual only on request, after parameterizing its data and testing another dataset.",
+      `For project work use project_context to confirm the binding, then read the chosen page. Use the connected ShowAI MCP tools for all library reads and writes. Do not invoke authoring CLI commands or switch connections if MCP fails. Read current hash/revision before saving and preserve conflicting drafts. Do not edit raw library files. Work files belong in ${workspace}.`,
       "For a saved-page preview, use page_present with the requested stable block IDs and return its delivery file link. Read the ShowAI authoring guide before editing. For status-only requests query project_sync_status. Run project_sync only when requested.",
-      `Component directory: ${JSON.stringify(componentCatalog)}`,
       "Read the selected revision's guide for page work and development guidance before inspecting component source.",
     ].join("\n");
   }
@@ -867,11 +865,6 @@ export class AgentHost {
           .library()
           .readPage(projectId, pageId, { checkpoint: false });
     }
-    const componentCatalog = test
-      ? undefined
-      : await new AgentService({
-          root: this.options.library().root,
-        }).componentPromptIndex(projectId);
     const workspace = join(
       this.workspaceRoot,
       projectId || "Connection Tests",
@@ -900,8 +893,8 @@ export class AgentHost {
         (item, index) => index < 50 || item.state === "running",
       );
     const cli = this.options.cli();
-    const instructions = componentCatalog
-      ? `${this.instructions(projectId, pageId ? `, pageId=${pageId}` : "", workspace, componentCatalog)} The user explicitly requests:\n${prompt}`
+    const instructions = !test
+      ? `${this.instructions(projectId, pageId ? `, pageId=${pageId}` : "", workspace)} The user explicitly requests:\n${prompt}`
       : prompt;
     const resume = args.taskId
       ? this.tasks.find(
@@ -1066,9 +1059,6 @@ export class AgentHost {
     const page = target.pageId
       ? await library.readPage(projectId, target.pageId, { checkpoint: false })
       : undefined;
-    const componentCatalog = await new AgentService({
-      root: library.root,
-    }).componentPromptIndex(projectId);
     await mkdir(conversation.workspace, { recursive: true, mode: 0o700 });
     const turn: AgentTurn = {
       id: reserved ? z.string().uuid().parse(reserved.turnId) : randomUUID(),
@@ -1092,21 +1082,13 @@ export class AgentHost {
     };
     if (page) await this.conversations.saveBase(turn, projectId, page.document);
     const resumable = this.resumable(conversation);
-    const header =
-      resumable && conversation.catalogRevision === componentCatalog.revision
-        ? `Continue this ShowAI conversation in projectId=${projectId}. The MCP binding, work directory ${conversation.workspace}, component directory revision ${componentCatalog.revision} and earlier ShowAI rules are unchanged.`
-        : this.instructions(
-            projectId,
-            "",
-            conversation.workspace,
-            componentCatalog,
-          );
+    const header = (resumable ? "Continue this ShowAI conversation. " : "") +
+      this.instructions(projectId, "", conversation.workspace);
     const history =
       !resumable && conversation.turns.length
         ? recap(conversation, turn.id)
         : "";
     const instructions = `${header}\n${targetInstructions(target, page?.document.title)}\n${history}The user explicitly requests:\n${prompt}`;
-    conversation.catalogRevision = componentCatalog.revision;
     conversation.turns.push(turn);
     conversation.updatedAt = now;
     this.conversations.add(conversation);

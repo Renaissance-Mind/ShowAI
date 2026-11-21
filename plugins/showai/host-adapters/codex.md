@@ -2,7 +2,7 @@
 
 <!-- showai-host-delivery:start -->
 
-- 临时组件用 `show_component` 的 `delivery:"auto"` 在 MCP Apps 视图显示。Codex 延迟加载工具时，在同一次工具发现中查询本次需要的 `public_catalog_list`、`public_catalog_describe`、`show_component`。
+- 临时组件用 `show_component` 的 `delivery:"auto"` 在 MCP Apps 视图显示。默认只需发现 `show_component`，将原创 HTML 直接传给它。
 - 新建或续改保存成功后，用最终回执的项目和页面 ID 调用 `card_present`。同一页只交付一次，多页放进同一次调用的 `additionalTargets`。
 - 用户明确要在聊天里读原页或片段时用 `page_present`。缺少卡片工具、原生视图未出现或用户要求直接打开时查完整宿主适配。
 
@@ -47,7 +47,7 @@
 
 ## 不支持 MCP Apps 的入口
 
-只有实际确认宿主不能显示 MCP Apps，或用户明确要求文件式展示时，使用 `show_component({kind,data,delivery:"fragment-file"})`，不传 live。使用返回的 delivery.inline 绝对路径，在最终回复中单独一行写：
+只有实际确认宿主不能显示 MCP Apps，或用户明确要求文件式展示时，使用 `show_component({html,delivery:"fragment-file"})`，不传 live。使用返回的 delivery.inline 绝对路径，在最终回复中单独一行写：
 
 ```text
 visualize{"path":"实际返回的绝对inline文件路径"}

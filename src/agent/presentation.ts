@@ -1,4 +1,5 @@
-import { CapacityError } from "../portable/capacity.mjs";
+import { assertBytes, CAPACITY, CapacityError } from "../portable/capacity.mjs";
+import { htmlVisualFragment } from "../core/html-visual";
 import { mkdtemp, rm, mkdir, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve, dirname, extname } from "node:path";
@@ -394,7 +395,11 @@ export const SHOW_DELIVERIES = [
   "image",
 ] as const;
 const showBlock = z.object({ kind: z.string().min(1), data: object });
+const htmlFragment = z.string().refine(value => value.trim().length > 0, "Provide a nonempty HTML fragment.");
+const visualInput = z.object({ html: htmlFragment, title: z.string().max(300).optional(), data: object.optional() }).strict();
 export const showComponentSchema = {
+  html: z.union([htmlFragment, z.array(z.union([htmlFragment, visualInput])).min(1).max(SHOW_COMPONENT_LIMIT)])
+    .optional().describe("Original HTML/CSS/JS, or ordered fragments. No catalog or project needed. Optional data is window.showaiData."),
   live: z.boolean().optional().describe("Keep view for updates; MCP Apps only."),
   kind: z
     .string()
@@ -404,7 +409,7 @@ export const showComponentSchema = {
   data: object
     .optional()
     .describe(
-      "component.insert data; custom: {componentId,version,props}.",
+      "Optional inputs for a single HTML visual, or component.insert data for an existing kind.",
     ),
   blocks: z
     .array(showBlock)
@@ -443,6 +448,29 @@ export const showComponentSchema = {
 export type ShowComponentInput = z.infer<
   z.ZodObject<typeof showComponentSchema>
 >;
+
+export function renderHtmlVisuals(input: ShowComponentInput & { html: NonNullable<ShowComponentInput["html"]> }) {
+  if (input.kind !== undefined || input.blocks !== undefined || input.componentSources !== undefined || input.projectId !== undefined || input.live)
+    throw new Error("HTML visuals take html, optional data/title and delivery. Use kind/blocks and live separately for catalog components.");
+  if (Array.isArray(input.html) && input.data !== undefined)
+    throw new Error("For several HTML visuals, supply data on its corresponding item.");
+  const visuals = typeof input.html === "string"
+    ? [{ html: input.html, data: input.data, title: input.title }]
+    : input.html.map(item => typeof item === "string" ? { html: item } : item);
+  const inline = htmlVisualFragment(visuals);
+  const bytes = Buffer.byteLength(inline);
+  assertBytes("HTML conversation visual", bytes, CAPACITY.chatBytes);
+  const html = '<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>body{margin:0;color-scheme:light dark}</style></head><body>' + inline + '</body></html>';
+  return {
+    title: input.title ?? "",
+    html, inline,
+    source: JSON.stringify({ html: visuals }),
+    components: visuals.map((item, index) => ({ kind: "html", index: index + 1, title: item.title })),
+    bytes: { inline: bytes, html: Buffer.byteLength(html), online: null, compact: null },
+    persistence: { savedToProject: false, synchronized: false },
+    warnings: [] as string[],
+  };
+}
 
 export async function renderComponents(
   raw: ShowComponentInput,
@@ -550,7 +578,7 @@ export async function onlinePresentation(html: string) {
 }
 
 export async function writePresentation(
-  value: Awaited<ReturnType<typeof renderPresentation>>,
+  value: Omit<Awaited<ReturnType<typeof renderPresentation>>, "document">,
   destination: string,
   overwrite = false,
 ) {

@@ -1,6 +1,6 @@
 ---
 name: create-component
-description: 通过 ShowAI MCP 创建或改造可复用 React 组件，包括读取页面之间引用的组件，以及填入快速跳转（⌘K）命令、正文 @ 菜单和数据库字段类型的组件。先查目录和评估组合，通过统一组件契约声明对象、事件、子内容和宿主能力，维护可查询的参数契约，再补齐确实缺少的图形、表达或交互能力。
+description: 把聊天中选定的 HTML 可视化注册为可换数据的组件，或通过 ShowAI MCP 创建和改造可复用 React 组件，包括读取页面之间引用的组件，以及填入快速跳转（⌘K）命令、正文 @ 菜单和数据库字段类型的组件。新建 React 组件时先查目录和评估组合，通过统一组件契约声明对象、事件、子内容和宿主能力，维护可查询的参数契约，再补齐确实缺少的图形、表达或交互能力。
 ---
 
 沿用已核实MCP连接、项目和页面；缺少时读 [use-showai](../use-showai/SKILL.md)。正式资源保存到目标项目；开发中想先在对话里看效果时，把源码对象作为 `show_component` 的 componentSources 预览；用户明确要独立文件时交给render_document。两者都不自动创建个人项目。
@@ -9,7 +9,7 @@ description: 通过 ShowAI MCP 创建或改造可复用 React 组件，包括读
 
 需要跨组件联动、承载子内容或调用宿主能力时，先读 showai_capabilities.componentRuntime，再用 catalog_describe 的 view:"contract" 查询精确组件版本；instance:{pageId,blockId} 查询实际实例对象，objectOffset/objectLimit 分页。可点击的画面不代表已公开事件。新组件提供 manifest.contract:{version:1,...}，按[组件制作格式](../use-showai/references/formats/component.json)的 runtimeContractSchema 声明；没有声明的旧包标为 legacy，按兼容入口使用，不推断它支持新增能力。具体做法见 [统一组件契约](references/component-authoring.md#统一组件契约)。
 
-先明确内容输入、读者操作及可见结果。需要分组或响应式多栏时，先查原生 `region` 布局容器；它支持任意子组件组合，不必为了排列现有内容另写 React 容器。先取得或复用project_context的componentCatalog；目录变化时用catalog_list更新。catalog_describe先取guide，再用view=parameters按字段/子树读取类型、含义、遗漏行为、真实例子与关系约束；schema/examples按需读取；调整数据或组合即可达到目标时复用。需要新实现时读取 [组件设计](references/component-authoring.md)和[组件制作格式](../use-showai/references/formats/component.json)。读取详情或源码时沿用目录或页面引用中的scope、version、integrity，准确区分同名组件；实现开发先取development，再只取选中组件所需的source文件；修改已有组件时需要它的全部源码文件与资源，因为component_save保存完整的包：本机连接用 `catalog_describe({projectId,id,scope,version,integrity,view:"source",out:"/绝对路径/新文件夹"})` 把整个组件包写进一个文件夹（放在任务工作目录，不放进内容库；文件夹须不存在或为空，否则加 overwrite:true 覆盖同名文件），在文件夹里修改后提高 manifest.version，再用 directory 保存；远程连接用 view:"source" 与 file:"*" 读取。
+从聊天里注册原创 HTML 时，先按 [show-visual 的注册流程](../show-visual/SKILL.md#之后要保存)读回选中的原图，抽出参数并验证两组数据。保留 HTML 入口、交互和原始默认数据，manifest.examples 至少有一组不同的有效数据。此处已有要注册的源码，直接完成该包的参数规范与保存。其他组件创作先明确内容输入、读者操作及可见结果。需要分组或响应式多栏时，先查原生 `region` 布局容器；它支持任意子组件组合，不必为了排列现有内容另写 React 容器。先取得或复用project_context的componentCatalog；目录变化时用catalog_list更新。catalog_describe先取guide，再用view=parameters按字段/子树读取类型、含义、遗漏行为、真实例子与关系约束；schema/examples按需读取；调整数据或组合即可达到目标时复用。需要新实现时读取 [组件设计](references/component-authoring.md)和[组件制作格式](../use-showai/references/formats/component.json)。读取详情或源码时沿用目录或页面引用中的scope、version、integrity，准确区分同名组件；实现开发先取development，再只取选中组件所需的source文件；修改已有组件时需要它的全部源码文件与资源，因为component_save保存完整的包：本机连接用 `catalog_describe({projectId,id,scope,version,integrity,view:"source",out:"/绝对路径/新文件夹"})` 把整个组件包写进一个文件夹（放在任务工作目录，不放进内容库；文件夹须不存在或为空，否则加 overwrite:true 覆盖同名文件），在文件夹里修改后提高 manifest.version，再用 directory 保存；远程连接用 view:"source" 与 file:"*" 读取。
 
 大源码或资源包在保存前读取 showai_capabilities 的 capacities，按 [容量与大文件](../use-showai/references/capacity.md) 分别检查源码、原始资源、实例数据和编译输出；文件资源预算不代表编译后的 data URI 代码也能达到同样大小。读者只需在本机查看的大文件（如视频原片）不必内嵌，用本机文件链接，见 [组件设计](references/component-authoring.md) 的「本机文件」。
 
@@ -21,7 +21,7 @@ description: 通过 ShowAI MCP 创建或改造可复用 React 组件，包括读
 
 先检查宿主已有选中、右键和悬停扩展点，复用操作、菜单容器与定位。阅读控件按其理解任务组织；编辑动作不进入只读导出。具体验证见组件设计参考。
 
-保存编译成功后，把组件放入真实Page，读取源数据、检查图像与实际交互，再重新读取确认保存。仅声明readData不证明计算结果正确；按稳定ID核对原始值与派生值。独立结果用render_document验证传入源码，交付可编辑输入及HTML/source。连接或编译失败时保留材料并报告，不转用CLI或未保存网页假装成功。
+只要求注册 HTML 组件时，用保存回执中的精确版本在对话里复核两组数据和交互。页面集成任务把组件放入目标 Page，读取源数据、检查图像与实际交互，再重新读取确认保存。仅声明readData不证明计算结果正确；按稳定ID核对原始值与派生值。独立结果用render_document验证传入源码，交付可编辑输入及HTML/source。连接或编译失败时保留材料并报告，不转用CLI或未保存网页假装成功。
 
 ## 页面升级到新版本
 

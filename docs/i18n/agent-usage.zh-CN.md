@@ -43,7 +43,9 @@ showai pages save PAGE --project PROJECT --input revised.showai.json --base-hash
 
 ## 查询目录与参数
 
-在任一宿主展示公共组件都从 show-visual 开始。调用 `public_catalog_list({kind:"component",view:"compact"})`，省略 `limit` 和 `cursor` 即可取全目录，每行给出 ID、名称和使用场景。已知 ID 可直接用 `public_catalog_describe` 的 `view:"guide"` 读用法，再调用 `show_component`。按工作流中的宿主步骤交付。核对未知的显示方式用 `showai_capabilities({view:"presentation"})`，访问项目或持续更新时用完整报告。
+在聊天里做可视化时，用 show-visual 编写原创 HTML，直接调用 `show_component({html})`。多幅图按顺序传入数组，每次最多五幅。用户明确要求使用现有 ShowAI 组件时才查询目录，已知 ID 可直接读使用说明。需要核对宿主显示方式时用 `showai_capabilities({view:"presentation"})`。
+
+用户要求注册复用时，从回执的 source 读回选中片段，让 HTML 从 `window.showaiData` 读取业务参数。用原数据和另一组有效数据验证同一份 HTML 的画面和交互。以 `visual.html` 为入口注册已验证的源码，原始数据放入 defaultData，替代数据放入 manifest.examples。预览与注册后的 HTML 使用相同的沙箱。
 
 ```sh
 showai catalog list --kind component --project PROJECT --json
@@ -154,7 +156,7 @@ CLI：`showai pages read PAGE --project PROJECT --view image --capture viewport 
 
 支持插件界面的 Codex 桌面端可以从主侧栏打开 ShowAI 项目工作台，也可以在聊天右侧打开同一个 Page 和 Board 编辑器。选中内容后用「引用到 Codex 对话」交给当前聊天。Codex 按引用用 ShowAI MCP 读取对应对象，写入原页面之前核对版本。
 
-Codex 插件声明 `SHOWAI_HOST_DISPLAY=mcp-app`。`show_component` 的 `delivery:"auto"` 使用原生视图；内容分批到达时加 `live:true`，先展示第一批有效内容，再更新同一显示区。小任务一次给完，正式页面创作流程保持不变。旧安装若仍声明 `codex-visualize`，可在支持 MCP Apps 的 Codex 中显式使用 `delivery:"mcp-app"`；旧声明仍保留文件式交付含义。
+Codex 插件声明 `SHOWAI_HOST_DISPLAY=mcp-app`。`show_component` 的 `delivery:"auto"` 使用原生视图；用户指定的目录组件分批接收数据时加 `live:true`，先展示第一批有效内容，再更新同一显示区。小任务一次给完，正式页面创作流程保持不变。旧安装若仍声明 `codex-visualize`，可在支持 MCP Apps 的 Codex 中显式使用 `delivery:"mcp-app"`；旧声明仍保留文件式交付含义。
 
 页面创作使用 page_create、page_apply、page_save，保存后的交付入口由当前宿主适配决定。会话可用 `show_component({kind,data,live:true,delivery:"mcp-app"})` 创建一个可持续更新的 MCP Apps 显示区。先查 `showai_capabilities.presentation.liveUpdates`，并确认宿主提供 serverTools；文件片段展示不代表支持持续更新。当前句柄属于原本机 MCP 连接，30 分钟未访问后过期，重连后不恢复；最多 32 份，每份源内容最多 16 MiB。
 

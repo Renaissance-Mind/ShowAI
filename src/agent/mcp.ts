@@ -239,7 +239,7 @@ export async function startPublicMcp(root: string) {
     new McpServer(
       { name: "showai", version: packageMetadata.version },
       {
-        instructions: skillRoute + " Public catalogs and rendering only. Use public_catalog_list view=compact, public_catalog_describe view=guide, then show_component.",
+        instructions: skillRoute + " Render original HTML with show_component. Look up components only when the user explicitly requests the existing catalog.",
       },
     ),
   );

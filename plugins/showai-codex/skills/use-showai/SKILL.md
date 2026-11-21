@@ -1,6 +1,6 @@
 ---
 name: use-showai
-description: 连接 ShowAI 或通过 MCP 管理内容、确定项目、续改作品、制作组件或模板的入口。本机专用包自带 MCP 配置，通用包按 ChatGPT、Grok Bot 或其他客户端逐步引导手动连接。只想在聊天里看内置组件时直接使用 show-visual。
+description: 连接 ShowAI 或通过 MCP 管理内容、确定项目、续改作品、制作组件或模板的入口。本机专用包自带 MCP 配置，通用包按 ChatGPT、Grok Bot 或其他客户端逐步引导手动连接。在聊天里看可视化时直接使用 show-visual。
 ---
 
 # 使用 ShowAI
@@ -14,7 +14,7 @@ Agent 通过 MCP 操作 ShowAI。App、网页、CLI 和 MCP 共用内容核心�
 | 用户要的结果 | 典型说法 | 路径 |
 | --- | --- | --- |
 | 讨论或解释 | “解释一下”“这两个怎么选” | 直接回答；文字、Markdown 表格或 Mermaid 足够时不调用 ShowAI |
-| 在对话里看、试或比较 | “画出来看看”“演示一下这个机制”“做个对比图”“给我看个界面原型” | [show-visual](../show-visual/SKILL.md)：选现有组件，或改造、新建一个组件，用 `show_component` 展示；不需要项目、不保存。展示后用户说“存下来”，也按 show-visual 的“之后要保存”处理 |
+| 在对话里看、试或比较 | “画出来看看”“演示一下这个机制”“做个对比图”“给我看个界面原型” | [show-visual](../show-visual/SKILL.md)：直接编写 HTML 并用 `show_component` 展示，明确要求已有组件时才查目录；不需要项目、不保存。展示后用户说“存下来”，也按 show-visual 的“之后要保存”处理 |
 | 创作或修改作品 | “整理成文档/报告”“做一份讲解页”“把上周那页的结论改清楚”“先帮我规划怎么讲、出设计稿”“评审这页并修改” | 按下文核对连接与归属，再读 [show-document](../show-document/SKILL.md)：它一次给全制作流程（也用于只要规划、设计稿或评审的请求），选用模板时再补充模板的方法 |
 | 查找、阅读或管理已有内容 | “上周那页在哪个项目里”“这个项目里有什么”“哪些页面引用了这一页”“把这三页移到新文件夹”“删掉那页，过几天再找回来”“删掉不用的组件版本”“页面接上这份 Excel” | 留在本 Skill，按 [按任务查找操作](references/tasks.md) 选工具；有 `showai.reference` 时先按 [用户引用](references/user-references.md) 读取它指向的内容 |
 | 从其他应用导入 | “把这个 Notion 导出导进来”“导入这份 Word”“以后要能导入 OPML” | 留在本 Skill，按 [导入与导入器](references/import.md) 先给计划、确认后导入；新格式写一个导入器保存到项目 |
@@ -27,7 +27,7 @@ Agent 通过 MCP 操作 ShowAI。App、网页、CLI 和 MCP 共用内容核心�
 
 ## 核对连接和归属
 
-在聊天里一次展示 1–5 个内置组件，直接按 show-visual 选择组件、读 guide、展示。本机和远程连接都可复用已知的宿主交付方式。只需核对显示声明时用 `showai_capabilities({view:"presentation"})` 取声明和组件数上限。项目归属、跨组件事件和持续更新按各自流程核实。
+在聊天里一次展示 1–5 幅图，按 show-visual 直接写 HTML 并展示。本机和远程连接都可复用已知的宿主交付方式。只需核对显示声明时用 `showai_capabilities({view:"presentation"})` 取声明和组件数上限。项目归属、跨组件事件和持续更新按各自流程核实。
 
 访问项目时，如果连接信息未知或发生变化，调用一次 `showai_capabilities` 取完整报告，复用当前连接已经核实的结果。工具可能带宿主前缀，使用实际暴露的名称。检查 `agentProtocol`、`transport`、`projects.access` 和 `projects.available`；HTTP 连接同时检查 `projects.storage`，`local` 表示桌面直接保存。调用 `project_context` 或 `projects_list` 核对目标。
 
@@ -35,7 +35,7 @@ Agent 通过 MCP 操作 ShowAI。App、网页、CLI 和 MCP 共用内容核心�
 - **project 绑定连接**：`project_context` 返回固定项目。沿用它，不能用另一个 projectId 越过绑定。
 - **authorized 远程连接**：`projects_list` 返回授权项目与当前权限。所有私有操作使用返回的 projectId；不要查询本机内容库或向远程传本机路径。用户明确要求新项目且连接实际提供 `project_create` 时使用它；桌面完整内容库授权支持新建及后续项目；受限模式按当前工具和权限处理。授权、重试、登录和本机项目可见性见 [连接配置的远程部分](references/runtime.md#远程)。
 
-项目操作显式传 `projectId`。进入页面制作或组件制作任务时，用 `project_context({projectId})` 取得 `componentCatalog`：完整内置＋项目索引、目录 revision 和两条工作流说明。项目解析回执也包含该索引；内置 Agent 由宿主在启动时注入。已持有当前连接、当前项目的完整索引时可传 knownCatalogRevision；回执 unchanged=true 时沿用已持有索引，不将省略的 items 当作空目录。没有完整索引时不传该参数。目录变化或切换项目后更新。页面身份来自真实结果中的 `document.id` 或页面列表；会话 ID 用于来源记录，不代替项目或页面身份。远程与本机 ID 不可自行互换。
+项目操作显式传 `projectId`。进入页面制作或组件制作任务时，用 `project_context({projectId})` 取得 `componentCatalog`：完整内置＋项目索引、目录 revision 和两条工作流说明。项目解析回执也包含该索引，页面或组件制作时按需取得。已持有当前连接、当前项目的完整索引时可传 knownCatalogRevision；回执 unchanged=true 时沿用已持有索引，不将省略的 items 当作空目录。没有完整索引时不传该参数。目录变化或切换项目后更新。页面身份来自真实结果中的 `document.id` 或页面列表；会话 ID 用于来源记录，不代替项目或页面身份。远程与本机 ID 不可自行互换。
 
 连接错误、项目不匹配或工具缺失时，先报告缺项并按 [连接配置](references/runtime.md) 核实宿主配置；只看到 `showai_connection_problem` 时调用它并转述原因与修复步骤。完全没有 ShowAI 工具（宿主报 Connection closed 等）时，先区分连接类型：HTTP 连接按[远程连接](references/runtime.md#远程)检查地址、设备和授权；本机 stdio 插件按[连接中断或没有工具](references/runtime.md#连接中断或没有工具)处理。工具报错时按 [错误码与下一步](references/runtime.md#错误码与下一步) 判断能否自行修正；无法恢复时，按 [无法恢复的失败与反馈](references/runtime.md#无法恢复的失败与反馈) 告诉用户失败的步骤和错误码，并指向「设置 → 关于与反馈」。保存或创作失败时，把用户要保存的内容留在对话中，便于修复后重试。用户说页面里的组件报错、显示不出来时，按 [组件显示异常](references/runtime.md#组件显示异常) 处理。继续沿用当前连接和内容库：把失败原因告诉用户，内容留在对话中，等连接恢复后在同一项目里完成。库切换由宿主重新连接明确的 home，不通过文档工具修改全局库配置。已有可信连接、项目和页面身份时直接继续，不重复发现。
 

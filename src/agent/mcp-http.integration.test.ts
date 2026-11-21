@@ -203,10 +203,20 @@ test("remote clients use installed Skills and receive capability facts without a
   expect(data(await anonymous.callTool({
     name: "showai_capabilities", arguments: { view: "presentation" },
   }))).toEqual({
-    presentation: { declaredHostDisplay: "mcp-app", show: { maxComponents: 5 } },
+    presentation: { declaredHostDisplay: "mcp-app", show: { maxComponents: 5, html: true } },
   });
   const removed = await anonymous.callTool({ name: "guide", arguments: {} });
   expect(removed.isError).toBe(true);
+});
+
+test("a public caller can recover the selected original HTML without a project or catalog", async () => {
+  const anonymous = await client();
+  const html = [{ html: "<p>First</p>" }, { html: "<button>第二幅</button>", title: "Second" }];
+  const shown = data(await anonymous.callTool({ name: "show_component", arguments: { html } }));
+  expect(shown.delivery).toMatchObject({ mode: "mcp-app" });
+  expect(shown.persistence).toMatchObject({ savedToProject: false });
+  const recovered = data(await anonymous.callTool({ name: "presentation_source", arguments: { artifactId: shown.artifactId } }));
+  expect(JSON.parse(String(recovered.text))).toEqual({ html });
 });
 
 test("authorized Board reads deliver overlapping images without exposing local cache paths", async () => {

@@ -57,7 +57,9 @@ Ordinary research, comparison and report tasks default to **one resource Page**.
 
 ## Discover resources, then request one view
 
-For public visuals on any host, start with show-visual. Call `public_catalog_list({kind:"component",view:"compact"})` once with no limit or cursor. Each row gives an ID, name and use case. If you know the ID, go straight to `public_catalog_describe` with `view:"guide"`, then call `show_component`. Follow the host's delivery steps in the workflow. To check an unknown display use `showai_capabilities({view:"presentation"})`. Use the full report for project access or live updates.
+For a chat visual, use show-visual and call `show_component({html})` with the HTML you authored. Pass an ordered array of up to five fragments for separate visuals. The runtime renders the fragments directly. Read the catalog only when the user explicitly requests existing ShowAI components. A known ID goes straight to its guide. Use `showai_capabilities({view:"presentation"})` when the host display is unknown.
+
+To register a visual for reuse, recover the selected fragment from the source receipt, parameterize its business data through `window.showaiData`, and test the original and a different dataset against the same HTML and controls. Save the tested HTML as the package entry (for example, `visual.html`), with the original defaultData and the alternate example in manifest.examples. Each HTML entry uses the same sandbox in chat and after registration.
 
 Read the full accessible catalog of names, descriptions, scenarios and one-line component signatures before inspecting individual resources:
 
@@ -347,7 +349,7 @@ CLI: `showai pages read PAGE --project PROJECT --view image --capture viewport -
 
 ## Optional live conversation updates
 
-Codex plugins declare `SHOWAI_HOST_DISPLAY=mcp-app`. `show_component` with `delivery:"auto"` uses the native view; add `live:true` when content arrives in batches. Show the first valid batch immediately, then update the same view. Complete small tasks in one call. Saved Page authoring remains unchanged. Older installations that declare `codex-visualize` can explicitly select `delivery:"mcp-app"` in a supported Codex host; the legacy declaration still selects file delivery.
+Codex plugins declare `SHOWAI_HOST_DISPLAY=mcp-app`. `show_component` with `delivery:"auto"` uses the native view; for explicitly selected catalog components add `live:true` when data arrives in batches. Show the first valid batch immediately, then update the same view. Complete small tasks in one call. Saved Page authoring remains unchanged. Older installations that declare `codex-visualize` can explicitly select `delivery:"mcp-app"` in a supported Codex host; the legacy declaration still selects file delivery.
 
 Page authoring uses page_create, page_apply and page_save. The host adapter selects the saved-Page delivery. A conversation can instead opt into one persistent MCP Apps view with `show_component({kind,data,live:true,delivery:"mcp-app"})`. Inspect `showai_capabilities.presentation.liveUpdates` and verify that the host advertises `serverTools`; a file-fragment display alone is insufficient. Current live handles belong to one local MCP connection, expire after 30 minutes of inactivity and do not survive reconnects. Limits are 32 views and 16 MiB of source per view.
 

@@ -71,7 +71,7 @@ test("library discovery is read-only; parallel project calls retain explicit ide
   expect(await call(c, "showai_capabilities", { view: "presentation" })).toEqual({
     presentation: {
       declaredHostDisplay: capabilities.presentation.declaredHostDisplay,
-      show: { maxComponents: capabilities.presentation.show.maxComponents },
+      show: { maxComponents: capabilities.presentation.show.maxComponents, html: true },
     },
   });
   expect(await call(c, "showai_capabilities", { view: "full" })).toEqual(capabilities);

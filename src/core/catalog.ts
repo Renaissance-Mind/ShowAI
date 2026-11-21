@@ -99,6 +99,7 @@ import { validateDocument, validateSubtree } from "../portable/validation.mjs";
 import type { ShowDocument } from "../types";
 import type { PageOperation } from "./model";
 import { canonicalJson } from "./diff";
+import { htmlVisualModule } from "./html-visual";
 import {
   workspaceRoot,
   versionedLibrary,
@@ -272,6 +273,7 @@ export default function Component({ data, onChange, readOnly }) {
 }
 
 const SOURCE_EXTENSIONS = new Set([
+  ".html",
   ".ts",
   ".tsx",
   ".js",
@@ -288,6 +290,7 @@ const SOURCE_EXTENSIONS = new Set([
   ".woff2",
 ]);
 const TEXT_EXTENSIONS = new Set([
+  ".html",
   ".ts",
   ".tsx",
   ".js",
@@ -1412,10 +1415,10 @@ function manifestFrom(value: unknown): ComponentManifest {
     isAbsolute(entry) ||
     entry.includes("\\") ||
     entry.split("/").some((part) => part === "..") ||
-    !/\.[jt]sx?$/.test(entry)
+    !/\.(?:[jt]sx?|html)$/.test(entry)
   )
     throw new Error(
-      "Component entry must be a local JavaScript or TypeScript file.",
+      "Component entry must be a local HTML, JavaScript or TypeScript file.",
     );
   if (
     !Array.isArray(item.scenarios) ||
@@ -1770,6 +1773,8 @@ export async function compilePackage(
   manifest.examples.forEach((example) =>
     assertProps(schema, example.data, manifest.documentation),
   );
+  if (/\.html$/i.test(manifest.entry) && !manifest.examples.some(example => canonicalJson(example.data) !== canonicalJson(manifest.defaultData)))
+    throw new Error("Registering an HTML visual requires a second example dataset different from defaultData.");
   if (manifest.contract)
     for (const data of [
       manifest.defaultData,
@@ -2099,6 +2104,8 @@ export default function Nested({data=defaults,onChange,readOnly=true}){check(dat
         if (!contents)
           return { errors: [{ text: `Missing package file: ${file}` }] };
         const extension = extname(file).slice(1);
+        if (extension.toLowerCase() === "html" && file === owner.manifest.entry.replace(/^\.\//, ""))
+          return { contents: htmlVisualModule(contents.toString(), owner.manifest.name), loader: "tsx" };
         return {
           contents,
           loader: ["tsx", "ts", "jsx", "js", "json", "css"].includes(extension)

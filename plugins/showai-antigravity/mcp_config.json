@@ -2,12 +2,6 @@
   "mcpServers": {
     "showai": {
       "tools": {
-        "public_catalog_list": {
-          "eager": true
-        },
-        "public_catalog_describe": {
-          "eager": true
-        },
         "show_component": {
           "eager": true
         }

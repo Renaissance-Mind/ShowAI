@@ -209,8 +209,6 @@ describe("host-specific plugin distributions", () => {
       expect(launch.env.SHOWAI_HOST_DISPLAY).toBe(first.declaredHostDisplay);
       if (profile === "antigravity") {
         expect(launch.tools).toEqual({
-          public_catalog_list: { eager: true },
-          public_catalog_describe: { eager: true },
           show_component: { eager: true },
         });
       } else expect(launch.tools).toBeUndefined();

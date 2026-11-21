@@ -299,7 +299,7 @@ export async function renderReading(
       timeout: 15000,
     });
     await page
-      .locator(".portable-app")
+      .locator(".portable-app, [data-showai-html-visuals]").first()
       .waitFor()
       .catch((error) => {
         if (errors.length)
@@ -310,6 +310,13 @@ export async function renderReading(
       });
     for (const frame of page.frames()) {
       if (!frame.parentFrame()) continue;
+      const element = await frame.frameElement();
+      const isHtmlVisual = await element.evaluate(node => node instanceof Element && node.hasAttribute("data-showai-html-frame"));
+      await element.dispose();
+      if (isHtmlVisual) {
+        await frame.waitForFunction(() => document.documentElement.dataset.showaiHtmlReady === "true");
+        continue;
+      }
       await frame.waitForFunction(
         () =>
           !!document.getElementById("component-root") &&

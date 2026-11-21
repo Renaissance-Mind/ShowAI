@@ -3361,8 +3361,7 @@
         {
           "type": "noauth"
         }
-      ],
-      "anthropic/alwaysLoad": true
+      ]
     }
   },
   {
@@ -3455,8 +3454,7 @@
         {
           "type": "noauth"
         }
-      ],
-      "anthropic/alwaysLoad": true
+      ]
     }
   },
   {
@@ -3537,10 +3535,53 @@
   },
   {
     "name": "show_component",
-    "description": "Show 1–5 components without saving. Built-ins need kind/data. auto follows the host. live requests updates.",
+    "description": "Render original HTML directly in chat (1–5 visuals). Use kind/data or blocks only when existing components are requested.",
     "inputSchema": {
       "type": "object",
       "properties": {
+        "html": {
+          "description": "Original HTML/CSS/JS, or ordered fragments. No catalog or project needed. Optional data is window.showaiData.",
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "minItems": 1,
+              "maxItems": 5,
+              "type": "array",
+              "items": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "html": {
+                        "type": "string"
+                      },
+                      "title": {
+                        "type": "string",
+                        "maxLength": 300
+                      },
+                      "data": {
+                        "type": "object",
+                        "propertyNames": {
+                          "type": "string"
+                        },
+                        "additionalProperties": {}
+                      }
+                    },
+                    "required": [
+                      "html"
+                    ],
+                    "additionalProperties": false
+                  }
+                ]
+              }
+            }
+          ]
+        },
         "live": {
           "description": "Keep view for updates; MCP Apps only.",
           "type": "boolean"
@@ -3551,7 +3592,7 @@
           "minLength": 1
         },
         "data": {
-          "description": "component.insert data; custom: {componentId,version,props}.",
+          "description": "Optional inputs for a single HTML visual, or component.insert data for an existing kind.",
           "type": "object",
           "propertyNames": {
             "type": "string"

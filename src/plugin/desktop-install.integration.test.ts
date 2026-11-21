@@ -192,8 +192,6 @@ describe.skipIf(!output || !config)(
         const server = manifest.mcpServers.showai;
         if (host === "antigravity") {
           expect(server.tools).toEqual({
-            public_catalog_list: { eager: true },
-            public_catalog_describe: { eager: true },
             show_component: { eager: true },
           });
         } else expect(server.tools).toBeUndefined();
