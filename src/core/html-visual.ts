@@ -33,12 +33,14 @@ if (!customElements.get("showai-html-visual")) {
       this.frame = document.createElement("iframe");
       this.frame.setAttribute("sandbox", "allow-scripts");
       this.frame.setAttribute("data-showai-html-frame", "");
-      this.frame.style.cssText = "display:block;width:100%;height:1px;border:0";
+      this.frame.style.cssText = "display:block;width:100%;height:1px;border:0;visibility:hidden";
       this.attachShadow({mode:"open"}).append(this.frame);
       this.resize = event => {
         if (event.source !== this.frame.contentWindow || event.data?.type !== "showai:html-visual-size") return;
         const height = event.data.height;
-        if (Number.isFinite(height) && height >= 0) this.frame.style.height = Math.max(1, Math.min(32000, height)) + "px";
+        if (!Number.isFinite(height) || height < 0) return;
+        this.frame.style.height = Math.max(1, Math.min(32000, height)) + "px";
+        this.frame.style.visibility = "visible";
       };
     }
     connectedCallback() {
@@ -54,7 +56,10 @@ if (!customElements.get("showai-html-visual")) {
       this.frame.title = input.title || "Visualization";
       const data = JSON.stringify(JSON.stringify(input.data ?? {})).replace(/</g, "\\\\u003c");
       const source = ${scriptJson(head)} + "JSON.parse(" + data + ");</" + "script></head><body>" + input.html + "</body></html>";
-      if (this.frame.getAttribute("srcdoc") !== source) this.frame.srcdoc = source;
+      if (this.frame.getAttribute("srcdoc") !== source) {
+        this.frame.style.visibility = "hidden";
+        this.frame.srcdoc = source;
+      }
     }
   });
 }`;

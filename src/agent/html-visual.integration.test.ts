@@ -5,27 +5,37 @@ import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
-import { chromium, type Page } from "playwright-core";
+import { chromium, type Page, type FrameLocator } from "playwright-core";
 import { createMcpServer } from "./mcp";
 import { AgentService } from "./service";
 import { readingBrowserExecutable } from "./reading-renderer";
 import { syncManager } from "../sync/manager";
 import { statusTagComponent } from "../test/page-reference-components";
 import { renderHtmlVisuals } from "./presentation";
+import { componentResourceUri } from "./mcp-ui";
 
 const oneOff =
   '<button id="read">Read status</button><output></output><script>document.querySelector("button").onclick=()=>{document.querySelector("output").textContent="Ready"}</script>';
 const parameterized = oneOff.replace('"Ready"', "window.showaiData.label");
 
-async function readStatus(page: Page, index: number, expected: string) {
+async function readStatus(
+  page: Page | FrameLocator,
+  index: number,
+  expected: string,
+) {
   const visual = page
     .locator("showai-html-visual")
     .nth(index)
     .frameLocator("iframe");
   await visual
+    .locator("html[data-showai-html-ready]")
+    .waitFor({ state: "attached" });
+  await visual
     .getByRole("button", { name: "Read status" })
     .click({ timeout: 15_000 });
-  expect(await visual.locator("output").textContent()).toBe(expected);
+  await expect
+    .poll(() => visual.locator("output").textContent())
+    .toBe(expected);
 }
 
 test("direct HTML stays selectable, isolated and interactive, then registers and renders with different data", async () => {
@@ -151,32 +161,90 @@ test("direct HTML stays selectable, isolated and interactive, then registers and
       expect(await visual.locator("output").textContent()).toBe(value.label);
     }
 
+    const alternateBlock = created.document.content.content![1].attrs!.id;
+    const inspected = await call("page_read", {
+      pageId: created.document.id,
+      blockIds: [alternateBlock],
+      view: "html",
+      actions: [
+        {
+          type: "click",
+          blockId: alternateBlock,
+          role: "button",
+          name: "Read status",
+        },
+      ],
+      out: join(root, "inspected.html"),
+    });
+    const inspection = JSON.parse(
+      await readFile(String(inspected.data.metadataPath), "utf8"),
+    );
+    expect(inspection.dom).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          blockId: alternateBlock,
+          accessibility: expect.stringContaining(alternate.label),
+        }),
+      ]),
+    );
+
     const app = await call("show_component", {
       html: parameterized,
       data: alternate,
       delivery: "mcp-app",
     });
     const resource = await client.readResource({
-      uri: "ui://showai/component-v2.html",
+      uri: componentResourceUri,
     });
     const appPath = join(root, "mcp-app.html");
     const reader = resource.contents[0];
     if (!("text" in reader)) throw new Error("Expected an HTML resource.");
     await writeFile(appPath, reader.text);
-    await page.goto(pathToFileURL(appPath).href);
-    await page.evaluate(
-      (meta) =>
-        window.postMessage(
+    const hostPath = join(root, "host.html");
+    await writeFile(
+      hostPath,
+      `<script>window.addEventListener("message", event => {
+        if(event.data.method === "ui/initialize") document.documentElement.dataset.request = JSON.stringify(event.data.id);
+        if(event.data.method === "ui/notifications/initialized") document.documentElement.dataset.connected = "true";
+      });</script><iframe title="Tool view" sandbox="allow-scripts" width="460" height="320" src="mcp-app.html"></iframe>`,
+    );
+    await page.goto(pathToFileURL(hostPath).href);
+    const appElement = page.locator('iframe[title="Tool view"]');
+    const appFrame = appElement.contentFrame();
+    await appFrame.locator("#reader").waitFor({ state: "attached" });
+    await appElement.evaluate(
+      (node, result) => {
+        (node as HTMLIFrameElement).contentWindow!.postMessage(
           {
             jsonrpc: "2.0",
             method: "ui/notifications/tool-result",
-            params: { _meta: meta },
+            params: result,
           },
           "*",
-        ),
-      app._meta,
+        );
+      },
+      { _meta: app._meta, structuredContent: app.structuredContent },
     );
-    await readStatus(page, 0, alternate.label);
+    await readStatus(appFrame, 0, alternate.label);
+    await appElement.evaluate((node) => {
+      (node as HTMLIFrameElement).contentWindow!.postMessage(
+        {
+          jsonrpc: "2.0",
+          id: JSON.parse(document.documentElement.dataset.request!),
+          result: { hostCapabilities: { updateModelContext: true } },
+        },
+        "*",
+      );
+    });
+    await page
+      .locator('html[data-connected="true"]')
+      .waitFor({ state: "attached" });
+    expect(
+      await appFrame
+        .frameLocator("showai-html-visual iframe")
+        .locator("output")
+        .textContent(),
+    ).toBe(alternate.label);
     expect(errors).toEqual([]);
   } finally {
     await browser.close();
