@@ -28,6 +28,7 @@ export type RichTextHost = Pick<
   | "onEditorReady"
   | "onInsertNative"
   | "onDetachBlock"
+  | "emitInitialUpdate"
   | "retentionKey"
 > & {
   continuousPage?: boolean;

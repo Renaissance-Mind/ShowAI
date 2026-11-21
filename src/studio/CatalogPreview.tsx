@@ -5,7 +5,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import { Search, Focus, Expand } from "../ui/icons";
+import { Search, Focus, Expand, RotateCcw } from "../ui/icons";
 import { previewColumns, previewFit, previewZoom } from "./preview-geometry";
 import { errorMessage } from "../host/bridge";
 import { useTranslator } from "../i18n/react";
@@ -18,6 +18,7 @@ export default function CatalogPreview({
   label,
   width = 960,
   resetKey,
+  onReset,
   accessory,
   thumbnail = false,
   maxColumns = 1,
@@ -29,6 +30,7 @@ export default function CatalogPreview({
   label: string;
   width?: number;
   resetKey?: string | number;
+  onReset?: () => void;
   accessory?: ReactNode;
   thumbnail?: boolean;
   maxColumns?: number;
@@ -168,9 +170,21 @@ export default function CatalogPreview({
       {!thumbnail && (
         <div
           className="catalog-preview-tools"
+          data-edited={onReset ? "" : undefined}
           role="group"
           aria-label={t("previewActions")}
         >
+          {onReset && (
+            <button
+              className="studio-icon"
+              type="button"
+              aria-label={t("resetExample")}
+              title={t("resetExample")}
+              onClick={onReset}
+            >
+              <RotateCcw size={18} />
+            </button>
+          )}
           <div
             className="catalog-zoom-menu"
             ref={zoomMenu}
