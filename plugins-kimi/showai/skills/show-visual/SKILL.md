@@ -5,7 +5,7 @@ description: 在对话中直接展示 1–5 个 ShowAI 组件（图表、示意�
 
 # 对话展示
 
-用 `show_component` 把组件直接放进对话。在支持持续更新的宿主中，用户要求边生成边看，或内容会分批到达时，先展示第一批有效内容，再更新同一个显示区；内容已齐或任务很小时一次给完。不需要项目、模板或制作流程，结果不写入内容库。
+只在当前对话展示内置组件时，从本 Skill 开始。直接使用当前连接的 `public_catalog_list`、`public_catalog_describe` 和 `show_component`。如果工具按需加载，用宿主的工具搜索或选择功能一次取出本次需要的工具，沿用实际前缀。已知组件 ID 或已持有索引时只取后两项。在支持持续更新的宿主中，数据分批到达时先展示第一批有效内容，再更新同一显示区。展示结果不写入内容库。
 
 跨组件联动先读 showai_capabilities.componentRuntime 和组件 view:"contract"；按照公开事件与稳定对象绑定，legacy 包不推断事件能力。需要临时创建或改造组件时采用 create-component 的统一契约与真实编译验证。
 
@@ -38,11 +38,11 @@ description: 在对话中直接展示 1–5 个 ShowAI 组件（图表、示意�
 
 ## 当前宿主交付
 
-已绑定本机展示适配、只需一次展示内置组件时，直接执行上面的制作步骤。连接未知、发生变化或回执与本节不符时，用 `showai_capabilities` 核对连接与显示能力。
+本机插件和远程 MCP Apps 已绑定当前交付方式，或同一连接的显示能力已经核实时，一次性展示直接执行上面的制作步骤。若只需确认未知或变更连接的显示声明，调用 `showai_capabilities({view:"presentation"})`，读取 `presentation.declaredHostDisplay` 和 `presentation.show.maxComponents`。旧运行时没有 view 参数时才取完整报告。声明为 `undeclared` 时按宿主实际提供的显示动作交付，回执与预期不同再查完整适配。
 
 <!-- showai-host-delivery:start -->
 
-- 先确认当前 Widget 的工作区、大小上限与显示动作。用 `show_component` 的 `delivery:"auto"` 取得 `fragment-file`。
+- 使用当前 Widget 的工作区、大小上限与显示动作。已注册的工具可直接调用；当前会话提供 `select_tools` 且延迟加载时，一次选择用到的 ShowAI 工具。用 `show_component` 的 `delivery:"auto"` 取得 `fragment-file`。
 - 核对 `display.reader:"bundled"` 和压缩大小，把回执的 `delivery.inline` 原样复制到该 Widget 的 `workspace/index.html`，执行显示动作。
 - 新作品保存后用 `page_present` 预览，续改给出所在项目、改动和原页链接。缺少 Widget、超限或阅读器为 `cdn` 时查完整宿主适配。
 

@@ -187,7 +187,8 @@ afterAll(async () => {
 
 test("remote clients use installed Skills and receive capability facts without a guide tool", async () => {
   const anonymous = await client();
-  expect(anonymous.getInstructions()).toContain("Read use-showai Skill");
+  expect(anonymous.getInstructions()).toContain("show-visual");
+  expect(anonymous.getInstructions()).toContain("use-showai");
   expect(anonymous.getInstructions()).not.toContain("guide()");
   const tools = await anonymous.listTools();
   expect(tools.tools.map((tool) => tool.name)).not.toContain("guide");
@@ -199,6 +200,11 @@ test("remote clients use installed Skills and receive capability facts without a
   });
   expect(capabilities).not.toHaveProperty("workflow");
   expect(capabilities).not.toHaveProperty("next");
+  expect(data(await anonymous.callTool({
+    name: "showai_capabilities", arguments: { view: "presentation" },
+  }))).toEqual({
+    presentation: { declaredHostDisplay: "mcp-app", show: { maxComponents: 5 } },
+  });
   const removed = await anonymous.callTool({ name: "guide", arguments: {} });
   expect(removed.isError).toBe(true);
 });

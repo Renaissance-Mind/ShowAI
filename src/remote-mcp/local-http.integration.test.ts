@@ -161,6 +161,14 @@ afterAll(async () => {
 
 test("local OAuth protects projects and saves real pages directly to the desktop library", async () => {
   const anonymous = await client();
+  const display = await anonymous.callTool({
+    name: "showai_capabilities", arguments: { view: "presentation" },
+  });
+  expect(display.structuredContent).toEqual({
+    ok: true, data: { presentation: { declaredHostDisplay: "mcp-app", show: { maxComponents: 5 } } },
+  });
+  const full = await anonymous.callTool({ name: "showai_capabilities", arguments: { view: "full" } });
+  expect(full.structuredContent).toMatchObject({ data: { projects: { storage: "local" } } });
   const tools = await anonymous.listTools();
   expect(tools.tools.some((t) => t.name === "project_create")).toBe(false);
   expect(

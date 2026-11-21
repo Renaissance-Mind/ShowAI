@@ -1,5 +1,5 @@
 import { test, expect } from "vitest";
-import { mkdtemp, writeFile, rm } from "node:fs/promises";
+import { cp, mkdtemp, writeFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { execFile } from "node:child_process";
@@ -9,8 +9,14 @@ const execute = promisify(execFile);
 test("a real ZIP includes complete workflows and a remote connection without local launchers", async () => {
   const directory = await mkdtemp(join(tmpdir(), "showai-plugin-zip-"));
   try {
+    const source = join(directory, "bundle");
+    await cp(resolve("plugins/showai"), source, { recursive: true });
+    for (const skill of ["show-visual", "show-document"]) {
+      const file = `skills/${skill}/SKILL.md`;
+      await cp(resolve("plugins/showai-claude", file), join(source, file));
+    }
     const result = await remotePluginPackage(
-      resolve("plugins/showai"),
+      source,
       "https://device.example.com/mcp",
       "asdk_app_testconnection",
     );
@@ -24,7 +30,8 @@ test("a real ZIP includes complete workflows and a remote connection without loc
 with zipfile.ZipFile(sys.argv[1]) as z:
  assert z.testzip() is None
  names=z.namelist(); root=names[0].split('/')[0]+'/'
- print(json.dumps({'names':names,'manifest':json.loads(z.read(root+'plugin.json')),'app':json.loads(z.read(root+'.app.json')),'adapter':z.read(root+'skills/use-showai/references/host-adapter.md').decode()}))`,
+ workflows=[z.read(root+'skills/'+skill+'/SKILL.md').decode() for skill in ['show-visual','show-document']]
+ print(json.dumps({'names':names,'manifest':json.loads(z.read(root+'plugin.json')),'app':json.loads(z.read(root+'.app.json')),'adapter':z.read(root+'skills/use-showai/references/host-adapter.md').decode(),'workflows':workflows}))`,
         path,
       ],
     );
@@ -48,6 +55,9 @@ with zipfile.ZipFile(sys.argv[1]) as z:
       false,
     );
     expect(archive.adapter).toContain("mcp-app");
+    const delivery = archive.adapter.match(/<!-- showai-host-delivery:start -->[\s\S]+?<!-- showai-host-delivery:end -->/)?.[0];
+    expect(delivery).toBeTruthy();
+    for (const workflow of archive.workflows) expect(workflow).toContain(delivery);
     expect(
       (
         await remotePluginPackage(

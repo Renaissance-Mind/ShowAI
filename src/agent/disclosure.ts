@@ -331,6 +331,12 @@ export function catalogEntry(item: CatalogSummary) {
   };
 }
 
+export const COMPACT_CATALOG_COLUMNS = ["id", "name", "scenario"] as const;
+
+export function compactCatalogRow(item: ReturnType<typeof catalogEntry>) {
+  return [item.id, item.name, item.scenarios[0] || item.description];
+}
+
 export function catalogPage<T>(
   items: T[],
   input: { limit?: number; cursor?: string; key?: unknown } = {},

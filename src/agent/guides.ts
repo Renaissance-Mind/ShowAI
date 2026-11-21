@@ -66,7 +66,7 @@ const guides: Record<
     purpose:
       "Use common ShowAI capabilities across harnesses, choosing display and synchronization independently.",
     rules: [
-      "A bound local plugin can display public components once using its installed show-visual delivery steps and the actual receipt. Check runtime info (CLI) or showai_capabilities (MCP) for unknown or changed connections, unexpected display modes, private access or live updates.",
+      "Across stdio and HTTP, start public visuals with show-visual. Use public_catalog_list view=compact only if choosing an ID, read its guide, then call show_component. Discover deferred tools together through the host. Known display contracts need no capabilities call. For an unknown display use showai_capabilities view=presentation; for private access or live updates use the full report.",
       "CLI scripts can preview import and datasets transform with --dry-run. Commands reject unsupported options before opening the library. With --json, argument errors return ok:false and error.message.",
       "Public components/templates and customization do not require a personal project or synchronization. public list/describe and render are the CLI equivalents of public_catalog_list/describe and render_document.",
       "render input is {document?,templateId?,title?,componentSources?}; supply document or templateId. componentSources use the editable manifest/schema/source/files/assets contract from guide component. Rendering returns HTML, inline and source plus savedToProject=false/synchronized=false.",

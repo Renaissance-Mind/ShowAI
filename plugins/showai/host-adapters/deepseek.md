@@ -2,7 +2,7 @@
 
 <!-- showai-host-delivery:start -->
 
-- 用 `show_component` 的 `delivery:"auto"` 取得 `fragment-file`。插件自动读取本机 `delivery.inline`（缺省时读取 `delivery.html`），在工具结果旁显示预览。
+- Harness 连接后会注册 ShowAI 的 MCP 工具，可直接调用。用 `show_component` 的 `delivery:"auto"` 取得 `fragment-file`，插件自动读取本机 `delivery.inline`（缺省时读取 `delivery.html`），在工具结果旁显示预览。
 - 新作品保存后用 `page_present` 展示，给出实际项目和 `openUrl`。续改说明改动并给出原页入口。
 - 确认预览出现后，正文只补充必要结论。缺少预览或返回远程 URL 时查完整宿主适配。
 

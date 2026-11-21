@@ -2,7 +2,7 @@
 
 **Language:** English | [简体中文](i18n/agent-integration.zh-CN.md) · [Documentation](README.md)
 
-**Agent document operations use MCP** in every host. Read the installed `use-showai` Skill for task routing and ownership. Query `showai_capabilities` when the connection is unknown or changes, and reuse the result for that connection. It reports runtime capabilities and limits; workflows stay in Skills. Local plugins include a stdio launcher; remote packages provide an HTTP endpoint. CLI examples below configure services or support scripts and operators.
+**Agent document operations use MCP** in every host. Start a public visual with `show-visual`. Use `use-showai` for project ownership and other workflows. Local plugins include a stdio launcher and remote packages connect over HTTP.
 
 Local library MCP uses explicit `projectId` per operation. Use `projects_list` for read-only discovery, `project_resolve` with a trusted absolute `sourceDirectory` for new formal content, or a project-bound connection. Save formal work before delivering it through the host adapter. Use `render_document` for explicitly standalone deliverables. **Connection failure** does not change the destination or persistence mode.
 
@@ -62,7 +62,18 @@ For deployment commands and acceptance gates, see [Cloudflare MCP operations](cl
 
 ### Public and authorized tools
 
-Antigravity packages eagerly load `public_catalog_list`, `public_catalog_describe` and `show_component`. A one-time display of public components through a bound local plugin can use these tools directly. Read the installed workflow's delivery steps and use the receipt to confirm the chosen mode. Use `showai_capabilities` to check unknown or changed connections and features such as live updates.
+On stdio and HTTP, a public visual uses `public_catalog_list({kind:"component",view:"compact"})`, the selected ID's guide, then `show_component`. Go straight to the guide if you know the ID. A bound display needs no preliminary call. To check an unknown display, `showai_capabilities({view:"presentation"})` returns its declaration and component limit. The default full report covers project access, live updates and other capabilities.
+
+| Client | How the three public visual tools become available |
+| --- | --- |
+| Claude Code | The MCP server marks the three tools with `_meta["anthropic/alwaysLoad"]`. An explicit client setting can override it. [Tool loading](https://code.claude.com/docs/en/mcp#mark-a-tool-to-load-upfront-or-stay-deferred) |
+| Antigravity | The plugin requests eager loading for the three tools in `mcp_config.json`. [Eager tools](https://antigravity.google/docs/mcp#configure-eager-tools) |
+| Codex | Use the registered tools directly when visible. With tool search enabled, search together for the needed names. |
+| Kimi Work | Use the registered tools. In sessions that expose `select_tools`, select the needed names together. |
+| DeepSeek Harness | Its MCP client registers the server's tools at connection time. |
+| ChatGPT MCP Apps and other HTTP clients | The server supplies the same tool schemas through `tools/list`. The client controls discovery and rendering. Clients without installed Skills can follow the tool descriptions. |
+
+ShowAI's built-in Agent receives the compact component index with project scopes, versions and integrity values. It can select a built-in directly from that index. The embedded text view can link the file returned by a local preview.
 
 Public tools are `showai_capabilities`, `public_catalog_list`, `public_catalog_describe`, `render_document`, `show_component` and `presentation_source`. The last tool retrieves editable public render input in text chunks when a host cannot download the HTTP URL; it does not expose private project exports. The catalog includes built-in components and editable starter templates. All public rendering inputs come from the caller; anonymous operations do not read the user's content library.
 

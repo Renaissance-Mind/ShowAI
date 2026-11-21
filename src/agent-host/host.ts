@@ -789,10 +789,16 @@ export class AgentHost {
     projectId: string,
     focus: string,
     workspace: string,
-    componentCatalog: unknown,
-    revision?: string,
+    componentCatalog: Awaited<ReturnType<AgentService["componentPromptIndex"]>>,
   ) {
-    return `You are working inside ShowAI. The host has supplied these verified selections: projectId=${projectId}${focus}. Operate only that project${focus ? " and focused page" : ""}. Use project_context with knownCatalogRevision=${revision} to confirm the MCP binding without repeating the supplied index, then read the chosen page. Use the connected ShowAI MCP tools for all library reads and writes. Do not invoke authoring CLI commands or switch connections if MCP fails. Read current hash/revision before saving; preserve conflicting drafts. Do not edit raw library files. Work files belong in ${workspace}. This host displays text and file links, without inline HTML rendering. For a requested preview, use page_present with the requested stable block IDs and return its delivery file link; do not claim it is displayed in the conversation. Read the ShowAI authoring guide before editing. For status-only requests query project_sync_status; do not run project_sync unless the user requests synchronization. Component directory (complete; reuse this index until its revision changes): ${JSON.stringify(componentCatalog)}\nFor page work read selected component guides; for component work read development guidance before source.`;
+    return [
+      `You are working inside ShowAI. The host has supplied these verified selections: projectId=${projectId}${focus}. Operate only that project${focus ? " and focused page" : ""}.`,
+      "Choose a component from the supplied index using its column names. For a public visual, read the selected built-in's guide with public_catalog_describe, then call show_component with delivery=fragment-file. This host displays text and file links. Link delivery.inline when the returned local file is accessible. Follow the actual delivery mode on fallback.",
+      `For project work use project_context with knownCatalogRevision=${componentCatalog.revision} to confirm the binding, then read the chosen page. Use the connected ShowAI MCP tools for all library reads and writes. Do not invoke authoring CLI commands or switch connections if MCP fails. Read current hash/revision before saving and preserve conflicting drafts. Do not edit raw library files. Work files belong in ${workspace}.`,
+      "For a saved-page preview, use page_present with the requested stable block IDs and return its delivery file link. Read the ShowAI authoring guide before editing. For status-only requests query project_sync_status. Run project_sync only when requested.",
+      `Component directory: ${JSON.stringify(componentCatalog)}`,
+      "Read the selected revision's guide for page work and development guidance before inspecting component source.",
+    ].join("\n");
   }
   private async loadTasks() {
     if (!this.loaded)
@@ -865,7 +871,7 @@ export class AgentHost {
       ? undefined
       : await new AgentService({
           root: this.options.library().root,
-        }).componentContext(projectId);
+        }).componentPromptIndex(projectId);
     const workspace = join(
       this.workspaceRoot,
       projectId || "Connection Tests",
@@ -894,9 +900,9 @@ export class AgentHost {
         (item, index) => index < 50 || item.state === "running",
       );
     const cli = this.options.cli();
-    const instructions = test
-      ? prompt
-      : `${this.instructions(projectId, pageId ? `, pageId=${pageId}` : "", workspace, componentCatalog, componentCatalog?.revision)} The user explicitly requests:\n${prompt}`;
+    const instructions = componentCatalog
+      ? `${this.instructions(projectId, pageId ? `, pageId=${pageId}` : "", workspace, componentCatalog)} The user explicitly requests:\n${prompt}`
+      : prompt;
     const resume = args.taskId
       ? this.tasks.find(
           (item) =>
@@ -1062,7 +1068,7 @@ export class AgentHost {
       : undefined;
     const componentCatalog = await new AgentService({
       root: library.root,
-    }).componentContext(projectId);
+    }).componentPromptIndex(projectId);
     await mkdir(conversation.workspace, { recursive: true, mode: 0o700 });
     const turn: AgentTurn = {
       id: reserved ? z.string().uuid().parse(reserved.turnId) : randomUUID(),
@@ -1094,7 +1100,6 @@ export class AgentHost {
             "",
             conversation.workspace,
             componentCatalog,
-            componentCatalog.revision,
           );
     const history =
       !resumable && conversation.turns.length

@@ -54,6 +54,7 @@ export interface PresentationDelivery {
   expiresAt?: string;
 }
 export const noAuth = [{ type: "noauth" }];
+const visualToolMeta = { securitySchemes: noAuth, "anthropic/alwaysLoad": true };
 export const readerToolMeta = {
   ui: { resourceUri: readerResourceUri },
   "openai/outputTemplate": readerResourceUri,
@@ -243,6 +244,7 @@ export function registerPresentationTools(
   },
 ) {
   const declaredDisplay = options.hostDisplay ?? hostDisplay();
+  const reportedDisplay = declaredDisplay ?? "undeclared";
   const liveViews = new Map<string, { session: PresentationSession; projectId?: string; touched: number }>();
   const expireViews = () => {
     const cutoff = Date.now() - 30 * 60 * 1000;
@@ -337,13 +339,20 @@ export function registerPresentationTools(
   server.registerTool(
     "showai_capabilities",
     {
-      description: "Return this connection's ShowAI capabilities.",
-      inputSchema: {},
+      description: "Connection capabilities. view=presentation returns display and component limit.",
+      inputSchema: { view: z.enum(["presentation", "full"]).optional() },
       annotations: readOnly,
       _meta: { securitySchemes: noAuth },
     },
-    async () =>
-      mcpSuccess({
+    async ({ view }) => {
+      if (view === "presentation")
+        return mcpSuccess({
+          presentation: {
+            declaredHostDisplay: reportedDisplay,
+            show: { maxComponents: SHOW_COMPONENT_LIMIT },
+          },
+        });
+      return mcpSuccess({
         version,
         agentProtocol: "showai-mcp-v1",
         support: await supportInfo(),
@@ -534,7 +543,7 @@ export function registerPresentationTools(
             tools: options.transport === "stdio" ? ["show_component_update", "show_component_read", "show_component_close"] : [],
             preservesPageWorkflow: true,
           },
-          declaredHostDisplay: declaredDisplay ?? "undeclared",
+          declaredHostDisplay: reportedDisplay,
         },
         projects: {
           available: options.privateProjects ?? true,
@@ -550,13 +559,14 @@ export function registerPresentationTools(
           sharedSynchronization: true,
           htmlDisplayRequired: false,
         },
-      }),
+      });
+    },
   );
   server.registerTool(
     "public_catalog_list",
     {
       description:
-        "List public components/templates. Use view=compact without limit for the whole index in one call; detailed (default) includes signatures.",
+        "List all built-ins with kind=component, view=compact and no limit. Default view includes signatures.",
       inputSchema: {
         kind: z.enum(["component", "template"]).optional(),
         query: z.string().optional(),
@@ -565,7 +575,7 @@ export function registerPresentationTools(
         cursor: z.string().optional(),
       },
       annotations: readOnly,
-      _meta: { securitySchemes: noAuth },
+      _meta: visualToolMeta,
     },
     (input) => safe(() => publicCatalog(input)),
   );
@@ -573,7 +583,7 @@ export function registerPresentationTools(
     "public_catalog_describe",
     {
       description:
-        "Read public components or whole template guides.",
+        "Read a public component or template. For a known ID use view=guide, then show_component.",
       inputSchema: {
         id: z.string(),
         version: z.string().optional(),
@@ -595,7 +605,7 @@ export function registerPresentationTools(
         file: z.string().optional(),
       },
       annotations: readOnly,
-      _meta: { securitySchemes: noAuth },
+      _meta: visualToolMeta,
     },
     ({ id, ...input }) => safe(() => describePublicResource(id, input)),
   );
@@ -658,10 +668,10 @@ export function registerPresentationTools(
   server.registerTool(
     "show_component",
     {
-      description: `Show 1–${SHOW_COMPONENT_LIMIT} components without saving; same kind/data as page_apply. live opts into updates.`,
+      description: `Show 1–${SHOW_COMPONENT_LIMIT} components without saving. Built-ins need kind/data. auto follows the host. live requests updates.`,
       inputSchema: showComponentSchema,
       annotations: readOnly,
-      _meta: { securitySchemes: noAuth, ...componentToolMeta },
+      _meta: { ...visualToolMeta, ...componentToolMeta },
     },
     async (input) => {
       try {

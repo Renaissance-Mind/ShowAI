@@ -80,7 +80,7 @@ The marketplace identity stays `showai@renaissance-mind`. The generated Codex an
 | [create-template](skills/create-template/SKILL.md)       | Reusable template folders and methods                                |
 | [collaborate-canvas](skills/collaborate-canvas/SKILL.md) | Co-editing on canvases, multi-device pairing                         |
 
-Agent document operations use MCP. Read the installed use-showai Skill and discover the required project. Query showai_capabilities once when the current connection is unknown or changes. Save formal work in the selected project and use the installed host adapter to deliver it. Use `render_document` for standalone files. Detailed methods remain in the canonical Skills; this README is the installation entrypoint.
+For public visuals, start with show-visual on any host. A known connection can go straight from the compact catalog to the chosen guide and `show_component`. If the connection's display is unknown, `showai_capabilities({view:"presentation"})` returns its display declaration and component limit. For project work, start with use-showai, confirm the project and save before delivery. Use `render_document` for standalone files.
 
 ## Runtime and library
 

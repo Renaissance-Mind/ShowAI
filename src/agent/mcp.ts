@@ -38,16 +38,18 @@ import {
   type ToolConnection,
 } from "./mcp-tools/tool";
 
+const skillRoute = "Visuals: show-visual. Else use-showai.";
+
 export function createMcpServer(options: McpServerOptions): McpServer {
   const service = new AgentService(options);
   const projectId = service.requireProject(options.projectId);
+  const scope = options.instructions ??
+    (options.projectAccess === "library" ? undefined : `Bound project: ${projectId}.`);
   const server = strictToolInputs(
     new McpServer(
       { name: "showai", version: packageMetadata.version, icons: options.icons },
       {
-        instructions:
-          options.instructions ??
-          `Read use-showai Skill. Bound project: ${projectId}.`,
+        instructions: scope ? `${skillRoute} ${scope}` : skillRoute,
       },
     ),
   );
@@ -228,8 +230,7 @@ export async function startPublicMcp(root: string) {
     new McpServer(
       { name: "showai", version: packageMetadata.version },
       {
-        instructions:
-          "Read use-showai Skill. Public catalogs and rendering only.",
+        instructions: skillRoute + " Public catalogs and rendering only. Use public_catalog_list view=compact, public_catalog_describe view=guide, then show_component.",
       },
     ),
   );

@@ -12,7 +12,7 @@
 
 show-visual 和 show-document 的「当前宿主交付」包含安装包绑定的常规交付步骤。回执与声明不符、显示失败或需要特殊交付时，查[完整宿主适配](host-adapter.md)。host-profile.json 记录适配身份、显示声明和文件指纹，供安装和诊断核验。
 
-showai_capabilities.presentation.declaredHostDisplay 回显连接声明，show_component 的 delivery:auto 按声明选择；以工具实际返回的 delivery.mode 交付。需要模型自己写 HTML 的宿主中，page_present 与 render_document 另外返回 `conversation`（`mode`、`next`，可展示时带 `fragment`），按它完成展示。声明与插件指南不一致时，先核对所选连接、安装版本和宿主能力。配置更新后旧 MCP 进程可能仍沿用此前声明，重连与宿主加载分别验证。
+需要核对显示时，`showai_capabilities({view:"presentation"})` 返回 `presentation.declaredHostDisplay` 和 `presentation.show.maxComponents`。show_component 的 delivery:auto 跟随连接声明，以实际返回的 delivery.mode 交付。需要模型自己写 HTML 的宿主中，page_present 与 render_document 另外返回 `conversation`（`mode`、`next`，可展示时带 `fragment`），按它完成展示。声明与插件指南不一致时，核对所选连接、安装版本和宿主能力。
 
 使用已绑定契约支持的交付方式。缺少契约或实际能力时说明缺项，保留源内容和可用文件；用户明确选择另一入口后再按其真实契约交付。工具成功、资源已附带、文件已生成、用户实际看到分别核对。
 

@@ -7,7 +7,12 @@ import { AgentService } from "./service";
 import { builtinTemplateBundles } from "../core/builtin-template-bundles";
 import { parseTemplateBundle } from "../portable/template-bundle.mjs";
 import { blocksDocument } from "./page-authoring";
-import { catalogPage, type CatalogView } from "./disclosure";
+import {
+  catalogPage,
+  COMPACT_CATALOG_COLUMNS,
+  compactCatalogRow,
+  type CatalogView,
+} from "./disclosure";
 import { FileStore } from "../core/store";
 import { buildPageHtml } from "./exporter";
 import {
@@ -123,12 +128,10 @@ export async function publicCatalog(
   return {
     ...page,
     ...(compact && {
-      columns: [...(input.kind ? [] : ["kind"]), "id", "name", "scenario"],
+      columns: [...(input.kind ? [] : ["kind"]), ...COMPACT_CATALOG_COLUMNS],
       items: page.items.map((item) => [
         ...(input.kind ? [] : [item.kind]),
-        item.id,
-        item.name,
-        item.scenarios[0] || item.description,
+        ...compactCatalogRow(item),
       ]),
     }),
     requiresLogin: false,

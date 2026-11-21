@@ -2,7 +2,7 @@
 
 <!-- showai-host-delivery:start -->
 
-- 先确认当前 Widget 的工作区、大小上限与显示动作。用 `show_component` 的 `delivery:"auto"` 取得 `fragment-file`。
+- 使用当前 Widget 的工作区、大小上限与显示动作。已注册的工具可直接调用；当前会话提供 `select_tools` 且延迟加载时，一次选择用到的 ShowAI 工具。用 `show_component` 的 `delivery:"auto"` 取得 `fragment-file`。
 - 核对 `display.reader:"bundled"` 和压缩大小，把回执的 `delivery.inline` 原样复制到该 Widget 的 `workspace/index.html`，执行显示动作。
 - 新作品保存后用 `page_present` 预览，续改给出所在项目、改动和原页链接。缺少 Widget、超限或阅读器为 `cdn` 时查完整宿主适配。
 

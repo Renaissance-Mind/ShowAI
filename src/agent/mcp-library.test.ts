@@ -55,7 +55,8 @@ test("library discovery is read-only; parallel project calls retain explicit ide
   );
   expect((await call(c, "project_context")).scope).toBe("library");
   expect((await c.listTools()).tools.map((tool) => tool.name)).not.toContain("guide");
-  expect(c.getInstructions()).toContain("Read use-showai Skill");
+  expect(c.getInstructions()).toContain("show-visual");
+  expect(c.getInstructions()).toContain("use-showai");
   const capabilities = await call(c, "showai_capabilities");
   expect(capabilities).not.toHaveProperty("workflow");
   expect(capabilities).not.toHaveProperty("next");
@@ -64,6 +65,13 @@ test("library discovery is read-only; parallel project calls retain explicit ide
   expect(capabilities.datasets).not.toHaveProperty("guide");
   expect(capabilities.authoring.workRecords.available).toBe(true);
   expect(capabilities.presentation.show.maxComponents).toBe(5);
+  expect(await call(c, "showai_capabilities", { view: "presentation" })).toEqual({
+    presentation: {
+      declaredHostDisplay: capabilities.presentation.declaredHostDisplay,
+      show: { maxComponents: capabilities.presentation.show.maxComponents },
+    },
+  });
+  expect(await call(c, "showai_capabilities", { view: "full" })).toEqual(capabilities);
   const removed = await c.callTool({ name: "guide", arguments: {} });
   expect(removed.isError).toBe(true);
   expect((removed.structuredContent as any).error.nextStep).toContain("installed ShowAI Skills");
@@ -350,6 +358,21 @@ test("default component discovery combines built-ins and only the selected proje
   const args = { projectId: project.id, kind: "component" };
   const listing = await call(client, "catalog_list", args);
   expect(listing.total).toBe(listBuiltinComponents().length + 1);
+  const index = await new AgentService({ root }).componentPromptIndex(project.id);
+  expect(index.revision).toBe(listing.revision);
+  expect(index.columns).toEqual(["id", "name", "scenario", "scope", "version", "integrity"]);
+  const expectedRows = listing.items.map((item: {
+    id: string;
+    name: string;
+    scenarios: string[];
+    scope: string;
+    version?: string;
+    integrity?: string;
+  }) => [item.id, item.name, item.scenarios[0], item.scope, item.version ?? null, item.integrity ?? null]);
+  expect(index.items).toEqual(expectedRows);
+  expect(Buffer.byteLength(JSON.stringify(index))).toBeLessThan(
+    Buffer.byteLength(JSON.stringify(listing)) / 4,
+  );
   expect(listing.nextCursor).toBeNull();
   expect(listing.items.filter((item: any) => item.scope === "project")).toEqual(
     [

@@ -267,7 +267,7 @@ export async function createMcpHttpApp(options: McpHttpOptions) {
         channel: "mcp",
         ...(grant ? { readerId: `grant:${grant.id}` } : {}),
       },
-      instructions: "Read use-showai Skill. HTTP; authorized projects.",
+      instructions: "HTTP. Public visuals: public_catalog_list view=compact, public_catalog_describe view=guide, then show_component. Private operations require an authorized project.",
       presentation: {
         transport: "http",
         storePresentation: (value) => storeForClient(value, true),
@@ -750,7 +750,7 @@ export async function createMcpHttpApp(options: McpHttpOptions) {
       if (
         options.local &&
         (body.params as { name?: string })?.name === "showai_capabilities" &&
-        output.result?.structuredContent?.data
+        output.result?.structuredContent?.data?.projects
       ) {
         const data = output.result.structuredContent.data;
         data.projects.storage = "local";

@@ -3282,10 +3282,18 @@
   },
   {
     "name": "showai_capabilities",
-    "description": "Return this connection's ShowAI capabilities.",
+    "description": "Connection capabilities. view=presentation returns display and component limit.",
     "inputSchema": {
       "type": "object",
-      "properties": {},
+      "properties": {
+        "view": {
+          "type": "string",
+          "enum": [
+            "presentation",
+            "full"
+          ]
+        }
+      },
       "$schema": "http://json-schema.org/draft-07/schema#",
       "additionalProperties": false
     },
@@ -3307,7 +3315,7 @@
   },
   {
     "name": "public_catalog_list",
-    "description": "List public components/templates. Use view=compact without limit for the whole index in one call; detailed (default) includes signatures.",
+    "description": "List all built-ins with kind=component, view=compact and no limit. Default view includes signatures.",
     "inputSchema": {
       "type": "object",
       "properties": {
@@ -3353,12 +3361,13 @@
         {
           "type": "noauth"
         }
-      ]
+      ],
+      "anthropic/alwaysLoad": true
     }
   },
   {
     "name": "public_catalog_describe",
-    "description": "Read public components or whole template guides.",
+    "description": "Read a public component or template. For a known ID use view=guide, then show_component.",
     "inputSchema": {
       "type": "object",
       "properties": {
@@ -3446,7 +3455,8 @@
         {
           "type": "noauth"
         }
-      ]
+      ],
+      "anthropic/alwaysLoad": true
     }
   },
   {
@@ -3527,7 +3537,7 @@
   },
   {
     "name": "show_component",
-    "description": "Show 1–5 components without saving; same kind/data as page_apply. live opts into updates.",
+    "description": "Show 1–5 components without saving. Built-ins need kind/data. auto follows the host. live requests updates.",
     "inputSchema": {
       "type": "object",
       "properties": {
@@ -3633,6 +3643,7 @@
           "type": "noauth"
         }
       ],
+      "anthropic/alwaysLoad": true,
       "ui": {
         "resourceUri": "ui://showai/component-v2.html"
       },

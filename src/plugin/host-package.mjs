@@ -20,6 +20,7 @@ export const HOST_PROFILES = {
   "mcp-app": "mcp-app",
 };
 export const HOST_GUIDE = "use-showai/references/host-adapter.md";
+export const DELIVERY_WORKFLOWS = ["show-visual/SKILL.md", "show-document/SKILL.md"];
 export const ANTIGRAVITY_EAGER_TOOLS = {
   public_catalog_list: { eager: true },
   public_catalog_describe: { eager: true },
@@ -45,18 +46,22 @@ export async function skillFiles(root) {
   return files;
 }
 
-export async function bindWorkflowDelivery(sourceSkills, targetSkills, adapter) {
+export function workflowWithHostDelivery(file, workflow, adapter) {
   const section =
     /<!-- showai-host-delivery:start -->[\s\S]*?<!-- showai-host-delivery:end -->/;
   const delivery = adapter.match(section)?.[0];
   if (!delivery)
     throw new Error("The host adapter is missing its delivery section.");
+  if (!section.test(workflow))
+    throw new Error(`${file} is missing its host delivery section.`);
+  return workflow.replace(section, () => delivery);
+}
+
+export async function bindWorkflowDelivery(sourceSkills, targetSkills, adapter) {
   const hashes = {};
-  for (const file of ["show-visual/SKILL.md", "show-document/SKILL.md"]) {
+  for (const file of DELIVERY_WORKFLOWS) {
     const workflow = await readFile(join(sourceSkills, file), "utf8");
-    if (!section.test(workflow))
-      throw new Error(`${file} is missing its host delivery section.`);
-    const bound = workflow.replace(section, () => delivery);
+    const bound = workflowWithHostDelivery(file, workflow, adapter);
     if (sourceSkills !== targetSkills || bound !== workflow)
       await writeFile(join(targetSkills, file), bound);
     hashes[file] = hash(bound);

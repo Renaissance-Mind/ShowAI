@@ -2,6 +2,11 @@ import { readFile, readdir } from "node:fs/promises";
 import { join } from "node:path";
 import { createHash } from "node:crypto";
 import { crc32, deflateRawSync } from "node:zlib";
+import {
+  DELIVERY_WORKFLOWS,
+  HOST_GUIDE,
+  workflowWithHostDelivery,
+} from "../plugin/host-package.mjs";
 
 function archive(entries: { name: string; data: Buffer }[]) {
   const locals: Buffer[] = [],
@@ -130,10 +135,15 @@ export async function remotePluginPackage(
   await visit("skills");
   for (const file of ["logo.svg", "logo-dark.svg"])
     files.set(`assets/${file}`, await readFile(join(source, "assets", file)));
-  files.set(
-    "skills/use-showai/references/host-adapter.md",
-    await readFile(join(source, "host-adapters/mcp-app.md")),
-  );
+  const adapter = await readFile(join(source, "host-adapters/mcp-app.md"), "utf8");
+  files.set(`skills/${HOST_GUIDE}`, Buffer.from(adapter));
+  for (const file of DELIVERY_WORKFLOWS) {
+    const path = `skills/${file}`;
+    const workflow = files.get(path);
+    if (!workflow) throw new Error(`Missing remote workflow: ${path}`);
+    const bound = workflowWithHostDelivery(file, workflow.toString("utf8"), adapter);
+    files.set(path, Buffer.from(bound));
+  }
   const skills = [...files.keys()].filter((path) =>
     /^skills\/[^/]+\/SKILL.md$/.test(path),
   );

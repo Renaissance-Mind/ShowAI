@@ -1,6 +1,6 @@
 ---
 name: use-showai
-description: ShowAI 的总入口，通过 ShowAI MCP 做任何事都先读它。按用户要的结果分流：创作或修改作品（含只要规划、设计稿或评审）、在对话里展示组件、查找阅读与管理已有内容、做组件或模板、多端协作；并给出连接与项目归属、内容模型、保存与冲突的通用规则。查找、引用、共享数据（含外部 JSON/CSV/Excel）、从 Notion/Word/Markdown 导入、草稿和内容库切换的做法在它的参考里。连接或显示异常时保留内容并指向「设置 → 关于与反馈」。
+description: 通过 ShowAI MCP 查找和管理内容、确定项目、创作或续改作品、制作组件或模板、多端协作时的入口。只想在聊天里看内置组件时直接使用 show-visual。此处提供连接、内容模型、保存与冲突的通用规则，参考文件涵盖用户引用、共享数据、导入、草稿和内容库切换。
 ---
 
 # 使用 ShowAI
@@ -25,9 +25,9 @@ Agent 通过 MCP 操作 ShowAI。App、网页、CLI 和 MCP 共用内容核心�
 
 ## 核对连接和归属
 
-使用已绑定展示适配的本机插件，一次展示 1–5 个内置组件时，直接按 show-visual 选择组件、读 guide、展示。无需先调 `showai_capabilities` 或查询项目。连接不明、发生变化、回执异常或涉及项目归属、跨组件事件、持续更新时，按对应流程核实能力。
+在聊天里一次展示 1–5 个内置组件，直接按 show-visual 选择组件、读 guide、展示。本机和远程连接都可复用已知的宿主交付方式。只需核对显示声明时用 `showai_capabilities({view:"presentation"})` 取声明和组件数上限。项目归属、跨组件事件和持续更新按各自流程核实。
 
-连接信息未知或发生变化时调用一次 `showai_capabilities`，复用当前连接已经核实的结果。它只提供连接、能力、版本与限制；操作方法按本 Skill 和所选工作流读取。工具可能带宿主前缀，使用实际暴露的名称。检查 `agentProtocol`、`transport`、`projects.access`、`projects.available` 和展示能力；HTTP 连接同时检查 `projects.storage`，`local` 表示桌面直接保存。调用 `project_context` 或 `projects_list` 核对目标。不能仅凭“Codex”“ChatGPT”判断连接或显示能力。
+访问项目时，如果连接信息未知或发生变化，调用一次 `showai_capabilities` 取完整报告，复用当前连接已经核实的结果。工具可能带宿主前缀，使用实际暴露的名称。检查 `agentProtocol`、`transport`、`projects.access` 和 `projects.available`；HTTP 连接同时检查 `projects.storage`，`local` 表示桌面直接保存。调用 `project_context` 或 `projects_list` 核对目标。
 
 - **library 本机连接**：`project_context` 返回固定内容库。纯查询用 `projects_list`、`pages_list`、`library_search`，不创建项目。新正式内容未指定项目时，`project_resolve({sourceDirectory})` 使用宿主提供的绝对项目目录；首次映射可创建项目。不要使用插件、预览或临时输出目录。宿主当前工作目录是用户的项目或代码仓库、且内容与之相关时可以作为可信目录；对话整理、与当前目录无关的内容或没有可信目录时询问归属。用户要求独立命名项目时才用 `project_create`。
 - **project 绑定连接**：`project_context` 返回固定项目。沿用它，不能用另一个 projectId 越过绑定。

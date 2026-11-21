@@ -65,7 +65,7 @@ npm run plugin:dsh
 | [create-template](skills/create-template/SKILL.md)       | 可复用模板文件夹与方法                         |
 | [collaborate-canvas](skills/collaborate-canvas/SKILL.md) | 画布协作、多端配对与保存状态                   |
 
-Agent 文档操作使用 MCP，先读取已安装的 use-showai Skill，核对项目；连接信息未知或变化时查询一次 showai_capabilities。正式成果先保存到项目，再按当前宿主适配交付。明确要求独立文件时使用 `render_document`。详细方法由同源 Skill 维护，本页用于安装与接入。
+在任何宿主里展示内置组件都从 show-visual 开始。当前交付方式已知时，直接查轻量目录、读所选 guide、调用 `show_component`。只需核对未知连接的显示方式时，用 `showai_capabilities({view:"presentation"})` 取得显示声明和组件数上限。项目操作从 use-showai 开始，核对项目并保存后交付。明确要求独立文件时用 `render_document`。
 
 ## 运行时与内容库
 

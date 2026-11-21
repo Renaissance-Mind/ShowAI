@@ -3,6 +3,12 @@
     {
       "date": "2026-11-21",
       "version": "0.12.0",
+      "before": "showai_capabilities always returned the full connection report.",
+      "now": "Optional view=presentation returns presentation.declaredHostDisplay and presentation.show.maxComponents on stdio and HTTP. Omit view or use full for the existing report."
+    },
+    {
+      "date": "2026-11-21",
+      "version": "0.12.0",
       "before": "public_catalog_list returned detailed entries with signatures and scenarios.",
       "now": "Optional view=compact returns columns and rows with one scenario per entry. Omit limit and cursor for the complete index. Existing calls keep their detailed response and cursors."
     },

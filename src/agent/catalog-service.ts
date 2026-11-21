@@ -33,6 +33,8 @@ import {
   compareCatalogVersions,
   catalogEntry,
   catalogPage,
+  COMPACT_CATALOG_COLUMNS,
+  compactCatalogRow,
   shellToken,
   summarizeCatalog,
   type CatalogKind,
@@ -364,6 +366,23 @@ export class CatalogService {
           ...(problems.length ? { problems } : {}),
         },
       ],
+    };
+  }
+
+  async componentPromptIndex(projectId: string) {
+    const { items, revision } = await this.catalogList({
+      projectId,
+      kind: "component",
+    });
+    return {
+      revision,
+      columns: [...COMPACT_CATALOG_COLUMNS, "scope", "version", "integrity"],
+      items: items.map((item) => [
+        ...compactCatalogRow(item),
+        item.scope,
+        item.version ?? null,
+        item.integrity ?? null,
+      ]),
     };
   }
 

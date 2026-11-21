@@ -40,6 +40,13 @@ async function compare(file: string, actual: string) {
 const listing = async (client: Client) => {
   const tools = (await client.listTools()).tools;
   expect(tools.map((tool) => tool.name)).not.toContain("guide");
+  expect(client.getInstructions()).toContain("show-visual");
+  const upfront = tools.filter((tool) => tool._meta?.["anthropic/alwaysLoad"] === true);
+  expect(upfront.map((tool) => tool.name).sort()).toEqual([
+    "public_catalog_describe",
+    "public_catalog_list",
+    "show_component",
+  ]);
   return JSON.stringify(tools, null, 2) + "\n";
 };
 async function inMemory(server: McpServer) {
