@@ -61,6 +61,10 @@ window.__ModuleLoader__.load({
     };
 
     const css = `
+.showai-workbench-logo{display:inline-block;flex:none;background:center/contain no-repeat url("assets/logo.svg")}
+body[data-ds-dark-theme] .showai-workbench-logo{background-image:url("assets/logo-dark.svg")}
+/* In a collapsed macOS sidebar the window controls sit over the main panel. */
+.showai-workbench-main{padding-block-start:min(var(--dsh-frame-leading-clearance, 0px), var(--dsh-frame-top-clearance, 0px))}
 .showai-page-card{display:flex;flex-direction:column}
 .showai-page-row{align-items:center;min-width:0;height:24px;display:flex;position:relative;overflow:hidden}
 .showai-page-card[data-state=running] .showai-page-row:after{content:"";background:linear-gradient(90deg, transparent 0%, color-mix(in srgb, var(--dsw-alias-bg-base) 60%, transparent) 55%, transparent 100%);pointer-events:none;width:300px;animation:showai-page-sweep 2.6s ease-out infinite;position:absolute;inset:0 auto 0 0}
@@ -107,10 +111,9 @@ window.__ModuleLoader__.load({
         ? PAGE_RESOURCE + data.projectId + "/" + data.pageId : undefined;
     }
 
-    function WorkbenchIcon() {
-      return h("svg", { width: 20, height: 20, viewBox: "0 0 24 24", fill: "none", stroke: "currentColor",
-        strokeWidth: 1.7, "aria-hidden": true }, h("rect", { x: 3, y: 4, width: 18, height: 16, rx: 3 }),
-        h("path", { d: "M9 4v16m3-5 2-3 2 1 2-4" }));
+    function WorkbenchIcon({ size = 20 }) {
+      return h("span", { className: "showai-workbench-logo", "aria-hidden": true,
+        style: { width: size, height: size } });
     }
 
     function WorkbenchFrame({ t, address, navigation, instance = "global", attachReference, global }) {
@@ -173,9 +176,8 @@ window.__ModuleLoader__.load({
           frame.current?.contentWindow?.postMessage({ type: "showai:open-page",
             href: "showai://project/" + project + "/page/" + page }, new URL(url).origin);
       }, [ready, url, address, navigation?.revision]);
-      return h("section", { "aria-label": t("workbench.title"), style: { height: "100%", minHeight: 0,
-        boxSizing: "border-box", display: "flex", flexDirection: "column",
-        ...(global ? { paddingTop: "var(--dsh-frame-top-clearance, 0px)" } : {}) } },
+      return h("section", { "aria-label": t("workbench.title"), className: global ? "showai-workbench-main" : undefined,
+        style: { height: "100%", minHeight: 0, boxSizing: "border-box", display: "flex", flexDirection: "column" } },
         url ? h("iframe", { ref: frame, src: url, title: t("workbench.title"), referrerPolicy: "no-referrer",
           style: { width: "100%", height: "100%", minHeight: 0, border: 0 },
           allow: "clipboard-write", sandbox: "allow-scripts allow-same-origin allow-forms allow-modals allow-downloads allow-popups" })

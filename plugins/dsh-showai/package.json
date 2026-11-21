@@ -1,6 +1,6 @@
 {
   "name": "@showai/dsh-showai",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "private": true,
   "type": "module",
   "description": "ShowAI MCP, Skills, inline previews, session sidebar and editable library workbench for DeepSeek Harness.",

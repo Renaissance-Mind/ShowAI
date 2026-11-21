@@ -40,6 +40,7 @@ import {
 } from "./host-package.mjs";
 import {
   DSH_BUNDLE_FILES,
+  DSH_LOGOS,
   inspectDshProfile,
   stageDshBundle,
   type DshProfileState,
@@ -187,7 +188,7 @@ function hostFiles(host: PluginHost, files: [string, string][]) {
       );
     if (name === "skills/use-showai/references/host-adapter.md") return false;
     if (host === "deepseek")
-      return name.startsWith("skills/") || name === "mcp/launch.mjs";
+      return name.startsWith("skills/") || name === "mcp/launch.mjs" || DSH_LOGOS.includes(name);
     if (name.startsWith(".claude-plugin/")) return host === "claude";
     if (name === "mcp.json" || name === ".mcp.json") return false;
     return host !== "codex" || name !== "mcp/launch.mjs";

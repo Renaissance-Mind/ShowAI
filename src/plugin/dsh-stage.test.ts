@@ -43,6 +43,12 @@ test("stages the bundle with Skills, the launcher and a literal MCP row", async 
   const skills = (await readdir(resolve("plugins/showai/skills"))).sort();
   expect((await readdir(join(target, "skills"))).sort()).toEqual(skills);
   await stat(join(target, "mcp/launch.mjs"));
+  const client = await readFile(join(target, "client.js"), "utf8");
+  for (const logo of ["logo.svg", "logo-dark.svg"]) {
+    const svg = await readFile(resolve("plugins/showai/assets", logo), "base64");
+    expect(client).toContain(`url("data:image/svg+xml;base64,${svg}")`);
+    expect(client).not.toContain(`url("assets/${logo}")`);
+  }
   expect(JSON.parse(await readFile(join(target, "workbench-binding.json"), "utf8"))).toEqual({
     home: receipt.home, runtimeConfig: join(receipt.home, "agent-runtime.json"),
   });

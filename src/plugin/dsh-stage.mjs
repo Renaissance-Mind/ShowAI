@@ -14,6 +14,7 @@ import { dirname, isAbsolute, join, resolve } from "node:path";
 import { bindHostSkills, publishPluginDirectory } from "./host-package.mjs";
 
 export const DSH_BUNDLE = "@showai/dsh-showai";
+export const DSH_LOGOS = ["assets/logo.svg", "assets/logo-dark.svg"];
 export const DSH_LEGACY_BUNDLES = [
   "@showai/dsh-showai-preview",
   "@showai/dsh-showai-page",
@@ -126,6 +127,14 @@ export async function stageDshBundle({
   try {
     for (const file of DSH_BUNDLE_FILES)
       await cp(join(bundleRoot, file), join(staging, file));
+    // Harness serves client.js as a module bundle without an adjacent asset directory.
+    const clientPath = join(staging, "client.js");
+    let client = await readFile(clientPath, "utf8");
+    for (const asset of DSH_LOGOS) {
+      const svg = await readFile(join(pluginRoot, asset), "base64");
+      client = client.replaceAll(`url("${asset}")`, `url("data:image/svg+xml;base64,${svg}")`);
+    }
+    await writeFile(clientPath, client);
     await writeFile(join(staging, "workbench-binding.json"), JSON.stringify({
       home,
       runtimeConfig: server.env.SHOWAI_RUNTIME_CONFIG || join(home, "agent-runtime.json"),
