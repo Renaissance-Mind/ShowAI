@@ -39,7 +39,7 @@ import {
   type ToolConnection,
 } from "./mcp-tools/tool";
 
-const skillRoute = "Visuals: show-visual. Else use-showai.";
+const skillRoute = "Draw: show-visual. Else use-showai.";
 
 export function createMcpServer(options: McpServerOptions): McpServer {
   const service = new AgentService(options);

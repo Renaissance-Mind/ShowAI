@@ -3291,7 +3291,7 @@
   },
   {
     "name": "public_catalog_list",
-    "description": "List all built-ins with kind=component, view=compact and no limit. Default view includes signatures.",
+    "description": "Search the requested catalog. view=compact lists IDs and scenarios.",
     "inputSchema": {
       "type": "object",
       "properties": {
@@ -3342,7 +3342,7 @@
   },
   {
     "name": "public_catalog_describe",
-    "description": "Read a public component or template. For a known ID use view=guide, then show_component.",
+    "description": "Read a requested catalog item. view=guide gives its usage.",
     "inputSchema": {
       "type": "object",
       "properties": {
@@ -3511,12 +3511,12 @@
   },
   {
     "name": "show_component",
-    "description": "Render original HTML directly in chat (1–5 visuals). Use kind/data or blocks only when existing components are requested.",
+    "description": "Render 1–5 original HTML visuals. Use kind/data or blocks for requested catalog components.",
     "inputSchema": {
       "type": "object",
       "properties": {
         "html": {
-          "description": "Original HTML/CSS/JS, or ordered fragments. No catalog or project needed. Optional data is window.showaiData.",
+          "description": "Original HTML/CSS/JS. Optional data is window.showaiData.",
           "anyOf": [
             {
               "type": "string"
@@ -3559,16 +3559,15 @@
           ]
         },
         "live": {
-          "description": "Keep view for updates; MCP Apps only.",
+          "description": "Live catalog view in MCP Apps.",
           "type": "boolean"
         },
         "kind": {
-          "description": "Component kind.",
           "type": "string",
           "minLength": 1
         },
         "data": {
-          "description": "Optional inputs for a single HTML visual, or component.insert data for an existing kind.",
+          "description": "Single visual inputs or catalog props.",
           "type": "object",
           "propertyNames": {
             "type": "string"
@@ -3576,7 +3575,6 @@
           "additionalProperties": {}
         },
         "blocks": {
-          "description": "Ordered {kind,data} list instead of kind/data.",
           "minItems": 1,
           "maxItems": 5,
           "type": "array",
@@ -3602,12 +3600,11 @@
           }
         },
         "projectId": {
-          "description": "Resolve project components here.",
           "type": "string",
           "minLength": 1
         },
         "componentSources": {
-          "description": "Packages: manifest/schema/source/files/assets.",
+          "description": "Editable source packages.",
           "maxItems": 5,
           "type": "array",
           "items": {
@@ -3619,12 +3616,11 @@
           }
         },
         "title": {
-          "description": "View title.",
           "type": "string",
           "maxLength": 300
         },
         "delivery": {
-          "description": "auto uses the host contract.",
+          "description": "auto follows the host.",
           "type": "string",
           "enum": [
             "auto",
@@ -3635,7 +3631,6 @@
           ]
         },
         "theme": {
-          "description": "Image theme.",
           "type": "string",
           "enum": [
             "light",

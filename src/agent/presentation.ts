@@ -398,52 +398,19 @@ const showBlock = z.object({ kind: z.string().min(1), data: object });
 const htmlFragment = z.string().refine(value => value.trim().length > 0, "Provide a nonempty HTML fragment.");
 const visualInput = z.object({ html: htmlFragment, title: z.string().max(300).optional(), data: object.optional() }).strict();
 export const showComponentSchema = {
-  html: z.union([htmlFragment, z.array(z.union([htmlFragment, visualInput])).min(1).max(SHOW_COMPONENT_LIMIT)])
-    .optional().describe("Original HTML/CSS/JS, or ordered fragments. No catalog or project needed. Optional data is window.showaiData."),
-  live: z.boolean().optional().describe("Keep view for updates; MCP Apps only."),
-  kind: z
-    .string()
-    .min(1)
-    .optional()
-    .describe("Component kind."),
-  data: object
-    .optional()
-    .describe(
-      "Optional inputs for a single HTML visual, or component.insert data for an existing kind.",
-    ),
-  blocks: z
-    .array(showBlock)
-    .min(1)
-    .max(SHOW_COMPONENT_LIMIT)
-    .optional()
-    .describe(
-      "Ordered {kind,data} list instead of kind/data.",
-    ),
-  projectId: z
-    .string()
-    .min(1)
-    .optional()
-    .describe("Resolve project components here."),
-  componentSources: z
-    .array(object)
-    .max(SHOW_COMPONENT_LIMIT)
-    .optional()
-    .describe(
-      "Packages: manifest/schema/source/files/assets.",
-    ),
-  title: z
-    .string()
-    .max(300)
-    .optional()
-    .describe("View title."),
-  delivery: z
-    .enum(SHOW_DELIVERIES)
-    .optional()
-    .describe("auto uses the host contract."),
-  theme: z
-    .enum(["light", "dark"])
-    .optional()
-    .describe("Image theme."),
+  html: z.union([
+    htmlFragment,
+    z.array(z.union([htmlFragment, visualInput])).min(1).max(SHOW_COMPONENT_LIMIT),
+  ]).optional().describe("Original HTML/CSS/JS. Optional data is window.showaiData."),
+  live: z.boolean().optional().describe("Live catalog view in MCP Apps."),
+  kind: z.string().min(1).optional(),
+  data: object.optional().describe("Single visual inputs or catalog props."),
+  blocks: z.array(showBlock).min(1).max(SHOW_COMPONENT_LIMIT).optional(),
+  projectId: z.string().min(1).optional(),
+  componentSources: z.array(object).max(SHOW_COMPONENT_LIMIT).optional().describe("Editable source packages."),
+  title: z.string().max(300).optional(),
+  delivery: z.enum(SHOW_DELIVERIES).optional().describe("auto follows the host."),
+  theme: z.enum(["light", "dark"]).optional(),
 };
 export type ShowComponentInput = z.infer<
   z.ZodObject<typeof showComponentSchema>
