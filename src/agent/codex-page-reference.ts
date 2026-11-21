@@ -6,6 +6,7 @@ import { z } from "zod";
 import type { AgentService } from "./service";
 import type { ShowDocument } from "../types";
 import type { ProjectMetadata } from "../core/model";
+import { CoreError, folderVisible } from "../core/store";
 import { folderBreadcrumb } from "../core/folder-breadcrumb";
 import { structuredContent } from "./page-structured";
 
@@ -59,6 +60,16 @@ export async function readCodexPageCards(service: AgentService, targets: CodexCa
       if (!project) {
         project = await service.store.readProject(target.projectId);
         projects.set(target.projectId, project);
+      }
+      const parentId = document.parentId;
+      if (
+        project.archived ||
+        document.archived ||
+        (parentId &&
+          project.folders?.some((folder) => folder.id === parentId) &&
+          !folderVisible(project.folders, parentId))
+      ) {
+        throw new CoreError("NOT_FOUND", "This page was deleted.");
       }
       const folders = folderBreadcrumb(project.folders ?? [], document.parentId);
       page = { document, breadcrumb: [project.name, ...folders.map(folder => folder.name), document.title] };

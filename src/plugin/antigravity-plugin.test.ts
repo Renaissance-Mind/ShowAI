@@ -276,6 +276,28 @@ describe("Antigravity page cards and live workbench navigation", () => {
       });
       expect(helperResult.status).toBe("accepted");
 
+      // Archived (deleted) pages are rejected by card_present and card_navigate
+      const recTwo = await service.store.readPage(projectId, pageTwoId);
+      await service.store.savePage(
+        projectId,
+        pageTwoId,
+        { ...recTwo.document, archived: true },
+        recTwo.hash,
+        recTwo.revision,
+      );
+      const deletedCard = await client.callTool({
+        name: "card_present",
+        arguments: { projectId, pageId: pageTwoId },
+      });
+      expect(deletedCard.isError).toBe(true);
+      expect((deletedCard.structuredContent as any).error.code).toBe("NOT_FOUND");
+      const deletedNav = await client.callTool({
+        name: "card_navigate",
+        arguments: { projectId, pageId: pageTwoId },
+      });
+      expect(deletedNav.isError).toBe(true);
+      expect((deletedNav.structuredContent as any).error.code).toBe("NOT_FOUND");
+
       abort.abort();
       await reader.cancel().catch(() => {});
     } finally {

@@ -2,7 +2,7 @@
 import { execFileSync, spawn } from "node:child_process";
 import { createHash, randomUUID, timingSafeEqual } from "node:crypto";
 import { existsSync, readFileSync } from "node:fs";
-import { mkdir, readFile, rename, stat, writeFile } from "node:fs/promises";
+import { mkdir, readFile, rename, rm, stat, writeFile } from "node:fs/promises";
 import { createServer, request as httpRequest } from "node:http";
 import { homedir } from "node:os";
 import { dirname, isAbsolute, join, resolve } from "node:path";
@@ -498,6 +498,7 @@ function createNavigationCoordinator(env = process.env) {
         return;
       }
       lastDeliveredId = nav.id;
+      await rm(navPath, { force: true }).catch(() => {});
       const payload = `data: ${JSON.stringify(nav)}\n\n`;
       for (const client of clients) {
         client.write(payload);
