@@ -23,10 +23,9 @@ async function readStatus(
   index: number,
   expected: string,
 ) {
-  const visual = page
-    .locator("showai-html-visual")
-    .nth(index)
-    .frameLocator("iframe");
+  const element = page.locator("showai-html-visual").nth(index);
+  await element.locator("iframe:visible").waitFor();
+  const visual = element.frameLocator("iframe");
   await visual
     .locator("html[data-showai-html-ready]")
     .waitFor({ state: "attached" });
@@ -59,10 +58,13 @@ test("direct HTML stays selectable, isolated and interactive, then registers and
     const call = async (name: string, args: Record<string, unknown>) => {
       const result = await client.callTool({ name, arguments: args });
       expect(result.isError, JSON.stringify(result.content)).not.toBe(true);
+      const structuredContent = result.structuredContent as {
+        data: Record<string, unknown>;
+      };
       return {
-        ...result,
-        data: (result.structuredContent as { data: Record<string, unknown> })
-          .data,
+        _meta: result._meta,
+        structuredContent,
+        data: structuredContent.data,
       };
     };
     const page = await browser.newPage({
@@ -95,6 +97,14 @@ test("direct HTML stays selectable, isolated and interactive, then registers and
         .getAttribute("sandbox"),
     ).toBe("allow-scripts");
     expect(await service.listPages(project.id)).toHaveLength(0);
+    const captured = await call("show_component", {
+      html: ['<div style="height:820px">Overview</div>', recovered],
+      delivery: "image",
+    });
+    expect(captured.data.delivery).toMatchObject({ mode: "image" });
+    expect(
+      (captured.data.delivery as { height: number }).height,
+    ).toBeGreaterThan(820);
 
     const source = statusTagComponent("interactive-html-status");
     source.manifest.entry = "visual.html";
@@ -263,3 +273,29 @@ test("HTML input rejects conflicting catalog or per-visual inputs", () => {
     "corresponding item",
   );
 });
+
+test("a first click reaches the second visual in freshly opened browser contexts", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "showai-html-first-click-"));
+  const browser = await chromium.launch({
+    executablePath: await readingBrowserExecutable(),
+    headless: true,
+  });
+  try {
+    const path = join(directory, "chart.html");
+    await writeFile(
+      path,
+      renderHtmlVisuals({ html: ["<p>Overview</p>", oneOff] }).inline,
+    );
+    for (let index = 0; index < 8; index++) {
+      const page = await browser.newPage({
+        viewport: { width: 480, height: 600 },
+      });
+      await page.goto(pathToFileURL(path).href);
+      await readStatus(page, 1, "Ready");
+      await page.close();
+    }
+  } finally {
+    await browser.close();
+    await rm(directory, { recursive: true, force: true });
+  }
+}, 30_000);
