@@ -3,6 +3,27 @@
 
   const initialParams = new URLSearchParams(window.location.search);
   const sidecarToken = initialParams.get("token") || "";
+  window.__SHOWAI_ASSET_URL__ = new URL("/assets/index.js", window.location.href).href;
+
+  if (
+    window.location.protocol === "plugin:" &&
+    typeof HTMLHeadElement !== "undefined" &&
+    HTMLHeadElement.prototype &&
+    typeof HTMLHeadElement.prototype.appendChild === "function"
+  ) {
+    const nativeHeadAppend = HTMLHeadElement.prototype.appendChild;
+    HTMLHeadElement.prototype.appendChild = function (node) {
+      if (node && node.tagName === "LINK") {
+        if (node.rel === "modulepreload") {
+          return node;
+        }
+        if (node.rel === "stylesheet") {
+          node.removeAttribute("crossorigin");
+        }
+      }
+      return nativeHeadAppend.call(this, node);
+    };
+  }
 
   function parseColor(value) {
     if (!value || typeof value !== "string") return null;

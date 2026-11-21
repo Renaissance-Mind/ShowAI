@@ -1,13 +1,13 @@
 #!/usr/bin/env node
 import { execFileSync, spawn } from "node:child_process";
-import { timingSafeEqual } from "node:crypto";
+import { createHash, timingSafeEqual } from "node:crypto";
 import { existsSync, readFileSync } from "node:fs";
-import { mkdir, readFile } from "node:fs/promises";
+import { mkdir, readFile, stat, writeFile } from "node:fs/promises";
 import { createServer, request as httpRequest } from "node:http";
 import { homedir } from "node:os";
 import { dirname, isAbsolute, join, resolve } from "node:path";
 import { createInterface } from "node:readline";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const BIND_HOST = "127.0.0.1";
@@ -149,8 +149,10 @@ async function resolveRuntimeLaunch(env = process.env) {
   ) {
     throw new Error(`ShowAI 运行时配置格式无效：${configPath}`);
   }
+  const cliEntry = resolve(config.launch.args[0]);
   return {
     home,
+    cliEntry,
     command: config.launch.command,
     args: [
       ...config.launch.args,
@@ -168,6 +170,92 @@ async function resolveRuntimeLaunch(env = process.env) {
       SHOWAI_HOME: home,
     },
   };
+}
+
+function resolveWebRoot(cliEntry) {
+  if (!cliEntry) return null;
+  for (const rel of ["../web", "../dist"]) {
+    const candidate = resolve(dirname(cliEntry), rel);
+    if (existsSync(join(candidate, "index.html"))) return candidate;
+  }
+  return null;
+}
+
+async function loadEsbuild(cliEntry) {
+  const roots = [cliEntry ? dirname(cliEntry) : null, __dirname].filter(Boolean);
+  for (const start of roots) {
+    let cur = start;
+    while (true) {
+      const candidate = join(cur, "node_modules/esbuild/lib/main.js");
+      if (existsSync(candidate)) {
+        return import(pathToFileURL(candidate).href);
+      }
+      const parent = dirname(cur);
+      if (parent === cur) break;
+      cur = parent;
+    }
+  }
+  return import("esbuild");
+}
+
+function createClassicBundleCompiler(env = process.env) {
+  let cachedKey = "";
+  let cachedPromise = null;
+
+  async function compile(webRoot, entryRelativePath) {
+    const entryPath = resolve(webRoot, entryRelativePath);
+    if (!entryPath.startsWith(resolve(webRoot) + "/") && entryPath !== resolve(webRoot)) {
+      throw new Error("Invalid workbench entry path.");
+    }
+    const info = await stat(entryPath);
+    const cacheKey = `${entryPath}:${info.size}:${Math.trunc(info.mtimeMs)}`;
+    if (cachedKey === cacheKey && cachedPromise) return cachedPromise;
+
+    const task = (async () => {
+      const digest = createHash("sha256").update(cacheKey).digest("hex").slice(0, 16);
+      const dataDir = env.ANTIGRAVITY_EXECUTABLE_DATA_DIR;
+      const diskCache = dataDir
+        ? join(dataDir, `workbench-iife-${digest}.js`)
+        : null;
+      if (diskCache && existsSync(diskCache)) {
+        const bytes = await readFile(diskCache);
+        return { digest, bytes };
+      }
+      const esbuild = await loadEsbuild(webRoot);
+      const result = await esbuild.build({
+        entryPoints: [entryPath],
+        bundle: true,
+        format: "iife",
+        minify: true,
+        write: false,
+        target: "es2022",
+        logLevel: "error",
+        define: {
+          "import.meta.url": "window.__SHOWAI_ASSET_URL__",
+          "import.meta.resolve": "undefined",
+          "import.meta.env": "{}",
+        },
+      });
+      const bytes = Buffer.from(result.outputFiles[0].contents);
+      if (diskCache) {
+        await mkdir(dirname(diskCache), { recursive: true }).catch(() => {});
+        await writeFile(diskCache, bytes).catch(() => {});
+      }
+      return { digest, bytes };
+    })();
+
+    cachedKey = cacheKey;
+    cachedPromise = task.catch((err) => {
+      if (cachedPromise === task) {
+        cachedKey = "";
+        cachedPromise = null;
+      }
+      throw err;
+    });
+    return cachedPromise;
+  }
+
+  return { compile };
 }
 
 function createBackendManager(env = process.env) {
@@ -215,7 +303,12 @@ function createBackendManager(env = process.env) {
             settled = true;
             clearTimeout(timer);
             const url = new URL(parsed.data.url);
-            active = { child, url, home: parsed.data.home ?? spec.home };
+            active = {
+              child,
+              url,
+              home: parsed.data.home ?? spec.home,
+              webRoot: resolveWebRoot(spec.cliEntry),
+            };
             done(active);
           } else if (parsed?.ok === false) {
             settled = true;
@@ -324,16 +417,30 @@ export function isAllowedSidecarOrigin(origin, sidecarPort, options = {}) {
   return false;
 }
 
-function injectSidecarScripts(html) {
-  const cleaned = html
+function injectSidecarScripts(html, classicBundleSrc = null) {
+  let cleaned = html
     .replace(
-      /(<link\b[^>]*\brel="(?:modulepreload|stylesheet)"[^>]*?)\s+crossorigin(?:="[^"]*")?/gi,
-      "$1",
-    )
-    .replace(
-      /(<script\b[^>]*\btype="module"[^>]*?)\s+crossorigin(?:="[^"]*")?/gi,
+      /(<link\b[^>]*\brel="stylesheet"[^>]*?)\s+crossorigin(?:="[^"]*")?/gi,
       "$1",
     );
+  if (classicBundleSrc) {
+    cleaned = cleaned
+      .replace(/<link\b[^>]*\brel="modulepreload"[^>]*>\s*/gi, "")
+      .replace(
+        /<script\b[^>]*\btype="module"[^>]*\bsrc="\.\/assets\/[^"]+"[^>]*>\s*<\/script>/i,
+        `<script defer src="${classicBundleSrc}"></script>`,
+      );
+  } else {
+    cleaned = cleaned
+      .replace(
+        /(<link\b[^>]*\brel="modulepreload"[^>]*?)\s+crossorigin(?:="[^"]*")?/gi,
+        "$1",
+      )
+      .replace(
+        /(<script\b[^>]*\btype="module"[^>]*?)\s+crossorigin(?:="[^"]*")?/gi,
+        "$1",
+      );
+  }
   const scripts =
     '<style id="showai-ag-host-style">html,body,#root{height:100%;width:100%;}</style>' +
     '<script src="/preload.js"></script><script src="/_antigravity/bridge.js"></script>';
@@ -362,6 +469,8 @@ export async function startAntigravitySidecar(options = {}) {
   const token = options.token ?? env.ANTIGRAVITY_SIDECAR_UI_TOKEN ?? "";
   const preloadJs = loadPreloadJs();
   const backend = options.backend ?? createBackendManager(env);
+  const classicBundler = createClassicBundleCompiler(env);
+  let lastClassicBundle = null;
   let actualPort = port;
 
   const server = createServer(async (req, res) => {
@@ -422,6 +531,45 @@ export async function startAntigravitySidecar(options = {}) {
         "Content-Type": "application/javascript; charset=utf-8",
       });
       res.end(BRIDGE_JS);
+      return;
+    }
+    if (
+      (req.method === "GET" || req.method === "HEAD") &&
+      pathname === "/_antigravity/workbench.js"
+    ) {
+      try {
+        if (!lastClassicBundle) {
+          const upstream = await backend.ensure();
+          if (!upstream.webRoot) {
+            res.writeHead(404, { ...corsHeaders, "Content-Type": "text/plain" });
+            res.end("Not found");
+            return;
+          }
+          const indexHtml = await readFile(join(upstream.webRoot, "index.html"), "utf8");
+          const match = indexHtml.match(
+            /<script\b[^>]*\btype="module"[^>]*\bsrc="\.\/(assets\/[^"]+)"/i,
+          );
+          if (!match) {
+            res.writeHead(404, { ...corsHeaders, "Content-Type": "text/plain" });
+            res.end("Entry not found");
+            return;
+          }
+          lastClassicBundle = await classicBundler.compile(upstream.webRoot, match[1]);
+        }
+        res.writeHead(200, {
+          ...corsHeaders,
+          "Cache-Control": "private, max-age=3600",
+          "Content-Type": "application/javascript; charset=utf-8",
+          "Content-Length": lastClassicBundle.bytes.length,
+        });
+        res.end(req.method === "HEAD" ? undefined : lastClassicBundle.bytes);
+      } catch (error) {
+        console.error(
+          `[showai-workbench-sidecar] failed to build classic bundle: ${error.message}`,
+        );
+        res.writeHead(500, { ...corsHeaders, "Content-Type": "text/plain; charset=utf-8" });
+        res.end(error.message);
+      }
       return;
     }
     if (req.method === "GET" && pathname === "/_antigravity/health") {
@@ -584,10 +732,28 @@ export async function startAntigravitySidecar(options = {}) {
         if (isRootHtml) {
           const chunks = [];
           proxyRes.on("data", (chunk) => chunks.push(chunk));
-          proxyRes.on("end", () => {
-            const injected = injectSidecarScripts(
-              Buffer.concat(chunks).toString("utf8"),
-            );
+          proxyRes.on("end", async () => {
+            const rawHtml = Buffer.concat(chunks).toString("utf8");
+            let classicBundleSrc = null;
+            if (upstream.webRoot) {
+              const entryMatch = rawHtml.match(
+                /<script\b[^>]*\btype="module"[^>]*\bsrc="\.\/(assets\/[^"]+)"/i,
+              );
+              if (entryMatch) {
+                try {
+                  lastClassicBundle = await classicBundler.compile(
+                    upstream.webRoot,
+                    entryMatch[1],
+                  );
+                  classicBundleSrc = `/_antigravity/workbench.js?v=${lastClassicBundle.digest}`;
+                } catch (error) {
+                  console.error(
+                    `[showai-workbench-sidecar] classic bundle fallback failed: ${error.message}`,
+                  );
+                }
+              }
+            }
+            const injected = injectSidecarScripts(rawHtml, classicBundleSrc);
             const headers = { ...proxyRes.headers, ...corsHeaders };
             delete headers["content-length"];
             delete headers["transfer-encoding"];

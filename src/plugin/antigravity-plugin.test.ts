@@ -30,7 +30,7 @@ interface SidecarModule {
     token?: string;
     env?: Record<string, string | undefined>;
     backend?: {
-      ensure(): Promise<{ url: URL; home: string }>;
+      ensure(): Promise<{ url: URL; home: string; webRoot?: string | null }>;
       stop(): Promise<void>;
       status(): { running: boolean; url: string | null; home: string | null };
     };
@@ -579,6 +579,70 @@ describe("Antigravity sidecar workbench proxy", () => {
       expect(html).toContain("/_antigravity/restart");
     } finally {
       await sidecar.close();
+    }
+  });
+
+  test("compiles multi-chunk ESM workbench entry into a classic IIFE script for plugin:// scheme compatibility", async () => {
+    const webRoot = await makeTempDir("showai-ag-webroot-");
+    await mkdir(join(webRoot, "assets"), { recursive: true });
+    await writeFile(
+      join(webRoot, "assets/lazy.js"),
+      "export const studioLabel = 'ShowAI Studio Ready';\n",
+      "utf8",
+    );
+    await writeFile(
+      join(webRoot, "assets/index-test.js"),
+      `import { studioLabel } from "./lazy.js";
+const assetBase = new URL("./style.css", import.meta.url).href;
+window.__MOUNTED__ = { studioLabel, assetBase, env: import.meta.env };
+`,
+      "utf8",
+    );
+    const indexHtml =
+      '<!doctype html><html><head><script type="module" crossorigin src="./assets/index-test.js"></script><link rel="modulepreload" crossorigin href="./assets/lazy.js"><link rel="stylesheet" crossorigin href="./assets/style.css"></head><body><div id="root"></div></body></html>';
+    await writeFile(join(webRoot, "index.html"), indexHtml, "utf8");
+
+    const upstream = createServer((_req, res) => {
+      res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
+      res.end(indexHtml);
+    });
+    await new Promise<void>((done) => upstream.listen(0, "127.0.0.1", done));
+    const addr = upstream.address();
+    const upstreamPort = typeof addr === "object" && addr ? addr.port : 0;
+    const upstreamUrl = new URL(`http://127.0.0.1:${upstreamPort}/`);
+
+    const sidecar = await startAntigravitySidecar({
+      port: 0,
+      token: "iife-token",
+      backend: {
+        ensure: async () => ({ url: upstreamUrl, home: "/tmp/showai-iife", webRoot }),
+        stop: async () => {},
+        status: () => ({ running: true, url: upstreamUrl.href, home: "/tmp/showai-iife" }),
+      },
+    });
+
+    try {
+      const rootRes = await fetch(`${sidecar.url}/`);
+      expect(rootRes.status).toBe(200);
+      const html = await rootRes.text();
+      expect(html).not.toContain('type="module"');
+      expect(html).not.toContain('rel="modulepreload"');
+      expect(html).toContain('<link rel="stylesheet" href="./assets/style.css">');
+      const bundleMatch = /<script defer src="(\/_antigravity\/workbench\.js\?v=[0-9a-f]+)"><\/script>/.exec(
+        html,
+      );
+      expect(bundleMatch).toBeTruthy();
+
+      const bundleRes = await fetch(`${sidecar.url}${bundleMatch![1]}`);
+      expect(bundleRes.status).toBe(200);
+      expect(bundleRes.headers.get("content-type")).toContain("application/javascript");
+      const bundleJs = await bundleRes.text();
+      expect(bundleJs).toContain("ShowAI Studio Ready");
+      expect(bundleJs).toContain("__SHOWAI_ASSET_URL__");
+      expect(bundleJs).not.toMatch(/\bimport\s*\{/);
+    } finally {
+      await sidecar.close();
+      await new Promise<void>((done) => upstream.close(() => done()));
     }
   });
 });
