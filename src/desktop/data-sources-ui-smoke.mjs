@@ -1,3 +1,4 @@
+import { prepareDatabaseViewTest, checkDatabaseViewEdits } from "./database-view-interactions-smoke.mjs";
 import { desktopTestEnvironment } from "../../scripts/desktop-test-env.mjs";
 import assert from "node:assert/strict";
 import { execFile } from "node:child_process";
@@ -284,6 +285,7 @@ await tool("page_apply", {
     },
   ],
 });
+await prepareDatabaseViewTest(tool, projectId);
 await mcp.close();
 check("content created through MCP", { projectId, pageId, component: component.id });
 
@@ -380,7 +382,7 @@ try {
   const status = boundSchedule.getByRole("group", { name: "共享数据", exact: true });
   assert.equal(await status.count(), 0);
   check("bound widgets omit their dataset names and idle editable data has no status row");
-  await boundSchedule.getByRole("textbox", { name: "事项", exact: true }).first().click();
+  await boundSchedule.locator("th").first().click({ position: { x: 2, y: 2 } });
   await window.getByRole("button", { name: "移动或管理内容块", exact: true }).click();
   await window.getByRole("button", { name: "共享数据…", exact: true }).click();
   const settings = window.getByRole("dialog", { name: "共享数据", exact: true });
@@ -565,8 +567,14 @@ try {
   await shot("export-packaging");
   await packaging.getByRole("button", { name: "导出", exact: true }).click();
   const source = out.replace(/\.html$/, ".showai.json");
+  const inputs = join(output, "exports", "验收.inputs");
+  let inputFiles;
   for (let attempt = 0; attempt < 120; attempt++) {
-    if (await readFile(source).then(() => true, () => false)) break;
+    inputFiles = await readdir(inputs).catch((error) => {
+      if (error.code !== "ENOENT") throw error;
+      return [];
+    });
+    if (inputFiles.length) break;
     await new Promise((done) => setTimeout(done, 250));
   }
   const exported = await readFile(source, "utf8");
@@ -579,14 +587,14 @@ try {
   assert.match(exported, /data:video\/mp4;base64,/);
   assert.match(exported, /"file:%E8%AF%B4%E6%98%8E\.pdf"|"file:说明\.pdf"/);
   assert.match(exported, /"clip":\s*"file:/);
-  const inputs = join(output, "exports", "验收.inputs");
-  const inputFiles = await readdir(inputs);
   assert.equal(inputFiles.length, 1, "the transform's input snapshot");
   check("export carries the mixed packaging choices and no device path", {
     html: out,
     source,
     inputs: inputFiles,
   });
+  await checkDatabaseViewEdits(window);
+  check("filtered creation, four record previews, independent copies, bulk update and undo persist on the bound database");
   result.passed = true;
 } catch (error) {
   result.error = error.stack ?? String(error);

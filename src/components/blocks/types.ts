@@ -111,6 +111,8 @@ export interface DatabaseView {
     | import("../../datasets/record-query.mjs").FilterGroup
     | import("../../datasets/record-query.mjs").LegacyFilter;
   columnWidths?: Record<string, number>;
+  hiddenColumns?: string[];
+  calendar?: DatabaseCalendarConfig;
 }
 export interface DatabaseCalendarConfig {
   dateColumn?: string;

@@ -3,7 +3,12 @@ import {
   MAX_COLUMN_WIDTH,
   MIN_COLUMN_WIDTH,
 } from "./database-contract.mjs";
-import type { DatabaseColumn, DatabaseView, DatabaseViewType } from "./types";
+import type {
+  DatabaseCalendarConfig,
+  DatabaseColumn,
+  DatabaseView,
+  DatabaseViewType,
+} from "./types";
 import {
   filterConditions,
   readFilter,
@@ -17,7 +22,16 @@ export const COLUMN_WIDTH = 165;
 export const ROW_ACTION_WIDTH = 33;
 
 export type ViewOverride = Partial<
-  Pick<DatabaseView, "type" | "groupBy" | "sort" | "sorts" | "filter">
+  Pick<
+    DatabaseView,
+    | "type"
+    | "groupBy"
+    | "sort"
+    | "sorts"
+    | "filter"
+    | "hiddenColumns"
+    | "calendar"
+  >
 >;
 
 const isViewType = (value: unknown): value is DatabaseViewType =>
@@ -77,6 +91,8 @@ export function changeView(
       delete next[key];
   if (next.columnWidths && !Object.keys(next.columnWidths).length)
     delete next.columnWidths;
+  if (!next.hiddenColumns?.length && next.type !== "calendar")
+    delete next.hiddenColumns;
   return next;
 }
 
@@ -96,6 +112,18 @@ export function newViewId(views: DatabaseView[]): string {
   const used = new Set(views.map((view) => view.id));
   for (let index = views.length + 1; ; index += 1)
     if (!used.has(`view-${index}`)) return `view-${index}`;
+}
+
+export function duplicateDatabaseView(
+  view: DatabaseView,
+  views: DatabaseView[],
+  copyName: (name: string) => string,
+): DatabaseView {
+  const names = new Set(views.map((item) => item.name));
+  const base = copyName(view.name.slice(0, 185)).slice(0, 194);
+  let name = base;
+  for (let index = 2; names.has(name); index++) name = `${base} ${index}`;
+  return { ...structuredClone(view), id: newViewId(views), name };
 }
 
 export function columnWidth(
@@ -125,6 +153,48 @@ export function moveColumnTo<T extends { id: string }>(
   const index = next.findIndex((column) => column.id === target);
   if (index < 0) return columns;
   next.splice(placement === "before" ? index : index + 1, 0, moved);
+  return next;
+}
+
+export function pruneCalendarConfig(
+  config: DatabaseCalendarConfig | undefined,
+  columns: DatabaseColumn[],
+): DatabaseCalendarConfig | undefined {
+  if (!config) return undefined;
+  const next: DatabaseCalendarConfig = { ...config };
+  const pick = (
+    fields: DatabaseColumn[],
+    id: string | undefined,
+    type: DatabaseColumn["type"],
+  ) => fields.find((field) => field.id === id && field.type === type);
+  const keep = (
+    key:
+      | "dateColumn"
+      | "endDateColumn"
+      | "startTimeColumn"
+      | "endTimeColumn"
+      | "colorColumn"
+      | "doneColumn",
+    type: DatabaseColumn["type"],
+  ) => {
+    if (next[key] !== undefined && !pick(columns, next[key], type))
+      delete next[key];
+  };
+  keep("dateColumn", "date");
+  keep("endDateColumn", "date");
+  keep("startTimeColumn", "text");
+  keep("endTimeColumn", "text");
+  if (next.colorColumn !== "") keep("colorColumn", "select");
+  keep("doneColumn", "checkbox");
+  if (
+    next.contextColumn !== undefined &&
+    !pick(columns, next.contextColumn, "text") &&
+    !pick(columns, next.contextColumn, "select")
+  )
+    delete next.contextColumn;
+  if (next.endDateColumn && next.endDateColumn === next.dateColumn)
+    delete next.endDateColumn;
+  if (!next.startTimeColumn) delete next.endTimeColumn;
   return next;
 }
 
@@ -179,6 +249,13 @@ export function pruneViews(
       if (Object.keys(widths).length) next.columnWidths = widths;
       else delete next.columnWidths;
     }
+    if (next.hiddenColumns) {
+      next.hiddenColumns = next.hiddenColumns.filter((id) => ids.has(id));
+      if (!next.hiddenColumns.length && next.type !== "calendar")
+        delete next.hiddenColumns;
+    }
+    if (next.calendar)
+      next.calendar = pruneCalendarConfig(next.calendar, columns);
     return next;
   });
 }

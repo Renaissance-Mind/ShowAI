@@ -10,6 +10,8 @@ import {
   Plus,
   Table2,
 } from "../../ui/icons";
+import { SelectRecords, type DatabaseSelection } from "./DatabaseBulkEdit";
+import { activateRecord } from "./DatabaseRecordControls";
 import { EmptyState } from "./shared";
 import { DatabaseCalendar } from "./DatabaseCalendar";
 import { ROW_ACTION_WIDTH, columnWidth } from "./database-views";
@@ -36,13 +38,21 @@ export interface DatabaseViewProps {
   shownRows: DatabaseRow[];
   pagedRows: DatabaseRow[];
   editable: boolean;
+  canAdd: boolean;
+  selection?: DatabaseSelection;
   sources: ReadonlyMap<string, BlockItemSource> | null;
   cell: (row: DatabaseRow, column: DatabaseColumn) => ReactNode;
   readCell: (row: DatabaseRow, column: DatabaseColumn) => ReactNode;
   cellEditable: (row: DatabaseRow, column: DatabaseColumn) => boolean;
   deleteButton: (row: DatabaseRow, label: string) => ReactNode;
   rowName: (row: DatabaseRow) => string;
-  addRow: (group?: string, preset?: Record<string, DatabaseValue>) => string;
+  titleColumn?: DatabaseColumn;
+  titleCell: (row: DatabaseRow, showCheckbox?: boolean) => ReactNode;
+  openRow: (row: DatabaseRow) => void;
+  addRow: (
+    group?: string,
+    preset?: Record<string, DatabaseValue>,
+  ) => string | undefined;
   updateFields: (id: string, values: Record<string, DatabaseValue>) => void;
   removeRow: (id: string) => void;
   board: {
@@ -65,6 +75,8 @@ export interface DatabaseViewProps {
   calendar: {
     settings: ReturnType<typeof resolveCalendar>;
     savedKey: string;
+    labels: (row: DatabaseRow) => { name: string; value: string }[];
+    changeMode?: (mode: "month" | "week" | "heatmap") => void;
   };
 }
 export interface DatabaseViewDefinition {
@@ -133,6 +145,20 @@ function TableView(props: DatabaseViewProps) {
                       : "none"
                   }
                 >
+                  {column.id === props.titleColumn?.id && props.selection && (
+                    <SelectRecords
+                      checked={
+                        shownRows.length > 0 &&
+                        props.selection.count === shownRows.length
+                      }
+                      mixed={
+                        props.selection.count > 0 &&
+                        props.selection.count < shownRows.length
+                      }
+                      label={t("selectAllRecords", { count: shownRows.length })}
+                      onChange={props.selection.toggleAll}
+                    />
+                  )}
                   <button
                     type="button"
                     onClick={() => table.toggleSort(column.id)}
@@ -182,10 +208,21 @@ function TableView(props: DatabaseViewProps) {
           </thead>
           <tbody>
             {pagedRows.map((row) => (
-              <tr key={row.id} title={props.sources?.get(row.id)?.label}>
+              <tr
+                key={row.id}
+                data-record-selected={
+                  props.selection?.selected.has(row.id) || undefined
+                }
+                title={props.sources?.get(row.id)?.label}
+                onClick={(event) =>
+                  activateRecord(event, () => props.openRow(row))
+                }
+              >
                 {table.orderedColumns.map((column) => (
                   <td key={column.id} {...table.reorder.cellProps(column.id)}>
-                    {props.cell(row, column)}
+                    {column.id === props.titleColumn?.id
+                      ? props.titleCell(row, true)
+                      : props.cell(row, column)}
                   </td>
                 ))}
                 {editable && (
@@ -225,22 +262,29 @@ function ListView(props: DatabaseViewProps) {
     <>
       <ul className="sb-database-list">
         {pagedRows.map((row) => (
-          <li key={row.id} title={props.sources?.get(row.id)?.label}>
-            {columns[0] && (
-              <div className="sb-list-title">{props.cell(row, columns[0])}</div>
-            )}
+          <li
+            key={row.id}
+            data-record-selected={
+              props.selection?.selected.has(row.id) || undefined
+            }
+            title={props.sources?.get(row.id)?.label}
+            onClick={(event) => activateRecord(event, () => props.openRow(row))}
+          >
+            <div className="sb-list-title">{props.titleCell(row)}</div>
             <div className="sb-list-properties">
-              {columns.slice(1).map((column) =>
-                isBlank(row[column.id]) &&
-                column.type !== "formula" &&
-                column.type !== "rollup" &&
-                !column.relation?.reverseOf ? null : (
-                  <span className="sb-list-property" key={column.id}>
-                    <span>{column.name}</span>
-                    {props.readCell(row, column)}
-                  </span>
-                ),
-              )}
+              {columns
+                .filter((column) => column.id !== props.titleColumn?.id)
+                .map((column) =>
+                  isBlank(row[column.id]) &&
+                  column.type !== "formula" &&
+                  column.type !== "rollup" &&
+                  !column.relation?.reverseOf ? null : (
+                    <span className="sb-list-property" key={column.id}>
+                      <span>{column.name}</span>
+                      {props.readCell(row, column)}
+                    </span>
+                  ),
+                )}
             </div>
             {editable && (
               <span className="sb-row-action">
@@ -253,7 +297,7 @@ function ListView(props: DatabaseViewProps) {
           </li>
         ))}
       </ul>
-      {editable && (
+      {props.canAdd && (
         <button
           type="button"
           className="sb-add-row"
@@ -280,8 +324,8 @@ function BoardView(props: DatabaseViewProps) {
     null,
   );
   const group = board.column;
-  const [titleColumn, ...properties] = columns.filter(
-    (column) => column.id !== group?.id,
+  const properties = columns.filter(
+    (column) => column.id !== group?.id && column.id !== props.titleColumn?.id,
   );
   return (
     <div className="sb-board">
@@ -325,7 +369,7 @@ function BoardView(props: DatabaseViewProps) {
               >
                 {groupRows.length}
               </span>
-              {editable && (
+              {props.canAdd && (
                 <button
                   type="button"
                   className="sb-icon-button"
@@ -339,16 +383,24 @@ function BoardView(props: DatabaseViewProps) {
             {groupRows.map((row) => (
               <article
                 aria-label={props.rowName(row) || t("untitled")}
+                data-record-selected={
+                  props.selection?.selected.has(row.id) || undefined
+                }
                 className={`sb-board-card ${dragging?.id === row.id ? "is-dragging" : ""}`}
                 key={row.id}
-                draggable={!!group && props.cellEditable(row, group)}
+                onClick={(event) =>
+                  activateRecord(event, () => props.openRow(row))
+                }
+                draggable={
+                  !props.selection?.active &&
+                  !!group &&
+                  props.cellEditable(row, group)
+                }
                 onDragStart={() => setDragging({ id: row.id, from: name })}
                 onDragEnd={() => setDragging(null)}
               >
                 <div className="sb-board-card-title">
-                  {titleColumn
-                    ? props.cell(row, titleColumn)
-                    : props.rowName(row) || t("untitled")}
+                  {props.titleCell(row)}
                 </div>
                 {properties.length > 0 && (
                   <dl className="sb-board-card-properties">
@@ -401,7 +453,7 @@ function BoardView(props: DatabaseViewProps) {
                 )}
               </article>
             ))}
-            {editable && !emptyUnassigned && (
+            {props.canAdd && !emptyUnassigned && (
               <button
                 type="button"
                 className="sb-add-row"
@@ -428,8 +480,14 @@ function CalendarView(props: DatabaseViewProps) {
       columns={props.columns}
       rows={props.shownRows}
       settings={calendar.settings}
+      labels={calendar.labels}
       editable={props.editable}
       renderCell={props.cell}
+      onOpenRecord={props.openRow}
+      selection={props.selection?.active ? props.selection.selected : undefined}
+      onModeChange={calendar.changeMode}
+      titleColumn={props.titleColumn}
+      viewId={props.view.id}
       onMove={(id, start, until) =>
         props.updateFields(id, {
           [date!.id]: start,
@@ -437,7 +495,9 @@ function CalendarView(props: DatabaseViewProps) {
         })
       }
       onAdd={
-        date ? (day) => props.addRow(undefined, { [date.id]: day }) : undefined
+        date && props.canAdd
+          ? (day) => props.addRow(undefined, { [date.id]: day })
+          : undefined
       }
       onRemove={props.removeRow}
     />

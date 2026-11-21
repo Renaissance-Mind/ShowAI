@@ -74,7 +74,7 @@ function validateCalendar(calendar, columns) {
   if (!isObject(calendar)) fail("calendar must be an object.");
   const column = (key, types) => {
     const id = calendar[key];
-    if (id === undefined) return;
+    if (id === undefined || (key === "colorColumn" && id === "")) return;
     if (typeof id !== "string")
       fail(`calendar.${key} must be a column id string.`);
     const target = columns.find((item) => item.id === id);
@@ -160,6 +160,8 @@ function validateViews(views, columns) {
           "sorts",
           "filter",
           "columnWidths",
+          "hiddenColumns",
+          "calendar",
         ].includes(key)
       )
         fail(`${path}.${key} is not a supported setting.`);
@@ -194,6 +196,21 @@ function validateViews(views, columns) {
         columns.filter((column) => column.type !== "custom" || column.kind),
       );
     if (view.sorts !== undefined) validateSorts(view.sorts, `${path}.sorts`);
+    if (view.hiddenColumns !== undefined) {
+      if (
+        !Array.isArray(view.hiddenColumns) ||
+        view.hiddenColumns.length > 50 ||
+        new Set(view.hiddenColumns).size !== view.hiddenColumns.length
+      )
+        fail(
+          `${path}.hiddenColumns must be a list of at most 50 distinct column ids.`,
+        );
+      for (const id of view.hiddenColumns) {
+        reference(id, `${path}.hiddenColumns`);
+        if (!id) fail(`${path}.hiddenColumns requires non-empty column ids.`);
+      }
+    }
+    if (view.calendar !== undefined) validateCalendar(view.calendar, columns);
     if (view.columnWidths !== undefined) {
       if (!isObject(view.columnWidths))
         fail(`${path}.columnWidths must map column ids to widths.`);
