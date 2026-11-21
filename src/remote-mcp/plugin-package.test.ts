@@ -5,7 +5,24 @@ import { join, resolve } from "node:path";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { remotePluginPackage, chatgptAppId } from "./plugin-package";
+import { universalPluginFiles } from "../plugin/universal-package.mjs";
 const execute = promisify(execFile);
+test("the universal package guides a disconnected host without registering a server", async () => {
+  const source = resolve("plugins/showai");
+  const zip = await remotePluginPackage(source);
+  expect(zip.name).toBe("showai-universal");
+  expect(zip.endpoint).toBeUndefined();
+  expect(zip.files.filter((path) => path.endsWith("/SKILL.md"))).toHaveLength(6);
+  expect(zip.files).toContain("skills/use-showai/references/connect-mcp.md");
+  for (const path of [".app.json", "mcp.json", ".mcp.json", "mcp/launch.mjs", ".claude-plugin/plugin.json"])
+    expect(zip.files).not.toContain(path);
+  const { files } = await universalPluginFiles(source, { setupUrl: "https://example.org/mcp" });
+  expect(files.get("README.md")?.toString()).toContain("https://example.org/mcp");
+  expect(files.get("plugin.json")?.toString()).not.toContain("example.org");
+  expect(files.has("mcp.json")).toBe(false);
+  expect(files.has(".mcp.json")).toBe(false);
+  expect(files.get("skills/use-showai/SKILL.md")?.toString()).toContain("references/connect-mcp.md");
+});
 test("a real ZIP includes complete workflows and a remote connection without local launchers", async () => {
   const directory = await mkdtemp(join(tmpdir(), "showai-plugin-zip-"));
   try {

@@ -5,7 +5,7 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import lightLogo from "../../plugins/showai/assets/logo.svg?raw";
 import darkLogo from "../../plugins/showai/assets/logo-dark.svg?raw";
-import antigravityMark from "../studio/assets/agent-brands/antigravity.svg?raw";
+import antigravityMark from "../plugin/assets/antigravity.svg?raw";
 import messages from "../i18n/messages/codex-workbench";
 import { openSystemUrl } from "../host/local-system";
 import { pageLink } from "../document/page-link.mjs";

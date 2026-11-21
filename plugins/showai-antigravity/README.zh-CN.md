@@ -87,25 +87,20 @@ page_present 返回完整离线 HTML/source 与聊天预览。预览容纳时使
 
 宿主可以显示 MCP Apps、使用返回的 Codex 本机可视化路径，或交付完整 HTML/source。显示能力取决于宿主。路径与 HTTP 预览是快照，项目中源页面持续可编辑。详见[对话展示](skills/use-showai/references/host-display.md)。
 
-## 网页 ChatGPT 与远程包
 
-ChatGPT 网页安装带完整 Skill 的 ShowAI 插件，并连接其中的托管 MCP App。见 [ChatGPT 接入](https://github.com/Renaissance-Mind/ShowAI/blob/main/docs/i18n/chatgpt.zh-CN.md)。
+## 通用插件与手动连接
 
-运营者可以从相同 Skill 生成 HTTP/OAuth 包：
+五个专用包面向同一台电脑上的 Agent 和 ShowAI，一次安装六个 Skills 与本机 MCP 启动配置。DeepSeek Harness 启用 App 准备的插件包，Kimi Work 在宿主里注册并安装本地插件。
 
-```sh
-npm run package:plugin -- --mcp-url HTTPS_MCP_URL --out NEW_DIRECTORY
-```
-
-输出名为 showai-cloud，移除本机 launcher，使用 OAuth DCR。已有 ChatGPT 注册连接可加 --chatgpt-app asdk_app_ID。与本机插件并存安装：
+在其他客户端使用时，可在桌面「设置 → 插件 → 导出通用插件」保存 ZIP，也可从源码生成目录：
 
 ```sh
-node scripts/install-codex-plugin.mjs --remote-url HTTPS_MCP_URL --marketplace-root DIRECTORY
+npm run package:plugin -- --out NEW_DIRECTORY
 ```
 
-安装器使用独立 marketplace 并核验文件，包内不包含凭据。部署与公开提交是独立发行操作。参见 [Agent 接入](https://github.com/Renaissance-Mind/ShowAI/blob/main/docs/i18n/agent-integration.zh-CN.md)。
+通用包提供六个 Skills 和离线[连接向导](skills/use-showai/references/connect-mcp.md)，MCP 在宿主中手动添加。旧命令中的 `--mcp-url` 只把地址写入 README 供手动填写；`--chatgpt-app` 可引用已手动注册的 ChatGPT 连接。
 
-边写边画、位置参考和 iPad/Mac 配对见 [collaborate-canvas](skills/collaborate-canvas/SKILL.md)。
+ChatGPT 网页通过公网 HTTPS 和 OAuth 连接。Grok Bot 可选同一 tailnet 的私网设备授权或公网 HTTPS。其他客户端按运行位置选择本机 stdio、局域网或远程 HTTP。在客户端实际发起只读调用核验，见[在 Agent 中使用](https://showai.renaissancemind.ai/doc/agent-hosts)。
 
 ## 宿主包与公共源码
 

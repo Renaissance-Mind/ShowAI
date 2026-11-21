@@ -2,7 +2,7 @@
 
 **Language:** English | [简体中文](i18n/agent-integration.zh-CN.md) · [Documentation](README.md)
 
-**Agent document operations use MCP** in every host. Start a public visual with `show-visual`. Use `use-showai` for project ownership and other workflows. Local plugins include a stdio launcher and remote packages connect over HTTP.
+**Agent document operations use MCP** in every host. Start a public visual with `show-visual`. Use `use-showai` for project ownership and other workflows. Local host plugins ship their stdio launcher and Skills together. The universal plugin uses MCP configured manually in the host, with stdio or a reachable HTTP endpoint.
 
 Local library MCP uses explicit `projectId` per operation. Use `projects_list` for read-only discovery, `project_resolve` with a trusted absolute `sourceDirectory` for new formal content, or a project-bound connection. Save formal work before delivering it through the host adapter. Use `render_document` for explicitly standalone deliverables. **Connection failure** does not change the destination or persistence mode.
 
@@ -107,11 +107,7 @@ MCP Apps resources use `text/html;profile=mcp-app` and `_meta.ui.resourceUri`, w
 
 The same skill source supports local and remote connections. For a remote package:
 
-```sh
-npm run package:plugin -- --mcp-url https://agent.example.com/mcp --out /absolute/new/showai-plugin
-```
-
-The output creates a `showai-cloud` package from the same Skills/assets, with HTTP/OAuth configuration instead of the local launcher. Archive that directory for the target host's plugin upload or public submission. Local installation continues using `npm run plugin:update -- --json`; it does not force every local Agent through a remote service. Public publication, organization verification and review are separate from local or personal-plugin testing.
+Generate an unbound universal package with `npm run package:plugin -- --out NEW_DIRECTORY`, or export the ZIP from desktop Settings → Plugins. Install the six Skills in the host and configure its MCP connection manually. The optional ChatGPT Personal export can reference a connection the user has already registered. A supplied `--mcp-url` is a manual setup hint in the README. See [Set up an agent](https://showai.renaissancemind.ai/doc/agent-hosts).
 
 ## Saved-page presentation contract
 

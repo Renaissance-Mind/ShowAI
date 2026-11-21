@@ -96,6 +96,7 @@ plugins/showai/scripts/cli.mjs
 !/plugins/showai/skills/use-showai/SKILL.md
 !/plugins/showai/skills/use-showai/references/integration.md
 !/plugins/showai/skills/use-showai/references/runtime.md
+!/plugins/showai/skills/use-showai/references/connect-mcp.md
 !/plugins/showai/skills/use-showai/references/shared-data.md
 !/plugins/showai/skills/use-showai/references/import.md
 !/plugins/showai/skills/use-showai/references/extension-points.md
@@ -245,6 +246,7 @@ plugins/showai/scripts/cli.mjs
 !/plugins/showai-antigravity/skills/use-showai/references/host-display.md
 !/plugins/showai-antigravity/skills/use-showai/references/integration.md
 !/plugins/showai-antigravity/skills/use-showai/references/runtime.md
+!/plugins/showai-antigravity/skills/use-showai/references/connect-mcp.md
 !/plugins/showai-antigravity/skills/use-showai/references/shared-data.md
 !/plugins/showai-antigravity/skills/use-showai/references/authoring.md
 !/plugins/showai-antigravity/skills/use-showai/references/board-authoring.md
@@ -274,6 +276,7 @@ plugins/showai/scripts/cli.mjs
 !/plugins/showai-claude/skills/use-showai/references/host-display.md
 !/plugins/showai-claude/skills/use-showai/references/integration.md
 !/plugins/showai-claude/skills/use-showai/references/runtime.md
+!/plugins/showai-claude/skills/use-showai/references/connect-mcp.md
 !/plugins/showai-claude/skills/use-showai/references/shared-data.md
 !/plugins/showai-claude/skills/use-showai/references/authoring.md
 !/plugins/showai-claude/skills/use-showai/references/board-authoring.md
@@ -303,6 +306,7 @@ plugins/showai/scripts/cli.mjs
 !/plugins/showai-codex/skills/use-showai/references/host-display.md
 !/plugins/showai-codex/skills/use-showai/references/integration.md
 !/plugins/showai-codex/skills/use-showai/references/runtime.md
+!/plugins/showai-codex/skills/use-showai/references/connect-mcp.md
 !/plugins/showai-codex/skills/use-showai/references/shared-data.md
 !/plugins/showai-codex/skills/use-showai/references/authoring.md
 !/plugins/showai-codex/skills/use-showai/references/board-authoring.md
@@ -330,6 +334,7 @@ plugins/showai/scripts/cli.mjs
 !/plugins-kimi/showai/skills/use-showai/references/host-display.md
 !/plugins-kimi/showai/skills/use-showai/references/integration.md
 !/plugins-kimi/showai/skills/use-showai/references/runtime.md
+!/plugins-kimi/showai/skills/use-showai/references/connect-mcp.md
 !/plugins-kimi/showai/skills/use-showai/references/shared-data.md
 !/plugins-kimi/showai/skills/use-showai/references/authoring.md
 !/plugins-kimi/showai/skills/use-showai/references/board-authoring.md

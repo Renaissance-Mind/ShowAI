@@ -2,7 +2,7 @@
 
 **语言：** [English](../agent-integration.md) | 简体中文 · [文档目录](index.zh-CN.md)
 
-所有宿主都通过 MCP 操作 ShowAI。展示内置组件直接从 `show-visual` 开始，项目归属和其他工作流从 `use-showai` 开始。本机插件提供 stdio 启动器，远程连接使用 HTTP。
+所有宿主都通过 MCP 操作 ShowAI。展示内置组件直接从 `show-visual` 开始，项目归属和其他工作流从 `use-showai` 开始。本机专用插件随 Skills 提供 stdio 启动配置。通用插件使用宿主里手动添加的本机 stdio 或可达的 HTTP MCP 连接。
 
 正式内容先保存到项目，再按宿主适配交付。明确要求独立文件时使用 render_document。本机 library 连接每次携带 projectId，只读发现用 projects_list，新正式内容可用 project_resolve 与可信宿主绝对目录定位。绑定项目连接沿用其身份。
 
@@ -91,13 +91,7 @@ OAuth 提供发现、DCR、S256 PKCE、resource 绑定、过期访问 token、�
 
 对话预览优先带压缩本地阅读器；超预算后可使用固定版本的在线阅读器，从 ShowAI reader 源、jsDelivr、unpkg 加载。delivery.compact 面向模型写 HTML 的宿主。reader:bundled 与 SHOWAI_READER_CDN=off 禁止在线回退；reader:cdn 明确联网。预览链接一小时到期，应保存到项目或保留源数据。纯文本宿主可以交付完整 HTML/source 和项目回执。
 
-远程插件包可由以下命令生成：
-
-```sh
-npm run package:plugin -- --mcp-url https://agent.example.com/mcp --out /absolute/new/showai-plugin
-```
-
-生成 showai-cloud，复用相同 Skill 与资源，使用 HTTP/OAuth 替代本机 launcher。ChatGPT 网页安装带完整 Skill 的插件并连接其中的 MCP App。本机安装仍使用 plugin:update；公共提交与组织审核是独立流程。
+可在桌面「设置 → 插件 → 导出通用插件」取得 ZIP，也可以用 `npm run package:plugin -- --out NEW_DIRECTORY` 生成目录。安装六个 Skills 后，在宿主手动添加 MCP。可选的 ChatGPT Personal 导出可引用已经注册的连接。旧命令提供的 `--mcp-url` 仅写入 README 供手动填写。见[在 Agent 中使用](https://showai.renaissancemind.ai/doc/agent-hosts)。
 
 ## 已保存页面的展示约定
 

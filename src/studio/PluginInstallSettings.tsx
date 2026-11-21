@@ -453,6 +453,8 @@ function ManualPath({
 
 export function LaunchConfigCopy({ info }: { info: DesktopInfo | null }) {
   const t = useTranslator(messages);
+  const notify = useNotify();
+  const [exporting, setExporting] = useState(false);
   const [launcher, setLauncher] = useState<McpLaunch | null>(null);
   const [copied, setCopied] = useState<LaunchSnippetKind | null>(null);
   const [error, setError] = useState("");
@@ -474,12 +476,31 @@ export function LaunchConfigCopy({ info }: { info: DesktopInfo | null }) {
   if (!info) return null;
   const server = launcher ?? runtimeMcpLaunch(info.cli);
   const kinds: LaunchSnippetKind[] = ["claude", "codex", "json"];
+  async function exportUniversal() {
+    setError("");
+    setExporting(true);
+    try {
+      const result = await desktop.invoke<{ path: string } | null>(
+        "remoteMcp:exportPlugin", { universal: true },
+      );
+      if (result) notify(t("universalSaved", { path: result.path }));
+    } catch (reason) {
+      setError(errorMessage(reason));
+    } finally {
+      setExporting(false);
+    }
+  }
   return (
     <section
       className="settings-group plugin-launch-config"
       aria-labelledby="settings-launch-title"
     >
       <h2 id="settings-launch-title">{t("launch.title")}</h2>
+      {info.mode === "desktop" && (
+        <button type="button" className="settings-button" disabled={exporting} onClick={exportUniversal}>
+          {t("exportUniversal")}
+        </button>
+      )}
       {kinds.map((kind) => {
         const text = launchSnippet(kind, server, info.platform);
         return (

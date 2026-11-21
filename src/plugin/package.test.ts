@@ -61,6 +61,7 @@ async function packageSkill(
     await copyFile(join(root, file), join(fixture, file));
   }
   await symlink(join(root, "node_modules"), join(fixture, "node_modules"), process.platform === "win32" ? "junction" : "dir");
+  await copyFile(join(root, "src/plugin/universal-package.mjs"), join(fixture, "src/plugin/universal-package.mjs"));
   await cp(
     join(root, "plugins/showai/host-adapters"),
     join(fixture, "plugins/showai/host-adapters"),

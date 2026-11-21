@@ -104,6 +104,8 @@ export default defineMessages("pluginInstall", {
     "next.deepseek": "重启 DeepSeek Harness 后生效。",
     verifyHint: "重启 Agent 后，在新对话中发送",
     "launch.title": "手动添加 MCP",
+    exportUniversal: "导出通用插件",
+    universalSaved: "通用插件已保存到 {path}",
   },
   en: {
     "rescanHost": "Check {host} again",
@@ -212,5 +214,7 @@ export default defineMessages("pluginInstall", {
     "next.deepseek": "Restart DeepSeek Harness to load it.",
     verifyHint: "After restarting the Agent, send in a new conversation",
     "launch.title": "Add MCP manually",
+    exportUniversal: "Export universal plugin",
+    universalSaved: "Universal plugin saved to {path}",
   },
 });

@@ -310,34 +310,34 @@ async function install() {
       throw new Error(`Unknown option ${flag}.`);
   if (flags.has("--help")) {
     log(
-      "Usage: node scripts/install-codex-plugin.mjs [--update] [--json]\n       node scripts/install-codex-plugin.mjs --remote-url HTTPS_MCP_URL --marketplace-root DIRECTORY [--chatgpt-app asdk_app_ID] [--update] [--json]\nValidates the MCP plugin, then uses official Codex commands to install or refresh it. The remote form generates showai-cloud in its own marketplace. Use --workbench-test DIRECTORY --home LIBRARY with a built checkout. Each concurrent checkout can use its own directory and --workbench-channel NAME. The ShowAI software runtime is installed separately. Verifies installed bytes and enabled status.",
+      "Usage: node scripts/install-codex-plugin.mjs [--update] [--json]\n       node scripts/install-codex-plugin.mjs --marketplace-root DIRECTORY [--remote-url MANUAL_SETUP_HINT] [--chatgpt-app asdk_app_ID] [--update] [--json]\nValidates the MCP plugin, then uses official Codex commands to install or refresh it. The universal form installs Skills in a separate marketplace. Configure MCP in the host; --remote-url adds a README hint. Use --workbench-test DIRECTORY --home LIBRARY with a built checkout. Each concurrent checkout can use its own directory and --workbench-channel NAME. The ShowAI software runtime is installed separately. Verifies installed bytes and enabled status.",
     );
     return;
   }
   const remoteUrl = options.get("--remote-url");
+  const universalRoot = options.get("--marketplace-root");
   const workbenchTest = options.get("--workbench-test");
   const testHome = options.get("--home");
   if (channel !== undefined && (!workbenchTest || channel.length > 32 || !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(channel)))
     throw new Error("--workbench-channel requires --workbench-test and a lowercase name of up to 32 letters, digits and hyphens.");
-  if ((!workbenchTest !== !testHome) || (workbenchTest && remoteUrl))
+  if ((!workbenchTest !== !testHome) || (workbenchTest && universalRoot))
     throw new Error("--workbench-test and --home are used together for a local test package.");
   if (testHome && !isAbsolute(testHome))
     throw new Error("--home must be an absolute content library path.");
-  if (!remoteUrl !== !options.get("--marketplace-root"))
-    throw new Error("--remote-url and --marketplace-root are used together.");
-  if (options.get("--chatgpt-app") && !remoteUrl)
-    throw new Error("--chatgpt-app applies to the remote plugin.");
-  const marketplaceRoot = workbenchTest
-    ? resolve(workbenchTest)
-    : remoteUrl ? resolve(options.get("--marketplace-root")) : root;
-  const pluginName = workbenchTest ? workbenchTestName : remoteUrl ? "showai-cloud" : "showai";
-  const pluginRoot = join(marketplaceRoot, "plugins", remoteUrl || workbenchTest ? pluginName : "showai-codex");
+  if ((remoteUrl || options.has("--chatgpt-app")) && !universalRoot)
+    throw new Error("--remote-url and --chatgpt-app require --marketplace-root.");
+  const marketplaceRoot = resolve(workbenchTest ?? universalRoot ?? root);
   const marketFile = join(marketplaceRoot, ".agents/plugins/marketplace.json");
   const initial = await optionalJson(marketFile);
-  const marketName = workbenchTest ? workbenchTestName : remoteUrl ? "renaissance-mind-cloud" : initial?.name;
+  const legacyRemote = initial ? initial.name === "renaissance-mind-cloud" : !!remoteUrl;
+  const universalName = legacyRemote ? "showai-cloud" : "showai-universal";
+  const universalMarket = legacyRemote ? "renaissance-mind-cloud" : "renaissance-mind-universal";
+  const pluginName = workbenchTest ? workbenchTestName : universalRoot ? universalName : "showai";
+  const pluginRoot = join(marketplaceRoot, "plugins", universalRoot || workbenchTest ? pluginName : "showai-codex");
+  const marketName = workbenchTest ? workbenchTestName : universalRoot ? universalMarket : initial?.name;
   if (typeof marketName !== "string" || !/^[a-z0-9][a-z0-9_-]*$/.test(marketName))
     throw new Error("Expected a local marketplace with a valid name.");
-  if (initial && (remoteUrl || workbenchTest) &&
+  if (initial && (universalRoot || workbenchTest) &&
       (initial.name !== marketName || initial.plugins?.length !== 1 ||
         initial.plugins[0].name !== pluginName || initial.plugins[0].source?.source !== "local" ||
         resolve(marketplaceRoot, initial.plugins[0].source.path) !== pluginRoot))
@@ -371,14 +371,15 @@ async function install() {
   }
 
   if (workbenchTest) await checkTestServer(join(marketplaceRoot, "agent-runtime.json"));
-  if (remoteUrl) {
+  if (universalRoot) {
     await assertPackageTarget(pluginRoot, pluginName);
     await mkdir(dirname(pluginRoot), { recursive: true });
     const staging = await mkdtemp(join(dirname(pluginRoot), ".remote-"));
     const prepared = join(staging, "new");
     try {
       await command(process.execPath, [
-        join(root, "scripts/package-plugin.mjs"), "--mcp-url", remoteUrl,
+        join(root, "scripts/package-plugin.mjs"),
+        ...(remoteUrl ? ["--mcp-url", remoteUrl] : []),
         "--out", prepared, "--name", pluginName,
         ...(options.has("--chatgpt-app") ? ["--chatgpt-app", options.get("--chatgpt-app")] : []),
       ]);
@@ -390,12 +391,12 @@ async function install() {
     await writeJson(
       join(marketplaceRoot, ".agents/plugins/marketplace.json"),
         {
-          name: "renaissance-mind-cloud",
-          interface: { displayName: "Renaissance Mind Cloud" },
+          name: marketName,
+          interface: { displayName: "ShowAI Universal" },
           plugins: [
             {
-              name: "showai-cloud",
-              source: { source: "local", path: "./plugins/showai-cloud" },
+              name: pluginName,
+              source: { source: "local", path: `./plugins/${pluginName}` },
               policy: { installation: "AVAILABLE", authentication: "ON_USE" },
               category: "Productivity",
             },
@@ -427,7 +428,7 @@ async function install() {
     );
   const identity = `${pluginName}@${marketplace.name}`;
 
-  if (!remoteUrl && !workbenchTest) {
+  if (!universalRoot && !workbenchTest) {
     log("Preparing the ShowAI skills…");
     const packaged = await command(process.execPath, [join(root, "scripts/package-plugin.mjs")]);
     if (packaged.stdout.trim()) log(packaged.stdout.trim());
@@ -486,7 +487,7 @@ async function install() {
       `Installed version ${installed.version} differs from the bundle version ${manifest.version}.`,
     );
   const registeredMcp = workbenchTest ? await verifyWorkbenchTestServer(installedPath) : undefined;
-  const receiptPath = remoteUrl || workbenchTest
+  const receiptPath = universalRoot || workbenchTest
     ? join(marketplaceRoot, "codex-plugin-install.json")
     : join(root, "artifacts/codex-plugin-install.json");
   const receipt = {
@@ -497,8 +498,8 @@ async function install() {
     enabled: true,
     marketplaceRoot,
     ...(workbenchBinding ? { ...workbenchBinding, registeredMcp } : {}),
-    ...(remoteUrl
-      ? { mcpUrl: remoteUrl, chatgptApp: options.get("--chatgpt-app") ?? null }
+    ...(universalRoot
+      ? { connectionMode: "manual", ...(remoteUrl && { mcpUrl: remoteUrl }), chatgptApp: options.get("--chatgpt-app") ?? null }
       : {}),
     sourcePath: pluginRoot,
     installedPath,

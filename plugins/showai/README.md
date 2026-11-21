@@ -65,7 +65,7 @@ Edit workflows in `plugins/showai/skills` and host delivery contracts in `plugin
 | Antigravity | `plugins/showai-antigravity` | Native MCP Apps views, page cards, and side-pane workbench |
 | DeepSeek Harness | Prepared bundle directory | Automatic tool-result preview |
 | Kimi Work | `plugins-kimi/showai` | Offline Widget workspace and display action |
-| Remote MCP Apps | Remote plugin with installed Skills | Attached native view |
+| Universal | Six Skills; configure MCP in the host | MCP Apps view when supported, otherwise results and links |
 
 The marketplace identity stays `showai@renaissance-mind`. The generated Codex and Claude directories are committed so Git-backed marketplace installation also works in a fresh checkout. Regenerate them when changing shared source; do not edit generated Skills or launchers. `host-profile.json` records the profile, declared display and shared-file fingerprints. App installation binds the same adapters from bundled source resources. Each host must reload its installed plugin and reconnect separately; updating source does not replace an already running MCP process.
 
@@ -102,22 +102,18 @@ page_present returns complete offline HTML/source plus a conversation preview. T
 
 Follow the distribution’s bound host adapter for display. The shared workflows do not select another host’s presentation syntax. Runtime-owned paths and HTTP preview URLs are snapshots, while the saved project remains editable. See [conversation display](skills/use-showai/references/host-display.md).
 
-## ChatGPT web and remote packages
+## Universal plugin and manual MCP setup
 
-For ChatGPT web use, install the complete ShowAI plugin with its Skills and connect its hosted MCP app. Follow [ChatGPT setup](https://github.com/Renaissance-Mind/ShowAI/blob/main/docs/chatgpt.md).
+The five host-specific packages install six Skills and the local MCP launch configuration together. Run the Agent and ShowAI on the same computer and use the host's installer. DeepSeek Harness enables the bundle prepared by ShowAI; Kimi Work installs its registered local plugin.
 
-Operators can generate an HTTP/OAuth package from the same Skills:
-
-```sh
-npm run package:plugin -- --mcp-url HTTPS_MCP_URL --out NEW_DIRECTORY
-```
-
-The output is showai-cloud without the local launcher. It uses OAuth dynamic client registration. Add --chatgpt-app asdk_app_ID when using an existing registered ChatGPT connection. To install beside the local plugin:
+For another client, export the universal ZIP from **Settings → Plugins → Export universal plugin**, or generate the directory from source:
 
 ```sh
-node scripts/install-codex-plugin.mjs --remote-url HTTPS_MCP_URL --marketplace-root DIRECTORY
+npm run package:plugin -- --out NEW_DIRECTORY
 ```
 
-The installer uses a separate marketplace and verifies its installed files. No credentials enter the package. Deployment and public submission remain separate release operations. See [Agent integration](https://github.com/Renaissance-Mind/ShowAI/blob/main/docs/agent-integration.md).
+The universal package contains six Skills and an offline [connection guide](skills/use-showai/references/connect-mcp.md). Configure ShowAI MCP in the host. An existing `--mcp-url` argument adds the address to the setup README only. Optional `--chatgpt-app` references an already registered ChatGPT connection. No server, launcher or credentials are installed by the universal package.
+
+ChatGPT web uses a public HTTPS endpoint and OAuth. A Grok Bot connector on the same tailnet can use Tailscale Serve and device approval, or choose public HTTPS. Other clients can use a local stdio command or a reachable HTTP endpoint. Check the connection in the client with a read-only call. See [Agent setup](https://showai.renaissancemind.ai/doc/agent-hosts).
 
 Collaborative canvas work, optional spatial references, and iPad/Mac pairing are described in [collaborate-canvas](skills/collaborate-canvas/SKILL.md).
