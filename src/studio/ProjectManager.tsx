@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import {
   Archive,
   ArchiveRestore,
+  CircleAlert,
   Cloud,
   CloudCheck,
   CloudOff,
@@ -40,6 +41,7 @@ import {
 } from "./managed-projects";
 import { desktop, errorMessage } from "../host/bridge";
 import Dialog from "../ui/Dialog";
+import Select from "../ui/Select";
 import AccountLogin from "./AccountLogin";
 import { LibraryContextMenu } from "../ui/LibraryContextMenu";
 
@@ -54,6 +56,7 @@ export type ManagedSyncStatus = Omit<SyncConfiguration, "connections"> & {
   downloads?: DownloadState[];
   running: boolean;
 };
+
 export default function ProjectManager({
   status,
   localProjects,
@@ -348,14 +351,33 @@ export default function ProjectManager({
     if (!row.binding) return t("status.local");
     return t(`state.${row.binding.status}`);
   }
+  function stateTone(
+    row: ManagedProject,
+    downloading: boolean,
+  ): "ok" | "warn" | "error" | undefined {
+    if (downloading) return "warn";
+    if (row.binding?.status === "conflict" || row.binding?.status === "save-failed")
+      return "error";
+    if (row.connection?.signedOut || row.binding?.status === "offline" || row.binding?.status === "revoked")
+      return "warn";
+    if (row.binding && !row.binding.paused && row.binding.status === "synced")
+      return "ok";
+    return undefined;
+  }
   return (
-    <section className="sync-project-manager" aria-label={f("projects.title")}>
-      <div className="sync-manager-heading">
-        <h2>{f("projects.title")}</h2>
+    <section
+      className="settings-group sync-project-manager"
+      aria-labelledby="sync-project-manager-title"
+    >
+      <div className="settings-group-heading">
+        <div>
+          <h2 id="sync-project-manager-title">{f("projects.title")}</h2>
+          <p className="settings-group-desc">{t("section.projectsHelp")}</p>
+        </div>
         <div className="sync-manager-actions">
           {iconButton(
             f("projects.refresh"),
-            <RefreshCw size={18} />,
+            <RefreshCw size={15} />,
             () => {
               setRevision((n) => n + 1);
               void onRefresh();
@@ -367,7 +389,7 @@ export default function ProjectManager({
           )}
           {iconButton(
             f("invitationTitle"),
-            <Link2 size={16} />,
+            <Link2 size={15} />,
             onJoin,
             false,
             "",
@@ -376,7 +398,7 @@ export default function ProjectManager({
           )}
           {iconButton(
             f("projects.new"),
-            <Plus size={19} />,
+            <Plus size={16} />,
             () => {
               setName("");
               setLoginInCreate(false);
@@ -384,15 +406,16 @@ export default function ProjectManager({
               setDialog({ kind: "create" });
             },
             false,
-            "is-accent",
+            "settings-primary-button",
             undefined,
             f("projects.new"),
           )}
         </div>
       </div>
+
       <div className="sync-manager-filters">
         <div
-          className="sync-flat-tabs"
+          className="settings-segmented"
           role="group"
           aria-label={f("projects.filter")}
         >
@@ -413,8 +436,7 @@ export default function ProjectManager({
         </div>
         <label className="sync-source-filter">
           <span>{f("projects.source")}</span>
-          <select
-            className="showai-select"
+          <Select
             aria-label={f("projects.location")}
             value={filter}
             onChange={(e) => onFilter(e.target.value)}
@@ -426,7 +448,7 @@ export default function ProjectManager({
                 {account.name} · {account.user.name}
               </option>
             ))}
-          </select>
+          </Select>
         </label>
         {filter !== "all" && (
           <button
@@ -437,8 +459,8 @@ export default function ProjectManager({
             {f("clearSourceFilter")}
           </button>
         )}
-        <label className="sync-manager-search">
-          <Search size={16} />
+        <label className="settings-search-field sync-manager-search">
+          <Search size={15} aria-hidden="true" />
           <input
             type="search"
             aria-label={f("projectSearch")}
@@ -448,169 +470,196 @@ export default function ProjectManager({
           />
         </label>
       </div>
+
       {Object.entries(catalogErrors)
         .filter(([id]) => filter === "all" || filter === id)
         .map(([id, error]) => (
-          <p key={id} role="alert" className="sync-error">
-            {status.connections.find((item) => item.id === id)?.name}: {error}
-          </p>
+          <div
+            key={id}
+            role="alert"
+            className="settings-callout sync-alert"
+            data-tone="error"
+          >
+            <CircleAlert size={15} aria-hidden="true" />
+            <span>
+              {status.connections.find((item) => item.id === id)?.name}: {error}
+            </span>
+          </div>
         ))}
-      <table className="sync-manager-table">
-        <thead>
-          <tr>
-            <th>{f("projectColumn")}</th>
-            <th className="sync-manager-source">{f("projects.source")}</th>
-            <th className="sync-manager-state">{f("projects.state")}</th>
-            <th>{f("actionsColumn")}</th>
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((row) => {
-            const transfer = status.downloads?.some(
-              (item) =>
-                item.remoteProjectId === row.remote?.id &&
-                item.connectionId === row.connection?.id,
-            );
-            const downloading =
-              !!transfer || (pending.has(row.key) && !row.local);
-            const updating = pending.has(row.key) && !!row.local;
-            const state = label(row, downloading);
-            return (
-              <tr key={row.key}>
-                <td>
-                  <strong className="sync-project-name">{row.name}</strong>
-                  <small>
-                    {row.remote
-                      ? t(`role.${row.remote.role}`)
-                      : row.binding
-                        ? t(`role.${row.binding.role}`)
-                        : f("localTitle")}
-                    <span className="sync-manager-mobile-state">
-                      {" "}
-                      · {state}
-                    </span>
-                  </small>
-                  {(errors[row.key] ||
-                    errors[`${row.key}:cancel`] ||
-                    (!row.binding?.paused && row.binding?.error)) && (
-                    <p className="sync-error" role="alert">
-                      {errors[row.key] ||
-                        errors[`${row.key}:cancel`] ||
-                        row.binding?.error}
-                    </p>
-                  )}
-                </td>
-                <td className="sync-manager-source">
-                  {row.connection?.name ?? f("localLocation")}
-                </td>
-                <td className="sync-manager-state">
-                  <span
-                    className={`sync-state-label ${row.binding?.paused ? "is-paused" : ""}`}
-                  >
-                    {downloading ? (
-                      <Loader2 size={15} className="sync-spin" />
-                    ) : !row.local ? (
-                      <Cloud size={15} />
-                    ) : row.binding ? (
-                      row.binding.paused ? (
-                        <CloudOff size={15} />
-                      ) : (
-                        <CloudCheck size={15} />
-                      )
-                    ) : (
-                      <HardDrive size={15} />
-                    )}{" "}
-                    {state}
-                  </span>
-                  {row.local && (
-                    <span
-                      className="sync-local-copy"
-                      aria-label={f("projects.alreadyDownloaded", {
-                        name: row.name,
-                      })}
-                    >
-                      {f("projects.onDevice")}
-                    </span>
-                  )}
-                </td>
-                <td>
-                  <div className="sync-manager-row-actions">
-                    {downloading
-                      ? iconButton(
-                          f("projects.cancelDownload", { name: row.name }),
-                          <X size={16} />,
-                          () => void cancelDownload(row),
-                          pending.has(`${row.key}:cancel`),
-                        )
-                      : row.local
-                        ? iconButton(
-                            f("projects.open", { name: row.name }),
-                            <FolderOpen size={16} />,
-                            () =>
-                              void act(row.key, async () => {
-                                await onOpenProject?.(row.local!.id);
-                              }),
-                            updating,
-                            "",
-                            undefined,
-                            f("openCompact"),
-                          )
-                        : row.remote?.head
-                          ? iconButton(
-                              f("projects.download", { name: row.name }),
-                              <Download size={16} />,
-                              () => void download(row),
-                              !!row.connection?.signedOut,
-                              "",
-                              undefined,
-                              f("downloadCompact"),
-                            )
-                          : null}
-                    <button
-                      type="button"
-                      className="settings-button sync-action"
-                      aria-label={f("projects.more", { name: row.name })}
-                      title={f("projects.more", { name: row.name })}
-                      aria-haspopup="menu"
-                      aria-expanded={menu?.row.key === row.key}
-                      onClick={(e) => setMenu({ row, anchor: e.currentTarget })}
-                    >
-                      {f("moreActions")}
-                      <MoreHorizontal size={15} aria-hidden="true" />
-                    </button>
-                  </div>
-                </td>
+
+      <div className="settings-card sync-table-card">
+        {rows.length > 0 ? (
+          <table className="sync-manager-table">
+            <thead>
+              <tr>
+                <th>{f("projectColumn")}</th>
+                <th className="sync-manager-source">{f("projects.source")}</th>
+                <th className="sync-manager-state">{f("projects.state")}</th>
+                <th>{f("actionsColumn")}</th>
               </tr>
-            );
-          })}
-        </tbody>
-      </table>
-      {!rows.length && (
-        <div className="sync-empty">
-          <p>
-            {loading
-              ? t("readingProjects")
-              : query
-                ? t("noMatchingProjects")
-                : archived
-                  ? f("projects.noArchived")
-                  : t("noLocalProjects")}
-          </p>
-          {!loading && (query || filter !== "all" || archived) && (
-            <button
-              type="button"
-              className="settings-button"
-              onClick={() => {
-                setQuery("");
-                onFilter("all");
-                setArchived(false);
-              }}
-            >
-              {f("clearProjectFilters")}
-            </button>
-          )}
-        </div>
-      )}
+            </thead>
+            <tbody>
+              {rows.map((row) => {
+                const transfer = status.downloads?.some(
+                  (item) =>
+                    item.remoteProjectId === row.remote?.id &&
+                    item.connectionId === row.connection?.id,
+                );
+                const downloading =
+                  !!transfer || (pending.has(row.key) && !row.local);
+                const updating = pending.has(row.key) && !!row.local;
+                const state = label(row, downloading);
+                const tone = stateTone(row, downloading);
+                return (
+                  <tr key={row.key}>
+                    <td>
+                      <strong className="sync-project-name">{row.name}</strong>
+                      <small>
+                        {row.remote
+                          ? t(`role.${row.remote.role}`)
+                          : row.binding
+                            ? t(`role.${row.binding.role}`)
+                            : f("localTitle")}
+                        <span className="sync-manager-mobile-state">
+                          {" "}
+                          · {state}
+                        </span>
+                      </small>
+                      {(errors[row.key] ||
+                        errors[`${row.key}:cancel`] ||
+                        (!row.binding?.paused && row.binding?.error)) && (
+                        <p className="sync-error" role="alert">
+                          {errors[row.key] ||
+                            errors[`${row.key}:cancel`] ||
+                            row.binding?.error}
+                        </p>
+                      )}
+                    </td>
+                    <td className="sync-manager-source">
+                      {row.connection?.name ?? f("localLocation")}
+                    </td>
+                    <td className="sync-manager-state">
+                      <span
+                        className="settings-badge"
+                        data-tone={tone}
+                      >
+                        {downloading ? (
+                          <Loader2 size={13} className="sync-spin" />
+                        ) : !row.local ? (
+                          <Cloud size={13} />
+                        ) : row.binding ? (
+                          row.binding.paused ? (
+                            <CloudOff size={13} />
+                          ) : (
+                            <CloudCheck size={13} />
+                          )
+                        ) : (
+                          <HardDrive size={13} />
+                        )}{" "}
+                        {state}
+                      </span>
+                      {row.local && row.connection && (
+                        <span
+                          className="sync-local-copy"
+                          aria-label={f("projects.alreadyDownloaded", {
+                            name: row.name,
+                          })}
+                        >
+                          {f("projects.onDevice")}
+                        </span>
+                      )}
+                    </td>
+                    <td>
+                      <div className="sync-manager-row-actions">
+                        {row.binding?.status === "conflict" && (
+                          <button
+                            type="button"
+                            className="settings-button settings-primary-button sync-action"
+                            onClick={() => onConflict(row.binding!)}
+                          >
+                            {t("resolveConflict")}
+                          </button>
+                        )}
+                        {downloading
+                          ? iconButton(
+                              f("projects.cancelDownload", { name: row.name }),
+                              <X size={16} />,
+                              () => void cancelDownload(row),
+                              pending.has(`${row.key}:cancel`),
+                            )
+                          : row.local
+                            ? iconButton(
+                                f("projects.open", { name: row.name }),
+                                <FolderOpen size={15} />,
+                                () =>
+                                  void act(row.key, async () => {
+                                    await onOpenProject?.(row.local!.id);
+                                  }),
+                                updating,
+                                "",
+                                undefined,
+                                f("openCompact"),
+                              )
+                            : row.remote?.head
+                              ? iconButton(
+                                  f("projects.download", { name: row.name }),
+                                  <Download size={15} />,
+                                  () => void download(row),
+                                  !!row.connection?.signedOut,
+                                  "",
+                                  undefined,
+                                  f("downloadCompact"),
+                                )
+                              : null}
+                        <button
+                          type="button"
+                          className="settings-button sync-action"
+                          aria-label={f("projects.more", { name: row.name })}
+                          title={f("projects.more", { name: row.name })}
+                          aria-haspopup="menu"
+                          aria-expanded={menu?.row.key === row.key}
+                          onClick={(e) =>
+                            setMenu({ row, anchor: e.currentTarget })
+                          }
+                        >
+                          {f("moreActions")}
+                          <MoreHorizontal size={15} aria-hidden="true" />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        ) : (
+          <div className="sync-empty">
+            <p>
+              {loading
+                ? t("readingProjects")
+                : query
+                  ? t("noMatchingProjects")
+                  : archived
+                    ? f("projects.noArchived")
+                    : t("noLocalProjects")}
+            </p>
+            {!loading && (query || filter !== "all" || archived) && (
+              <button
+                type="button"
+                className="settings-button"
+                onClick={() => {
+                  setQuery("");
+                  onFilter("all");
+                  setArchived(false);
+                }}
+              >
+                {f("clearProjectFilters")}
+              </button>
+            )}
+          </div>
+        )}
+      </div>
+
       {menu && (
         <LibraryContextMenu
           anchor={menu.anchor}
@@ -811,8 +860,7 @@ export default function ProjectManager({
                 {dialog.kind === "create" && (
                   <label className="sync-field">
                     <span>{f("projects.saveTo")}</span>
-                    <select
-                      className="showai-select"
+                    <Select
                       value={location}
                       onChange={(e) => setLocation(e.target.value)}
                     >
@@ -824,7 +872,7 @@ export default function ProjectManager({
                             {item.name} · {item.user.name}
                           </option>
                         ))}
-                    </select>
+                    </Select>
                   </label>
                 )}
                 {dialog.kind === "create" &&
@@ -857,32 +905,34 @@ export default function ProjectManager({
                 </div>
               </form>
             ) : dialog.kind === "pause" ? (
-              <>
-                <div className="studio-dialog-actions">
-                  <button
-                    className="sync-text-button"
-                    onClick={() => setDialog(null)}
-                  >
-                    {f("projects.continueSync")}
-                  </button>
-                  <button
-                    className="settings-button sync-primary"
-                    disabled={pending.has(dialog.row!.key)}
-                    onClick={() => void enable(dialog.row!, false)}
-                  >
-                    {f("projects.keepAndStop")}
-                  </button>
-                </div>
-              </>
+              <div className="studio-dialog-actions">
+                <button
+                  type="button"
+                  className="sync-text-button"
+                  onClick={() => setDialog(null)}
+                >
+                  {f("projects.continueSync")}
+                </button>
+                <button
+                  type="button"
+                  className="settings-button sync-primary"
+                  disabled={pending.has(dialog.row!.key)}
+                  onClick={() => void enable(dialog.row!, false)}
+                >
+                  {f("projects.keepAndStop")}
+                </button>
+              </div>
             ) : (
               <div className="studio-dialog-actions">
                 <button
+                  type="button"
                   className="sync-text-button"
                   onClick={() => setDialog(null)}
                 >
                   {tc("cancel")}
                 </button>
                 <button
+                  type="button"
                   className="settings-button sync-primary"
                   disabled={pending.has("dialog")}
                   onClick={() =>

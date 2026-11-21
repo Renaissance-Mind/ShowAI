@@ -16,7 +16,12 @@ import { useTranslator } from "../i18n/react";
 import commonMessages from "../i18n/messages/common";
 import sidebarMessages from "../i18n/messages/sidebar";
 import { writerName } from "./external-change";
-import { clientIsMac, isDeleteShortcut } from "./keyboard-shortcuts";
+import {
+  clientIsMac,
+  isContextMenuShortcut,
+  isDeleteShortcut,
+  isRenameShortcut,
+} from "./keyboard-shortcuts";
 import "./external-change.css";
 
 const translate = translator(sidebarMessages);
@@ -185,15 +190,14 @@ export default memo(function RecentPages({
               });
             }}
             onKeyDown={(event) => {
-              if (event.key === "F2" || isDeleteShortcut(event, clientIsMac())) {
+              const mac = clientIsMac();
+              const renaming = isRenameShortcut(event, mac);
+              if (renaming || isDeleteShortcut(event, mac)) {
                 event.preventDefault();
-                onCommand(page, event.key === "F2" ? "rename" : "delete");
+                onCommand(page, renaming ? "rename" : "delete");
                 return;
               }
-              if (
-                event.key === "ContextMenu" ||
-                (event.shiftKey && event.key === "F10")
-              ) {
+              if (isContextMenuShortcut(event, mac)) {
                 event.preventDefault();
                 onMenu(page, event.currentTarget);
               }

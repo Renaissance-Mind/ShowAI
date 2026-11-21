@@ -11,9 +11,11 @@ export type AppUpdateAction =
 export function useAppUpdate() {
   const [state, setState] = useState<AppUpdateState | null>(null);
   useEffect(() => {
-    if (!window.showai?.onAppUpdate) return;
+    if (!window.showai) return;
     let stopped = false;
-    const stop = desktop.onAppUpdate((next) => setState(next));
+    const stop = window.showai.onAppUpdate
+      ? desktop.onAppUpdate((next) => setState(next))
+      : undefined;
     desktop.invoke<AppUpdateState>("appUpdate:state").then(
       (initial) => {
         if (!stopped) setState((current) => current ?? initial);
@@ -22,7 +24,7 @@ export function useAppUpdate() {
     );
     return () => {
       stopped = true;
-      stop();
+      stop?.();
     };
   }, []);
   const run = useCallback(

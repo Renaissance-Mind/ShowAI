@@ -22,7 +22,7 @@ Add remote projects from **Projects on server** on an account card, or expand a 
 
 The **Show on this device** switch in an expanded project controls the local navigation and recent-page list independently on each device. Hiding a project retains its content and server membership.
 
-In **Settings → Agent**, retrieve server model resources. Each API Key or ChatGPT authorization shows its source server and account. Select a resource to use it, or save an existing local source to a chosen server. The source server encrypts the credential and supplies it to authenticated devices when needed. ChatGPT refresh remains owned by that source server. An unavailable source is reported explicitly; credentials are not replicated across the bound group.
+In **Settings → Built-in Agent**, retrieve server model resources. Each API Key or ChatGPT authorization shows its source server and account. Select a resource to use it, or save an existing local source to a chosen server. The source server encrypts the credential and supplies it to authenticated devices when needed. ChatGPT refresh remains owned by that source server. An unavailable source is reported explicitly; credentials are not replicated across the bound group.
 
 ## Storage and synchronization
 

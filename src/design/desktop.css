@@ -193,7 +193,7 @@
   height: 28px;
   color: var(--muted);
 }
-.settings-select select {
+.settings-select :is(select, .showai-custom-select) {
   min-height: 32px;
   padding-block: 4px;
   background: var(--paper);
@@ -630,18 +630,7 @@
   border-color: var(--line);
 }
 .studio-settings {
-  max-width: 900px;
-  padding-top: 48px;
-}
-.settings-heading p,
-.settings-row-text p {
-  font-size: 14px;
-  line-height: 1.6;
-}
-.settings-row-text :is(h3, label),
-.settings-group > h2 {
-  font-size: 16px;
-  font-weight: 600;
+  max-width: 880px;
 }
 .settings-nav-label {
   font-size: 12px;
@@ -649,7 +638,7 @@
 }
 .settings-config,
 .settings-theme-preview {
-  border-radius: 12px;
+  border-radius: 10px;
 }
 @media (max-width: 1100px) {
   .studio-sidebar {

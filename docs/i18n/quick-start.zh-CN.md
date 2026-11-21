@@ -23,11 +23,11 @@ ShowAI 会自动更新：它在后台检查最新发行版，下载新版本，�
 
 ## 2. 连接你的 Agent
 
-1. 在 ShowAI 中打开插件面板：首次启动时欢迎页会显示它，之后随时可以在「设置 → 插件」中找到。
+1. 在 ShowAI 中打开插件面板：首次启动时欢迎页会显示它，之后随时可以在「设置 → 外部 Agent 插件」中找到。
 2. ShowAI 会检测 Claude Code 与 Codex。在你使用的 Agent 旁点「安装插件」，等待显示「已安装并启用」。
 3. 重新加载 Agent：Claude Code 重启会话；Codex 刷新插件或重启 Codex。已经打开的对话仍使用旧的工具列表，请新开一个对话。
 
-要确认连接，「设置 → 插件」会给出测试提示词「用 ShowAI 列出我的项目」。在新对话中发送它；Agent 连上 ShowAI 后，该 Agent 旁的状态会从「等待第一次调用」变为「已收到第一次调用」。
+要确认连接，「设置 → 外部 Agent 插件」会给出测试提示词「用 ShowAI 列出我的项目」。在新对话中发送它；Agent 连上 ShowAI 后，该 Agent 旁的状态会从「等待第一次调用」变为「已收到第一次调用」。
 
 插件和它连接的运行时都由 App 提供，不需要源码，也不需要另外安装 Node.js。插件连接 App 当前的内容库；切换内容库或移动 App 后，点「更新并启用」。
 
@@ -53,8 +53,8 @@ Agent 会把界面保存为 ShowAI 中的一个页面并展示出来：支持内
 | 显示「已安装，尚未启用」            | 点「更新并启用」。                                                                                                       |
 | 提示已启用其他来源的 ShowAI 插件    | 先在 Agent 中停用原插件，再点「重新检测」并安装 App 版本。                                                               |
 | Agent 只用文字回答，没有提到 ShowAI | 对话在插件加载前就已开始。重启 Agent 并新开对话；提示词以“用 ShowAI……”开头会更明确。                                     |
-| Agent 报告无法连接 ShowAI           | 打开「设置 → 插件」。「当前登记的运行时」显示问题时点「修复登记」；Agent 显示连接失败或连接了另一个内容库时点「修复并重新连接」或「更新并启用」。然后重启 Agent。 |
-| 页面已保存，但在 App 中找不到       | App 与插件使用了不同的内容库。对照「设置 → 通用 → 内容库」与「设置 → 插件」中该 Agent 的「插件连接的内容库」。              |
+| Agent 报告无法连接 ShowAI           | 打开「设置 → 外部 Agent 插件」。「当前登记的运行时」显示问题时点「修复登记」；Agent 显示连接失败或连接了另一个内容库时点「修复并重新连接」或「更新并启用」。然后重启 Agent。 |
+| 页面已保存，但在 App 中找不到       | App 与插件使用了不同的内容库。对照「设置 → 通用 → 内容库」与「设置 → 外部 Agent 插件」中该 Agent 的「插件连接的内容库」。              |
 
 仍未解决时，请[提交 Issue](https://github.com/Renaissance-Mind/ShowAI/issues)，写明 Agent 及其版本、「设置 → 关于与反馈」中的 ShowAI 版本，以及 Agent 的回复。
 
@@ -83,7 +83,7 @@ Agent 修改前会先读取当前页面，包括你的修改。你和 Agent 同�
 
 ## 不使用 Claude Code 或 Codex
 
-**内置 Agent。** 打开「设置 → Agent」，添加使用 API Key 的模型来源（也可以使用本机 Codex 或 Claude Code 的登录，或 ShowAI Cloud），然后点顶栏的 AI 按钮，或选中文字、打开内容块菜单，选择「让 AI 处理」。详见[内置 Agent](agent-host.zh-CN.md)。
+**内置 Agent。** 打开「设置 → 内置 Agent」，添加使用 API Key 的模型来源（也可以使用本机 Codex 或 Claude Code 的登录，或 ShowAI Cloud），然后点顶栏的 AI 按钮，或选中文字、打开内容块菜单，选择「让 AI 处理」。详见[内置 Agent](agent-host.zh-CN.md)。
 
 **其他 Agent。** DeepSeek Harness 与 Kimi 处于预览阶段，网页版 ChatGPT 采用邀请制，其他 MCP 客户端可以手动配置。详见[支持的 Agent](README.zh-CN.md#-支持的-agent)。
 

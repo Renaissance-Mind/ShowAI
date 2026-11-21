@@ -16,7 +16,12 @@ import DirectoryEntryButton from "./DirectoryEntryButton";
 import type { LibraryMenuPoint } from "../LibraryNavigation";
 import PageThumbnail from "../PageThumbnail";
 import FolderThumbnail from "../FolderThumbnail";
-import { clientIsMac, isDeleteShortcut } from "../keyboard-shortcuts";
+import {
+  clientIsMac,
+  isContextMenuShortcut,
+  isDeleteShortcut,
+  isRenameShortcut,
+} from "../keyboard-shortcuts";
 import type { StudioFeedback } from "./useStudioFeedback";
 import type { LibraryState } from "./useLibraryState";
 import type { RouteState } from "./useRouteState";
@@ -117,26 +122,21 @@ export function DirectoryView({
                   );
               }}
               onKeyDown={(event) => {
-                const deleting = isDeleteShortcut(event, clientIsMac());
+                const mac = clientIsMac();
+                const deleting = isDeleteShortcut(event, mac);
                 if (deleting && pageSelection.ids.length) {
                   event.preventDefault();
                   event.stopPropagation();
                   beginBatchPages("delete");
                   return;
                 }
-                if (event.key === "F2" || deleting) {
+                const renaming = isRenameShortcut(event, mac);
+                if (renaming || deleting) {
                   event.preventDefault();
-                  libraryKeyCommand(
-                    target,
-                    event.key === "F2" ? "rename" : "delete",
-                  );
+                  libraryKeyCommand(target, renaming ? "rename" : "delete");
                   return;
                 }
-                if (
-                  event.key !== "ContextMenu" &&
-                  !(event.shiftKey && event.key === "F10")
-                )
-                  return;
+                if (!isContextMenuShortcut(event, mac)) return;
                 event.preventDefault();
                 const anchor =
                   event.currentTarget.querySelector<HTMLElement>(

@@ -17,6 +17,7 @@ import type {
 } from "../sync/protocol";
 import { getLocale, type MessageKey } from "../i18n";
 import { useTranslator } from "../i18n/react";
+import Select from "../ui/Select";
 import messages from "../i18n/messages/sync";
 import common from "../i18n/messages/common";
 import flowMessages from "../i18n/messages/accountFlow";
@@ -189,8 +190,8 @@ export default function SyncDashboard({
             onChange={(event) => setQuery(event.target.value)}
           />
         )}
-        <select
-          className="showai-select sync-mobile-project-select"
+        <Select
+          className="sync-mobile-project-select"
           aria-label={t("switchManagedProject")}
           disabled={busy || !managed.length}
           value={selectedId}
@@ -206,7 +207,7 @@ export default function SyncDashboard({
               {item.archived ? ` · ${t("archived")}` : ""}
             </option>
           ))}
-        </select>
+        </Select>
         <nav className="sync-managed-projects" aria-label={t("projectList")}>
           {managed
             .filter((item) =>
@@ -356,8 +357,7 @@ export default function SyncDashboard({
                           </div>
                         </td>
                         <td>
-                          <select
-                            className="showai-select"
+                          <Select
                             aria-label={t("memberRoleFor", {
                               name: member.name,
                             })}
@@ -373,7 +373,7 @@ export default function SyncDashboard({
                             }
                           >
                             {roleOptions}
-                          </select>
+                          </Select>
                         </td>
                         <td>
                           <button
@@ -458,8 +458,7 @@ export default function SyncDashboard({
               <div className="sync-invite-controls">
                 <label>
                   <span>{t("roleAfterJoin")}</span>
-                  <select
-                    className="showai-select"
+                  <Select
                     aria-label={t("inviteRole")}
                     value={inviteRole}
                     disabled={busy}
@@ -468,12 +467,11 @@ export default function SyncDashboard({
                     }
                   >
                     {roleOptions}
-                  </select>
+                  </Select>
                 </label>
                 <label className="sync-field">
                   <span>{f("days")}</span>
-                  <select
-                    className="showai-select"
+                  <Select
                     aria-label={f("days")}
                     value={days}
                     disabled={busy}
@@ -484,14 +482,13 @@ export default function SyncDashboard({
                         {f("dayCount", { count })}
                       </option>
                     ))}
-                  </select>
+                  </Select>
                 </label>
                 {controlledInvites && (
                   <>
                     <label>
                       <span>{t("inviteUses")}</span>
-                      <select
-                        className="showai-select"
+                      <Select
                         aria-label={t("inviteUsesLimit")}
                         value={inviteUses}
                         disabled={busy}
@@ -505,7 +502,7 @@ export default function SyncDashboard({
                         <option value="unlimited">
                           {t("policy.unlimited")}
                         </option>
-                      </select>
+                      </Select>
                     </label>
                     <label>
                       <span>{t("targetAccount")}</span>

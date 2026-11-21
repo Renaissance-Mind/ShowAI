@@ -52,6 +52,7 @@ import {
 import type { DesktopChange, DesktopInfo, DesktopResponse } from "../host/protocol";
 import { workbenchChunkBytes, type WorkbenchRoute } from "../host/codex-workbench-transport";
 import { openLocalPath, systemVersion } from "../host/local-system";
+import { openNativeOsDialog } from "./native-file-dialog";
 import { localMediaResponse } from "../workbench/local-media";
 import { windowQuery } from "../workbench/window-target";
 
@@ -65,6 +66,7 @@ export interface BrowserServerOptions {
   codexWorkbench?: { key: string };
   additionalActions?: ReadonlySet<string>;
   agentWorkspaceRoot?: string;
+  disableNativeDialogs?: boolean;
   interceptInvoke?: (
     action: string,
     args: Record<string, unknown>,
@@ -670,7 +672,32 @@ export async function startBrowserServer(options: BrowserServerOptions) {
           throw new CoreError("INVALID_DATA", "Arguments must be an object.");
         let data: unknown;
         if (url.pathname === "/api/dialog/list") data = await dialogList(input);
-        else if (url.pathname === "/api/dialog/mkdir") {
+        else if (url.pathname === "/api/dialog/native") {
+          const mode =
+            input.mode === "directory" ||
+            input.mode === "openFile" ||
+            input.mode === "saveFile"
+              ? input.mode
+              : "openFile";
+          data = await openNativeOsDialog({
+            mode,
+            title: typeof input.title === "string" ? input.title : undefined,
+            defaultPath:
+              typeof input.defaultPath === "string"
+                ? input.defaultPath
+                : undefined,
+            defaultName:
+              typeof input.defaultName === "string"
+                ? input.defaultName
+                : undefined,
+            extensions: Array.isArray(input.extensions)
+              ? input.extensions.filter(
+                  (item: unknown): item is string => typeof item === "string",
+                )
+              : undefined,
+            disabled: options.disableNativeDialogs,
+          });
+        } else if (url.pathname === "/api/dialog/mkdir") {
           const parent = await realpath(required(input, "path"));
           const name = required(input, "name");
           if (name === "." || name === ".." || /[/\\\x00]/.test(name))

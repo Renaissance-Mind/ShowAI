@@ -14,14 +14,21 @@ import quickJumpMessages from "../../i18n/messages/quickJump";
 import shellMessages from "../../i18n/messages/appShell";
 import { modalOpen } from "../../ui/modal";
 import { REPORT_PROBLEM_EVENT, type ReportProblemDetail } from "../../problems";
-import { commandKey, tabShortcut } from "../../workbench/tab-shortcuts";
+import { tabShortcut } from "../../workbench/tab-shortcuts";
 import type { FeedbackRequest } from "../feedback/AboutFeedback";
 import type { LibraryContextMenuItem } from "../LibraryNavigation";
 import type { WorkbenchCommand } from "../quick-jump/QuickJump";
 import type { useFind } from "../find/useFind";
 import { SIDEBAR_TOGGLE_EVENT } from "../AutoHideSidebar";
 import { builtinDocLink } from "../builtin-docs";
-import { clientIsMac } from "../keyboard-shortcuts";
+import {
+  clientIsMac,
+  entryKeyMatches,
+  matchesChord,
+  readCustomShortcuts,
+  resolvedSlotChord,
+  shortcutSlotKey,
+} from "../keyboard-shortcuts";
 import type { StudioFeedback } from "./useStudioFeedback";
 import type { LibraryState } from "./useLibraryState";
 import type { RouteState } from "./useRouteState";
@@ -106,9 +113,7 @@ export function useStudioCommands({
     };
     const key = (event: KeyboardEvent) => {
       if (
-        commandKey(event, clientIsMac()) &&
-        !event.altKey &&
-        event.key.toLowerCase() === "r"
+        entryKeyMatches(event, "general.reload", 0, "Mod+R", clientIsMac())
       ) {
         event.preventDefault();
         event.stopPropagation();
@@ -126,10 +131,7 @@ export function useStudioCommands({
     const handle = (event: KeyboardEvent) => {
       if (event.key === "Escape") setContextMenu(null);
       if (
-        commandKey(event, clientIsMac()) &&
-        !event.altKey &&
-        !event.shiftKey &&
-        event.key.toLowerCase() === "n"
+        entryKeyMatches(event, "general.newPage", 0, "Mod+N", clientIsMac())
       ) {
         event.preventDefault();
         if (dialogRef.current) return;
@@ -148,10 +150,7 @@ export function useStudioCommands({
   useEffect(() => {
     const search = (event: KeyboardEvent) => {
       if (
-        !commandKey(event, clientIsMac()) ||
-        event.altKey ||
-        event.shiftKey ||
-        event.key.toLowerCase() !== "k" ||
+        !entryKeyMatches(event, "general.search", 0, "Mod+K", clientIsMac()) ||
         event.isComposing ||
         event.keyCode === 229 ||
         event.defaultPrevented ||
@@ -224,7 +223,32 @@ export function useStudioCommands({
       void operation().catch(report);
     };
     const key = (event: KeyboardEvent) => {
-      const shortcut = tabShortcut(event, clientIsMac());
+      const mac = clientIsMac();
+      const overrides = readCustomShortcuts();
+      const customSlots: [string, TabCommand][] = [
+        [shortcutSlotKey("tabs.new", 0), "new"],
+        [shortcutSlotKey("tabs.close", 0), "close"],
+        [shortcutSlotKey("tabs.switch", 0), "next"],
+        [shortcutSlotKey("tabs.switch", 1), "previous"],
+      ];
+      let shortcut: TabCommand | undefined;
+      for (const [slot, candidate] of customSlots) {
+        const chord = overrides[slot];
+        if (chord && matchesChord(event, chord, mac)) {
+          shortcut = candidate;
+          break;
+        }
+      }
+      if (!shortcut) {
+        const fallback = tabShortcut(event, mac);
+        const slotMap: Record<TabCommand, string> = {
+          new: shortcutSlotKey("tabs.new", 0),
+          close: shortcutSlotKey("tabs.close", 0),
+          next: shortcutSlotKey("tabs.switch", 0),
+          previous: shortcutSlotKey("tabs.switch", 1),
+        };
+        if (fallback && !(slotMap[fallback] in overrides)) shortcut = fallback;
+      }
       if (!shortcut || event.defaultPrevented || dialogRef.current) return;
       event.preventDefault();
       event.stopPropagation();
@@ -374,12 +398,18 @@ export function useStudioCommands({
         ? [
             {
               id: "page.find",
-              ...shortcut(tn("shortcut.find"), "Mod+F"),
+              ...shortcut(
+                tn("shortcut.find"),
+                resolvedSlotChord("page.find", 0, "Mod+F"),
+              ),
               run: () => menuCommand.current("find"),
             },
             {
               id: "page.findReplace",
-              ...shortcut(tn("shortcut.findReplace"), "Alt+Mod+F"),
+              ...shortcut(
+                tn("shortcut.findReplace"),
+                resolvedSlotChord("page.findReplace", 0, "Alt+Mod+F"),
+              ),
               run: () => menuCommand.current("findReplace"),
             },
             {
@@ -407,7 +437,10 @@ export function useStudioCommands({
       },
       {
         id: "sidebar.toggle",
-        ...shortcut(tn("shortcut.sidebar"), "Mod+\\"),
+        ...shortcut(
+          tn("shortcut.sidebar"),
+          resolvedSlotChord("general.sidebar", 0, "Mod+\\"),
+        ),
         keywords: tq("keywords.sidebar"),
         run: () => {
           window.dispatchEvent(new Event(SIDEBAR_TOGGLE_EVENT));
@@ -417,7 +450,10 @@ export function useStudioCommands({
         ? [
             {
               id: "tab.new",
-              ...shortcut(tn("shortcut.newTab"), "Mod+T"),
+              ...shortcut(
+                tn("shortcut.newTab"),
+                resolvedSlotChord("tabs.new", 0, "Mod+T"),
+              ),
               run: () => menuCommand.current("newTab"),
             },
           ]

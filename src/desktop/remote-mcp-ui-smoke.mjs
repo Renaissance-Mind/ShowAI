@@ -228,7 +228,6 @@ try {
   await button("配置局域网").click();
   await page.getByRole("spinbutton", { name: "本机端口", exact: true }).waitFor();
   assert.equal(await page.locator(".studio-settings details").count(), 0);
-  await tab("内容权限").click();
   await button("指定项目").click();
   await button("Remote flow verification：只读").click();
   await button("保存配置").click();
@@ -254,12 +253,11 @@ try {
     });
     return state.config.access === "all";
   });
-  await tab("网络配置").click();
   const addresses = page.getByRole("combobox", {
     name: "本机网络地址",
     exact: true,
   });
-  if (await addresses.locator("option:not([disabled])").count()) {
+  if ((await addresses.getAttribute("data-has-options")) === "true") {
     await button("开启连接").click();
     await page.locator('.rm-client-area[data-client-view="setup"]').waitFor();
     assert.equal(await button("ChatGPT").count(), 0);
@@ -291,7 +289,9 @@ try {
     }).then((r) => r.json());
     assert.notEqual(response.result?.isError, true);
     assert.ok(response.result);
-    await page.locator('.rm-client-area[data-client-view="list"]').waitFor();
+    await page.locator('.rm-client-area[data-client-view="verified"]').waitFor();
+    await button("在连接列表中管理已授权客户端").click();
+    await page.locator(".rm-overview-clients").waitFor();
     await button("撤销UI LAN acceptance的授权").click();
     assert.equal(
       (
@@ -307,18 +307,20 @@ try {
       401,
     );
     await page.getByRole("switch", { name: "关闭局域网", exact: true }).click();
-    await tab("网络配置").waitFor();
-    await page
-      .locator('[role="tab"][aria-selected="true"]')
-      .filter({ hasText: "网络配置" })
-      .waitFor();
+    await page.waitForFunction(async () => {
+      const s = await window.showai.invoke("remoteMcp:status", {
+        provider: "lan",
+      });
+      return s.phase === "stopped";
+    });
     assert.equal((await status("lan")).phase, "stopped");
     result.checks.push(
-      "real LAN key authenticates an MCP call, reaches the client list, revokes immediately and returns to network controls on shutdown",
+      "real LAN key authenticates an MCP call, appears in overview clients, revokes immediately and stops cleanly",
     );
-  } else
+  } else {
     result.checks.push("LAN UI reports no available interface on this host");
-  await button("返回连接列表").click();
+    await button("返回连接列表").click();
+  }
 
   await button("配置Tailscale 私网").click();
   await page

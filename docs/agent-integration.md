@@ -17,7 +17,7 @@ The page model, component compiler, authoring service, revision checks, export r
 
 ## Local use
 
-Find the actual runtime under **Settings → Plugins** (**Registered runtime** and the launch configuration) or in the selected library's `agent-runtime.json`. `showai` below abbreviates that executable and its arguments. Inspect `runtime info --json` and `guide integration --json`.
+Find the actual runtime under **Settings → External Agent plugins** (**Registered runtime** and the launch configuration) or in the selected library's `agent-runtime.json`. `showai` below abbreviates that executable and its arguments. Inspect `runtime info --json` and `guide integration --json`.
 
 ```sh
 showai public list --kind component --query chart --json
@@ -102,7 +102,7 @@ The output creates a `showai-cloud` package from the same Skills/assets, with HT
 
 ## Saved-page presentation contract
 
-Install or update the Codex plugin from ShowAI **Settings → Plugins**. Use `show_component` for temporary, interactive results in chat. When the connection exposes `card_present`, finish a successful Page creation or edit with an original-Page card in the same reply. Use the saved `projectId` and `pageId`. The card shows the Page title and its full project and folder path. Its optional `description` (up to 1,000 characters) can summarize the new contents or the edit. Add a verified `blockId` from the saved outline to point to a particular component. An explicit inline reading preview uses `page_present`.
+Install or update the Codex plugin from ShowAI **Settings → External Agent plugins**. Use `show_component` for temporary, interactive results in chat. When the connection exposes `card_present`, finish a successful Page creation or edit with an original-Page card in the same reply. Use the saved `projectId` and `pageId`. The card shows the Page title and its full project and folder path. Its optional `description` (up to 1,000 characters) can summarize the new contents or the edit. Add a verified `blockId` from the saved outline to point to a particular component. An explicit inline reading preview uses `page_present`.
 
 For several cards, pass the first target at the top level and the others in the ordered `additionalTargets` array of the same call. Each card has its own target and description. **Open in side panel** opens the original in a separate side tab or navigates its existing tab. The cards stay visible in chat when the tab opens or closes. To tune the layout, set `adjustSpacing:true` on the top-level call. Its controls preview spacing and send the chosen values back to the conversation when applied. The adjacent menu offers **Open in Workbench** and **Open in ShowAI App**, including the component location. For direct navigation, call `card_navigate` and use `card_open` if it reports `unavailable`. Use `workbench_page_reference` to deliver a local reference file.
 

@@ -11,6 +11,7 @@ import messages from "../../i18n/messages/feedback";
 import {
   BookOpen,
   Check,
+  CircleAlert,
   Copy,
   Download,
   ExternalLink,
@@ -21,7 +22,7 @@ import {
 } from "../../ui/icons";
 import { desktop, errorMessage } from "../../host/bridge";
 import { workbenchCapabilities } from "../capabilities";
-import { verifyState } from "../PluginInstallSettings";
+import { useFailureReason, verifyState } from "../PluginInstallSettings";
 import type { ReportProblemDetail } from "../../problems/report-event";
 import { pluginHostNames, usePluginHosts } from "../usePluginHosts";
 import { useAppUpdate } from "../useAppUpdate";
@@ -57,10 +58,11 @@ function timeText(at: string) {
   return Number.isNaN(date.getTime())
     ? at
     : date.toLocaleString(getLocale(), {
-        month: "numeric",
-        day: "numeric",
+        month: "2-digit",
+        day: "2-digit",
         hour: "2-digit",
         minute: "2-digit",
+        hourCycle: "h23",
       });
 }
 
@@ -105,11 +107,24 @@ function InfoRow({ label, value }: { label: string; value: string }) {
   );
 }
 
-function UpdateRows() {
+function ProductUpdateControl() {
   const t = useTranslator(messages);
   const { state, run } = useAppUpdate();
   const [failure, setFailure] = useState<string>();
-  if (!state?.supported) return null;
+  if (!state?.supported) {
+    return (
+      <div className="feedback-product-update">
+        <p className="feedback-update-status" role="status">
+          {state ? t("update.unsupported") : t("update.checking")}
+        </p>
+        <div className="feedback-product-update-actions">
+          <button type="button" className="settings-button" disabled>
+            {t("update.check")}
+          </button>
+        </div>
+      </div>
+    );
+  }
   const act = (...args: Parameters<typeof run>) => {
     setFailure(undefined);
     void run(...args).catch((reason: unknown) =>
@@ -145,46 +160,49 @@ function UpdateRows() {
       : state.phase === "ready"
         ? { label: t("update.restart"), action: "appUpdate:install" as const }
         : { label: t("update.check"), action: "appUpdate:check" as const };
+  const hasError = state.phase === "failed" || !!failure;
   return (
-    <>
-      <div className="settings-row feedback-info-row feedback-update-row">
-        <dt>{t("update.title")}</dt>
-        <dd>
-          <span
-            className={state.phase === "failed" ? "feedback-error" : undefined}
-            role={state.phase === "failed" ? "alert" : "status"}
+    <div className="feedback-product-update">
+      <p
+        className={
+          hasError
+            ? "feedback-update-status feedback-error-inline"
+            : "feedback-update-status"
+        }
+        role={hasError ? "alert" : "status"}
+      >
+        {failure ? t("update.failed", { message: failure }) : text}
+        {retry && state.version && ` · ${state.version}`}
+      </p>
+      <div className="feedback-product-update-actions">
+        {!busy ? (
+          <button
+            type="button"
+            className={`settings-button${state.phase === "ready" || state.phase === "available" ? " feedback-primary" : ""}`}
+            onClick={() => act(button.action)}
           >
-            {failure ? t("update.failed", { message: failure }) : text}
-            {retry && state.version && ` · ${state.version}`}
-          </span>
-          {!busy ? (
-            <button
-              type="button"
-              className={`settings-button${state.phase === "ready" ? " feedback-primary" : ""}`}
-              onClick={() => act(button.action)}
-            >
-              {button.label}
-            </button>
-          ) : (
-            <Loader2 size={14} className="studio-spin" aria-hidden="true" />
-          )}
-          {retry && (
-            <button
-              className="settings-button"
-              type="button"
-              onClick={() => act("appUpdate:check")}
-            >
-              {t("update.check")}
-            </button>
-          )}
-        </dd>
+            {button.label}
+          </button>
+        ) : (
+          <Loader2 size={15} className="studio-spin" aria-hidden="true" />
+        )}
+        {retry && (
+          <button
+            className="settings-button"
+            type="button"
+            onClick={() => act("appUpdate:check")}
+          >
+            {t("update.check")}
+          </button>
+        )}
       </div>
-    </>
+    </div>
   );
 }
 
 function PluginRows({ home }: { home: string }) {
   const t = useTranslator(messages);
+  const failureReason = useFailureReason();
   const plugins = usePluginHosts(home);
   const [records, setRecords] = useState<AgentConnectionRecord[]>([]);
   useEffect(() => {
@@ -221,7 +239,10 @@ function PluginRows({ home }: { home: string }) {
     const state = verifyState(host, records);
     const connection =
       state.kind === "failed"
-        ? t("conn.failed", { code: state.code, time: timeText(state.at) })
+        ? t("conn.failedReason", {
+            time: timeText(state.at),
+            reason: failureReason(state.code),
+          })
         : state.kind === "called"
           ? t("conn.called", { time: timeText(state.at) })
           : state.kind === "connected"
@@ -237,7 +258,7 @@ function PluginRows({ home }: { home: string }) {
     return (
       <div className="settings-row feedback-info-row">
         <dt>{t("info.plugins")}</dt>
-        <dd className="feedback-error">
+        <dd className="feedback-error-inline">
           {t("plugins.unavailable", { message: plugins.error })}
         </dd>
       </div>
@@ -267,11 +288,13 @@ export function AboutFeedback({
   request,
   onOpenDocs,
   onOpenFaq,
+  onOpenPlugins,
 }: {
   info: DesktopInfo | null;
   request?: FeedbackRequest;
   onOpenDocs?: () => void;
   onOpenFaq?: () => void;
+  onOpenPlugins?: () => void;
 }) {
   const t = useTranslator(messages);
   const appIcon = appIconForTheme(useAppearanceTheme());
@@ -343,18 +366,22 @@ export function AboutFeedback({
   };
   return (
     <div className="feedback-about">
-      <div className="settings-product">
-        <img
-          className="settings-product-symbol"
-          src={appIcon}
-          alt=""
-          draggable={false}
-        />
-        <div>
-          <h2>ShowAI</h2>
-          <p>{versionLine(info)}</p>
+      <div id="feedback-product-card" className="settings-card feedback-product-card">
+        <div className="settings-product">
+          <img
+            className="settings-product-symbol"
+            src={appIcon}
+            alt=""
+            draggable={false}
+          />
+          <div>
+            <h3>ShowAI</h3>
+            <p>{versionLine(info)}</p>
+          </div>
         </div>
+        <ProductUpdateControl />
       </div>
+
       <section className="settings-group" aria-labelledby="feedback-help-title">
         <h2 id="feedback-help-title">{t("help.title")}</h2>
         <div className="feedback-cards">
@@ -407,15 +434,24 @@ export function AboutFeedback({
           )}
         </div>
       </section>
-      {info?.mode !== "browser" && (
-        <dl className="feedback-update">{<UpdateRows />}</dl>
-      )}
+
       <section
         className="settings-group settings-about"
         aria-labelledby="feedback-technical-title"
       >
-        <h2 id="feedback-technical-title">{t("technicalInfo")}</h2>
-        <dl>
+        <div className="settings-group-heading">
+          <h2 id="feedback-technical-title">{t("technicalInfo")}</h2>
+          {onOpenPlugins && localPlugins && (
+            <button
+              type="button"
+              className="settings-button"
+              onClick={onOpenPlugins}
+            >
+              {t("openPluginSettings")}
+            </button>
+          )}
+        </div>
+        <dl className="settings-card feedback-info-list">
           <InfoRow label={t("info.version")} value={versionLine(info)} />
           <InfoRow label={t("info.platform")} value={platformLine(info)} />
           <InfoRow label={t("info.runtime")} value={runtimeLine(info)} />
@@ -436,58 +472,74 @@ export function AboutFeedback({
           {info && localPlugins && <PluginRows home={info.home} />}
         </dl>
       </section>
+
       <section
         className="settings-group"
         aria-labelledby="feedback-diagnostics-title"
       >
-        <h2 id="feedback-diagnostics-title">{t("diag.title")}</h2>
-        <p className="feedback-muted">{t("diag.privacy")}</p>
-        <DiagnosticsPreview text={diagnostics.text} error={diagnostics.error} />
-        <div className="feedback-actions">
-          <button
-            type="button"
-            className="settings-button feedback-primary"
-            disabled={!diagnostics.text}
-            onClick={() =>
-              void writeClipboard(diagnostics.text!).then(
-                () => done(t("diag.copied")),
-                fail,
-              )
-            }
-          >
-            <Copy size={14} aria-hidden="true" />
-            {t("diag.copy")}
-          </button>
-          {desktopLogs && (
-            <button
-              type="button"
-              className="settings-button"
-              onClick={() => void window.showai!.openLogFolder!().catch(fail)}
-            >
-              <FolderOpen size={14} aria-hidden="true" />
-              {t("diag.openLogs")}
-            </button>
-          )}
-          <button
-            type="button"
-            className="settings-button"
-            disabled={!diagnostics.text}
-            onClick={() =>
-              void exportDiagnostics(diagnostics.text!).catch(fail)
-            }
-          >
-            <Download size={14} aria-hidden="true" />
-            {t("diag.export")}
-          </button>
+        <div className="settings-group-heading">
+          <div>
+            <h2 id="feedback-diagnostics-title">{t("diag.title")}</h2>
+            <p className="settings-group-desc">{t("diag.privacy")}</p>
+          </div>
         </div>
-        {status && (
-          <p
-            className={status.error ? "feedback-error" : "feedback-status"}
-            role={status.error ? "alert" : "status"}
-          >
-            {status.text}
-          </p>
-        )}
+        <div className="settings-card">
+          <div className="settings-card-section">
+            <DiagnosticsPreview
+              text={diagnostics.text}
+              error={diagnostics.error}
+            />
+            <div className="feedback-actions">
+              <button
+                type="button"
+                className="settings-button feedback-primary"
+                disabled={!diagnostics.text}
+                onClick={() =>
+                  void writeClipboard(diagnostics.text!).then(
+                    () => done(t("diag.copied")),
+                    fail,
+                  )
+                }
+              >
+                <Copy size={14} aria-hidden="true" />
+                {t("diag.copy")}
+              </button>
+              {desktopLogs && (
+                <button
+                  type="button"
+                  className="settings-button"
+                  onClick={() =>
+                    void window.showai!.openLogFolder!().catch(fail)
+                  }
+                >
+                  <FolderOpen size={14} aria-hidden="true" />
+                  {t("diag.openLogs")}
+                </button>
+              )}
+              <button
+                type="button"
+                className="settings-button"
+                disabled={!diagnostics.text}
+                onClick={() =>
+                  void exportDiagnostics(diagnostics.text!).catch(fail)
+                }
+              >
+                <Download size={14} aria-hidden="true" />
+                {t("diag.export")}
+              </button>
+            </div>
+            {status && (
+              <div
+                className="settings-callout feedback-callout"
+                data-tone={status.error ? "error" : "ok"}
+                role={status.error ? "alert" : "status"}
+              >
+                {status.error && <CircleAlert size={15} aria-hidden="true" />}
+                <span>{status.text}</span>
+              </div>
+            )}
+          </div>
+        </div>
       </section>
     </div>
   );

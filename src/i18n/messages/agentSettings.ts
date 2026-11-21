@@ -23,6 +23,14 @@ export default defineMessages("agentSettings", {
     "mode.api.title": "提供 LLM API",
     "mode.api.text": "连接模型来源，由独立 Codex SDK 执行",
     availableAgents: "可用 Agent",
+    noLocalAgentsTitle: "未在本机检测到已安装的命令行 Agent",
+    noLocalAgentsDetail:
+      "安装 Codex 或 Claude Code 后点「重新探测」，或切换到「提供 LLM API」直接连接模型服务。",
+    switchToApiMode: "改用 LLM API",
+    addSourceHint: "选择服务预设，添加新的 API Key 或账号授权来源。",
+    testResultTitle: "最近连接测试",
+    copyPath: "复制路径",
+    pathCopied: "路径已复制",
     localHelp:
       "复用本机登录。连接测试会发送一条简短请求，确认模型能够返回结果。",
     rescan: "重新探测",
@@ -160,6 +168,15 @@ export default defineMessages("agentSettings", {
     "mode.api.text":
       "Connect a model source and run it with the standalone Codex SDK",
     availableAgents: "Available Agents",
+    noLocalAgentsTitle: "No installed CLI Agents detected on this computer",
+    noLocalAgentsDetail:
+      "Install Codex or Claude Code and click Scan again, or switch to Bring an LLM API to connect a model service directly.",
+    switchToApiMode: "Switch to LLM API",
+    addSourceHint:
+      "Choose a provider preset to add a new API key or account source.",
+    testResultTitle: "Latest connection test",
+    copyPath: "Copy path",
+    pathCopied: "Path copied",
     localHelp:
       "Reuses sign-ins on this device. The connection test sends a short request to confirm the model responds.",
     rescan: "Scan again",

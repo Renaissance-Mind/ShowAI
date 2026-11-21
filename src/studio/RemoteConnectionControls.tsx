@@ -1,5 +1,6 @@
-import { useEffect, useState, type SelectHTMLAttributes } from "react";
+import { useEffect, useState } from "react";
 import { Check, Copy, Network } from "../ui/icons";
+import Select, { type SelectProps } from "../ui/Select";
 import { useTranslator } from "../i18n/react";
 import messages from "../i18n/messages/remoteConnections";
 import type { RemoteMcpProvider } from "../remote-mcp/types";
@@ -33,10 +34,10 @@ export function RemoteBrand({ provider }: { provider: RemoteMcpProvider }) {
 export function RemoteSelect({
   className = "",
   ...props
-}: SelectHTMLAttributes<HTMLSelectElement>) {
+}: SelectProps) {
   return (
     <span className="rm-select">
-      <select {...props} className={`showai-select ${className}`} />
+      <Select {...props} className={className} />
     </span>
   );
 }

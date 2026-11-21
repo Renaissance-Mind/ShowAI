@@ -32,14 +32,34 @@ export interface FileDialogOptions {
   extensions?: string[];
 }
 export type LocalRequest = <T>(
-  route: "dialog/list" | "dialog/mkdir",
+  route: "dialog/list" | "dialog/mkdir" | "dialog/native",
   args: Record<string, unknown>,
 ) => Promise<T>;
 
-export function chooseLocalPath(
+export async function chooseLocalPath(
   options: FileDialogOptions,
   request: LocalRequest,
 ): Promise<string | null> {
+  try {
+    const nativeResult = await request<{
+      supported: boolean;
+      path: string | null;
+    }>("dialog/native", {
+      mode:
+        options.kind === "directory"
+          ? "directory"
+          : options.kind === "save"
+            ? "saveFile"
+            : "openFile",
+      title: options.title,
+      defaultPath: options.initialPath,
+      defaultName: options.defaultName,
+      extensions: options.extensions,
+    });
+    if (nativeResult.supported) return nativeResult.path;
+  } catch {
+    // Fall back to the in-app path dialog when native pickers are unavailable.
+  }
   return new Promise((done) => {
     const element = document.createElement("div");
     document.body.append(element);

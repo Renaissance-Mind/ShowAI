@@ -476,7 +476,7 @@ export default function Studio() {
         <AutoHideSidebar
           enabled={view === "page" && !!page.draft}
           pageOnly={codexThread && view === "page"}
-          compactOverlay={codexThread ? "always" : view === "settings" && settingsSection === "sync"}
+          compactOverlay={codexThread ? "always" : view === "settings" && (settingsSection === "sync" || settingsSection === "projects")}
           mobileBoardKey={
             view === "page" && page.draft?.content.attrs?.kind === "board"
               ? page.draft.id

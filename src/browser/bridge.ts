@@ -218,6 +218,16 @@ export function installBrowserBridge() {
         title: t("title.dataDirectory"),
         kind: "directory",
       },
+      "plugins:choosePath": {
+        title: t("title.executableFile"),
+        kind: "file",
+        initialPath: typeof args.path === "string" ? args.path : undefined,
+      },
+      "remoteMcp:chooseExecutable": {
+        title: t("title.executableFile"),
+        kind: "file",
+        initialPath: typeof args.path === "string" ? args.path : undefined,
+      },
     };
     if (action === "export:page") {
       const page = await request<LoadedPage>("invoke", {
@@ -277,6 +287,12 @@ export function installBrowserBridge() {
     }
     if (dialogs[action]) {
       const path = await chooseLocalPath(dialogs[action], request);
+      if (
+        action === "plugins:choosePath" ||
+        action === "remoteMcp:chooseExecutable"
+      ) {
+        return path as T;
+      }
       if (!path) return null as T;
       args = { ...args, selectedPath: path };
     }

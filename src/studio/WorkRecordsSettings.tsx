@@ -1,19 +1,17 @@
 import { useNotify } from "../problems/toast-context";
 import { useEffect, useId, useState } from "react";
-import { Copy, Folder } from "../ui/icons";
 import { desktop, errorMessage } from "../host/bridge";
 import { useTranslator } from "../i18n/react";
 import messages from "../i18n/messages/settings";
 import type { WorkRecordsLocation } from "../core/work-records";
+import { SettingsPath } from "./SettingsPath";
 
 export default function WorkRecordsSettings() {
   const t = useTranslator(messages);
   const errorId = useId();
   const notify = useNotify();
   const [busy, setBusy] = useState(false);
-  const [invalid, setInvalid] = useState(false);
   const [location, setLocation] = useState<WorkRecordsLocation | null>(null);
-  const [draft, setDraft] = useState<string | null>(null);
   const [error, setError] = useState("");
   useEffect(() => {
     void desktop
@@ -23,10 +21,6 @@ export default function WorkRecordsSettings() {
   async function save(directory: string | null) {
     if (busy) return;
     setError("");
-
-    setInvalid(
-      directory !== null && !/^(?:[/\\]|[A-Za-z]:[/\\])/.test(directory),
-    );
     if (directory !== null && !/^(?:[/\\]|[A-Za-z]:[/\\])/.test(directory)) {
       setError(t("completePath"));
       return;
@@ -38,7 +32,6 @@ export default function WorkRecordsSettings() {
           directory,
         }),
       );
-      setDraft(null);
       notify(t("recordsLocationSaved"));
     } catch (reason) {
       setError(errorMessage(reason));
@@ -46,140 +39,101 @@ export default function WorkRecordsSettings() {
       setBusy(false);
     }
   }
+  async function chooseFolder() {
+    if (!location || location.source === "environment" || busy) return;
+    setError("");
+    try {
+      const chosen = await desktop.invoke<string | null>(
+        "settings:chooseFolder",
+        { path: location.directory },
+      );
+      if (chosen) await save(chosen);
+    } catch (reason) {
+      setError(errorMessage(reason));
+    }
+  }
   const pinned = location?.source === "environment";
+  const badge = location
+    ? location.source === "default"
+      ? t("temporaryRecords")
+      : location.source === "environment"
+        ? t("workRecordsEnvBadge")
+        : t("workRecordsCustomBadge")
+    : undefined;
   return (
     <section
       className="settings-group work-records-settings"
       aria-labelledby="settings-work-records-title"
     >
       <h2 id="settings-work-records-title">{t("workRecords")}</h2>
-      <div className="settings-row settings-location-heading">
-        <div className="settings-row-text">
-          <h3>
-            {t(
-              location?.source === "default"
-                ? "temporaryRecords"
-                : "workRecordsLocation",
-            )}
-          </h3>
-          <p>{t("workRecordsDetail")}</p>
+      <div className="settings-card">
+        <div className="settings-card-section">
+          <div className="settings-row-head">
+            <div className="settings-row-text">
+              <h3>
+                {t("workRecordsLocation")}
+                {badge && (
+                  <span
+                    className="settings-badge"
+                    data-tone={location?.source === "setting" ? "ok" : undefined}
+                  >
+                    {badge}
+                  </span>
+                )}
+              </h3>
+              <p>{t("workRecordsDetail")}</p>
+            </div>
+            <div className="settings-row-actions">
+              {location?.source === "setting" && (
+                <button
+                  type="button"
+                  className="settings-button"
+                  disabled={busy}
+                  onClick={() => void save(null)}
+                >
+                  {t("resetWorkRecords")}
+                </button>
+              )}
+              <button
+                type="button"
+                className="settings-button"
+                disabled={!location || pinned || busy}
+                onClick={() => void chooseFolder()}
+              >
+                {t("changeWorkRecords")}
+              </button>
+            </div>
+          </div>
+          <SettingsPath
+            value={location?.directory ?? t("readingLibrary")}
+            copyLabel={t("copyDirectory")}
+            copiedLabel={t("directoryCopied")}
+            disabled={!location || busy}
+            onCopy={() =>
+              location
+                ? desktop
+                    .invoke("clipboard:write", { text: location.directory })
+                    .then(
+                      () => {
+                        notify(t("directoryCopied"));
+                        return true;
+                      },
+                      (reason) => {
+                        setError(errorMessage(reason));
+                        return false;
+                      },
+                    )
+                : false
+            }
+          />
+          {pinned && <p className="settings-help">{t("workRecordsPinned")}</p>}
+          {error && (
+            <p id={errorId} className="studio-form-error" role="alert">
+              {error}
+            </p>
+          )}
         </div>
       </div>
-      {draft === null ? (
-        <div className="settings-path">
-          <Folder size={17} aria-hidden="true" />
-          <code>{location?.directory ?? t("readingLibrary")}</code>
-          {location && (
-            <button
-              className="settings-button"
-              type="button"
-              aria-label={t("copyDirectory")}
-              disabled={busy}
-              onClick={() =>
-                void desktop
-                  .invoke("clipboard:write", { text: location.directory })
-                  .then(
-                    () => notify(t("directoryCopied")),
-                    (reason) => setError(errorMessage(reason)),
-                  )
-              }
-            >
-              <Copy size={15} aria-hidden="true" />
-              {t("copyDirectory")}
-            </button>
-          )}
-          {location?.source === "setting" && (
-            <button
-              className="settings-button"
-              disabled={busy}
-              onClick={() => void save(null)}
-            >
-              {t("resetWorkRecords")}
-            </button>
-          )}
-          <button
-            type="button"
-            className="settings-button"
-            disabled={!location || pinned || busy}
-            onClick={() => {
-              setDraft(location?.directory ?? "");
-
-              setError("");
-            }}
-          >
-            {t("changeWorkRecords")}
-          </button>
-        </div>
-      ) : (
-        <form
-          className="work-records-form"
-          onSubmit={(event) => {
-            event.preventDefault();
-            void save(draft.trim());
-          }}
-        >
-          <input
-            className="showai-input"
-            aria-label={t("workRecordsLocation")}
-            value={draft}
-            autoFocus
-            disabled={busy}
-            aria-invalid={invalid}
-            aria-describedby={error ? errorId : undefined}
-            spellCheck={false}
-            onChange={(event) => {
-              setDraft(event.target.value);
-              setInvalid(false);
-              setError("");
-            }}
-            onKeyDown={(event) => {
-              if (event.key === "Escape" && !busy) {
-                setDraft(null);
-                setError("");
-              }
-            }}
-          />
-          <button
-            className="settings-button"
-            type="button"
-            disabled={busy}
-            onClick={() =>
-              void desktop.invoke<string | null>("settings:chooseFolder").then(
-                (path) => {
-                  if (path) setDraft(path);
-                },
-                (reason) => setError(errorMessage(reason)),
-              )
-            }
-          >
-            {t("chooseFolder")}
-          </button>
-          <button
-            className="settings-button settings-primary-button"
-            type="submit"
-            disabled={busy}
-          >
-            {t(busy ? "savingRecordsLocation" : "saveWorkRecords")}
-          </button>
-          <button
-            className="settings-button"
-            type="button"
-            disabled={busy}
-            onClick={() => {
-              setDraft(null);
-              setError("");
-            }}
-          >
-            {t("cancelWorkRecords")}
-          </button>
-        </form>
-      )}
-      {pinned && <p className="settings-help">{t("workRecordsPinned")}</p>}
-      {error && (
-        <p id={errorId} className="studio-form-error" role="alert">
-          {error}
-        </p>
-      )}
     </section>
   );
 }

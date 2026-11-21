@@ -15,7 +15,12 @@ import type {
 import { useInlineInk } from "./useInlineInk";
 import { BoardGestureInput } from "./BoardGestureInput";
 import { DrawingInput } from "./Drawing";
-import { boardEditDescription, boardToolForKey } from "./board-tools";
+import { boardEditDescription } from "./board-tools";
+import {
+  entryKeyMatches,
+  hasSlotOverride,
+  matchCustomizedBoardTool,
+} from "./shortcut-matcher";
 import type { JSONContent } from "@tiptap/core";
 import type { BoardTool, BoardDrawingTool, DrawingStyle } from "../document/types";
 import { findSurfaceNode } from "../document/document.mjs";
@@ -1802,14 +1807,52 @@ export default function PageSurface({
           }
           if (!editable || target.closest('[data-drawing-active="true"]'))
             return;
+          const ids = [...board.ids];
+          const run = (action: () => void) => {
+            event.preventDefault();
+            event.stopPropagation();
+            action();
+          };
+          if (entryKeyMatches(event, "library.selectAll", 0, "Mod+A"))
+            return run(() => board.selectAll());
+          if (ids.length && entryKeyMatches(event, "board.duplicate", 0, "Mod+D"))
+            return run(() => duplicateSelection(ids));
           if (
-            !command &&
-            !event.altKey &&
-            !event.shiftKey &&
-            !pointing.current &&
-            !marquee.current
-          ) {
-            const entry = boardToolForKey(event.key);
+            selectedRegion &&
+            entryKeyMatches(event, "board.ungroup", 0, "Shift+Mod+G")
+          )
+            return run(() => ungroup(selectedRegion));
+          if (
+            ids.length &&
+            entryKeyMatches(event, "board.lock", 0, "Shift+Mod+L")
+          )
+            return run(() => toggleLock(ids));
+          if (ids.length) {
+            if (
+              entryKeyMatches(event, "board.orderEdge", 0, "Shift+]") ||
+              (!hasSlotOverride("board.orderEdge", 0) &&
+                !command &&
+                !event.shiftKey &&
+                event.altKey &&
+                (event.code === "BracketRight" || event.key === "]"))
+            )
+              return run(() => reorder(ids, "front"));
+            if (
+              entryKeyMatches(event, "board.orderEdge", 1, "Shift+[") ||
+              (!hasSlotOverride("board.orderEdge", 1) &&
+                !command &&
+                !event.shiftKey &&
+                event.altKey &&
+                (event.code === "BracketLeft" || event.key === "["))
+            )
+              return run(() => reorder(ids, "back"));
+            if (entryKeyMatches(event, "board.order", 0, "]"))
+              return run(() => reorder(ids, "forward"));
+            if (entryKeyMatches(event, "board.order", 1, "["))
+              return run(() => reorder(ids, "backward"));
+          }
+          if (!pointing.current && !marquee.current) {
+            const entry = matchCustomizedBoardTool(event);
             if (
               entry &&
               (!mobile ||
@@ -1823,41 +1866,6 @@ export default function PageSurface({
               return;
             }
           }
-          const ids = [...board.ids];
-          const run = (action: () => void) => {
-            event.preventDefault();
-            event.stopPropagation();
-            action();
-          };
-          if (command && event.key.toLowerCase() === "a")
-            return run(() => board.selectAll());
-          if (command && event.key.toLowerCase() === "d" && ids.length)
-            return run(() => duplicateSelection(ids));
-          if (
-            command &&
-            event.shiftKey &&
-            event.code === "KeyG" &&
-            selectedRegion
-          )
-            return run(() => ungroup(selectedRegion));
-          if (command && event.shiftKey && event.code === "KeyL" && ids.length)
-            return run(() => toggleLock(ids));
-          if (
-            (event.code === "BracketRight" || event.code === "BracketLeft") &&
-            ids.length
-          )
-            return run(() =>
-              reorder(
-                ids,
-                event.code === "BracketRight"
-                  ? event.shiftKey || event.altKey
-                    ? "front"
-                    : "forward"
-                  : event.shiftKey || event.altKey
-                    ? "back"
-                    : "backward",
-              ),
-            );
           if (event.altKey && !command && ids.length > 1) {
             const mode = (
               {

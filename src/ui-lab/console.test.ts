@@ -238,8 +238,6 @@ test("LAN controls align and permission scope has its own interactive panel", as
     shadow: expect.stringContaining("inset"),
   });
   await shot("lan-controls");
-  await frame().getByRole("tab", { name: "内容权限", exact: true }).click();
-  await state("lan.permissions");
   await frame().getByRole("button", { name: "指定项目", exact: true }).click();
   await state("lan.permissions.selected");
   expect(await frame().locator(".remote-rules,.remote-resume").count()).toBe(0);
@@ -301,7 +299,6 @@ test("flow branches jump to the message screen and authorization states remain o
     "funnel.setup",
     "funnel.starting",
     "funnel.ready",
-    "funnel.client",
     "funnel.chatgpt",
   ]) {
     const expander = page.locator(
@@ -350,16 +347,13 @@ test("stopping the selected client connection returns to its network controls", 
     .getByRole("button", { name: "已开启", exact: true })
     .click();
   await state("lan.ready");
-  await frame().getByRole("tab", { name: "客户端", exact: true }).click();
-  await state("lan.client");
+  await frame()
+    .locator('.rm-client-area[data-client-view="setup"]')
+    .waitFor();
   await frame()
     .getByRole("switch", { name: "关闭局域网", exact: true })
     .click();
   await state("lan.setup");
-  expect(
-    await frame()
-      .getByRole("tab", { name: "网络配置", exact: true })
-      .getAttribute("aria-selected"),
-  ).toBe("true");
+  await frame().locator(".rm-step-placeholder").waitFor();
   expect(errors).toEqual([]);
 }, 60000);

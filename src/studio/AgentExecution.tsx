@@ -2,14 +2,25 @@ import { useEffect, useState, useRef } from "react";
 import { desktop, errorMessage } from "../host/bridge";
 import type { AgentDestination } from "../agent-host/remote-protocol";
 import type { ConnectorSettings } from "../agent-host/remote-connector";
-import { translator } from "../i18n";
+import { useTranslator } from "../i18n/react";
+import common from "../i18n/messages/common";
 import messages from "../i18n/messages/agentExecution";
-
+import Dialog from "../ui/Dialog";
+import Select from "../ui/Select";
 import { NearbyMacs } from "./LanPairing";
-import { Laptop, Globe } from "../ui/icons";
-const t = translator(messages);
+import {
+  ArrowRight,
+  CircleAlert,
+  Folder,
+  Globe,
+  Laptop,
+  RefreshCw,
+  Tablet,
+} from "../ui/icons";
+
 export const remoteExecution = () =>
   document.documentElement.dataset.native === "ios";
+
 export function AgentExecutionPicker({
   projectId,
   onChange,
@@ -19,6 +30,7 @@ export function AgentExecutionPicker({
   onChange?: (changed?: boolean) => void;
   disabled?: boolean;
 }) {
+  const t = useTranslator(messages);
   const [context, setContext] = useState<{
     connections: { id: string; name: string }[];
     connectionId: string;
@@ -92,8 +104,7 @@ export function AgentExecutionPicker({
           ) : (
             <Globe size={17} />
           )}
-          <select
-            className="showai-select"
+          <Select
             aria-label={t("runAgentOn")}
             disabled={disabled || selecting || !context}
             value={context?.destinationId ?? "cloud"}
@@ -120,7 +131,7 @@ export function AgentExecutionPicker({
                     : ""}
                 </option>
               ))}
-          </select>
+          </Select>
         </div>
       </label>
       <button
@@ -149,11 +160,14 @@ export function AgentExecutionPicker({
     </div>
   );
 }
+
 export function RemoteDeviceSettings({
   onAccounts,
 }: {
   onAccounts?: () => void;
 }) {
+  const t = useTranslator(messages);
+  const tc = useTranslator(common);
   const [state, setState] = useState<{
     settings: ConnectorSettings;
     online: boolean;
@@ -169,6 +183,7 @@ export function RemoteDeviceSettings({
   } | null>(null);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  const [crossNetworkOpen, setCrossNetworkOpen] = useState(false);
   const refresh = (preserveDraft = false) =>
     desktop
       .invoke<NonNullable<typeof state>>("agent:remoteDevice")
@@ -206,7 +221,7 @@ export function RemoteDeviceSettings({
               : next,
           ),
         )
-        .catch((reason) => setError(reason.message));
+        .catch((reason) => setError(errorMessage(reason)));
     }, 5000);
     return () => clearInterval(timer);
   }, []);
@@ -216,18 +231,29 @@ export function RemoteDeviceSettings({
       <section
         id="agent-device-settings"
         className="settings-group agent-device-settings"
+        aria-labelledby="agent-device-heading"
       >
-        <h2>{t("useThisComputerFromIPad")}</h2>
-        {error ? (
-          <p role="alert" className="agent-error">
-            {error}
-          </p>
-        ) : (
-          <p role="status">{t("readingDeviceConnection")}</p>
-        )}
-        <button className="settings-button" onClick={() => void refresh()}>
-          {t("refresh")}
-        </button>
+        <h2 id="agent-device-heading">{t("useThisComputerFromIPad")}</h2>
+        <div className="settings-card">
+          <div className="settings-row">
+            <div className="settings-row-text">
+              {error ? (
+                <p role="alert" className="agent-error">
+                  {error}
+                </p>
+              ) : (
+                <p role="status">{t("readingDeviceConnection")}</p>
+              )}
+            </div>
+            <button
+              type="button"
+              className="settings-button"
+              onClick={() => void refresh()}
+            >
+              {t("refresh")}
+            </button>
+          </div>
+        </div>
       </section>
     );
   const change = (value: Partial<ConnectorSettings>) =>
@@ -239,255 +265,479 @@ export function RemoteDeviceSettings({
       await desktop.invoke("agent:shareDevice", { settings });
       await refresh();
     } catch (reason) {
-      setError((reason as Error).message);
+      setError(errorMessage(reason));
     } finally {
       setBusy(false);
     }
   };
+  const crossNetworkPending = state.pendingClients.filter(
+    (client) => !client.id.startsWith("lan:"),
+  );
+  const trustedDevices = [
+    ...(state.settings.trustedClients ?? []),
+    ...(state.lan?.trusted ?? []),
+  ];
+  const selectedConnection = state.connections.find(
+    (c) => c.id === state.settings.connectionId,
+  );
   return (
-    <section
-      id="agent-device-settings"
-      className="settings-group agent-device-settings"
-    >
-      <h2>{t("useThisComputerFromIPad")}</h2>
-      <p className="settings-help">{t("nearbyHelp")}</p>
-      <p className="settings-help" role="status">
-        {state.lan?.online ? t("discoverableOnLAN") : t("disconnected")}
-      </p>
-      <section className="agent-remote-advanced">
-        <h3 className="settings-section-heading">{t("acrossNetworks")}</h3>
-        <p className="settings-help">
-          {t(
-            "connectThisComputerToShowAICloudOverWSSDevicesSignedIntoTheSameServerAccountCanRunTasksHereKeepShowAIRunningAndTheComputerAwake",
-          )}
-        </p>
-        <label className="settings-row">
-          {t("deviceName")}
-          <input
-            className="showai-input"
-            value={state.settings.name}
-            onChange={(e) => change({ name: e.target.value })}
-          />
-        </label>
-        <label className="settings-row">
-          {t("serverAccount")}
-          <select
-            className="showai-select"
-            value={state.settings.connectionId}
-            onChange={(e) =>
-              change({ connectionId: e.target.value, projectIds: [] })
-            }
-          >
-            <option value="">{t("chooseAccount")}</option>
-            {state.connections.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.name}
-              </option>
-            ))}
-          </select>
-        </label>
-        {onAccounts && !state.connections.length && (
-          <button
-            type="button"
-            className="settings-button agent-account-link"
-            onClick={onAccounts}
-          >
-            {t("openAccounts")}
-          </button>
-        )}
-        <fieldset>
-          <legend>{t("allowedProjects")}</legend>
-          {!state.projects.some(
-            (p) => p.connectionId === state.settings.connectionId,
-          ) && (
-            <p className="settings-help">
-              {state.settings.connectionId
-                ? t("syncTheRequiredProjectsOnThisComputerFirst")
-                : t("chooseAnAccountToShowSynchronizedProjects")}
-            </p>
-          )}
-          {state.settings.projectIds.map((id) => (
-            <div className="settings-row" key={id}>
-              <span>
-                {state.projects.find((project) => project.id === id)?.name ??
-                  id}
-              </span>
+    <>
+      <section
+        id="agent-device-settings"
+        className="settings-group agent-device-settings"
+        aria-labelledby="agent-device-heading"
+      >
+        <h2 id="agent-device-heading">{t("useThisComputerFromIPad")}</h2>
+        <div className="settings-card">
+          <div className="settings-card-section">
+            <div className="settings-row settings-row-compact">
+              <div className="settings-row-text">
+                <h3>
+                  {t("lanDiscoveryTitle")}
+                  <span
+                    className="settings-badge"
+                    data-tone={state.lan?.online ? "ok" : undefined}
+                    role="status"
+                  >
+                    {state.lan?.online
+                      ? t("discoverableOnLAN")
+                      : t("lanOffline")}
+                  </span>
+                </h3>
+                <p>{t("nearbyHelp")}</p>
+              </div>
+            </div>
+            {state.lan?.error && (
+              <div className="settings-callout" data-tone="error" role="alert">
+                <CircleAlert size={15} aria-hidden="true" />
+                <span>{state.lan.error}</span>
+              </div>
+            )}
+          </div>
+
+          <div className="settings-card-section">
+            <div className="settings-row settings-row-compact">
+              <div className="settings-row-text">
+                <h3>
+                  {t("acrossNetworks")}
+                  <span
+                    className="settings-badge"
+                    data-tone={
+                      state.online
+                        ? "ok"
+                        : state.settings.enabled
+                          ? "warn"
+                          : undefined
+                    }
+                    role="status"
+                  >
+                    {t(
+                      state.online
+                        ? "connected"
+                        : state.settings.enabled
+                          ? "reconnecting"
+                          : "notConfigured",
+                    )}
+                  </span>
+                </h3>
+                <p>
+                  {state.settings.enabled && selectedConnection
+                    ? t("crossNetworkConnectedSummary", {
+                        account: selectedConnection.name,
+                        count: state.settings.projectIds.length,
+                      })
+                    : t(
+                        "connectThisComputerToShowAICloudOverWSSDevicesSignedIntoTheSameServerAccountCanRunTasksHereKeepShowAIRunningAndTheComputerAwake",
+                      )}
+                </p>
+              </div>
               <button
                 type="button"
                 className="settings-button"
-                disabled={busy}
-                onClick={() =>
-                  change({
-                    projectIds: state.settings.projectIds.filter(
-                      (projectId) => projectId !== id,
-                    ),
-                  })
-                }
+                onClick={() => {
+                  setError("");
+                  setCrossNetworkOpen(true);
+                }}
               >
-                {t("removeProject")}
+                {t("configureCrossNetwork")}
               </button>
             </div>
-          ))}
-          <select
-            className="showai-select"
-            aria-label={t("addProject")}
-            value=""
-            disabled={busy || !state.settings.connectionId}
-            onChange={(event) => {
-              if (event.target.value)
-                change({
-                  projectIds: [
-                    ...state.settings.projectIds,
-                    event.target.value,
-                  ],
-                });
-            }}
-          >
-            <option value="">{t("addProject")}</option>
-            {state.projects
-              .filter(
-                (project) =>
-                  project.connectionId === state.settings.connectionId &&
-                  !state.settings.projectIds.includes(project.id),
-              )
-              .map((project) => (
-                <option key={project.id} value={project.id}>
-                  {project.name ?? project.id}
-                </option>
-              ))}
-          </select>
-        </fieldset>
-        <div className="settings-row">
-          <div>
-            <span role="status">
-              {t(
-                state.online
-                  ? "connected"
-                  : state.settings.enabled
-                    ? "reconnecting"
-                    : "notConfigured",
-              )}
-            </span>
-            {(error || state.error) && (
-              <p role="alert" className="agent-error">
-                {error || state.error}
-              </p>
+            {(error || state.error) && !crossNetworkOpen && (
+              <div className="settings-callout" data-tone="error" role="alert">
+                <CircleAlert size={15} aria-hidden="true" />
+                <span>{error || state.error}</span>
+              </div>
             )}
           </div>
-          <div className="agent-device-actions">
-            {state.settings.enabled && !state.online && (
-              <button
-                type="button"
-                className="settings-button"
-                disabled={busy}
-                onClick={() => void refresh(true)}
-              >
-                {t("refreshConnectionStatus")}
-              </button>
-            )}
-            {state.settings.enabled && (
-              <button
-                type="button"
-                className="settings-button"
-                disabled={busy}
-                onClick={() => void save({ ...state.settings, enabled: false })}
-              >
-                {t("disableCrossNetwork")}
-              </button>
-            )}
-            <button
-              type="button"
-              className="settings-button"
-              disabled={
-                busy ||
-                !state.settings.connectionId ||
-                !state.settings.projectIds.length
-              }
-              onClick={() => void save({ ...state.settings, enabled: true })}
+
+          {crossNetworkPending.length > 0 && (
+            <div
+              className="settings-card-section"
+              aria-label={t("pendingDevices")}
             >
-              {t(
-                state.settings.enabled
-                  ? "saveCrossNetwork"
-                  : "enableCrossNetwork",
-              )}
-            </button>
-          </div>
+              <h3 className="settings-section-heading">{t("pendingDevices")}</h3>
+              {crossNetworkPending.map((client) => (
+                <div className="settings-row settings-row-compact" key={client.id}>
+                  <span className="agent-device-client-name">
+                    <Laptop size={15} aria-hidden="true" />
+                    {client.name} · <code>{client.code ?? client.id.slice(-6)}</code>
+                  </span>
+                  <div className="library-space-actions">
+                    <button
+                      type="button"
+                      className="settings-button settings-primary-button"
+                      onClick={() =>
+                        void desktop
+                          .invoke("agent:approveRemoteClient", {
+                            id: client.id,
+                            approve: true,
+                          })
+                          .then(() => refresh(true))
+                          .catch((reason) => setError(errorMessage(reason)))
+                      }
+                    >
+                      {t("allowDevice")}
+                    </button>
+                    <button
+                      type="button"
+                      className="settings-button"
+                      onClick={() =>
+                        void desktop
+                          .invoke("agent:approveRemoteClient", {
+                            id: client.id,
+                            approve: false,
+                          })
+                          .then(() => refresh(true))
+                          .catch((reason) => setError(errorMessage(reason)))
+                      }
+                    >
+                      {t("reject")}
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {trustedDevices.length > 0 && (
+            <div
+              className="settings-card-section"
+              aria-label={t("trustedDevices")}
+            >
+              <div className="settings-row-text">
+                <h3>{t("trustedDevices")}</h3>
+                <p>{t("trustedDevicesHelp")}</p>
+              </div>
+              <div className="agent-trusted-list">
+                {trustedDevices.map((client) => (
+                  <div
+                    className="settings-row settings-row-compact"
+                    key={client.id}
+                  >
+                    <span className="agent-device-client-name">
+                      <Laptop size={15} aria-hidden="true" />
+                      {client.name} · <code>{client.id.slice(-6)}</code>
+                    </span>
+                    <button
+                      type="button"
+                      className="settings-button settings-danger-button"
+                      onClick={() =>
+                        void desktop
+                          .invoke("agent:approveRemoteClient", {
+                            id: client.id,
+                            approve: false,
+                          })
+                          .then(() => refresh(true))
+                          .catch((reason) => setError(errorMessage(reason)))
+                      }
+                    >
+                      {t("revokeDevice")}
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       </section>
-      {state.pendingClients.some((client) => !client.id.startsWith("lan:")) && (
-        <section
-          className="agent-remote-advanced"
-          aria-label={t("pendingDevices")}
-        >
-          <h3 className="settings-section-heading">{t("pendingDevices")}</h3>
-          {state.pendingClients
-            .filter((client) => !client.id.startsWith("lan:"))
-            .map((client) => (
-              <div className="settings-row" key={client.id}>
-                <span>
-                  {client.name} · {client.code ?? client.id.slice(-6)}
-                </span>
-                <button
-                  className="settings-button"
-                  onClick={() =>
-                    void desktop
-                      .invoke("agent:approveRemoteClient", {
-                        id: client.id,
-                        approve: true,
-                      })
-                      .then(() => refresh(true))
-                      .catch((reason) => setError(reason.message))
-                  }
-                >
-                  {t("allowDevice")}
-                </button>
-                <button
-                  className="settings-button"
-                  onClick={() =>
-                    void desktop
-                      .invoke("agent:approveRemoteClient", {
-                        id: client.id,
-                        approve: false,
-                      })
-                      .then(() => refresh(true))
-                      .catch((reason) => setError(reason.message))
-                  }
-                >
-                  {t("reject")}
-                </button>
+
+      {crossNetworkOpen &&
+        (() => {
+          const candidateProjects = state.projects.filter(
+            (project) => project.connectionId === state.settings.connectionId,
+          );
+          const allowedSet = new Set(state.settings.projectIds);
+          const selectedCount = candidateProjects.filter((project) =>
+            allowedSet.has(project.id),
+          ).length;
+          const allSelected =
+            candidateProjects.length > 0 &&
+            selectedCount === candidateProjects.length;
+          const toggleProject = (projectId: string, checked: boolean) => {
+            change({
+              projectIds: checked
+                ? [...new Set([...state.settings.projectIds, projectId])]
+                : state.settings.projectIds.filter((id) => id !== projectId),
+            });
+          };
+          return (
+            <Dialog
+              title={t("acrossNetworks")}
+              wide
+              onClose={() => {
+                if (!busy) setCrossNetworkOpen(false);
+              }}
+            >
+              <div className="studio-dialog-body agent-cross-dialog">
+                <div className="agent-cross-banner">
+                  <div className="agent-cross-flow" aria-hidden="true">
+                    <span className="agent-cross-node">
+                      <Tablet size={15} />
+                      <span>iPad</span>
+                    </span>
+                    <span className="agent-cross-edge">
+                      <span className="agent-cross-edge-pill">
+                        {t("crossTopologyEdge")}
+                      </span>
+                      <ArrowRight size={13} />
+                    </span>
+                    <span className="agent-cross-node is-host">
+                      <Laptop size={15} />
+                      <span>{state.settings.name.trim() || "Mac"}</span>
+                    </span>
+                  </div>
+                  <div className="agent-cross-banner-status">
+                    <span
+                      className="settings-badge"
+                      data-tone={
+                        state.online
+                          ? "ok"
+                          : state.settings.enabled
+                            ? "warn"
+                            : undefined
+                      }
+                      role="status"
+                    >
+                      {t(
+                        state.online
+                          ? "connected"
+                          : state.settings.enabled
+                            ? "reconnecting"
+                            : "notEnabled",
+                      )}
+                    </span>
+                    {state.settings.enabled && (
+                      <button
+                        type="button"
+                        className="settings-icon-button"
+                        aria-label={t("refreshConnectionStatus")}
+                        title={t("refreshConnectionStatus")}
+                        disabled={busy}
+                        onClick={() => void refresh(true)}
+                      >
+                        <RefreshCw size={14} aria-hidden="true" />
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                <div className="agent-cross-grid">
+                  <div className="agent-cross-section">
+                    <div className="agent-cross-section-head">
+                      <label htmlFor="agent-device-name">{t("deviceName")}</label>
+                    </div>
+                    <input
+                      id="agent-device-name"
+                      className="showai-input"
+                      value={state.settings.name}
+                      onChange={(e) => change({ name: e.target.value })}
+                    />
+                    <p className="agent-cross-hint">{t("deviceNameHint")}</p>
+                  </div>
+
+                  <div className="agent-cross-section">
+                    <div className="agent-cross-section-head">
+                      <label htmlFor="agent-device-account">
+                        {t("serverAccount")}
+                      </label>
+                    </div>
+                    {state.connections.length === 0 ? (
+                      <div className="agent-cross-empty-account">
+                        <div className="agent-cross-empty-account-text">
+                          <strong>{t("noAccountTitle")}</strong>
+                          <p>{t("noAccountHint")}</p>
+                        </div>
+                        {onAccounts && (
+                          <button
+                            type="button"
+                            className="settings-button"
+                            onClick={() => {
+                              setCrossNetworkOpen(false);
+                              onAccounts();
+                            }}
+                          >
+                            {t("openAccounts")}
+                          </button>
+                        )}
+                      </div>
+                    ) : (
+                      <Select
+                        id="agent-device-account"
+                        value={state.settings.connectionId}
+                        onChange={(e) =>
+                          change({
+                            connectionId: e.target.value,
+                            projectIds: [],
+                          })
+                        }
+                      >
+                        <option value="">{t("chooseAccount")}</option>
+                        {state.connections.map((c) => (
+                          <option key={c.id} value={c.id}>
+                            {c.name}
+                          </option>
+                        ))}
+                      </Select>
+                    )}
+                  </div>
+                </div>
+
+                <div className="agent-cross-section">
+                  <div className="agent-cross-section-head">
+                    <div className="agent-cross-section-title">
+                      <span>{t("allowedProjects")}</span>
+                      {candidateProjects.length > 0 && (
+                        <span className="settings-badge">
+                          {t("selectedProjectsCount", {
+                            selected: selectedCount,
+                            total: candidateProjects.length,
+                          })}
+                        </span>
+                      )}
+                    </div>
+                    {candidateProjects.length > 0 && (
+                      <button
+                        type="button"
+                        className="settings-button"
+                        disabled={busy}
+                        onClick={() =>
+                          change({
+                            projectIds: allSelected
+                              ? []
+                              : candidateProjects.map((project) => project.id),
+                          })
+                        }
+                      >
+                        {t(
+                          allSelected
+                            ? "clearAllProjects"
+                            : "selectAllProjects",
+                        )}
+                      </button>
+                    )}
+                  </div>
+
+                  {candidateProjects.length === 0 ? (
+                    <div className="agent-project-checklist-empty">
+                      <p>
+                        {state.settings.connectionId
+                          ? t("syncTheRequiredProjectsOnThisComputerFirst")
+                          : t("chooseAnAccountToShowSynchronizedProjects")}
+                      </p>
+                    </div>
+                  ) : (
+                    <div
+                      className="agent-project-checklist"
+                      role="group"
+                      aria-label={t("allowedProjects")}
+                    >
+                      {candidateProjects.map((project) => {
+                        const checked = allowedSet.has(project.id);
+                        return (
+                          <label
+                            key={project.id}
+                            className={`agent-project-check-row${checked ? " is-checked" : ""}`}
+                          >
+                            <input
+                              type="checkbox"
+                              checked={checked}
+                              disabled={busy}
+                              onChange={(event) =>
+                                toggleProject(project.id, event.target.checked)
+                              }
+                            />
+                            <Folder size={14} aria-hidden="true" />
+                            <span>{project.name ?? project.id}</span>
+                          </label>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+
+                {(error || state.error) && (
+                  <div
+                    className="settings-callout"
+                    data-tone="error"
+                    role="alert"
+                  >
+                    <CircleAlert size={15} aria-hidden="true" />
+                    <span>{error || state.error}</span>
+                  </div>
+                )}
+
+                <div className="studio-dialog-actions agent-cross-footer">
+                  <div className="agent-cross-footer-left">
+                    {state.settings.enabled && (
+                      <button
+                        type="button"
+                        className="settings-button settings-danger-button"
+                        disabled={busy}
+                        onClick={() =>
+                          void save({ ...state.settings, enabled: false }).then(
+                            () => setCrossNetworkOpen(false),
+                          )
+                        }
+                      >
+                        {t("disableCrossNetwork")}
+                      </button>
+                    )}
+                  </div>
+                  <div className="agent-cross-footer-right">
+                    <button
+                      type="button"
+                      className="settings-button"
+                      disabled={busy}
+                      onClick={() => setCrossNetworkOpen(false)}
+                    >
+                      {tc("cancel")}
+                    </button>
+                    <button
+                      type="button"
+                      className="settings-button settings-primary-button"
+                      disabled={
+                        busy ||
+                        !state.settings.connectionId ||
+                        !state.settings.projectIds.length
+                      }
+                      onClick={() =>
+                        void save({ ...state.settings, enabled: true }).then(
+                          () => setCrossNetworkOpen(false),
+                        )
+                      }
+                    >
+                      {t(
+                        state.settings.enabled
+                          ? "saveCrossNetwork"
+                          : "enableCrossNetwork",
+                      )}
+                    </button>
+                  </div>
+                </div>
               </div>
-            ))}
-        </section>
-      )}
-      {[
-        ...(state.settings.trustedClients ?? []),
-        ...(state.lan?.trusted ?? []),
-      ].map((client) => (
-        <div className="settings-row" key={client.id}>
-          <span>
-            {client.name} · {client.id.slice(-6)}
-          </span>
-          <button
-            className="settings-button"
-            onClick={() =>
-              void desktop
-                .invoke("agent:approveRemoteClient", {
-                  id: client.id,
-                  approve: false,
-                })
-                .then(() => refresh(true))
-                .catch((reason) => setError(reason.message))
-            }
-          >
-            {t("revokeDevice")}
-          </button>
-        </div>
-      ))}
-      {state.lan?.error && (
-        <p role="alert" className="agent-error">
-          {state.lan.error}
-        </p>
-      )}
-    </section>
+            </Dialog>
+          );
+        })()}
+    </>
   );
 }

@@ -23,11 +23,11 @@ ShowAI keeps itself up to date: it checks the latest release in the background, 
 
 ## 2. Connect your agent
 
-1. In ShowAI, open the plugin panel: the welcome screen shows it on first launch, and it is always available under **Settings → Plugins**.
+1. In ShowAI, open the plugin panel: the welcome screen shows it on first launch, and it is always available under **Settings → External Agent plugins**.
 2. ShowAI checks for Claude Code and Codex. Click **Install plugin** next to the agent you use and wait for **Installed and enabled**.
 3. Reload the agent: restart the Claude Code session, or refresh plugins or restart Codex. A conversation that was already open keeps its old tool list, so start a new one.
 
-To confirm the connection, **Settings → Plugins** shows a test prompt, _Use ShowAI to list my projects_. Send it in the new conversation; when the agent reaches ShowAI, the status next to that agent changes from **Waiting for the first call** to **First call received**.
+To confirm the connection, **Settings → External Agent plugins** shows a test prompt, _Use ShowAI to list my projects_. Send it in the new conversation; when the agent reaches ShowAI, the status next to that agent changes from **Waiting for the first call** to **First call received**.
 
 The app supplies both the plugin and the runtime it talks to, so you need neither the source code nor a separate Node.js installation. The plugin connects to the app's current content library; click **Update and enable** after switching libraries or moving the app.
 
@@ -53,8 +53,8 @@ Two more to try:
 | **Installed, disabled**                             | Click **Update and enable**.                                                                                                                                     |
 | ShowAI is enabled from another source               | Disable that plugin in the agent, then click **Check again** and install the app version.                                                                        |
 | The agent answers in text and never mentions ShowAI | The conversation started before the plugin loaded. Restart the agent and open a new conversation; asking explicitly with "Use ShowAI to …" helps.                |
-| The agent reports that it cannot connect to ShowAI  | Open **Settings → Plugins**. If **Registered runtime** shows a problem, click **Repair registration**; if the agent shows a failed connection or another library, click **Repair and reconnect** or **Update and enable**. Then restart the agent. |
-| A page was saved but you can't find it in the app   | The app and the plugin are using different content libraries. Compare **Settings → General → Content library** with **Plugin library** for that agent in **Settings → Plugins**. |
+| The agent reports that it cannot connect to ShowAI  | Open **Settings → External Agent plugins**. If **Registered runtime** shows a problem, click **Repair registration**; if the agent shows a failed connection or another library, click **Repair and reconnect** or **Update and enable**. Then restart the agent. |
+| A page was saved but you can't find it in the app   | The app and the plugin are using different content libraries. Compare **Settings → General → Content library** with **Plugin library** for that agent in **Settings → External Agent plugins**. |
 
 Still stuck? [Open an issue](https://github.com/Renaissance-Mind/ShowAI/issues) with your agent and its version, the ShowAI version from **Settings → About & feedback**, and what the agent said.
 
@@ -83,7 +83,7 @@ Choose **Export page** in the page's menu, or ask the agent. Standalone HTML ope
 
 ## Without Claude Code or Codex
 
-**Built-in agent.** Open **Settings → Agent**, add a model source with an API key (or use your local Codex or Claude Code sign-in, or ShowAI Cloud), then click the **AI** button in the top bar, or select text or open a block menu and choose **Ask AI**. See [Built-in agent](agent-host.md).
+**Built-in agent.** Open **Settings → Built-in Agent**, add a model source with an API key (or use your local Codex or Claude Code sign-in, or ShowAI Cloud), then click the **AI** button in the top bar, or select text or open a block menu and choose **Ask AI**. See [Built-in agent](agent-host.md).
 
 **Other agents.** DeepSeek Harness and Kimi are in preview, ChatGPT on the web is invite only, and other MCP clients can be configured manually. See [Supported agents](../README.md#-supported-agents).
 

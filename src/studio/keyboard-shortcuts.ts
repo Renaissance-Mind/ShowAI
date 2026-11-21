@@ -1,12 +1,45 @@
 import { boardTools } from "../surface/board-tools";
+import {
+  CUSTOM_SHORTCUTS_KEY,
+  SHORTCUTS_CHANGE_EVENT,
+  detectMacPlatform,
+  entryKeyMatches,
+  eventToChord,
+  getCustomShortcutsSnapshot,
+  hasSlotOverride,
+  matchCustomizedBoardTool,
+  matchesChord,
+  readCustomShortcuts,
+  resolvedSlotChord,
+  shortcutSlotKey,
+  writeCustomShortcuts,
+  type KeyChord,
+  type KeyEventInput,
+} from "../surface/shortcut-matcher";
 import type { MessageKey } from "../i18n";
 import type navigationMessages from "../i18n/messages/navigation";
 import type surfaceMessages from "../i18n/messages/surface";
 
-export type KeyChord = string;
+export {
+  SHORTCUTS_CHANGE_EVENT,
+  entryKeyMatches,
+  eventToChord,
+  getCustomShortcutsSnapshot,
+  hasSlotOverride,
+  matchCustomizedBoardTool,
+  matchesChord,
+  readCustomShortcuts,
+  resolvedSlotChord,
+  shortcutSlotKey,
+  type KeyChord,
+  type KeyEventInput,
+};
 
 export interface ShortcutEntry {
+  id: string;
   keys: KeyChord[];
+  defaultKeys?: KeyChord[];
+  editable?: boolean;
   label:
     | { navigation: MessageKey<typeof navigationMessages> }
     | { surface: MessageKey<typeof surfaceMessages> };
@@ -24,14 +57,57 @@ const glyphs: Record<string, [mac: string, other: string]> = {
   Alt: ["⌥", "Alt"],
   Left: ["←", "←"],
   Right: ["→", "→"],
+  Up: ["↑", "↑"],
+  Down: ["↓", "↓"],
   Backspace: ["⌫", "Backspace"],
   Escape: ["Esc", "Esc"],
   Tab: ["Tab", "Tab"],
 };
 
-export const clientIsMac = () =>
-  typeof navigator !== "undefined" &&
-  /Mac|iPhone|iPad/.test(navigator.platform);
+export const clientIsMac = detectMacPlatform;
+
+export function setCustomShortcut(
+  entryId: string,
+  slotIndex: number,
+  chord: KeyChord | null,
+) {
+  const next = readCustomShortcuts();
+  const key = shortcutSlotKey(entryId, slotIndex);
+  if (chord && chord.trim()) next[key] = chord.trim();
+  else delete next[key];
+  writeCustomShortcuts(next);
+}
+
+export function resetAllCustomShortcuts() {
+  writeCustomShortcuts({});
+}
+
+export function hasCustomShortcuts(): boolean {
+  return Object.keys(readCustomShortcuts()).length > 0;
+}
+
+export function subscribeShortcuts(listener: () => void): () => void {
+  if (typeof window === "undefined") return () => {};
+  const onStorage = (event: StorageEvent) => {
+    if (!event.key || event.key === CUSTOM_SHORTCUTS_KEY) listener();
+  };
+  window.addEventListener(SHORTCUTS_CHANGE_EVENT, listener);
+  window.addEventListener("storage", onStorage);
+  return () => {
+    window.removeEventListener(SHORTCUTS_CHANGE_EVENT, listener);
+    window.removeEventListener("storage", onStorage);
+  };
+}
+
+export function resolveEntryKeys(
+  entryId: string,
+  defaults: KeyChord[],
+  overrides: Record<string, KeyChord> = readCustomShortcuts(),
+): KeyChord[] {
+  return defaults.map(
+    (chord, index) => overrides[shortcutSlotKey(entryId, index)] ?? chord,
+  );
+}
 
 export function formatShortcut(
   chord: KeyChord,
@@ -59,31 +135,63 @@ export function formatShortcut(
   return modifiers.join("") + keys.join(mac && modifiers.length ? "" : "+");
 }
 
-export function isDeleteShortcut(
-  event: { key: string; metaKey: boolean; ctrlKey: boolean; altKey: boolean },
-  mac: boolean,
+export function isDeleteShortcut(event: KeyEventInput, mac: boolean) {
+  const overrides = readCustomShortcuts();
+  if (mac) {
+    const first =
+      overrides[shortcutSlotKey("library.delete", 0)] ?? "Mod+Backspace";
+    const second = overrides[shortcutSlotKey("library.delete", 1)] ?? "Delete";
+    return matchesChord(event, first, mac) || matchesChord(event, second, mac);
+  }
+  const sole = overrides[shortcutSlotKey("library.delete", 0)] ?? "Delete";
+  return matchesChord(event, sole, mac);
+}
+
+export function isRenameShortcut(event: KeyEventInput, mac = clientIsMac()) {
+  return entryKeyMatches(event, "library.rename", 0, "F2", mac);
+}
+
+export function isContextMenuShortcut(
+  event: KeyEventInput,
+  mac = clientIsMac(),
 ) {
-  if (event.altKey) return false;
   return (
-    (event.key === "Delete" && !event.metaKey && !event.ctrlKey) ||
-    (mac && event.metaKey && event.key === "Backspace")
+    entryKeyMatches(event, "library.menu", 0, "Shift+F10", mac) ||
+    entryKeyMatches(event, "library.menu", 1, "Menu", mac)
   );
 }
 
-export function isSidebarToggleShortcut(event: {
-  key: string;
-  code?: string;
-  metaKey: boolean;
-  ctrlKey: boolean;
-  altKey: boolean;
-  shiftKey: boolean;
-}) {
+export function isSidebarToggleShortcut(
+  event: KeyEventInput,
+  mac = clientIsMac(),
+) {
+  const overrides = readCustomShortcuts();
+  const custom = overrides[shortcutSlotKey("general.sidebar", 0)];
+  if (custom) return matchesChord(event, custom, mac);
   return (
     (event.metaKey || event.ctrlKey) &&
     !event.altKey &&
     !event.shiftKey &&
     (event.key === "\\" || event.code === "Backslash")
   );
+}
+
+export function findShortcutConflict(
+  candidateChord: KeyChord,
+  targetEntryId: string,
+  targetSlotIndex: number,
+  options: { mac: boolean; tabs: boolean; windows: boolean; browser?: boolean },
+): ShortcutEntry | null {
+  const normalized = candidateChord.toUpperCase();
+  for (const group of shortcutGroups(options)) {
+    for (const entry of group.entries) {
+      for (let i = 0; i < entry.keys.length; i++) {
+        if (entry.id === targetEntryId && i === targetSlotIndex) continue;
+        if (entry.keys[i].toUpperCase() === normalized) return entry;
+      }
+    }
+  }
+  return null;
 }
 
 export function shortcutGroups(options: {
@@ -98,17 +206,31 @@ export function shortcutGroups(options: {
   const n = (key: MessageKey<typeof navigationMessages>) => ({
     navigation: key,
   });
+  const overrides = readCustomShortcuts();
+  const make = (
+    id: string,
+    defaults: KeyChord[],
+    label: ShortcutEntry["label"],
+    editable = true,
+  ): ShortcutEntry => ({
+    id,
+    defaultKeys: defaults,
+    keys: editable ? resolveEntryKeys(id, defaults, overrides) : defaults,
+    editable,
+    label,
+  });
+
   return [
     {
       id: "general",
       entries: [
-        { keys: ["Mod+K"], label: n("shortcut.search") },
+        make("general.search", ["Mod+K"], n("shortcut.search")),
         ...(own(["Mod+N"])
-          ? [{ keys: ["Mod+N"], label: n("shortcut.newPage") }]
+          ? [make("general.newPage", ["Mod+N"], n("shortcut.newPage"))]
           : []),
-        { keys: ["Mod+\\"], label: n("shortcut.sidebar") },
-        { keys: ["Mod+R"], label: n("shortcut.reload") },
-        { keys: ["Escape"], label: n("shortcut.escape") },
+        make("general.sidebar", ["Mod+\\"], n("shortcut.sidebar")),
+        make("general.reload", ["Mod+R"], n("shortcut.reload")),
+        make("general.escape", ["Escape"], n("shortcut.escape"), false),
       ],
     },
     ...(options.tabs
@@ -118,21 +240,30 @@ export function shortcutGroups(options: {
             entries: [
               ...(own(["Mod+T", "Mod+W", "Ctrl+Tab"])
                 ? [
-                    { keys: ["Mod+T"], label: n("shortcut.newTab") },
-                    { keys: ["Mod+W"], label: n("shortcut.closeTab") },
-                    {
-                      keys: ["Ctrl+Tab", "Ctrl+Shift+Tab"],
-                      label: n("shortcut.switchTab"),
-                    },
+                    make("tabs.new", ["Mod+T"], n("shortcut.newTab")),
+                    make("tabs.close", ["Mod+W"], n("shortcut.closeTab")),
+                    make(
+                      "tabs.switch",
+                      ["Ctrl+Tab", "Ctrl+Shift+Tab"],
+                      n("shortcut.switchTab"),
+                    ),
                   ]
                 : []),
-              {
-                keys: ["Alt+Shift+Left", "Alt+Shift+Right"],
-                label: n("shortcut.moveTab"),
-              },
-              { keys: ["Mod+Click"], label: n("shortcut.openTab") },
+              make(
+                "tabs.move",
+                ["Alt+Shift+Left", "Alt+Shift+Right"],
+                n("shortcut.moveTab"),
+              ),
+              make("tabs.openTab", ["Mod+Click"], n("shortcut.openTab"), false),
               ...(options.windows
-                ? [{ keys: ["Shift+Click"], label: n("shortcut.openWindow") }]
+                ? [
+                    make(
+                      "tabs.openWindow",
+                      ["Shift+Click"],
+                      n("shortcut.openWindow"),
+                      false,
+                    ),
+                  ]
                 : []),
             ],
           },
@@ -141,49 +272,73 @@ export function shortcutGroups(options: {
     {
       id: "library",
       entries: [
-        { keys: ["F2"], label: n("shortcut.rename") },
-        {
-          keys: options.mac ? ["Mod+Backspace", "Delete"] : ["Delete"],
-          label: n("shortcut.delete"),
-        },
-        { keys: ["Shift+F10", "Menu"], label: n("shortcut.menu") },
-        {
-          keys: ["Mod+Z", "Shift+Mod+Z"],
-          label: n("shortcut.libraryUndo"),
-        },
-        { keys: ["Mod+A"], label: n("shortcut.selectAll") },
+        make("library.rename", ["F2"], n("shortcut.rename")),
+        make(
+          "library.delete",
+          options.mac ? ["Mod+Backspace", "Delete"] : ["Delete"],
+          n("shortcut.delete"),
+        ),
+        make("library.menu", ["Shift+F10", "Menu"], n("shortcut.menu")),
+        make(
+          "library.undo",
+          ["Mod+Z", "Shift+Mod+Z"],
+          n("shortcut.libraryUndo"),
+        ),
+        make("library.selectAll", ["Mod+A"], n("shortcut.selectAll")),
       ],
     },
     {
       id: "page",
       entries: [
-        { keys: ["/"], label: n("shortcut.insert") },
-        { keys: ["Mod+Z", "Shift+Mod+Z"], label: n("shortcut.editUndo") },
-        { keys: ["Mod+F"], label: n("shortcut.find") },
-        { keys: ["Alt+Mod+F"], label: n("shortcut.findReplace") },
-        { keys: ["Mod+G", "Shift+Mod+G"], label: n("shortcut.findStep") },
-        { keys: ["Shift+Mod+M"], label: n("shortcut.comment") },
+        make("page.insert", ["/"], n("shortcut.insert"), false),
+        make(
+          "page.undo",
+          ["Mod+Z", "Shift+Mod+Z"],
+          n("shortcut.editUndo"),
+          false,
+        ),
+        make("page.find", ["Mod+F"], n("shortcut.find")),
+        make("page.findReplace", ["Alt+Mod+F"], n("shortcut.findReplace")),
+        make(
+          "page.findStep",
+          ["Mod+G", "Shift+Mod+G"],
+          n("shortcut.findStep"),
+        ),
+        make("page.comment", ["Shift+Mod+M"], n("shortcut.comment")),
       ],
     },
     {
       id: "board",
       entries: [
-        ...boardTools.map((tool) => ({
-          keys: [tool.key, ...tool.aliases.map((alias) => alias.toUpperCase())]
-            .filter((key, index, all) => all.indexOf(key) === index),
-          label: { surface: tool.label },
-        })),
-        { keys: ["Space"], label: n("shortcut.pan") },
-        { keys: ["+", "-"], label: n("shortcut.zoom") },
-        { keys: ["0"], label: n("shortcut.fit") },
-        { keys: ["Arrows"], label: n("shortcut.nudge") },
-        { keys: ["Mod+D"], label: n("shortcut.duplicate") },
-        { keys: ["Mod+C", "Mod+X"], label: n("shortcut.copyCut") },
-        { keys: ["Mod+V"], label: n("shortcut.paste") },
-        { keys: ["]", "["], label: n("shortcut.order") },
-        { keys: ["Shift+]", "Shift+["], label: n("shortcut.orderEdge") },
-        { keys: ["Shift+Mod+G"], label: n("shortcut.ungroup") },
-        { keys: ["Shift+Mod+L"], label: n("shortcut.lock") },
+        ...boardTools.map((tool) =>
+          make(
+            `board.tool.${tool.tool ?? "select"}`,
+            [tool.key, ...tool.aliases.map((alias) => alias.toUpperCase())].filter(
+              (key, index, all) => all.indexOf(key) === index,
+            ),
+            { surface: tool.label },
+          ),
+        ),
+        make("board.pan", ["Space"], n("shortcut.pan"), false),
+        make("board.zoom", ["+", "-"], n("shortcut.zoom"), false),
+        make("board.fit", ["0"], n("shortcut.fit")),
+        make("board.nudge", ["Arrows"], n("shortcut.nudge"), false),
+        make("board.duplicate", ["Mod+D"], n("shortcut.duplicate")),
+        make(
+          "board.copyCut",
+          ["Mod+C", "Mod+X"],
+          n("shortcut.copyCut"),
+          false,
+        ),
+        make("board.paste", ["Mod+V"], n("shortcut.paste"), false),
+        make("board.order", ["]", "["], n("shortcut.order")),
+        make(
+          "board.orderEdge",
+          ["Shift+]", "Shift+["],
+          n("shortcut.orderEdge"),
+        ),
+        make("board.ungroup", ["Shift+Mod+G"], n("shortcut.ungroup")),
+        make("board.lock", ["Shift+Mod+L"], n("shortcut.lock")),
       ],
     },
   ];

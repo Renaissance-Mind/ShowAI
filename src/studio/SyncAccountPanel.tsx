@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Copy, Monitor } from "../ui/icons";
+import Dialog from "../ui/Dialog";
 import { desktop } from "../host/bridge";
 import ServiceLogin from "./ServiceLogin";
 import LoginMethods from "./LoginMethods";
@@ -67,248 +68,296 @@ export default function SyncAccountPanel({
     });
   return (
     <div
-      className="sync-account-panel"
+      className="sync-account-panel-groups"
       role="region"
       aria-label={t("accountPanelFor", { name: connection.user.name })}
     >
-      <section className="sync-account-block">
-        <h4>{t("account.methods")}</h4>
-        <LoginMethods connectionId={connection.id} revision={methodsRevision} />
-        <ServiceLogin
-          url={connection.url}
-          connectionId={connection.id}
-          registrationKey=""
-          onConnected={async () => {
-            setMethodsRevision((value) => value + 1);
-            await loadSessions();
-            notify(t("toast.loginMethodAdded"));
-          }}
-        />
-        {secure && (
-          <section className="sync-account-disclosure">
-            <h3 className="settings-section-heading">{t("changePassword")}</h3>
-            <p className="settings-help">{t("changePasswordHelp")}</p>
-            <form
-              className="sync-field-grid"
-              onSubmit={(event) => {
-                event.preventDefault();
-                void run(async () => {
-                  await desktop.invoke("sync:changePassword", {
-                    connectionId: connection.id,
-                    currentPassword: passwords.current,
-                    newPassword: passwords.next,
-                  });
-                  setPasswords({ current: "", next: "" });
-                  await loadSessions();
-                  notify(t("toast.passwordChanged"));
-                });
+      <section className="settings-group">
+        <h2>{t("account.methods")}</h2>
+        <div className="settings-card">
+          <div className="settings-card-section">
+            <LoginMethods
+              connectionId={connection.id}
+              revision={methodsRevision}
+            />
+            <ServiceLogin
+              url={connection.url}
+              connectionId={connection.id}
+              registrationKey=""
+              onConnected={async () => {
+                setMethodsRevision((value) => value + 1);
+                await loadSessions();
+                notify(t("toast.loginMethodAdded"));
               }}
-            >
-              <label className="sync-field">
-                <span>{t("currentPassword")}</span>
-                <input
-                  className="showai-input"
-                  type="password"
-                  required
-                  autoComplete="current-password"
-                  value={passwords.current}
-                  onChange={(event) =>
-                    setPasswords({ ...passwords, current: event.target.value })
-                  }
-                />
-              </label>
-              <label className="sync-field">
-                <span>{t("newPassword")}</span>
-                <input
-                  className="showai-input"
-                  type="password"
-                  required
-                  minLength={12}
-                  maxLength={1024}
-                  placeholder={t("passwordMinLength")}
-                  autoComplete="new-password"
-                  value={passwords.next}
-                  onChange={(event) =>
-                    setPasswords({ ...passwords, next: event.target.value })
-                  }
-                />
-              </label>
-              <div className="sync-form-actions">
-                <button
-                  className="settings-button sync-primary"
-                  disabled={busy}
-                  type="submit"
-                >
-                  {t("saveNewPassword")}
-                </button>
-              </div>
-            </form>
-          </section>
-        )}
-      </section>
-      <section className="sync-account-block">
-        <div className="sync-block-heading">
-          <div>
-            <h4>{t("personalToken")}</h4>
-            <p className="settings-help">{t("personalTokenHelp")}</p>
+            />
           </div>
-          <button
-            className="settings-button"
-            disabled={busy || !!personal}
-            onClick={() =>
-              void run(async () =>
-                setPersonal(
-                  await desktop.invoke("sync:createToken", {
-                    connectionId: connection.id,
-                  }),
-                ),
-              )
-            }
-          >
-            {t("createPersonalToken")}
-          </button>
-        </div>
-        {personal && (
-          <IssuedToken
-            token={personal.token}
-            detail={t("tokenValidity", {
-              date: new Date(personal.expiresAt).toLocaleDateString(
-                getLocale(),
-              ),
-            })}
-            busy={busy}
-            run={run}
-            onDone={() => setPersonal(null)}
-          />
-        )}
-      </section>
-      <section className="sync-account-block">
-        <h4>{t("account.sessions")}</h4>
-        <p className="settings-help">{t("deviceSessionsHelp")}</p>
-        {!sessions && <p className="settings-help">{t("processing")}</p>}
-        <ul className="sync-session-list">
-          {sessions?.map((session) => {
-            const expired =
-              new Date(session.expires_at).getTime() <= Date.now();
-            return (
-              <li key={session.digest}>
-                <Monitor size={16} aria-hidden="true" />
-                <div>
-                  <strong>
-                    {session.device}
-                    {!!session.current && (
-                      <span className="sync-badge">
-                        {t("session.thisDevice")}
-                      </span>
-                    )}
-                  </strong>
-                  <span>
-                    {t("session.signedIn", { date: date(session.created_at) })}
-                    {" · "}
-                    {session.revoked
-                      ? t("session.revoked")
-                      : expired
-                        ? t("session.expired")
-                        : t("session.validUntil", {
-                            date: date(session.expires_at),
-                          })}
-                  </span>
-                </div>
-                {!session.revoked && !expired && (
-                  <button
-                    className="sync-text-button"
-                    disabled={busy}
-                    onClick={() =>
-                      void run(async () => {
-                        await desktop.invoke("sync:revokeToken", {
-                          connectionId: connection.id,
-                          digest: session.digest,
-                        });
-                        if (session.current) {
-                          notify(t("toast.sessionRevoked"));
-                          onSignedOut();
-                        } else await loadSessions();
+          {secure && (
+            <div className="settings-card-section">
+              <div className="settings-row-text">
+                <h3>{t("changePassword")}</h3>
+                <p>{t("changePasswordHelp")}</p>
+              </div>
+              <form
+                className="sync-field-grid"
+                onSubmit={(event) => {
+                  event.preventDefault();
+                  void run(async () => {
+                    await desktop.invoke("sync:changePassword", {
+                      connectionId: connection.id,
+                      currentPassword: passwords.current,
+                      newPassword: passwords.next,
+                    });
+                    setPasswords({ current: "", next: "" });
+                    await loadSessions();
+                    notify(t("toast.passwordChanged"));
+                  });
+                }}
+              >
+                <label className="sync-field">
+                  <span>{t("currentPassword")}</span>
+                  <input
+                    className="showai-input"
+                    type="password"
+                    required
+                    autoComplete="current-password"
+                    value={passwords.current}
+                    onChange={(event) =>
+                      setPasswords({
+                        ...passwords,
+                        current: event.target.value,
                       })
                     }
+                  />
+                </label>
+                <label className="sync-field">
+                  <span>{t("newPassword")}</span>
+                  <input
+                    className="showai-input"
+                    type="password"
+                    required
+                    minLength={12}
+                    maxLength={1024}
+                    placeholder={t("passwordMinLength")}
+                    autoComplete="new-password"
+                    value={passwords.next}
+                    onChange={(event) =>
+                      setPasswords({ ...passwords, next: event.target.value })
+                    }
+                  />
+                </label>
+                <div className="sync-form-actions">
+                  <button
+                    className="settings-button settings-primary-button"
+                    disabled={busy}
+                    type="submit"
                   >
-                    {t("signOutDevice")}
+                    {t("saveNewPassword")}
                   </button>
-                )}
-              </li>
-            );
-          })}
-        </ul>
-      </section>
-      <section className="sync-account-block sync-account-danger">
-        <h4>{t("account.danger")}</h4>
-        <div className="sync-danger-row">
-          <p className="settings-help">{f("signOutHelp")}</p>
-          <button
-            type="button"
-            className="settings-button"
-            disabled={busy}
-            onClick={() =>
-              void run(async () => {
-                await desktop.invoke("sync:signOut", {
-                  connectionId: connection.id,
-                });
-                onRemoved();
-                notify(f("signedOut"));
-              })
-            }
-          >
-            {f("signOut")}
-          </button>
+                </div>
+              </form>
+            </div>
+          )}
         </div>
-        {secure && (
-          <div className="sync-danger-row">
-            <div>
-              <strong>{t("signOutAll")}</strong>
-              <p className="settings-help">{t("signOutAllHelp")}</p>
+      </section>
+
+      <section className="settings-group">
+        <h2>{t("personalToken")}</h2>
+        <div className="settings-card">
+          <div className="settings-row">
+            <div className="settings-row-text">
+              <h3>{t("personalToken")}</h3>
+              <p>{t("personalTokenHelp")}</p>
             </div>
             <button
-              className="settings-button sync-danger"
-              disabled={busy}
-              onClick={() => setConfirm("signOut")}
+              type="button"
+              className="settings-button"
+              disabled={busy || !!personal}
+              onClick={() =>
+                void run(async () =>
+                  setPersonal(
+                    await desktop.invoke("sync:createToken", {
+                      connectionId: connection.id,
+                    }),
+                  ),
+                )
+              }
             >
-              {t("signOutAll")}
+              {t("createPersonalToken")}
             </button>
           </div>
-        )}
-        <div className="sync-danger-row">
-          <div>
-            <strong>{t("removeConnection")}</strong>
-            <p className="settings-help">
-              {syncedProjects
-                ? t("removeConnectionBlocked", { count: syncedProjects })
-                : t("removeConnectionHelp")}
-            </p>
-          </div>
-          <button
-            className="settings-button sync-danger"
-            disabled={busy || syncedProjects > 0}
-            onClick={() => setConfirm("remove")}
-          >
-            {t("removeConnection")}
-          </button>
         </div>
-        {confirm && (
-          <div
-            className="sync-inline-confirm"
-            role="group"
-            aria-label={
-              confirm === "signOut"
-                ? t("confirmSignOutAll")
-                : t("confirmRemoveConnection")
-            }
-          >
-            <p>
+      </section>
+
+      {personal && (
+        <Dialog title={t("personalToken")} onClose={() => setPersonal(null)}>
+          <div className="studio-dialog-body">
+            <IssuedToken
+              token={personal.token}
+              detail={t("tokenValidity", {
+                date: new Date(personal.expiresAt).toLocaleDateString(
+                  getLocale(),
+                ),
+              })}
+              busy={busy}
+              run={run}
+              onDone={() => setPersonal(null)}
+            />
+          </div>
+        </Dialog>
+      )}
+
+      <section className="settings-group">
+        <div className="settings-group-heading">
+          <div>
+            <h2>{t("account.sessions")}</h2>
+            <p className="settings-group-desc">{t("deviceSessionsHelp")}</p>
+          </div>
+        </div>
+        <div className="settings-card">
+          <div className="settings-card-section">
+            {!sessions && <p className="settings-help">{t("processing")}</p>}
+            <ul className="sync-session-list">
+              {sessions?.map((session) => {
+                const expired =
+                  new Date(session.expires_at).getTime() <= Date.now();
+                return (
+                  <li key={session.digest}>
+                    <Monitor size={16} aria-hidden="true" />
+                    <div>
+                      <strong>
+                        {session.device}
+                        {!!session.current && (
+                          <span className="settings-badge" data-tone="accent">
+                            {t("session.thisDevice")}
+                          </span>
+                        )}
+                      </strong>
+                      <span>
+                        {t("session.signedIn", {
+                          date: date(session.created_at),
+                        })}
+                        {" · "}
+                        {session.revoked
+                          ? t("session.revoked")
+                          : expired
+                            ? t("session.expired")
+                            : t("session.validUntil", {
+                                date: date(session.expires_at),
+                              })}
+                      </span>
+                    </div>
+                    {!session.revoked && !expired && (
+                      <button
+                        type="button"
+                        className="settings-button settings-danger-button"
+                        disabled={busy}
+                        onClick={() =>
+                          void run(async () => {
+                            await desktop.invoke("sync:revokeToken", {
+                              connectionId: connection.id,
+                              digest: session.digest,
+                            });
+                            if (session.current) {
+                              notify(t("toast.sessionRevoked"));
+                              onSignedOut();
+                            } else await loadSessions();
+                          })
+                        }
+                      >
+                        {t("signOutDevice")}
+                      </button>
+                    )}
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+        </div>
+      </section>
+
+      <section className="settings-group">
+        <h2>{t("account.danger")}</h2>
+        <div className="settings-card">
+          <div className="settings-row">
+            <div className="settings-row-text">
+              <h3>{f("signOut")}</h3>
+              <p>{f("signOutHelp")}</p>
+            </div>
+            <button
+              type="button"
+              className="settings-button"
+              disabled={busy}
+              onClick={() =>
+                void run(async () => {
+                  await desktop.invoke("sync:signOut", {
+                    connectionId: connection.id,
+                  });
+                  onRemoved();
+                  notify(f("signedOut"));
+                })
+              }
+            >
+              {f("signOut")}
+            </button>
+          </div>
+          {secure && (
+            <div className="settings-row">
+              <div className="settings-row-text">
+                <h3>{t("signOutAll")}</h3>
+                <p>{t("signOutAllHelp")}</p>
+              </div>
+              <button
+                type="button"
+                className="settings-button settings-danger-button"
+                disabled={busy}
+                onClick={() => setConfirm("signOut")}
+              >
+                {t("signOutAll")}
+              </button>
+            </div>
+          )}
+          <div className="settings-row">
+            <div className="settings-row-text">
+              <h3>{t("removeConnection")}</h3>
+              <p>
+                {syncedProjects
+                  ? t("removeConnectionBlocked", { count: syncedProjects })
+                  : t("removeConnectionHelp")}
+              </p>
+            </div>
+            <button
+              type="button"
+              className="settings-button settings-danger-button"
+              disabled={busy || syncedProjects > 0}
+              onClick={() => setConfirm("remove")}
+            >
+              {t("removeConnection")}
+            </button>
+          </div>
+        </div>
+      </section>
+
+      {confirm && (
+        <Dialog
+          tone="danger"
+          title={
+            confirm === "signOut"
+              ? t("confirmSignOutAll")
+              : t("confirmRemoveConnection")
+          }
+          onClose={() => {
+            if (!busy) setConfirm(null);
+          }}
+        >
+          <div className="studio-dialog-body studio-dialog-form">
+            <p className="settings-help">
               {confirm === "signOut"
                 ? t("signOutAllQuestion")
                 : t("removeConnectionQuestion", { name: connection.name })}
             </p>
-            <div>
+            <div className="studio-dialog-actions">
               <button
+                type="button"
                 className="settings-button"
                 disabled={busy}
                 onClick={() => setConfirm(null)}
@@ -316,6 +365,7 @@ export default function SyncAccountPanel({
                 {tc("cancel")}
               </button>
               <button
+                type="button"
                 className="settings-button sync-danger-fill"
                 disabled={busy}
                 onClick={() =>
@@ -324,12 +374,15 @@ export default function SyncAccountPanel({
                       await desktop.invoke("sync:disconnect", {
                         connectionId: connection.id,
                       });
+                      setConfirm(null);
                       onRemoved();
                       return;
                     }
                     const result = await desktop.invoke<{
                       unreachable: string[];
-                    }>("sync:revokeAllTokens", { connectionId: connection.id });
+                    }>("sync:revokeAllTokens", {
+                      connectionId: connection.id,
+                    });
                     notify(
                       result.unreachable.length
                         ? t("toast.signedOutAllPartial", {
@@ -337,6 +390,7 @@ export default function SyncAccountPanel({
                           })
                         : t("toast.signedOutAll"),
                     );
+                    setConfirm(null);
                     onSignedOut();
                   })
                 }
@@ -347,8 +401,8 @@ export default function SyncAccountPanel({
               </button>
             </div>
           </div>
-        )}
-      </section>
+        </Dialog>
+      )}
     </div>
   );
 }
@@ -385,6 +439,7 @@ export function IssuedToken({
           onFocus={(event) => event.target.select()}
         />
         <button
+          type="button"
           className="settings-button"
           disabled={busy}
           onClick={() =>
@@ -397,7 +452,7 @@ export function IssuedToken({
           <Copy size={14} aria-hidden="true" />
           {copied ? t("tokenCopied") : t("copyToken")}
         </button>
-        <button className="settings-button" onClick={onDone}>
+        <button type="button" className="settings-button" onClick={onDone}>
           {t("tokenSaved")}
         </button>
       </div>

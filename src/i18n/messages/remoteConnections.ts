@@ -46,6 +46,13 @@ export default defineMessages("remoteConnections", {
     funnel: "Tailscale 公网",
     quick: "Cloudflare 临时域名",
     domain: "Cloudflare 自有域名",
+    "desc.lan": "同一 Wi-Fi 或以太网内的设备直连，使用访问密钥鉴权。",
+    "desc.tailnet": "仅供同一 Tailscale 私网内的个人设备安全访问。",
+    "desc.funnel":
+      "通过 Tailscale Funnel 暴露固定公网 HTTPS 地址，支持网页端客户端。",
+    "desc.quick": "无需自有域名，生成临时公网 HTTPS 地址用于快速测试。",
+    "desc.domain":
+      "绑定你自己的 Cloudflare 域名与隧道令牌，提供长期固定的公网入口。",
     configure: "配置{name}",
     enable: "启用{name}",
     disable: "关闭{name}",
@@ -149,6 +156,49 @@ export default defineMessages("remoteConnections", {
     continue: "继续",
     verify: "发送测试消息",
     oauthEndpoints: "OAuth 端点",
+    conceptTitle: "外部 Agent 通过远程 MCP 操作当前 ShowAI 内容库",
+    conceptDesc:
+      "开启下方任意入口后，位于局域网、另一台设备或网页端的外部 Agent，即可通过受控的 MCP 地址读取、编辑或创建本机 ShowAI 内容库；所有项目范围与授权均可在此随时撤销。",
+    topoLabel: "远程连接结构",
+    topoDeviceLan: "iPad / 桌面设备",
+    topoNetLan: "局域网",
+    topoAgentTailscale: "GrokBot",
+    topoNetTailscale: "Tailscale 私网",
+    topoAgentPublic: "ChatGPT",
+    topoNetPublic: "公网域名",
+    topoHubTitle: "ShowAI App",
+    topoHubBadge: "远程 MCP",
+    topoLibTitle: "内容库",
+    topoLibProjects: "项目",
+    topoLibPages: "页面",
+    topoLibBoards: "白板",
+    conceptNodeClient: "外部 Agent / 客户端",
+    conceptNodeClientSub: "其他设备或网页应用",
+    conceptEdgeMcp: "远程 MCP",
+    conceptNodeApp: "ShowAI 远程入口",
+    conceptNodeAppSub: "权限控制与人工批准",
+    conceptNodeLibrary: "本机 ShowAI 内容库",
+    conceptNodeLibrarySub: "项目、页面、白板与组件",
+    overviewClientsDesc: "通过任意远程连接方式接入并完成授权的外部客户端都会统一列在这里。",
+    overviewClientsEmpty: "暂无已授权客户端",
+    overviewClientsEmptyDetail:
+      "开启下方连接并在配置流程中完成一次客户端授权后，会显示在这里。",
+    step1Title: "准备连接方式与网络参数",
+    step2Title: "配置内容访问权限",
+    step3Title: "开启连接并获取 MCP 地址",
+    step4Title: "接入客户端并验证",
+    step4Inactive: "先完成第 3 步开启连接，之后即可在此获取访问密钥、接入提示词或引导 ChatGPT 验证。",
+    viewAllClients: "在连接列表中管理已授权客户端",
+    "guide.lan":
+      "选择在同一 Wi-Fi 或以太网下可访问的本机网络接口；端口留空时将自动分配可用端口。",
+    "guide.tailscale-private":
+      "1. 本机与远程设备需登录同一 Tailscale 账号；\n2. 打开 Tailscale 控制台的 DNS 页面，确保开启 MagicDNS 与 HTTPS 证书支持；\n3. 选择下方 HTTPS 端口与鉴权方式，然后前往第 3 步开启连接。",
+    "guide.tailscale":
+      "1. 在 Tailscale 控制台的 DNS 页面开启 MagicDNS 与 HTTPS 证书支持；\n2. 在访问控制规则中为当前设备开启 funnel 权限，使公网 HTTPS 请求转发到本机；\n3. 选好 HTTPS 端口后前往第 3 步开启连接。",
+    "guide.cloudflare-quick":
+      "无需登录或绑定域名。可直接继续第 2 步与第 3 步，通过 cloudflared 自动生成临时公网 HTTPS 地址（关闭连接后地址失效）。",
+    "guide.cloudflare":
+      "1. 点击下方「生成回源地址」为本机保留监听端口；\n2. 前往 Cloudflare 控制台创建 cloudflared 隧道并复制隧道令牌；\n3. 在隧道中绑定你的公网域名，将服务类型设为 HTTP 并指向下方生成的回源地址；\n4. 把公网域名与隧道令牌填回此处后前往第 3 步开启连接。",
   },
   en: {
     copyPath: "Copy path",
@@ -196,6 +246,16 @@ export default defineMessages("remoteConnections", {
     funnel: "Public Tailscale",
     quick: "Cloudflare temporary domain",
     domain: "Cloudflare custom domain",
+    "desc.lan":
+      "Direct access for devices on the same Wi-Fi or Ethernet network using an access key.",
+    "desc.tailnet":
+      "Private HTTPS access restricted to devices in your Tailscale network.",
+    "desc.funnel":
+      "Fixed public HTTPS endpoint via Tailscale Funnel for web-based clients.",
+    "desc.quick":
+      "Temporary public HTTPS URL for quick testing without a custom domain.",
+    "desc.domain":
+      "Bind your own Cloudflare domain and tunnel token for a permanent public endpoint.",
     configure: "Configure {name}",
     enable: "Enable {name}",
     disable: "Disable {name}",
@@ -299,5 +359,50 @@ export default defineMessages("remoteConnections", {
     continue: "Continue",
     verify: "Send a test message",
     oauthEndpoints: "OAuth endpoints",
+    conceptTitle: "External Agents operate this ShowAI library through remote MCP",
+    conceptDesc:
+      "Once a connection below is enabled, an external Agent on another device or in a web client can read, edit or create content in this Mac’s ShowAI library via MCP, subject to your project scope and approval.",
+    topoLabel: "Remote connection topology",
+    topoDeviceLan: "iPad / Desktop",
+    topoNetLan: "Local network",
+    topoAgentTailscale: "GrokBot",
+    topoNetTailscale: "Tailscale tailnet",
+    topoAgentPublic: "ChatGPT",
+    topoNetPublic: "Public domain",
+    topoHubTitle: "ShowAI App",
+    topoHubBadge: "Remote MCP",
+    topoLibTitle: "Content library",
+    topoLibProjects: "Projects",
+    topoLibPages: "Pages",
+    topoLibBoards: "Boards",
+    conceptNodeClient: "External Agent / Client",
+    conceptNodeClientSub: "Another device or web client",
+    conceptEdgeMcp: "Remote MCP",
+    conceptNodeApp: "ShowAI Remote Endpoint",
+    conceptNodeAppSub: "Permission scope & approval",
+    conceptNodeLibrary: "Local ShowAI Library",
+    conceptNodeLibrarySub: "Projects, pages, boards & components",
+    overviewClientsDesc:
+      "Authorized external clients from all connection methods are shown here.",
+    overviewClientsEmpty: "No authorized clients yet",
+    overviewClientsEmptyDetail:
+      "Enable any connection above and authorize a client to view or revoke access here.",
+    step1Title: "Prepare network and tunnel settings",
+    step2Title: "Choose content permissions",
+    step3Title: "Start connection and get MCP URL",
+    step4Title: "Connect client and verify",
+    step4Inactive:
+      "Start the connection in Step 3 first to issue an access key, copy a setup prompt or verify ChatGPT.",
+    viewAllClients: "Manage clients on overview",
+    "guide.lan":
+      "Choose a local network interface reachable over your Wi-Fi or Ethernet network. Leave port blank to assign one automatically.",
+    "guide.tailscale-private":
+      "1. Sign in to the same Tailscale network on this computer and your client device.\n2. In the Tailscale console DNS settings, enable MagicDNS and HTTPS certificates.\n3. Pick an HTTPS port and authentication mode below, then start in Step 3.",
+    "guide.tailscale":
+      "1. In the Tailscale console DNS settings, enable MagicDNS and HTTPS certificates.\n2. In access controls, allow funnel for this device to expose public HTTPS.\n3. Pick an HTTPS port below, then start in Step 3.",
+    "guide.cloudflare-quick":
+      "No account or custom domain required. Continue to Steps 2 and 3 to create a temporary HTTPS tunnel automatically with cloudflared (expires when stopped).",
+    "guide.cloudflare":
+      "1. Click Generate origin address below to reserve a local port.\n2. Create a cloudflared tunnel in the Cloudflare dashboard and copy its tunnel token.\n3. Map your custom domain to an HTTP service pointing at the origin address below.\n4. Enter your domain and tunnel token here, then start in Step 3.",
   },
 });

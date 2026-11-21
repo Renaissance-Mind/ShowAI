@@ -3,6 +3,7 @@ import { useMemo, useRef, useState } from "react";
 import * as icons from "../ui/icons";
 import {
   ChevronLeft,
+  CircleAlert,
   Copy,
   Download,
   Moon,
@@ -16,6 +17,7 @@ import {
   LayoutDashboard,
   Settings2,
 } from "../ui/icons";
+import { desktop } from "../host/bridge";
 import { useTranslator } from "../i18n/react";
 import messages from "../i18n/messages/icons";
 import "./icon-viewer.css";
@@ -61,10 +63,12 @@ const categoryIcons: Record<Group, typeof Shapes> = {
   navigation: LayoutDashboard,
   actions: Settings2,
 };
+const lightInk = "#252629";
+const darkInk = "#f4f4f6";
 const defaults = {
   size: 24,
   stroke: 1.7,
-  color: "#252629",
+  color: lightInk,
   background: "light" as "light" | "dark",
 };
 
@@ -107,7 +111,9 @@ export default function IconViewer() {
   const copy = async (text: string, message: string) => {
     setError("");
     try {
-      await navigator.clipboard.writeText(text);
+      await desktop
+        .invoke("clipboard:write", { text })
+        .catch(() => navigator.clipboard.writeText(text));
       notify(message);
     } catch (reason) {
       setError(
@@ -135,44 +141,49 @@ export default function IconViewer() {
       data-narrow-view={visible.length ? narrowView : "catalog"}
       aria-label={t("browser")}
     >
-      <div className="icon-viewer-tools">
-        <label className="icon-viewer-search">
-          <Search size={15} aria-hidden="true" />
-          <input
-            type="search"
-            aria-label={t("search")}
-            placeholder={t("searchPlaceholder")}
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-          />
-        </label>
-        <span className="icon-viewer-count" aria-live="polite">
-          {t("count", { visible: visible.length, count: catalog.length })}
-        </span>
+      <div className="icon-viewer-toolbar">
+        <div className="icon-viewer-tools">
+          <label className="settings-search-field icon-viewer-search">
+            <Search size={15} aria-hidden="true" />
+            <input
+              type="search"
+              aria-label={t("search")}
+              placeholder={t("searchPlaceholder")}
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+            />
+          </label>
+          <span className="settings-badge icon-viewer-count" aria-live="polite">
+            {t("count", { visible: visible.length, count: catalog.length })}
+          </span>
+        </div>
+        <div
+          className="settings-segmented icon-viewer-categories"
+          role="group"
+          aria-label={t("categories")}
+        >
+          {(["all", ...categories] as Group[]).map((item) => {
+            const CategoryIcon = categoryIcons[item];
+            return (
+              <button
+                type="button"
+                key={item}
+                aria-pressed={group === item}
+                onClick={() => setGroup(item)}
+              >
+                <CategoryIcon size={14} aria-hidden="true" />
+                {t(`category.${item}`)}
+              </button>
+            );
+          })}
+        </div>
       </div>
-      <div
-        className="icon-viewer-categories"
-        role="group"
-        aria-label={t("categories")}
-      >
-        {(["all", ...categories] as Group[]).map((item) => {
-          const CategoryIcon = categoryIcons[item];
-          return (
-            <button
-              key={item}
-              aria-pressed={group === item}
-              onClick={() => setGroup(item)}
-            >
-              <CategoryIcon size={14} aria-hidden="true" />
-              {t(`category.${item}`)}
-            </button>
-          );
-        })}
-      </div>
+
       <div className="icon-viewer-layout">
         <div className="icon-viewer-grid" role="group" aria-label={t("list")}>
           {visible.map(({ name, Icon }) => (
             <button
+              type="button"
               key={name}
               className="icon-viewer-tile"
               aria-label={name}
@@ -185,7 +196,6 @@ export default function IconViewer() {
                   setNarrowView("detail");
                   requestAnimationFrame(() => backButton.current?.focus());
                 }
-
                 setError("");
               }}
             >
@@ -203,10 +213,12 @@ export default function IconViewer() {
             </button>
           ))}
           {!visible.length && (
-            <div className="icon-viewer-empty">
-              <Search size={28} />
+            <div className="settings-card icon-viewer-empty">
+              <Search size={26} aria-hidden="true" />
               <p>{t("empty")}</p>
               <button
+                type="button"
+                className="settings-button"
                 onClick={() => {
                   setQuery("");
                   setGroup("all");
@@ -218,10 +230,13 @@ export default function IconViewer() {
           )}
         </div>
         {!!visible.length && (
-          <aside className="icon-viewer-detail" aria-label={t("detail")}>
+          <aside
+            className="settings-card icon-viewer-detail"
+            aria-label={t("detail")}
+          >
             <button
               type="button"
-              className="settings-button icon-viewer-back"
+              className="settings-button settings-back-button icon-viewer-back"
               ref={backButton}
               onClick={() => {
                 setNarrowView("catalog");
@@ -242,10 +257,12 @@ export default function IconViewer() {
                 aria-hidden="true"
               />
             </div>
-            <h2>{current.name}</h2>
-            <p>{t(`category.${current.category}`)} · Lucide</p>
+            <div className="icon-viewer-meta">
+              <h3>{current.name}</h3>
+              <p>{t(`category.${current.category}`)} · Lucide</p>
+            </div>
             <div className="icon-viewer-settings-heading">
-              <h3>{t("previewOptions")}</h3>
+              <h4>{t("previewOptions")}</h4>
               <button
                 type="button"
                 className="settings-button"
@@ -255,13 +272,14 @@ export default function IconViewer() {
                   setError("");
                 }}
               >
-                <RotateCcw size={14} aria-hidden="true" />
+                <RotateCcw size={13} aria-hidden="true" />
                 {t("resetPreview")}
               </button>
             </div>
             <div className="icon-viewer-controls">
               <label>
-                {t("size")} <output>{preview.size} px</output>
+                <span>{t("size")}</span>
+                <output>{preview.size} px</output>
                 <input
                   className="showai-range"
                   aria-label={t("sizeLabel")}
@@ -276,7 +294,8 @@ export default function IconViewer() {
                 />
               </label>
               <label>
-                {t("stroke")} <output>{preview.stroke}</output>
+                <span>{t("stroke")}</span>
+                <output>{preview.stroke}</output>
                 <input
                   className="showai-range"
                   aria-label={t("strokeLabel")}
@@ -294,7 +313,7 @@ export default function IconViewer() {
                 />
               </label>
               <label className="icon-viewer-color">
-                {t("color")}{" "}
+                <span>{t("color")}</span>
                 <input
                   aria-label={t("colorLabel")}
                   type="color"
@@ -308,53 +327,78 @@ export default function IconViewer() {
               <div className="icon-viewer-background-field">
                 <span>{t("previewBackground")}</span>
                 <div
-                  className="icon-viewer-background"
+                  className="settings-segmented icon-viewer-background"
                   role="group"
                   aria-label={t("background")}
                 >
                   <button
+                    type="button"
                     aria-pressed={preview.background === "light"}
                     onClick={() =>
                       setPreview({
                         ...preview,
                         background: "light",
+                        color:
+                          preview.color === darkInk ? lightInk : preview.color,
                       })
                     }
                   >
-                    <Sun size={14} />
+                    <Sun size={14} aria-hidden="true" />
                     {t("light")}
                   </button>
                   <button
+                    type="button"
                     aria-pressed={preview.background === "dark"}
                     onClick={() =>
                       setPreview({
                         ...preview,
                         background: "dark",
+                        color:
+                          preview.color === lightInk ? darkInk : preview.color,
                       })
                     }
                   >
-                    <Moon size={14} />
+                    <Moon size={14} aria-hidden="true" />
                     {t("dark")}
                   </button>
                 </div>
               </div>
             </div>
             {error && (
-              <div className="icon-viewer-copy-error" role="alert">
-                {error} {t("downloadInstead")}
+              <div
+                className="settings-callout icon-viewer-copy-error"
+                data-tone="error"
+                role="alert"
+              >
+                <CircleAlert size={14} aria-hidden="true" />
+                <span>
+                  {error} {t("downloadInstead")}
+                </span>
               </div>
             )}
             <div className="icon-viewer-actions">
-              <button onClick={() => void copy(current.name, t("copiedName"))}>
-                <Copy size={14} />
+              <button
+                type="button"
+                className="settings-button settings-primary-button"
+                onClick={() => void copy(current.name, t("copiedName"))}
+              >
+                <Copy size={14} aria-hidden="true" />
                 {t("copyName")}
               </button>
-              <button onClick={() => void copy(svg(), t("copiedSvg"))}>
-                <Copy size={14} />
+              <button
+                type="button"
+                className="settings-button"
+                onClick={() => void copy(svg(), t("copiedSvg"))}
+              >
+                <Copy size={14} aria-hidden="true" />
                 {t("copySvg")}
               </button>
-              <button onClick={download}>
-                <Download size={14} />
+              <button
+                type="button"
+                className="settings-button"
+                onClick={download}
+              >
+                <Download size={14} aria-hidden="true" />
                 {t("downloadSvg")}
               </button>
             </div>

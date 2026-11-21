@@ -16,7 +16,11 @@ import { WELCOME_DOC } from "../builtin-docs";
 import type { useSampleProject } from "../sample-project";
 import { SettingsPanel } from "../Settings";
 import { ComponentCatalog } from "../ComponentCatalog";
-import { clientIsMac, isDeleteShortcut } from "../keyboard-shortcuts";
+import {
+  clientIsMac,
+  entryKeyMatches,
+  isDeleteShortcut,
+} from "../keyboard-shortcuts";
 import type { StudioFeedback } from "./useStudioFeedback";
 import type { LibraryState } from "./useLibraryState";
 import type { RouteState } from "./useRouteState";
@@ -253,8 +257,7 @@ export function StudioViews({
         )
           return;
         if (
-          (event.metaKey || event.ctrlKey) &&
-          event.key.toLowerCase() === "a"
+          entryKeyMatches(event, "library.selectAll", 0, "Mod+A", clientIsMac())
         ) {
           event.preventDefault();
           pageSelection.selectAll();

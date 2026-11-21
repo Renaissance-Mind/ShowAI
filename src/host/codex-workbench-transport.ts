@@ -1,7 +1,7 @@
 import type { DesktopChange, DesktopResponse } from "./protocol";
 
 export const workbenchChunkBytes = 192 * 1024;
-export const workbenchRoutes = ["invoke", "locale", "dialog/list", "dialog/mkdir"] as const;
+export const workbenchRoutes = ["invoke", "locale", "dialog/list", "dialog/mkdir", "dialog/native"] as const;
 export type WorkbenchRoute = typeof workbenchRoutes[number];
 
 export interface WorkbenchAsset {

@@ -1,4 +1,9 @@
-import { clientIsMac, isDeleteShortcut } from "./keyboard-shortcuts";
+import {
+  clientIsMac,
+  isContextMenuShortcut,
+  isDeleteShortcut,
+  isRenameShortcut,
+} from "./keyboard-shortcuts";
 import { memo, useRef, type KeyboardEvent, type MouseEvent } from "react";
 import {
   ChevronRight,
@@ -81,17 +86,15 @@ function LibraryRowView({
   const Icon =
     target.kind === "page" ? FileText : expanded ? FolderOpen : Folder;
   const openKeyboardMenu = (event: KeyboardEvent<HTMLDivElement>) => {
-    if (
-      onCommand &&
-      (event.key === "F2" || isDeleteShortcut(event, clientIsMac()))
-    ) {
+    const mac = clientIsMac();
+    const renaming = isRenameShortcut(event, mac);
+    if (onCommand && (renaming || isDeleteShortcut(event, mac))) {
       event.preventDefault();
       event.stopPropagation();
-      onCommand(target, event.key === "F2" ? "rename" : "delete");
+      onCommand(target, renaming ? "rename" : "delete");
       return;
     }
-    if (event.key !== "ContextMenu" && !(event.shiftKey && event.key === "F10"))
-      return;
+    if (!isContextMenuShortcut(event, mac)) return;
     event.preventDefault();
     event.stopPropagation();
     if (menuButton.current) onMenu(target, menuButton.current);

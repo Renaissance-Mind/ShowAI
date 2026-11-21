@@ -51,7 +51,7 @@ export default function Dialog({
         panel.current?.querySelector<HTMLElement>(
           className.includes("catalog-")
             ? '[role="tab"][aria-selected="true"]'
-            : "input:not([disabled]),textarea:not([disabled]),select:not([disabled])",
+            : 'input:not([disabled]),textarea:not([disabled]),select:not([disabled]),[role="combobox"]:not([disabled])',
         ) ??
         panel.current)
     )?.focus();
@@ -60,7 +60,7 @@ export default function Dialog({
       if (event.key === "Escape") {
         if (
           panel.current?.contains(document.fullscreenElement) ||
-          document.querySelector('[role="menu"]')
+          document.querySelector('[role="menu"], [role="listbox"]')
         )
           return;
         event.preventDefault();
@@ -69,7 +69,7 @@ export default function Dialog({
       if (event.key === "Tab") {
         const items = [
           ...(panel.current?.querySelectorAll<HTMLElement>(
-            'button:not([disabled]),input:not([disabled]),textarea:not([disabled]),select:not([disabled]),a[href],summary,[tabindex],[contenteditable="true"]',
+            'button:not([disabled]),input:not([disabled]),textarea:not([disabled]),select:not([disabled]),[role="combobox"]:not([disabled]),a[href],summary,[tabindex],[contenteditable="true"]',
           ) ?? []),
         ].filter(
           (item) =>

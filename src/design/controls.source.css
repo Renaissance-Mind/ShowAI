@@ -166,7 +166,7 @@
 }
 
 /* Keep one arrow even where a compact layout supplies its own padding or background. */
-.showai-select:not([multiple]):is(:not([size]), [size="0"], [size="1"]) {
+.showai-select:not(.showai-custom-select):not([multiple]):is(:not([size]), [size="0"], [size="1"]) {
   --arrow-arm: calc(var(--select-arrow-size, 12px) / 2);
   --arrow-edge: var(--select-arrow-inset, 12px);
   --arrow-ink: var(--muted, #646a75);
@@ -194,7 +194,7 @@
   ) !important;
   text-overflow: ellipsis;
 }
-.showai-select:dir(rtl):not([multiple]):is(
+.showai-select:not(.showai-custom-select):dir(rtl):not([multiple]):is(
     :not([size]),
     [size="0"],
     [size="1"]

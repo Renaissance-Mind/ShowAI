@@ -1,4 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  matchesChord,
+  readCustomShortcuts,
+  shortcutSlotKey,
+} from "../../surface/shortcut-matcher";
 import type { FindCommand, FindRequest } from "./FindBar";
 
 export function findShortcut(
@@ -12,6 +17,17 @@ export function findShortcut(
   },
   mac: boolean,
 ): FindCommand | null {
+  const overrides = readCustomShortcuts();
+  const customSlots: [string, FindCommand][] = [
+    [shortcutSlotKey("page.find", 0), "open"],
+    [shortcutSlotKey("page.findReplace", 0), "replace"],
+    [shortcutSlotKey("page.findStep", 0), "next"],
+    [shortcutSlotKey("page.findStep", 1), "previous"],
+  ];
+  for (const [slot, cmd] of customSlots) {
+    const chord = overrides[slot];
+    if (chord && matchesChord(event, chord, mac)) return cmd;
+  }
   const mod = mac ? event.metaKey && !event.ctrlKey : event.ctrlKey && !event.metaKey;
   if (!mod) return null;
   const key = /^[a-z]$/i.test(event.key)
@@ -19,8 +35,19 @@ export function findShortcut(
     : event.code?.startsWith("Key")
       ? event.code.slice(3).toLowerCase()
       : "";
-  if (key === "f" && !event.shiftKey) return event.altKey ? "replace" : "open";
-  if (key === "g" && !event.altKey) return event.shiftKey ? "previous" : "next";
+  if (key === "f" && !event.shiftKey) {
+    const cmd: FindCommand = event.altKey ? "replace" : "open";
+    const slot = shortcutSlotKey(
+      cmd === "replace" ? "page.findReplace" : "page.find",
+      0,
+    );
+    return slot in overrides ? null : cmd;
+  }
+  if (key === "g" && !event.altKey) {
+    const cmd: FindCommand = event.shiftKey ? "previous" : "next";
+    const slot = shortcutSlotKey("page.findStep", cmd === "previous" ? 1 : 0);
+    return slot in overrides ? null : cmd;
+  }
   return null;
 }
 

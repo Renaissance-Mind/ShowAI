@@ -31,6 +31,11 @@ import type { DirectoryState } from "./useDirectory";
 import type { StudioRouter } from "./useStudioRouter";
 import type { LibraryEdits } from "./useLibraryEdits";
 import { DraftHeld, operation, type PageState } from "./types";
+import {
+  clientIsMac,
+  entryKeyMatches,
+  hasSlotOverride,
+} from "../keyboard-shortcuts";
 
 export function useLibraryMoves({
   feedback: { setNotice, report, notifyWithUndo },
@@ -248,8 +253,18 @@ export function useLibraryMoves({
       libraryLast.current = !!(event.target as Element).closest?.(libraryAreas);
     };
     const key = (event: KeyboardEvent) => {
-      if (!(event.metaKey || event.ctrlKey) || event.key.toLowerCase() !== "z")
-        return;
+      const mac = clientIsMac();
+      const redoMatch =
+        entryKeyMatches(event, "library.undo", 1, "Shift+Mod+Z", mac) ||
+        (!hasSlotOverride("library.undo", 1) &&
+          !mac &&
+          event.ctrlKey &&
+          !event.metaKey &&
+          !event.altKey &&
+          !event.shiftKey &&
+          event.key.toLowerCase() === "y");
+      const undoMatch = entryKeyMatches(event, "library.undo", 0, "Mod+Z", mac);
+      if (!undoMatch && !redoMatch) return;
       const target = event.target as HTMLElement;
       if (target.closest("input,textarea,[contenteditable=true],.page-surface"))
         return;
@@ -260,15 +275,13 @@ export function useLibraryMoves({
         !(target === document.body && libraryLast.current)
       )
         return;
-      if (!libraryHistory.current.next(event.shiftKey) && !pendingInput.current)
-        return;
+      const redo = redoMatch;
+      if (!libraryHistory.current.next(redo) && !pendingInput.current) return;
       event.preventDefault();
       event.stopPropagation();
-      void replayLibraryRef.current(event.shiftKey).catch((error) =>
+      void replayLibraryRef.current(redo).catch((error) =>
         report(error, {
-          action: operation(
-            event.shiftKey ? "op.redoLibrary" : "op.undoLibrary",
-          ),
+          action: operation(redo ? "op.redoLibrary" : "op.undoLibrary"),
         }),
       );
     };

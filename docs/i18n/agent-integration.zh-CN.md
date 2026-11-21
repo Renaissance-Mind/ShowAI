@@ -10,7 +10,7 @@
 
 支持 MCP 不代表支持 HTML 显示。兼容宿主可显示 MCP Apps/inline，纯文本宿主仍可保存项目、返回同步回执与文件链接。公共独立渲染、私有项目读写、实际显示分别核对。
 
-本机运行时见「设置 → 插件」中的「当前登记的运行时」与启动配置，或所选内容库的 agent-runtime.json。下面 showai 代表核实后的命令前缀：
+本机运行时见「设置 → 外部 Agent 插件」中的「当前登记的运行时」与启动配置，或所选内容库的 agent-runtime.json。下面 showai 代表核实后的命令前缀：
 
 ```sh
 showai runtime info --json
@@ -88,7 +88,7 @@ npm run package:plugin -- --mcp-url https://agent.example.com/mcp --out /absolut
 
 ## 已保存页面的展示约定
 
-从 ShowAI「设置 → 插件」安装或更新 Codex 插件。临时图表和组件用 `show_component` 在聊天里交互展示。当前连接提供 `card_present` 时，新建或编辑页面并保存成功后，默认在同一轮交付原页卡片。传入已保存页面的 `projectId` 和 `pageId`，卡片会显示标题及完整路径。可用 `description` 简述新内容或本次改动，最多 1000 个字符。要指向某个组件，再传入保存后大纲里的 `blockId`。明确要求在对话里阅读正文时使用 `page_present`。
+从 ShowAI「设置 → 外部 Agent 插件」安装或更新 Codex 插件。临时图表和组件用 `show_component` 在聊天里交互展示。当前连接提供 `card_present` 时，新建或编辑页面并保存成功后，默认在同一轮交付原页卡片。传入已保存页面的 `projectId` 和 `pageId`，卡片会显示标题及完整路径。可用 `description` 简述新内容或本次改动，最多 1000 个字符。要指向某个组件，再传入保存后大纲里的 `blockId`。明确要求在对话里阅读正文时使用 `page_present`。
 
 一次发多张时，首张照常传参，其余目标按顺序放入同一次调用的 `additionalTargets`。每张卡片都可以有自己的组件和说明。「侧边打开」在聊天右侧打开原页，已有同页标签时会直接跳转。侧栏打开或关闭时，卡片都会留在聊天里。需要调间距时在顶层传 `adjustSpacing:true`，拖动滑块预览，点击「采用这组间距」把数值送回对话。旁边的小箭头提供「从工作台打开」和「从 ShowAI App 打开」，都带上这张卡片指向的组件位置。需要直接跳转时，先调用 `card_navigate`，返回 `unavailable` 时再调用 `card_open`。交付本机引用文件时使用 `workbench_page_reference`。
 

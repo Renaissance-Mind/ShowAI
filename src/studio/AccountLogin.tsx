@@ -1,6 +1,13 @@
 import { settingsTabKeyDown } from "./settings-tab-keys";
 import { useEffect, useId, useRef, useState } from "react";
-import { AtSign, KeyRound, Loader2, RotateCcw, UserRound } from "../ui/icons";
+import {
+  AtSign,
+  CircleAlert,
+  KeyRound,
+  Loader2,
+  RotateCcw,
+  UserRound,
+} from "../ui/icons";
 import { useTranslator } from "../i18n/react";
 import messages from "../i18n/messages/accountFlow";
 import syncMessages from "../i18n/messages/sync";
@@ -97,15 +104,15 @@ export default function AccountLogin({
         src={value === "github" ? github : google}
         alt=""
         aria-hidden="true"
-        width={18}
-        height={18}
+        width={17}
+        height={17}
       />
     ) : value === "password" ? (
-      <UserRound size={18} />
+      <UserRound size={17} />
     ) : value === "token" ? (
-      <KeyRound size={18} />
+      <KeyRound size={17} />
     ) : (
-      <AtSign size={18} />
+      <AtSign size={17} />
     );
   function choose(value: Method) {
     setMethod(value);
@@ -146,6 +153,7 @@ export default function AccountLogin({
               }
             }}
           />
+          <small>{t("serverUrlHint")}</small>
         </label>
         {changedServer && ready && (
           <p className="settings-help" role="status">
@@ -154,19 +162,24 @@ export default function AccountLogin({
         )}
       </div>
       {serverError && (
-        <div className="sync-error" role="alert">
-          {serverError}
+        <div
+          className="settings-callout sync-alert"
+          data-tone="error"
+          role="alert"
+        >
+          <CircleAlert size={15} aria-hidden="true" />
+          <span>{serverError}</span>
           <button
             type="button"
-            className="studio-icon"
-            title={f("auth.retryServer")}
+            className="settings-button"
             aria-label={f("auth.retryServer")}
             onClick={() => {
               setProbe(url.trim());
               setRetry((n) => n + 1);
             }}
           >
-            <RotateCcw size={17} />
+            <RotateCcw size={14} aria-hidden="true" />
+            {f("auth.retryServer")}
           </button>
         </div>
       )}
@@ -283,6 +296,7 @@ export default function AccountLogin({
                 onChange={(e) => setSecret(e.target.value)}
                 disabled={busy}
               />
+              {method === "token" && <small>{t("tokenHint")}</small>}
             </label>
             {register && info?.registration === "controlled" && !invite && (
               <label className="sync-field">
@@ -294,6 +308,7 @@ export default function AccountLogin({
                   value={registrationKey}
                   onChange={(e) => setRegistrationKey(e.target.value)}
                 />
+                <small>{t("registrationKeyHelp")}</small>
               </label>
             )}
             {error && (

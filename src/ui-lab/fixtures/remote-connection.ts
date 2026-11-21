@@ -278,6 +278,9 @@ export function remoteConnectionFixture(
         url: value.url,
         reachable: value.reachable,
         clients: value.clients.length,
+        clientList: value.clients,
+        lastCallAt: value.lastCallAt,
+        lastCallClientId: value.lastCallClientId,
         error: value.error,
       };
     });

@@ -2,13 +2,14 @@
   --sync-busy: #946313;
   display: grid;
   grid-template-columns: minmax(0, 1fr);
-  gap: 8px;
+  gap: 0;
 }
 :root[data-theme="dark"] .sync-settings {
   --sync-busy: #e2b864;
 }
-.sync-settings input:not([type="radio"], [type="checkbox"]),
-.sync-settings select {
+.sync-settings
+  input:not([type="radio"], [type="checkbox"], .settings-search-field input),
+.sync-settings :is(select, .showai-custom-select) {
   min-height: var(--field-height);
   padding: 4px var(--field-pad);
   border: 1px solid var(--line);
@@ -19,12 +20,15 @@
   font-size: 13px;
   min-width: 0;
 }
-.sync-settings select {
+.sync-settings :is(select, .showai-custom-select) {
   max-width: 280px;
+}
+.sync-settings :is(select.showai-custom-select, .showai-custom-select) {
+  padding-inline-end: 34px;
 }
 .sync-settings
   :is(
-    button,
+    button:not(.showai-custom-select),
     input[type="checkbox"],
     input[type="radio"],
     select,
@@ -34,7 +38,7 @@
   outline-offset: 2px;
 }
 .sync-settings button:disabled,
-.sync-settings select:disabled {
+.sync-settings :is(select, .showai-custom-select):disabled {
   cursor: not-allowed;
   opacity: 0.55;
 }
@@ -428,15 +432,24 @@
   overflow-wrap: anywhere;
 }
 .sync-binding-list {
-  padding: 0 16px;
-  border-top: 1px solid var(--line);
+  padding: 0;
 }
 .sync-binding-list li:first-child {
   border-top: 0;
+  padding-top: 2px;
 }
 .sync-binding-empty {
   color: var(--muted);
   font-size: 13px;
+}
+.sync-bind-form {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding-top: 12px;
+  margin-top: 4px;
+  border-top: 1px solid var(--line);
 }
 .sync-issued-token {
   display: grid;
@@ -623,13 +636,13 @@
 }
 .sync-dialog .settings-button,
 .sync-dialog input:not([type="radio"], [type="checkbox"]),
-.sync-dialog select {
+.sync-dialog :is(select, .showai-custom-select) {
   min-height: var(--field-height);
   font-size: 13px;
 }
 .sync-dialog
   :is(
-    button,
+    button:not(.showai-custom-select),
     input[type="checkbox"],
     input[type="radio"],
     select,
@@ -895,7 +908,7 @@
   width: 44px;
   text-align: right;
 }
-.sync-members-table select {
+.sync-members-table :is(select, .showai-custom-select) {
   width: 88px;
   max-width: 100%;
 }
@@ -955,7 +968,7 @@
   gap: 6px;
   font-size: 12px;
 }
-.sync-invite-controls :is(select, input) {
+.sync-invite-controls :is(select, .showai-custom-select, input) {
   width: 100%;
   min-width: 0;
   max-width: none;
@@ -1092,6 +1105,9 @@
 .sync-dialog .settings-group {
   margin: 0;
 }
+.sync-dialog :is(.sync-conflict, .sync-binding-detach) .settings-help {
+  text-align: left;
+}
 .sync-dialog .sync-conflict h3 {
   overflow-wrap: anywhere;
 }
@@ -1151,7 +1167,7 @@
   .sync-account-block {
     padding-left: 16px;
   }
-  .sync-settings select {
+  .sync-settings :is(select, .showai-custom-select) {
     max-width: 100%;
   }
   .sync-field-inline {
@@ -1234,7 +1250,7 @@
   .sync-members-table td:nth-child(2) {
     width: 106px;
   }
-  .sync-members-table select {
+  .sync-members-table :is(select, .showai-custom-select) {
     width: 100px;
   }
 }
@@ -1470,54 +1486,37 @@
 }
 
 .sync-view-tabs {
-  margin-bottom: 26px;
+  margin-bottom: 24px;
 }
-.sync-flat-tabs {
-  display: flex;
-  gap: 22px;
-  align-items: center;
+.sync-local-banner,
+.sync-default-location-card,
+.sync-alert {
+  margin-bottom: 20px;
 }
-.sync-flat-tabs > button {
-  border: 0;
-  border-bottom: 2px solid transparent;
-  border-radius: 0;
-  background: none;
-  color: var(--muted);
-  padding: 9px 0;
-  font: inherit;
-  font-size: 13px;
-  cursor: pointer;
+.sync-subpage > .settings-card {
+  margin-bottom: 24px;
 }
-.sync-flat-tabs > button[aria-pressed="true"] {
-  color: var(--text);
-  border-bottom-color: var(--brand-accent, var(--accent));
+.sync-join {
+  padding: 16px 18px;
 }
-.sync-manager-heading {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 18px;
-  margin-bottom: 25px;
-}
-.sync-manager-heading > h2 {
-  margin: 0;
-  font-size: 24px;
-  font-weight: 650;
+.sync-join .sync-alert {
+  margin: 12px 0 0;
 }
 .sync-manager-actions,
 .sync-manager-row-actions {
   display: flex;
   align-items: center;
-  gap: 3px;
+  flex-wrap: wrap;
+  gap: 8px;
 }
 .sync-action.studio-icon,
 .sync-manager-actions .studio-icon {
-  width: 36px;
-  height: 36px;
-  flex: 0 0 36px;
-  border: 0;
-  background: none;
-  border-radius: 6px;
+  width: 34px;
+  height: 34px;
+  flex: 0 0 34px;
+  border: 1px solid var(--line);
+  background: var(--paper);
+  border-radius: var(--field-radius);
 }
 .sync-action.studio-icon:hover,
 .sync-manager-actions .studio-icon:hover {
@@ -1533,35 +1532,27 @@
   display: flex;
   align-items: center;
   flex-wrap: wrap;
-  gap: 20px;
-  margin-bottom: 20px;
-}
-.sync-manager-filters > select {
-  border: 0;
-  background: transparent;
-  font-size: 12px;
-  max-width: 200px;
-  padding-left: 0;
+  gap: 12px;
+  margin-bottom: 14px;
 }
 .sync-manager-search {
   margin-left: auto;
-  display: flex;
-  gap: 8px;
-  align-items: center;
-  width: 190px;
-  color: var(--muted);
-  border-bottom: 1px solid var(--line);
+  width: 220px;
 }
-.sync-manager-search:focus-within {
-  border-color: var(--dialog-accent);
+.sync-table-card {
+  overflow: hidden;
 }
-.sync-settings .sync-manager-search input {
-  padding-left: 0;
-  width: 100%;
+.sync-table-card > .sync-empty {
+  display: grid;
+  justify-items: center;
+  gap: 10px;
+  padding: 32px 20px;
+  text-align: center;
   border: 0;
-  background: none;
-  border-radius: 0;
-  font-size: 13px;
+}
+.sync-table-card > .sync-empty > p {
+  margin: 0;
+  max-width: 44ch;
 }
 .sync-manager-table {
   width: 100%;
@@ -1569,32 +1560,36 @@
   font-size: 13px;
 }
 .sync-manager-table th {
-  font-size: 11px;
+  font-size: 12px;
   color: var(--muted);
-  font-weight: 450;
+  font-weight: 500;
   text-align: left;
-  padding: 9px 7px;
+  padding: 10px 12px;
+  background: var(--surface);
   border-bottom: 1px solid var(--line);
 }
 .sync-manager-table td {
-  padding: 18px 7px;
+  padding: 14px 12px;
   border-bottom: 1px solid var(--line);
   vertical-align: middle;
 }
+.sync-manager-table tbody tr:last-child td {
+  border-bottom: 0;
+}
 .sync-manager-table td:first-child,
 .sync-manager-table th:first-child {
-  padding-left: 0;
+  padding-left: 18px;
 }
 .sync-manager-table td:last-child,
 .sync-manager-table th:last-child {
-  padding-right: 0;
+  padding-right: 18px;
   text-align: right;
 }
 .sync-manager-table small {
   display: block;
   color: var(--muted);
-  font-size: 11px;
-  margin-top: 4px;
+  font-size: 12px;
+  margin-top: 3px;
 }
 .sync-project-link {
   background: none;
@@ -1612,9 +1607,10 @@
 }
 .sync-manager-row-actions {
   justify-content: flex-end;
+  gap: 6px;
 }
 .sync-manager-source {
-  font-size: 12px;
+  font-size: 12.5px;
   color: var(--muted);
 }
 .sync-state-label {
@@ -1638,59 +1634,49 @@
   display: flex;
   align-items: center;
   justify-content: flex-end;
-  gap: 20px;
-  margin-top: 22px;
+  gap: 12px;
+  margin-top: 8px;
 }
-.sync-accounts-view {
+.sync-accounts-view,
+.sync-projects-view {
   min-width: 0;
 }
-.sync-account-row {
+.sync-account-lead {
   display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 14px;
-  padding: 20px 0;
-  border-bottom: 1px solid var(--line);
-}
-.sync-account-identity {
+  align-items: flex-start;
+  gap: 12px;
   min-width: 0;
   flex: 1;
 }
-.sync-account-identity strong {
-  font-size: 15px;
-  font-weight: 600;
-}
-.sync-account-identity span {
-  display: block;
-  font-size: 12px;
+.sync-account-lead > svg {
+  flex-shrink: 0;
+  margin-top: 2px;
   color: var(--muted);
-  overflow-wrap: anywhere;
 }
 .sync-login {
-  width: min(440px, 100%);
-  margin: 12px auto 35px;
+  width: min(460px, 100%);
+  margin: 6px auto;
 }
 .sync-login .sync-server-field {
-  margin-bottom: 25px;
+  margin-bottom: 16px;
 }
 .sync-login .sync-server-field > span {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
 }
-.sync-login .sync-server-field input {
-  background: none;
-  border: 0;
-  border-bottom: 1px solid var(--line);
-  border-radius: 0;
-  padding-left: 0;
+.sync-login-server {
+  margin-bottom: 16px;
+}
+.sync-login > .sync-alert {
+  margin-bottom: 16px;
 }
 .sync-login-tabs {
   display: flex;
   align-items: stretch;
   border-bottom: 1px solid var(--line);
-  gap: 9px;
-  margin-bottom: 23px;
+  gap: 8px;
+  margin-bottom: 20px;
 }
 .sync-login-tabs > button {
   flex: 1;
@@ -1701,24 +1687,25 @@
   border: 0;
   border-bottom: 2px solid transparent;
   border-radius: 0;
-  padding: 13px 1px;
+  padding: 11px 4px;
   margin-bottom: -1px;
   white-space: nowrap;
   color: var(--muted);
   background: none;
   font: inherit;
-  font-size: 12px;
+  font-size: 12.5px;
   cursor: pointer;
 }
 .sync-login-tabs > button[aria-selected="true"] {
   color: var(--text);
+  font-weight: 600;
   border-bottom-color: var(--brand-accent, var(--accent));
 }
 .sync-login-panel {
-  min-height: 240px;
+  min-height: 210px;
 }
 .sync-login .sync-field {
-  margin: 0 0 17px;
+  margin: 0 0 15px;
 }
 .sync-login .sync-field input {
   width: 100%;
@@ -1727,7 +1714,7 @@
 .sync-login-panel .sync-oauth > .sync-actions > .settings-button {
   width: 100%;
   justify-content: center;
-  min-height: 40px;
+  min-height: 38px;
   margin-top: 4px;
 }
 .sync-login-panel .sync-oauth > .sync-actions > .settings-button {
@@ -1736,7 +1723,7 @@
 }
 .sync-login-panel .sync-oauth {
   border: 0;
-  padding: 20px 0;
+  padding: 16px 0;
   margin: 0;
 }
 .sync-login-panel .sync-oauth .sync-actions {
@@ -1827,17 +1814,17 @@
     width: 100%;
   }
   .sync-manager-filters {
-    gap: 12px;
+    gap: 10px;
   }
   .sync-manager-row-actions {
-    gap: 0;
+    gap: 4px;
   }
   .sync-action.studio-icon {
     width: 34px;
     flex-basis: 34px;
   }
   .sync-manager-table td {
-    padding: 17px 3px;
+    padding: 14px 8px;
   }
   .sync-login-tabs {
     gap: 4px;
@@ -1849,9 +1836,6 @@
   .sync-login-tabs > button > :is(svg, img) {
     width: 16px;
     height: 16px;
-  }
-  .sync-account-row > .sync-manager-actions {
-    margin-left: auto;
   }
 }
 
@@ -1868,28 +1852,15 @@
   cursor: pointer;
 }
 
-.sync-flat-tabs > button[aria-selected="true"] {
-  color: var(--text);
-  font-weight: 600;
-  box-shadow: inset 0 -2px var(--accent);
-}
-.sync-login-server {
-  margin-bottom: 12px;
-}
-.sync-subpage-back {
-  margin-bottom: 12px;
-}
 .sync-local-copy {
   display: block;
   color: var(--muted);
   font-size: 11px;
+  margin-top: 3px;
 }
 .sync-project-name {
   font-weight: 600;
   overflow-wrap: anywhere;
-}
-.sync-manager-actions {
-  flex-wrap: wrap;
 }
 
 .sync-source-filter {
@@ -1898,23 +1869,9 @@
   gap: 8px;
   min-width: 0;
   color: var(--muted);
-  font-size: 12px;
+  font-size: 12.5px;
 }
-.sync-source-filter select {
+.sync-source-filter :is(select, .showai-custom-select) {
   min-width: 0;
-  max-width: 100%;
-}
-.sync-manager-row-actions {
-  flex-wrap: wrap;
-}
-.sync-manager-filters {
-  flex-wrap: wrap;
-}
-
-.sync-load-failure {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  gap: 10px;
-  padding-block: 16px;
+  max-width: 200px;
 }

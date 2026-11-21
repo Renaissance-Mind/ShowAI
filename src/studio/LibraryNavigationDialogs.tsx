@@ -7,14 +7,9 @@ import { getLocale } from "../i18n";
 import { useTranslator } from "../i18n/react";
 import navigationMessages from "../i18n/messages/navigation";
 import commonMessages from "../i18n/messages/common";
-import surfaceMessages from "../i18n/messages/surface";
 import type { DeletedEntries } from "../core/deleted-entries";
 import type { ProjectSummary } from "../core/model";
-import {
-  clientIsMac,
-  formatShortcut,
-  shortcutGroups,
-} from "./keyboard-shortcuts";
+import ShortcutsPanel from "./ShortcutsPanel";
 import "./library-navigation-dialogs.css";
 
 export type RestoreTarget =
@@ -451,47 +446,10 @@ export function ShortcutsDialog({
   onClose: () => void;
 }) {
   const t = useTranslator(navigationMessages);
-  const ts = useTranslator(surfaceMessages);
-  const mac = clientIsMac();
-  const names = {
-    Click: t("key.click"),
-    Space: t("key.space"),
-    Menu: t("key.menu"),
-    Arrows: t("key.arrows"),
-  };
   return (
     <Dialog title={t("shortcuts.title")} onClose={onClose} wide>
-      <div className="navigation-shortcuts">
-        {shortcutGroups({ mac, tabs, windows, browser }).map((group) => (
-          <section key={group.id} aria-labelledby={`shortcuts-${group.id}`}>
-            <h3 id={`shortcuts-${group.id}`}>
-              {t(`shortcuts.${group.id}`)}
-            </h3>
-            <dl>
-              {group.entries.map((entry, index) => (
-                <div key={index}>
-                  <dt>
-                    {entry.keys.map((chord, keyIndex) => (
-                      <span key={chord}>
-                        {keyIndex > 0 && (
-                          <span className="navigation-shortcut-or">
-                            {t("shortcuts.or")}
-                          </span>
-                        )}
-                        <kbd>{formatShortcut(chord, mac, names)}</kbd>
-                      </span>
-                    ))}
-                  </dt>
-                  <dd>
-                    {"navigation" in entry.label
-                      ? t(entry.label.navigation)
-                      : ts(entry.label.surface)}
-                  </dd>
-                </div>
-              ))}
-            </dl>
-          </section>
-        ))}
+      <div className="navigation-shortcuts-dialog">
+        <ShortcutsPanel browser={browser} tabs={tabs} windows={windows} dialog />
       </div>
     </Dialog>
   );

@@ -152,6 +152,9 @@ export class RemoteMcpConnections {
         checkedAt: value.checkedAt,
         tokenSaved: value.tokenSaved,
         clients: value.clients.length,
+        clientList: value.clients,
+        lastCallAt: value.lastCallAt,
+        lastCallClientId: value.lastCallClientId,
         error: value.error,
       })),
     };

@@ -1,8 +1,16 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
+  entryKeyMatches,
+  eventToChord,
+  findShortcutConflict,
   formatShortcut,
+  hasCustomShortcuts,
   isDeleteShortcut,
   isSidebarToggleShortcut,
+  matchCustomizedBoardTool,
+  matchesChord,
+  resetAllCustomShortcuts,
+  setCustomShortcut,
   shortcutGroups,
 } from "./keyboard-shortcuts";
 import { boardTools } from "../surface/board-tools";
@@ -89,5 +97,86 @@ describe("keyboard shortcuts", () => {
       expect(keys).not.toContain(key);
     expect(keys).toContain("Mod+K");
     expect(keys).toContain("Alt+Shift+Left");
+  });
+});
+
+describe("customizable shortcuts", () => {
+  const originalDescriptor = Object.getOwnPropertyDescriptor(
+    globalThis,
+    "localStorage",
+  );
+  let store = new Map<string, string>();
+
+  beforeEach(() => {
+    store = new Map<string, string>();
+    Object.defineProperty(globalThis, "localStorage", {
+      configurable: true,
+      value: {
+        getItem: (k: string) => store.get(k) ?? null,
+        setItem: (k: string, v: string) => {
+          store.set(k, v);
+        },
+        removeItem: (k: string) => {
+          store.delete(k);
+        },
+      },
+    });
+  });
+
+  afterEach(() => {
+    if (originalDescriptor) {
+      Object.defineProperty(globalThis, "localStorage", originalDescriptor);
+    }
+  });
+
+  it("captures keyboard events into platform chords and matches them", () => {
+    const macSave = eventToChord(key("k", { metaKey: true }), true);
+    expect(macSave).toBe("Mod+K");
+    expect(matchesChord(key("K", { metaKey: true }), macSave!, true)).toBe(true);
+    expect(matchesChord(key("K", { ctrlKey: true }), macSave!, false)).toBe(true);
+    expect(
+      matchesChord(key("K", { metaKey: true, shiftKey: true }), macSave!, true),
+    ).toBe(false);
+    expect(eventToChord(key("Shift", { shiftKey: true }), true)).toBeNull();
+  });
+
+  it("persists overrides, resolves live bindings and resets to defaults", () => {
+    expect(hasCustomShortcuts()).toBe(false);
+    expect(
+      entryKeyMatches(key("k", { metaKey: true }), "general.search", 0, "Mod+K", true),
+    ).toBe(true);
+
+    setCustomShortcut("general.search", 0, "Mod+P");
+    expect(hasCustomShortcuts()).toBe(true);
+    expect(
+      entryKeyMatches(key("p", { metaKey: true }), "general.search", 0, "Mod+K", true),
+    ).toBe(true);
+    expect(
+      entryKeyMatches(key("k", { metaKey: true }), "general.search", 0, "Mod+K", true),
+    ).toBe(false);
+
+    const groups = shortcutGroups({ mac: true, tabs: true, windows: false });
+    const searchEntry = groups[0].entries.find((e) => e.id === "general.search");
+    expect(searchEntry?.keys).toEqual(["Mod+P"]);
+
+    setCustomShortcut("board.tool.pen", 0, "Shift+P");
+    const matchedTool = matchCustomizedBoardTool(
+      key("P", { shiftKey: true }),
+      true,
+    );
+    expect(matchedTool?.tool).toBe("pen");
+
+    const conflict = findShortcutConflict("Mod+P", "general.reload", 0, {
+      mac: true,
+      tabs: false,
+      windows: false,
+    });
+    expect(conflict?.id).toBe("general.search");
+
+    resetAllCustomShortcuts();
+    expect(hasCustomShortcuts()).toBe(false);
+    expect(
+      entryKeyMatches(key("k", { metaKey: true }), "general.search", 0, "Mod+K", true),
+    ).toBe(true);
   });
 });

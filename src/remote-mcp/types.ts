@@ -69,6 +69,9 @@ export interface RemoteMcpConnectionSummary {
   checkedAt?: string;
   tokenSaved?: boolean;
   clients: number;
+  clientList?: RemoteMcpStatus["clients"];
+  lastCallAt?: string;
+  lastCallClientId?: string;
   error?: string;
 }
 export const remoteMcpProviders: RemoteMcpProvider[] = [

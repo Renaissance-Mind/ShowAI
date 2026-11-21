@@ -1,11 +1,14 @@
 import { useNotify } from "../problems/toast-context";
 import { useState } from "react";
+import { CircleAlert } from "../ui/icons";
+import Select from "../ui/Select";
 import { desktop, errorMessage } from "../host/bridge";
 import type { ResolvedResource } from "../sync/accounts";
 import type { ServerConnection } from "../sync/protocol";
 import type { AgentHostStatus, ModelSource } from "../agent-host/types";
 import { useTranslator } from "../i18n/react";
 import strings from "../i18n/messages/agentSettings";
+
 export default function ServerResources({
   selected,
   disabled,
@@ -25,7 +28,6 @@ export default function ServerResources({
   async function run(action: () => Promise<unknown>) {
     setBusy(true);
     setError("");
-
     try {
       await action();
     } catch (error) {
@@ -35,7 +37,7 @@ export default function ServerResources({
     }
   }
   return (
-    <div className="agent-server-resources">
+    <div className="settings-card agent-server-resources">
       <div className="settings-row">
         <div className="settings-row-text">
           <h3>{t("resources.title")}</h3>
@@ -73,23 +75,32 @@ export default function ServerResources({
         </button>
       </div>
       {error && (
-        <p className="sync-error" role="alert">
-          {error}
-        </p>
+        <div className="settings-card-section">
+          <div className="settings-callout" data-tone="error" role="alert">
+            <CircleAlert size={15} aria-hidden="true" />
+            <span>{error}</span>
+          </div>
+        </div>
       )}
       {resources?.map((resource) => (
         <div className="settings-row" key={resource.id}>
           <div className="settings-row-text">
-            <h3>{resource.name}</h3>
+            <h3>
+              {resource.name}
+              <span
+                className="settings-badge"
+                data-tone={resource.available ? "ok" : "warn"}
+              >
+                {resource.credential === "chatgpt"
+                  ? t("resources.chatgpt")
+                  : t("resources.apiKey")}
+                {!resource.available ? ` · ${t("resources.offline")}` : ""}
+              </span>
+            </h3>
             <p>
               {resource.source.serverName} · {resource.source.user.name} ·{" "}
               {resource.source.url}
-            </p>
-            <p>
-              {resource.credential === "chatgpt"
-                ? `${t("resources.chatgpt")}${resource.account ? ` · ${resource.account}` : ""}`
-                : t("resources.apiKey")}
-              {resource.available ? "" : ` · ${t("resources.offline")}`}
+              {resource.account ? ` · ${resource.account}` : ""}
             </p>
           </div>
           <button
@@ -115,22 +126,28 @@ export default function ServerResources({
         </div>
       ))}
       {resources?.length === 0 && (
-        <p className="settings-help">{t("resources.none")}</p>
+        <div className="settings-card-section">
+          <p className="settings-help">{t("resources.none")}</p>
+        </div>
       )}
       {selected?.hosted && (
-        <p className="settings-help">
-          {t("resources.current", {
-            server: selected.hosted.serverName,
-            url: selected.hosted.url,
-          })}
-        </p>
+        <div className="settings-card-section">
+          <p className="settings-help">
+            {t("resources.current", {
+              server: selected.hosted.serverName,
+              url: selected.hosted.url,
+            })}
+          </p>
+        </div>
       )}
       {selected && !selected.hosted && resources !== null && (
-        <div className="sync-form">
-          <label>
-            {t("resources.saveTo")}
-            <select
-              className="showai-select"
+        <div className="settings-card-section agent-resource-publish">
+          <div className="settings-row-text">
+            <h3>{t("resources.saveTo")}</h3>
+            <p>{t("resources.saveHelp")}</p>
+          </div>
+          <div className="library-space-actions">
+            <Select
               aria-label={t("resources.saveServer")}
               value={target}
               disabled={disabled || busy}
@@ -142,28 +159,30 @@ export default function ServerResources({
                   {server.name} · {server.user.name}
                 </option>
               ))}
-            </select>
-          </label>
-          <p className="settings-help">{t("resources.saveHelp")}</p>
-          <button
-            type="button"
-            className="settings-button"
-            disabled={disabled || busy || !target}
-            onClick={() =>
-              void run(async () => {
-                update(
-                  await desktop.invoke<AgentHostStatus>("agent:publishSource", {
-                    id: selected.id,
-                    connectionId: target,
-                  }),
-                );
-                setResources(await desktop.invoke("agent:serverResources"));
-                notify(t("resources.saved"));
-              })
-            }
-          >
-            {t("resources.save")}
-          </button>
+            </Select>
+            <button
+              type="button"
+              className="settings-button"
+              disabled={disabled || busy || !target}
+              onClick={() =>
+                void run(async () => {
+                  update(
+                    await desktop.invoke<AgentHostStatus>(
+                      "agent:publishSource",
+                      {
+                        id: selected.id,
+                        connectionId: target,
+                      },
+                    ),
+                  );
+                  setResources(await desktop.invoke("agent:serverResources"));
+                  notify(t("resources.saved"));
+                })
+              }
+            >
+              {t("resources.save")}
+            </button>
+          </div>
         </div>
       )}
     </div>

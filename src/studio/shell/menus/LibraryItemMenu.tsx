@@ -246,7 +246,7 @@ export function LibraryItemMenu({
                             intent,
                             key: Date.now(),
                           });
-                          setSettingsSection("sync");
+                          setSettingsSection("projects");
                           await navigate("settings");
                         }),
                       })),

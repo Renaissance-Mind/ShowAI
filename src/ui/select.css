@@ -1,0 +1,107 @@
+.showai-select.showai-custom-select {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-width: 120px;
+  min-height: var(--field-height, 32px);
+  padding: 4px 34px 4px var(--field-pad, 10px);
+  border: 1px solid var(--line);
+  border-radius: var(--field-radius, 7px);
+  background: var(--paper);
+  color: var(--text);
+  font: inherit;
+  font-size: 13px;
+  line-height: 1.4;
+  text-align: left;
+  cursor: pointer;
+}
+.showai-select.showai-custom-select[data-placeholder="true"] .showai-select-label {
+  color: var(--muted);
+}
+.showai-select.showai-custom-select:hover:not(:disabled) {
+  border-color: color-mix(in srgb, var(--text) 38%, var(--paper));
+}
+.showai-select-label {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.showai-select-arrow {
+  position: absolute;
+  right: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  flex-shrink: 0;
+  color: var(--muted);
+  pointer-events: none;
+  transition: transform var(--duration-fast, 140ms) var(--ease-out, ease-out);
+}
+.showai-select.showai-custom-select[aria-expanded="true"] .showai-select-arrow {
+  transform: translateY(-50%) rotate(180deg);
+}
+.showai-select.showai-custom-select[aria-expanded="true"] {
+  border-color: color-mix(in srgb, var(--text) 42%, var(--line));
+}
+
+.showai-select-menu {
+  position: fixed;
+  z-index: 2200;
+  box-sizing: border-box;
+  overflow-y: auto;
+  padding: 4px;
+  border: 1px solid var(--line);
+  border-radius: var(--field-radius, 8px);
+  background: var(--paper);
+  color: var(--text);
+  box-shadow:
+    0 12px 30px rgb(15 23 42 / 12%),
+    0 2px 8px rgb(15 23 42 / 6%);
+  font-family: inherit;
+  font-size: 13px;
+  line-height: 1.4;
+}
+:root[data-theme="dark"] .showai-select-menu {
+  box-shadow:
+    0 14px 34px rgb(0 0 0 / 48%),
+    0 2px 8px rgb(0 0 0 / 28%);
+}
+.showai-select-option {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  min-height: 32px;
+  padding: 6px 9px;
+  border-radius: calc(var(--field-radius, 7px) - 2px);
+  color: var(--text);
+  cursor: pointer;
+  user-select: none;
+}
+.showai-select-option-text {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.showai-select-option-check {
+  flex-shrink: 0;
+  color: var(--accent, currentColor);
+}
+.showai-select-option.is-active:not([aria-disabled="true"]) {
+  background: var(--hover);
+}
+.showai-select-option.is-selected {
+  font-weight: 550;
+  background: var(--accent-soft);
+}
+.showai-select-option.is-active.is-selected:not([aria-disabled="true"]) {
+  background: color-mix(in srgb, var(--accent-soft) 72%, var(--hover));
+}
+.showai-select-option[aria-disabled="true"] {
+  color: var(--muted);
+  opacity: 0.6;
+  cursor: not-allowed;
+}

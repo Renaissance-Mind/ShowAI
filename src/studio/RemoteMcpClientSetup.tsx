@@ -1,74 +1,69 @@
-import { settingsTabKeyDown } from "./settings-tab-keys";
 import { useEffect, useId, useRef, useState } from "react";
+import { desktop, errorMessage } from "../host/bridge";
+import messages from "../i18n/messages/remoteConnections";
+import { useTranslator } from "../i18n/react";
+import { isPublicProvider } from "../remote-mcp/client-setup";
+import type { RemoteMcpStatus } from "../remote-mcp/types";
 import {
   ArrowRight,
-  ChevronLeft,
   Check,
+  CircleAlert,
   CircleCheck,
   Copy,
+  ExternalLink,
   Eye,
   EyeOff,
   KeyRound,
   Laptop,
   Plus,
   RefreshCw,
-  Unplug,
-  ExternalLink,
 } from "../ui/icons";
-import { desktop, errorMessage } from "../host/bridge";
-import { useLocale, useTranslator } from "../i18n/react";
-import messages from "../i18n/messages/remoteConnections";
-import { isPublicProvider } from "../remote-mcp/client-setup";
-import type { RemoteMcpStatus } from "../remote-mcp/types";
 import ChatgptConnectionGuide from "./ChatgptConnectionGuide";
 import { RemoteCopyField } from "./RemoteConnectionControls";
+import { settingsTabKeyDown } from "./settings-tab-keys";
 
 export default function RemoteMcpClientSetup({
   state,
-  addRequest,
   busy,
   onCopy,
   onCopyPrompt,
   promptCopied,
   onExport,
   onRefresh,
+  onBackToOverview,
 }: {
   state: RemoteMcpStatus;
-  addRequest: number;
   busy: boolean;
   onCopy(value: string): Promise<void>;
   onCopyPrompt(): Promise<void>;
   promptCopied: boolean;
   onExport(): void;
   onRefresh(): Promise<void>;
+  onBackToOverview(): void;
 }) {
   const tabId = useId();
-  const locale = useLocale();
-  const t = useTranslator(messages),
-    lan = state.config.provider === "lan",
-    publicNetwork = isPublicProvider(state.config.provider);
-  const [client, setClient] = useState<"chatgpt" | "other">("other"),
-    [view, setView] = useState<"list" | "setup" | "verify">(
-      state.clients.length ? "list" : "setup",
-    );
-  const [name, setName] = useState(""),
-    [key, setKey] = useState<{
-      id: string;
-      token: string;
-      expiresAt: string;
-    }>(),
-    [showKey, setShowKey] = useState(false),
-    [copied, setCopied] = useState(false),
-    [working, setWorking] = useState(false),
-    [error, setError] = useState("");
-  const [revoked, setRevoked] = useState("");
+  const t = useTranslator(messages);
+  const lan = state.config.provider === "lan";
+  const publicNetwork = isPublicProvider(state.config.provider);
+  const [client, setClient] = useState<"chatgpt" | "other">("other");
+  const [view, setView] = useState<"setup" | "verify" | "verified">("setup");
+  const [name, setName] = useState("");
+  const [key, setKey] = useState<{
+    id: string;
+    token: string;
+    expiresAt: string;
+  }>();
+  const [showKey, setShowKey] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const [working, setWorking] = useState(false);
+  const [error, setError] = useState("");
   const [waitingTooLong, setWaitingTooLong] = useState(false);
   const approvalBaseline = useRef(state.approval?.at);
-  const handledAdd = useRef(0);
-  const baseline = useRef(new Set(state.clients.map((client) => client.id))),
-    callBaseline = useRef(state.lastCallAt);
-  const pending = busy || working,
-    provider = state.config.provider;
+  const baseline = useRef(new Set(state.clients.map((item) => item.id)));
+  const callBaseline = useRef(state.lastCallAt);
+  const pending = busy || working;
+  const provider = state.config.provider;
+
   useEffect(() => {
     if (
       view === "verify" &&
@@ -79,153 +74,84 @@ export default function RemoteMcpClientSetup({
         : !!state.lastCallClientId &&
           !baseline.current.has(state.lastCallClientId))
     )
-      setView("list");
+      setView("verified");
   }, [state.lastCallAt, state.lastCallClientId, view, key]);
+
   async function run(operation: () => Promise<void>) {
     setWorking(true);
     setError("");
     try {
       await operation();
-    } catch (error) {
-      setError(errorMessage(error));
+    } catch (err) {
+      setError(errorMessage(err));
     } finally {
       setWorking(false);
     }
   }
-  function add() {
+
+  function resetSetup() {
     approvalBaseline.current = state.approval?.at;
-    baseline.current = new Set(state.clients.map((client) => client.id));
+    baseline.current = new Set(state.clients.map((item) => item.id));
     callBaseline.current = state.lastCallAt;
     setKey(undefined);
     setShowKey(false);
     setCopied(false);
-    setRevoked("");
     setName("");
     setView("setup");
   }
-  useEffect(() => {
-    if (addRequest > handledAdd.current) {
-      handledAdd.current = addRequest;
-      add();
-    }
-  }, [addRequest]);
+
   useEffect(() => {
     setWaitingTooLong(false);
     if (view !== "verify") return;
     const timer = setTimeout(() => setWaitingTooLong(true), 45000);
     return () => clearTimeout(timer);
   }, [view]);
+
   async function copyKey() {
     await onCopy(key!.token);
     setCopied(true);
     setTimeout(() => setCopied(false), 1800);
   }
+
   const authorized =
-    (!!key && state.clients.some((client) => client.id === key.id)) ||
-    state.clients.some((client) => !baseline.current.has(client.id));
+    (!!key && state.clients.some((item) => item.id === key.id)) ||
+    state.clients.some((item) => !baseline.current.has(item.id));
   const rejected =
     !authorized &&
     state.approval?.decision === "deny" &&
     approvalBaseline.current !== state.approval.at;
+
   return (
     <div
       className="rm-client-area"
       data-client-view={view}
       data-client-type={client}
     >
-      {view === "list" ? (
-        <>
-          <div className="rm-section-heading">
-            <h3>{t("authorizedClients")}</h3>
-            <button className="rm-button" onClick={add}>
+      {view === "verified" ? (
+        <div className="rm-message-task">
+          <div className="rm-client-status success" role="status">
+            <CircleCheck size={17} />
+            <span>
+              {name ? `${name} · ` : ""}
+              {t("verifiedState")}
+            </span>
+          </div>
+          <div className="rm-form-actions">
+            <button
+              type="button"
+              className="rm-button primary"
+              onClick={onBackToOverview}
+            >
+              {t("viewAllClients")}
+            </button>
+            <button type="button" className="rm-button" onClick={resetSetup}>
               <Plus size={15} />
               {t("addClient")}
             </button>
           </div>
-          {revoked && (
-            <p className="settings-help" role="status">
-              {revoked}
-            </p>
-          )}
-          {state.clients.length ? (
-            <div className="rm-client-table">
-              <div className="rm-client-table-head">
-                <span>{t("clients")}</span>
-                <span>{t("clientStatus")}</span>
-                <span>{t("clientAccess")}</span>
-              </div>
-              {state.clients.map((connection) => {
-                const lastCall =
-                  connection.lastCallAt ??
-                  (state.lastCallClientId === connection.id
-                    ? state.lastCallAt
-                    : undefined);
-                return (
-                  <div className="rm-client-record" key={connection.id}>
-                    <span className="rm-device-name">
-                      <Laptop size={18} />
-                      {connection.name}
-                    </span>
-                    <span className={`rm-tag${lastCall ? " success" : ""}`}>
-                      {lastCall ? <Check size={12} /> : <KeyRound size={12} />}
-                      {t(lastCall ? "verifiedState" : "authorizedState")}
-                      {lastCall && (
-                        <time dateTime={lastCall} title={t("activity")}>
-                          {new Date(lastCall).toLocaleString(locale)}
-                        </time>
-                      )}
-                    </span>
-                    <button
-                      type="button"
-                      className="rm-button rm-danger-action"
-                      aria-label={t("revoke", { name: connection.name })}
-                      disabled={pending}
-                      onClick={() =>
-                        void run(async () => {
-                          await desktop.invoke("remoteMcp:revoke", {
-                            provider,
-                            id: connection.id,
-                          });
-                          await onRefresh();
-                          setRevoked(
-                            t("accessRevoked", { name: connection.name }),
-                          );
-                        })
-                      }
-                    >
-                      <Unplug size={16} aria-hidden="true" />
-                      {t("revokeAccess")}
-                    </button>
-                  </div>
-                );
-              })}
-            </div>
-          ) : (
-            <div className="rm-empty">
-              <Laptop size={28} />
-              <h3>{t("noClients")}</h3>
-              <button className="rm-button primary" onClick={add}>
-                <Plus size={15} />
-                {t("addClient")}
-              </button>
-            </div>
-          )}
-        </>
+        </div>
       ) : (
         <>
-          {state.clients.length > 0 && (
-            <button
-              type="button"
-              className="rm-button rm-return"
-              onClick={() => {
-                setShowKey(false);
-                setView("list");
-              }}
-            >
-              <ChevronLeft size={16} aria-hidden="true" />
-              {t("backToAuthorized")}
-            </button>
-          )}
           <div className="rm-client-toolbar">
             <div
               className="rm-step-tabs"
@@ -234,6 +160,7 @@ export default function RemoteMcpClientSetup({
               onKeyDown={settingsTabKeyDown}
             >
               <button
+                type="button"
                 id={`${tabId}-setup`}
                 aria-controls={`${tabId}-step`}
                 tabIndex={view === "setup" ? 0 : -1}
@@ -245,6 +172,7 @@ export default function RemoteMcpClientSetup({
                 {t("serverSetup")}
               </button>
               <button
+                type="button"
                 id={`${tabId}-verify`}
                 aria-controls={`${tabId}-step`}
                 tabIndex={view === "verify" ? 0 : -1}
@@ -258,6 +186,7 @@ export default function RemoteMcpClientSetup({
               </button>
             </div>
           </div>
+
           <div
             role="tabpanel"
             id={`${tabId}-step`}
@@ -271,6 +200,7 @@ export default function RemoteMcpClientSetup({
                     aria-label={t("clientType")}
                   >
                     <button
+                      type="button"
                       aria-pressed={client === "other"}
                       onClick={() => setClient("other")}
                     >
@@ -278,6 +208,7 @@ export default function RemoteMcpClientSetup({
                       {t("other")}
                     </button>
                     <button
+                      type="button"
                       aria-pressed={client === "chatgpt"}
                       onClick={() => setClient("chatgpt")}
                     >
@@ -285,34 +216,34 @@ export default function RemoteMcpClientSetup({
                     </button>
                   </div>
                 )}
+
                 {client === "chatgpt" && publicNetwork ? (
-                  <>
-                    <ChatgptConnectionGuide
-                      endpoint={state.url!}
-                      onCopy={onCopy}
-                      busy={pending}
-                      onExport={onExport}
-                      onReady={() => setView("verify")}
-                    />
-                  </>
+                  <ChatgptConnectionGuide
+                    endpoint={state.url!}
+                    onCopy={onCopy}
+                    busy={pending}
+                    onExport={onExport}
+                    onReady={() => setView("verify")}
+                  />
                 ) : (
                   <div className="rm-client-recipe">
-                    <button
-                      type="button"
-                      className="rm-button primary"
-                      disabled={pending}
-                      onClick={() => void run(onCopyPrompt)}
-                    >
-                      {promptCopied ? <Check size={15} /> : <Copy size={15} />}
-                      <span aria-live="polite">
-                        {t(promptCopied ? "copied" : "setupPrompt")}
-                      </span>
-                    </button>
-                    <RemoteCopyField
-                      label={t("endpoint")}
-                      value={state.url!}
-                      onCopy={onCopy}
-                    />
+                    <div className="rm-form-actions">
+                      <button
+                        type="button"
+                        className="rm-button primary"
+                        disabled={pending}
+                        onClick={() => void run(onCopyPrompt)}
+                      >
+                        {promptCopied ? (
+                          <Check size={15} />
+                        ) : (
+                          <Copy size={15} />
+                        )}
+                        <span aria-live="polite">
+                          {t(promptCopied ? "copied" : "setupPrompt")}
+                        </span>
+                      </button>
+                    </div>
                     <div className="rm-readonly-row">
                       <span>{t("authentication")}</span>
                       <span className="rm-capability">
@@ -414,6 +345,7 @@ export default function RemoteMcpClientSetup({
                       ))}
                     <div className="rm-form-actions">
                       <button
+                        type="button"
                         className="rm-button primary"
                         disabled={pending || (lan && !key)}
                         onClick={() => setView("verify")}
@@ -473,7 +405,11 @@ export default function RemoteMcpClientSetup({
                   </span>
                 </div>
                 {rejected ? (
-                  <button className="rm-button" type="button" onClick={add}>
+                  <button
+                    className="rm-button"
+                    type="button"
+                    onClick={resetSetup}
+                  >
                     {t("retryAuthorization")}
                   </button>
                 ) : (
@@ -486,9 +422,15 @@ export default function RemoteMcpClientSetup({
           </div>
         </>
       )}
+
       {error && (
-        <div role="alert" className="rm-error">
-          {error}
+        <div
+          role="alert"
+          className="settings-callout rm-error"
+          data-tone="error"
+        >
+          <CircleAlert size={16} aria-hidden="true" />
+          <span>{error}</span>
         </div>
       )}
     </div>

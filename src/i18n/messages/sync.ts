@@ -3,6 +3,12 @@ import { defineMessages } from "../index";
 export default defineMessages("sync", {
   "zh-CN": {
     operationFailed: "操作未完成",
+    loadFailedDetail: "无法读取服务器与项目同步状态：{error}",
+    localModeBannerTitle: "当前仅使用本机存储",
+    localModeBannerDetail:
+      "尚未登录服务器账号。所有项目保存在这台设备；添加账号后可同步或与成员共享项目。",
+    accountConnectedCount: "已登录 {count} 个服务器账号",
+    accountSummaryProjects: "{count} 个同步项目",
     "newConflictVersion": "同步状态有变化，请加载最新版本后重新确认。",
     "reloadConflict": "加载最新版本",
     "role.admin": "管理员",
@@ -313,6 +319,18 @@ export default defineMessages("sync", {
   },
   en: {
     operationFailed: "Action could not be completed",
+    loadFailedDetail: "Could not read server and project sync status: {error}",
+    localModeBannerTitle: "Using local storage only",
+    localModeBannerDetail:
+      "No server account is signed in yet. Projects stay on this device until you add an account to sync or share them.",
+    accountConnectedCount: {
+      one: "{count} server account signed in",
+      other: "{count} server accounts signed in",
+    },
+    accountSummaryProjects: {
+      one: "{count} synced project",
+      other: "{count} synced projects",
+    },
     "newConflictVersion": "Sync state changed. Load the latest versions and review your choices.",
     "reloadConflict": "Load latest versions",
     "role.admin": "Admin",

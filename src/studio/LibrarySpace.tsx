@@ -1,7 +1,7 @@
 import { useNotify } from "../problems/toast-context";
 import settingsMessages from "../i18n/messages/settings";
 import { useCallback, useEffect, useState } from "react";
-import { Loader2, RefreshCw } from "../ui/icons";
+import { CircleAlert, Loader2, RefreshCw } from "../ui/icons";
 import { desktop, errorMessage } from "../host/bridge";
 import Dialog from "../ui/Dialog";
 import type {
@@ -12,17 +12,30 @@ import type {
 import type { IntegrityResult } from "../core/library-integrity";
 import { getLocale } from "../i18n";
 import { useTranslator } from "../i18n/react";
+import common from "../i18n/messages/common";
 import messages from "../i18n/messages/library";
+
 function bytes(value: number) {
   if (value < 1024) return `${value.toLocaleString(getLocale())} B`;
   const unit = value >= 1024 ** 3 ? "GB" : value >= 1024 ** 2 ? "MB" : "KB",
     divisor = unit === "GB" ? 1024 ** 3 : unit === "MB" ? 1024 ** 2 : 1024;
   return `${(value / divisor).toLocaleString(getLocale(), { maximumFractionDigits: 1 })} ${unit}`;
 }
+
+const KNOWN_INTEGRITY = new Set([
+  "database",
+  "content",
+  "history",
+  "repository",
+  "unknown",
+]);
+
 export default function LibrarySpace({ home }: { home: string }) {
   const t = useTranslator(messages);
   const ts = useTranslator(settingsMessages);
+  const tc = useTranslator(common);
   const [refreshing, setRefreshing] = useState(false);
+  const [archiveOpen, setArchiveOpen] = useState(false);
   const [archivePending, setArchivePending] = useState(false);
   const [archiveError, setArchiveError] = useState("");
   const [storage, setStorage] = useState<LibraryStorage | null>(null);
@@ -34,6 +47,7 @@ export default function LibrarySpace({ home }: { home: string }) {
     [error, setError] = useState("");
   const [archivePath, setArchivePath] = useState("");
   const [integrity, setIntegrity] = useState<IntegrityResult | null>(null);
+  const [integrityErrorOpen, setIntegrityErrorOpen] = useState(false);
   const refresh = useCallback(
     async (projects = false) => {
       setStorage(
@@ -54,7 +68,6 @@ export default function LibrarySpace({ home }: { home: string }) {
   async function run(action: () => Promise<void>, refreshAfter = true) {
     setBusy(true);
     setError("");
-
     try {
       await action();
       if (refreshAfter) await refresh(!!storage?.projects);
@@ -69,19 +82,25 @@ export default function LibrarySpace({ home }: { home: string }) {
     setAnalyzing(true);
     void run(() => refresh(true), false).finally(() => setAnalyzing(false));
   }
+  const integrityProblemKey =
+    integrity && !integrity.ok
+      ? (`integrity.${KNOWN_INTEGRITY.has(integrity.problem) ? integrity.problem : "unknown"}` as Parameters<
+          typeof t
+        >[0])
+      : undefined;
   return (
-    <section
-      className="settings-group library-space"
-      aria-label={t("spaceManagement")}
-    >
-      <h2>{t("spaceManagement")}</h2>
-      <section className="library-space-section" aria-label={t("storage")}>
-        <div className="settings-row">
-          <div className="settings-row-text">
-            <h3>{t("storage")}</h3>
+    <>
+      <section
+        className="settings-group library-space"
+        aria-labelledby="settings-space-title"
+      >
+        <div className="settings-group-heading">
+          <div>
+            <h2 id="settings-space-title">{t("spaceManagement")}</h2>
           </div>
           <div className="library-space-actions">
             <button
+              type="button"
               className="settings-button"
               disabled={busy || !storage}
               onClick={analyzeProjects}
@@ -111,285 +130,440 @@ export default function LibrarySpace({ home }: { home: string }) {
             </button>
           </div>
         </div>
-        <div className="library-space-section-content">
-          {storage ? (
-            <>
-              <p className="library-space-summary">
-                {t("summary", {
-                  size: bytes(storage.totalBytes),
-                  allocated: bytes(storage.allocatedBytes),
-                  count: storage.files.toLocaleString(getLocale()),
-                })}
-              </p>
-              <div className="library-space-breakdown">
-                {Object.entries(storage.categories)
-                  .filter(([, item]) => item.files)
-                  .map(([name, item]) => (
-                    <div key={name}>
-                      <span>{t(`category.${name as StorageCategory}`)}</span>
-                      <span>{bytes(item.bytes)}</span>
-                    </div>
-                  ))}
-                <p>
-                  {t("gitSummary", {
-                    packs: storage.git.packs.toLocaleString(getLocale()),
-                    objects:
-                      storage.git.looseObjects.toLocaleString(getLocale()),
-                  })}
-                </p>
-              </div>
-            </>
-          ) : (
-            <p className="library-space-summary">{t("checkingFiles")}</p>
-          )}
-        </div>
-      </section>
-      <section className="library-space-section" aria-label={t("maintenance")}>
-        <h3>{t("maintenance")}</h3>
-        <div className="library-space-section-content">
-          <div className="library-space-actions">
-            <button
-              className="settings-button"
-              disabled={busy}
-              onClick={() =>
-                void run(async () => {
-                  setPlan(
-                    await desktop.invoke<CleanupPlan>("library:cleanupPlan"),
-                  );
-                })
-              }
-            >
-              {t("findCleanup")}
-            </button>
-            <button
-              className="settings-button"
-              disabled={busy}
-              onClick={() =>
-                void run(async () => {
-                  setIntegrity(null);
-                  setIntegrity(
-                    await desktop.invoke<IntegrityResult>("library:integrity"),
-                  );
-                }, false)
-              }
-            >
-              {t("checkIntegrity")}
-            </button>
-            {busy && <Loader2 size={15} className="studio-spin" />}
+
+        <div className="settings-card">
+          <div className="settings-card-section" aria-label={t("storage")}>
+            {storage ? (
+              <>
+                <div className="library-space-metrics">
+                  <div>
+                    <span>{t("metric.totalSize")}</span>
+                    <strong>{bytes(storage.totalBytes)}</strong>
+                  </div>
+                  <div>
+                    <span>{t("metric.allocated")}</span>
+                    <strong>{bytes(storage.allocatedBytes)}</strong>
+                  </div>
+                  <div>
+                    <span>{t("metric.files")}</span>
+                    <strong>
+                      {t("fileCount", { count: storage.files })}
+                    </strong>
+                  </div>
+                </div>
+                <div className="library-space-breakdown">
+                  {Object.entries(storage.categories)
+                    .filter(([, item]) => item.files)
+                    .map(([name, item]) => (
+                      <div key={name}>
+                        <span>{t(`category.${name as StorageCategory}`)}</span>
+                        <span>{bytes(item.bytes)}</span>
+                      </div>
+                    ))}
+                </div>
+              </>
+            ) : (
+              <p className="library-space-summary">{t("checkingFiles")}</p>
+            )}
           </div>
-          {integrity?.ok && (
-            <p className="settings-help" role="status">
-              {t("integrity.ok", {
-                date: new Date(integrity.checkedAt).toLocaleString(getLocale()),
-              })}
-            </p>
-          )}
-          {integrity && !integrity.ok && (
-            <div className="library-space-integrity" role="alert">
-              <p>{t(`integrity.${integrity.problem}`)}</p>
-              <code>{integrity.message}</code>
-              <div className="library-space-actions">
-                <button
-                  className="settings-button"
-                  onClick={() =>
-                    void desktop
-                      .invoke("library:reveal", { path: "." })
-                      .catch((reason) => setError(errorMessage(reason)))
-                  }
-                >
-                  {t("integrity.reveal")}
-                </button>
-                <button
-                  className="settings-button"
-                  onClick={() =>
-                    void desktop
-                      .invoke("clipboard:write", {
-                        text: `${t(`integrity.${integrity.problem}`)}\n${integrity.message}\n${home}\n${integrity.checkedAt}`,
-                      })
-                      .then(() => notify(t("integrity.copied")))
-                      .catch((reason) => setError(errorMessage(reason)))
-                  }
-                >
-                  {t("integrity.copy")}
-                </button>
+
+          <div className="settings-card-section" aria-label={t("maintenance")}>
+            <div className="settings-row settings-row-compact">
+              <div className="settings-row-text">
+                <h3>{t("findCleanupTitle")}</h3>
+                <p>{t("findCleanupDetail")}</p>
               </div>
-            </div>
-          )}
-          <section
-            className="library-space-section"
-            aria-labelledby="library-maintenance-tools"
-          >
-            <div>
-              <h4
-                id="library-maintenance-tools"
-                className="settings-section-heading"
-              >
-                {t("advancedMaintenance")}
-              </h4>
-              <p className="settings-help">{t("maintenanceEffects")}</p>
-            </div>
-            <div className="library-space-actions">
               <button
+                type="button"
                 className="settings-button"
                 disabled={busy}
                 onClick={() =>
                   void run(async () => {
-                    const result = await desktop.invoke<{
-                      beforeBytes: number;
-                      afterBytes: number;
-                    }>("library:compact");
-                    notify(
-                      t("toast.compacted", {
-                        before: bytes(result.beforeBytes),
-                        after: bytes(result.afterBytes),
-                      }),
+                    setPlan(
+                      await desktop.invoke<CleanupPlan>("library:cleanupPlan"),
                     );
                   })
                 }
               >
-                {t("compactNow")}
+                {t("findCleanup")}
               </button>
+            </div>
+          </div>
+
+          <div className="settings-card-section">
+            <div className="settings-row settings-row-compact">
+              <div className="settings-row-text">
+                <h3>{t("checkIntegrityTitle")}</h3>
+                <p
+                  className={integrity?.ok ? "library-space-integrity-ok" : undefined}
+                  role={integrity?.ok ? "status" : undefined}
+                >
+                  {integrity?.ok
+                    ? t("integrity.ok", {
+                        date: new Date(integrity.checkedAt).toLocaleString(
+                          getLocale(),
+                        ),
+                      })
+                    : t("checkIntegrityDetail")}
+                </p>
+              </div>
               <button
+                type="button"
                 className="settings-button"
                 disabled={busy}
                 onClick={() =>
                   void run(async () => {
-                    await desktop.invoke("library:rebuildIndex");
-                    notify(t("toast.indexRebuilt"));
-                  })
+                    const next =
+                      await desktop.invoke<IntegrityResult>("library:integrity");
+                    setIntegrity(next);
+                    if (!next.ok) setIntegrityErrorOpen(true);
+                  }, false)
                 }
               >
-                {t("rebuildIndex")}
+                {t("checkIntegrity")}
               </button>
             </div>
-          </section>
-          {plan && (
-            <div className="library-space-plan">
-              <p>
-                {t("cleanupPlan", {
-                  count: plan.files.length,
-                  size: bytes(plan.bytes),
-                  drafts: plan.protectedDrafts,
-                  conflicts: plan.protectedConflicts,
-                })}
-              </p>
-              <section>
-                <h3 className="settings-section-heading">
-                  {t("showCleanupFiles")}
+          </div>
+
+          <div
+            className="settings-card-section"
+            aria-labelledby="library-maintenance-tools"
+          >
+            <div className="settings-row settings-row-compact">
+              <div className="settings-row-text">
+                <h3 id="library-maintenance-tools">
+                  {t("compactAndIndexTitle")}
                 </h3>
-                {plan.files.map((item) => (
-                  <p key={item.path}>
-                    <code>{item.path}</code> · {bytes(item.bytes)}
-                  </p>
-                ))}
-              </section>
-              <button
-                className="settings-button"
-                disabled={busy || !plan.files.length}
-                onClick={() =>
-                  void run(async () => {
-                    await desktop.invoke("library:cleanup", { id: plan.id });
-                    setPlan(null);
-                    notify(t("toast.cleaned"));
-                  })
-                }
-              >
-                {t("cleanUpFiles")}
-              </button>
+                <p>{t("maintenanceEffects")}</p>
+              </div>
+              <div className="library-space-actions">
+                <button
+                  type="button"
+                  className="settings-button"
+                  disabled={busy}
+                  onClick={() =>
+                    void run(async () => {
+                      const result = await desktop.invoke<{
+                        beforeBytes: number;
+                        afterBytes: number;
+                      }>("library:compact");
+                      notify(
+                        t("toast.compacted", {
+                          before: bytes(result.beforeBytes),
+                          after: bytes(result.afterBytes),
+                        }),
+                      );
+                    })
+                  }
+                >
+                  {t("compactNow")}
+                </button>
+                <button
+                  type="button"
+                  className="settings-button"
+                  disabled={busy}
+                  onClick={() =>
+                    void run(async () => {
+                      await desktop.invoke("library:rebuildIndex");
+                      notify(t("toast.indexRebuilt"));
+                    })
+                  }
+                >
+                  {t("rebuildIndex")}
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {(storage?.maintenance?.state === "running" ||
+            storage?.maintenance?.state === "failed" ||
+            (error && !showProjects)) && (
+            <div className="settings-card-section">
+              {storage?.maintenance?.state === "running" && (
+                <div className="settings-callout" role="status">
+                  <Loader2 size={15} className="studio-spin" />
+                  <span>{t("maintenanceRunning")}</span>
+                </div>
+              )}
+              {storage?.maintenance?.state === "failed" && (
+                <div
+                  className="settings-callout"
+                  data-tone="warn"
+                  role="status"
+                >
+                  <span>
+                    {t("maintenanceFailed", {
+                      error: storage.maintenance.error ?? "",
+                    })}
+                  </span>
+                </div>
+              )}
+              {error && !showProjects && (
+                <div
+                  className="settings-callout"
+                  data-tone="error"
+                  role="alert"
+                >
+                  <CircleAlert size={15} aria-hidden="true" />
+                  <span>{error}</span>
+                </div>
+              )}
             </div>
           )}
         </div>
       </section>
-      <section className="library-space-section" aria-label={t("fullArchive")}>
-        <div className="settings-row">
-          <div className="settings-row-text">
-            <h3 id="settings-backup-title">{t("fullArchive")}</h3>
-          </div>
-        </div>
-        <div className="library-space-section-content">
-          <div className="library-space-archive">
-            <input
-              className="showai-input"
-              aria-label={t("archiveLocation")}
-              placeholder={t("archivePlaceholder")}
-              value={archivePath}
-              aria-invalid={!!archiveError}
-              aria-describedby={
-                archiveError ? "library-backup-error" : undefined
-              }
-              onChange={(event) => {
-                setArchivePath(event.target.value);
-                setArchiveError("");
-              }}
-            />
+
+      <section
+        className="settings-group"
+        aria-labelledby="settings-backup-title"
+      >
+        <h2 id="settings-backup-title">{t("fullArchive")}</h2>
+        <div className="settings-card">
+          <div className="settings-row">
+            <div className="settings-row-text">
+              <h3>{t("archiveLocation")}</h3>
+              <p>{t("fullArchiveDetail")}</p>
+            </div>
             <button
-              className="settings-button"
               type="button"
-              disabled={busy}
-              onClick={() =>
-                void desktop
-                  .invoke<string | null>("settings:chooseFolder")
-                  .then(
-                    (folder) => {
-                      if (folder)
-                        setArchivePath(
-                          folder.replace(/[/\\]$/, "") +
-                            "/ShowAI-backup-" +
-                            new Date().toISOString().replace(/[:.]/g, "-"),
-                        );
-                      setArchiveError("");
-                    },
-                    (reason) => setArchiveError(errorMessage(reason)),
-                  )
-              }
-            >
-              {ts("chooseFolder")}
-            </button>
-            <button
               className="settings-button"
-              disabled={busy || !archivePath.trim()}
+              disabled={busy}
               onClick={() => {
                 setArchiveError("");
-                setArchivePending(true);
-                void run(async () => {
-                  const result = await desktop
-                    .invoke<{ path: string }>("library:archive", {
-                      out: archivePath.trim(),
-                    })
-                    .catch((reason) => {
-                      setArchiveError(errorMessage(reason));
-                      return null;
-                    });
-                  if (result)
-                    notify(t("toast.archived", { path: result.path }));
-                }, false).finally(() => setArchivePending(false));
+                setArchiveOpen(true);
               }}
             >
-              {archivePending && (
-                <Loader2 size={14} className="studio-spin" aria-hidden="true" />
-              )}
-              {t(archivePending ? "archiving" : "saveArchive")}
+              {t("createBackup")}
             </button>
           </div>
-          {archiveError && (
-            <p
-              id="library-backup-error"
-              className="studio-form-error"
-              role="alert"
-            >
-              {archiveError}
-            </p>
-          )}
         </div>
       </section>
-      {storage?.maintenance?.state === "running" && (
-        <p role="status">{t("maintenanceRunning")}</p>
+
+      {plan && (
+        <Dialog
+          title={t("findCleanupTitle")}
+          onClose={() => {
+            if (!busy) setPlan(null);
+          }}
+        >
+          <div className="studio-dialog-body studio-dialog-form">
+            <div className="library-space-plan">
+              <p className="library-space-plan-summary">
+                {plan.files.length > 0
+                  ? t("cleanupPlan", {
+                      count: plan.files.length,
+                      size: bytes(plan.bytes),
+                      drafts: plan.protectedDrafts,
+                      conflicts: plan.protectedConflicts,
+                    })
+                  : t("noCleanupNeeded")}
+              </p>
+              {plan.files.length > 0 && (
+                <section aria-label={t("showCleanupFiles")}>
+                  <h4 className="settings-section-heading">
+                    {t("showCleanupFiles")}
+                  </h4>
+                  {plan.files.map((item) => (
+                    <p key={item.path}>
+                      <code>{item.path}</code>
+                      <span>{bytes(item.bytes)}</span>
+                    </p>
+                  ))}
+                </section>
+              )}
+            </div>
+            <div className="studio-dialog-actions">
+              <button
+                type="button"
+                className="settings-button"
+                disabled={busy}
+                onClick={() => setPlan(null)}
+              >
+                {t("dismissCleanupPlan")}
+              </button>
+              {plan.files.length > 0 && (
+                <button
+                  type="button"
+                  className="settings-button settings-primary-button"
+                  disabled={busy}
+                  onClick={() =>
+                    void run(async () => {
+                      await desktop.invoke("library:cleanup", {
+                        id: plan.id,
+                      });
+                      setPlan(null);
+                      notify(t("toast.cleaned"));
+                    })
+                  }
+                >
+                  {t("cleanUpFiles")}
+                </button>
+              )}
+            </div>
+          </div>
+        </Dialog>
       )}
-      {storage?.maintenance?.state === "failed" && (
-        <p className="settings-help" role="status">
-          {t("maintenanceFailed", { error: storage.maintenance.error ?? "" })}
-        </p>
+
+      {integrityErrorOpen && integrity && !integrity.ok && integrityProblemKey && (
+        <Dialog
+          tone="danger"
+          title={t("checkIntegrityTitle")}
+          onClose={() => setIntegrityErrorOpen(false)}
+        >
+          <div className="studio-dialog-body studio-dialog-form">
+            <div className="library-space-integrity" role="alert">
+              <div className="library-space-integrity-head">
+                <CircleAlert size={16} aria-hidden="true" />
+                <p>{t(integrityProblemKey)}</p>
+              </div>
+              {integrity.message && <code>{integrity.message}</code>}
+            </div>
+            <div className="studio-dialog-actions">
+              <button
+                type="button"
+                className="settings-button"
+                onClick={() =>
+                  void desktop
+                    .invoke("library:reveal", { path: "." })
+                    .catch((reason) => setError(errorMessage(reason)))
+                }
+              >
+                {t("integrity.reveal")}
+              </button>
+              <button
+                type="button"
+                className="settings-button"
+                onClick={() =>
+                  void desktop
+                    .invoke("clipboard:write", {
+                      text: `${t(integrityProblemKey)}\n${integrity.message}\n${home}\n${integrity.checkedAt}`,
+                    })
+                    .then(() => notify(t("integrity.copied")))
+                    .catch((reason) => setError(errorMessage(reason)))
+                }
+              >
+                {t("integrity.copy")}
+              </button>
+              <button
+                type="button"
+                className="settings-button settings-primary-button"
+                onClick={() => setIntegrityErrorOpen(false)}
+              >
+                {tc("done")}
+              </button>
+            </div>
+          </div>
+        </Dialog>
       )}
+
+      {archiveOpen && (
+        <Dialog
+          title={t("fullArchive")}
+          onClose={() => {
+            if (!archivePending) setArchiveOpen(false);
+          }}
+        >
+          <form
+            className="studio-dialog-body studio-dialog-form"
+            onSubmit={(event) => {
+              event.preventDefault();
+              if (!archivePath.trim() || archivePending || busy) return;
+              setArchiveError("");
+              setArchivePending(true);
+              void run(async () => {
+                const result = await desktop
+                  .invoke<{ path: string }>("library:archive", {
+                    out: archivePath.trim(),
+                  })
+                  .catch((reason) => {
+                    setArchiveError(errorMessage(reason));
+                    return null;
+                  });
+                if (result) {
+                  setArchiveOpen(false);
+                  notify(t("toast.archived", { path: result.path }));
+                }
+              }, false).finally(() => setArchivePending(false));
+            }}
+          >
+            <p className="settings-help">{t("fullArchiveDetail")}</p>
+            <div className="library-space-archive">
+              <input
+                className="showai-input"
+                aria-label={t("archiveLocation")}
+                placeholder={t("archivePlaceholder")}
+                value={archivePath}
+                autoFocus
+                aria-invalid={!!archiveError}
+                aria-describedby={
+                  archiveError ? "library-backup-error" : undefined
+                }
+                onChange={(event) => {
+                  setArchivePath(event.target.value);
+                  setArchiveError("");
+                }}
+              />
+              <button
+                className="settings-button"
+                type="button"
+                disabled={busy || archivePending}
+                onClick={() =>
+                  void desktop
+                    .invoke<string | null>("settings:chooseFolder")
+                    .then(
+                      (folder) => {
+                        if (folder)
+                          setArchivePath(
+                            folder.replace(/[/\\]$/, "") +
+                              "/ShowAI-backup-" +
+                              new Date().toISOString().replace(/[:.]/g, "-"),
+                          );
+                        setArchiveError("");
+                      },
+                      (reason) => setArchiveError(errorMessage(reason)),
+                    )
+                }
+              >
+                {ts("chooseFolder")}
+              </button>
+            </div>
+            {archiveError && (
+              <p
+                id="library-backup-error"
+                className="studio-form-error"
+                role="alert"
+              >
+                {archiveError}
+              </p>
+            )}
+            <div className="studio-dialog-actions">
+              <button
+                type="button"
+                className="settings-button"
+                disabled={archivePending}
+                onClick={() => setArchiveOpen(false)}
+              >
+                {tc("cancel")}
+              </button>
+              <button
+                type="submit"
+                className="settings-button settings-primary-button"
+                disabled={busy || archivePending || !archivePath.trim()}
+              >
+                {archivePending && (
+                  <Loader2
+                    size={14}
+                    className="studio-spin"
+                    aria-hidden="true"
+                  />
+                )}
+                {t(archivePending ? "archiving" : "saveArchive")}
+              </button>
+            </div>
+          </form>
+        </Dialog>
+      )}
+
       {showProjects && (
         <Dialog
           title={t("projectStorage")}
@@ -400,6 +574,7 @@ export default function LibrarySpace({ home }: { home: string }) {
           <div className="library-project-space-content" aria-busy={analyzing}>
             <div className="library-space-actions">
               <button
+                type="button"
                 className="settings-button"
                 disabled={busy}
                 onClick={analyzeProjects}
@@ -487,11 +662,6 @@ export default function LibrarySpace({ home }: { home: string }) {
           </div>
         </Dialog>
       )}
-      {error && !showProjects && (
-        <p className="studio-form-error" role="alert">
-          {error}
-        </p>
-      )}
-    </section>
+    </>
   );
 }

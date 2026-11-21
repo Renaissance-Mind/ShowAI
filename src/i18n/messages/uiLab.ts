@@ -2,6 +2,10 @@ import { defineMessages } from "../index";
 export default defineMessages("uiLab", {
   "zh-CN": {
     title: "界面场景",
+    settingsAcceptance: "设置界面",
+    syncConnected: "已连接账号与冲突项目",
+    syncLocalOnly: "仅本机存储模式",
+    agentEmptyLocal: "无本地命令行工具",
     closeDialog: "关闭弹窗",
     remote: "远程连接",
     workspace: "工作台",
@@ -84,6 +88,10 @@ export default defineMessages("uiLab", {
   },
   en: {
     title: "UI scenes",
+    settingsAcceptance: "Settings UI",
+    syncConnected: "Connected accounts and conflict",
+    syncLocalOnly: "Local-only storage",
+    agentEmptyLocal: "No local CLI tools",
     closeDialog: "Close dialog",
     remote: "Remote connection",
     workspace: "Workbench",

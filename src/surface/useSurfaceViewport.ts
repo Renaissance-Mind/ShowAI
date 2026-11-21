@@ -3,6 +3,7 @@ import { EditorViewScope } from "../editor/view-scope";
 import { translator } from "../i18n";
 import messages from "../i18n/messages/surface";
 import { fingerNavigatesBoard } from "./board-input.mjs";
+import { entryKeyMatches } from "./shortcut-matcher";
 import {
   GESTURE_IDLE,
   MAX_ZOOM,
@@ -996,7 +997,7 @@ export function useSurfaceViewport(
         zoom(camera.current.scale * (event.key === "-" ? 1 / 1.2 : 1.2));
       }
       if (
-        (event.key === "0" && !event.shiftKey && !event.metaKey) ||
+        entryKeyMatches(event, "board.fit", 0, "0") ||
         event.key === "Home"
       ) {
         event.preventDefault();

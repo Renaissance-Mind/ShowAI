@@ -200,7 +200,7 @@ export function formatDiagnostics(input: DiagnosticsInput): string {
       ? [`  Connection records unavailable (${input.connections.error})`]
       : []),
     ...part("Runtime registration", input.runtime, (runtime) => [
-      `  ${runtime.state}${runtime.reason ? ` (${runtime.reason})` : ""}; this App ${runtime.current.version}${runtime.registered ? `; registered ${runtime.registered.version}${runtime.registered.channel ? ` ${runtime.registered.channel}` : ""}${runtime.registered.home === info?.home ? "" : ", other library"}` : ""}`,
+      `  ${runtime.state}${runtime.reason ? ` (${runtime.reason})` : ""}${runtime.current?.version ? `; this App ${runtime.current.version}` : ""}${runtime.registered ? `; registered ${runtime.registered.version}${runtime.registered.channel ? ` ${runtime.registered.channel}` : ""}${runtime.registered.home === info?.home ? "" : ", other library"}` : ""}`,
     ]),
     ...part("Sync", input.sync, syncLines),
     `Recent problems (${input.problems.length}):`,

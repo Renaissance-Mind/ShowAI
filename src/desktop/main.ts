@@ -939,6 +939,16 @@ async function handle(
   }
   if (desktopPluginActions.has(action))
     return pluginInstallerAction(pluginInstaller, action, args);
+  if (action === "plugins:choosePath") {
+    const selection = await dialog.showOpenDialog(window, {
+      defaultPath:
+        typeof args.path === "string" && args.path.trim()
+          ? args.path.trim()
+          : undefined,
+      properties: ["openFile"],
+    });
+    return selection.canceled ? null : (selection.filePaths[0] ?? null);
+  }
   if (action === "agent:remoteDevice") return remoteConnector.status();
   if (action === "agent:approveRemoteClient")
     return remoteConnector.approveClient(

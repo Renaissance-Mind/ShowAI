@@ -20,11 +20,14 @@ import messages from "../i18n/messages/pluginInstall";
 import onboardingMessages from "../i18n/messages/onboarding";
 import settingsMessages from "../i18n/messages/settings";
 import { PendingNotice } from "../ui/PendingNotice";
-import { Copy, ExternalLink, RefreshCw } from "../ui/icons";
+import { ChevronDown, CircleAlert, Copy, ExternalLink, FolderOpen, RefreshCw } from "../ui/icons";
+import Dialog from "../ui/Dialog";
+import commonMessages from "../i18n/messages/common";
 import { desktop, errorMessage } from "../host/bridge";
 import {
   pluginActionBlocked,
   pluginActionLabel,
+  pluginErrorText,
   pluginHostNames,
   pluginLibraryMismatch,
   pluginNeedsUpdate,
@@ -60,6 +63,7 @@ function DshSteps({ steps }: { steps: DshPendingSteps }) {
       <div className="plugin-install-path">
         <code>{steps.bundlePath}</code>
         <button
+          type="button"
           className="settings-button"
           onClick={() =>
             void desktop
@@ -111,13 +115,17 @@ export function PluginError({
 }) {
   const t = useTranslator(messages);
   if (!message) return null;
+  const distinctDetails =
+    details?.trim() && details.trim() !== message.trim()
+      ? details.trim()
+      : undefined;
   return (
     <div role="alert" className="plugin-install-error">
       <p>{message}</p>
-      {details && (
+      {distinctDetails && (
         <section>
           <h3 className="settings-section-heading">{t("technicalDetails")}</h3>
-          <pre className="plugin-install-details">{details}</pre>
+          <pre className="plugin-install-details">{distinctDetails}</pre>
         </section>
       )}
     </div>
@@ -198,7 +206,7 @@ function useVerifyStates(hosts: PluginInstallation[]) {
   return { states, error };
 }
 
-function useFailureReason() {
+export function useFailureReason() {
   const t = useTranslator(onboardingMessages);
   return (code: string) => {
     const key = `failure.${code}` as Parameters<typeof t>[0];
@@ -219,6 +227,7 @@ function VerifyPrompt({ label }: { label: string }) {
         <span>{label}</span>
         <code>{t("verify.prompt")}</code>
         <button
+          type="button"
           className="settings-button"
           onClick={() =>
             void desktop
@@ -286,6 +295,7 @@ export function VerifyConnection({
                 {state.kind === "failed" && (
                   <>
                     <button
+                      type="button"
                       className="settings-button"
                       disabled={busy}
                       onClick={() =>
@@ -353,7 +363,12 @@ function RuntimeRegistration({
   const registered = runtime.registered;
   const state = runtime.state === "other" ? runtime.reason! : runtime.state;
   return (
-    <div className="settings-row plugin-runtime" data-runtime-state={state}>
+    <div
+      className="settings-callout plugin-runtime"
+      data-tone="warn"
+      data-runtime-state={state}
+    >
+      <CircleAlert size={16} aria-hidden="true" />
       <div className="settings-row-text">
         <h3>{t("runtime.title")}</h3>
         <p role="status">
@@ -371,7 +386,12 @@ function RuntimeRegistration({
           </code>
         )}
       </div>
-      <button className="settings-button" disabled={busy} onClick={onRepair}>
+      <button
+        type="button"
+        className="settings-button settings-primary-button"
+        disabled={busy}
+        onClick={onRepair}
+      >
         {busy ? t("runtime.repairing") : t("runtime.repair")}
       </button>
     </div>
@@ -382,13 +402,16 @@ function ManualPath({
   host,
   busy,
   onSave,
+  onClose,
 }: {
   host: PluginInstallation;
   busy: boolean;
   onSave: (path: string) => void;
+  onClose?: () => void;
 }) {
   const t = useTranslator(messages);
   const [path, setPath] = useState(host.manualPath ?? "");
+  const [choosing, setChoosing] = useState(false);
   const command =
     host.host === "deepseek"
       ? "dsh"
@@ -397,18 +420,6 @@ function ManualPath({
         : host.host;
   return (
     <div className="plugin-manual-path">
-      {host.searched && (
-        <section>
-          <h3 className="settings-section-heading">{t("searched")}</h3>
-          <ul className="plugin-install-searched">
-            {host.searched.map((directory) => (
-              <li key={directory}>
-                <code>{directory}</code>
-              </li>
-            ))}
-          </ul>
-        </section>
-      )}
       <form
         className="plugin-install-path"
         onSubmit={(event) => {
@@ -428,12 +439,34 @@ function ManualPath({
         </label>
         <button
           className="settings-button"
+          type="button"
+          disabled={busy || choosing}
+          onClick={() => {
+            setChoosing(true);
+            void desktop
+              .invoke<string | null>("plugins:choosePath", {
+                path: path.trim() || host.manualPath || host.executable || undefined,
+              })
+              .then(
+                (chosen) => {
+                  if (chosen) setPath(chosen);
+                },
+                () => {},
+              )
+              .finally(() => setChoosing(false));
+          }}
+        >
+          <FolderOpen size={14} aria-hidden="true" />
+          {t("chooseFile")}
+        </button>
+        <button
+          className="settings-button settings-primary-button"
           type="submit"
-          disabled={busy || !path.trim()}
+          disabled={busy || choosing || !path.trim()}
         >
           {t("manualSave")}
         </button>
-        {host.manualPath && (
+        {host.manualPath ? (
           <button
             className="settings-button"
             type="button"
@@ -442,17 +475,41 @@ function ManualPath({
           >
             {t("manualClear")}
           </button>
+        ) : (
+          onClose && (
+            <button
+              className="settings-button"
+              type="button"
+              disabled={busy}
+              onClick={onClose}
+            >
+              {t("manualCancel")}
+            </button>
+          )
         )}
       </form>
       <p className="plugin-install-note">
         {t("manualPathDetail", { command })}
       </p>
+      {host.searched && host.searched.length > 0 && (
+        <div>
+          <h4 className="settings-section-heading">{t("searched")}</h4>
+          <ul className="plugin-install-searched">
+            {host.searched.map((directory) => (
+              <li key={directory}>
+                <code>{directory}</code>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
     </div>
   );
 }
 
 export function LaunchConfigCopy({ info }: { info: DesktopInfo | null }) {
   const t = useTranslator(messages);
+  const notify = useNotify();
   const [launcher, setLauncher] = useState<McpLaunch | null>(null);
   const [copied, setCopied] = useState<LaunchSnippetKind | null>(null);
   const [error, setError] = useState("");
@@ -479,7 +536,12 @@ export function LaunchConfigCopy({ info }: { info: DesktopInfo | null }) {
       className="settings-group plugin-launch-config"
       aria-labelledby="settings-launch-title"
     >
-      <h2 id="settings-launch-title">{t("launch.title")}</h2>
+      <div className="settings-group-heading">
+        <div>
+          <h2 id="settings-launch-title">{t("launch.title")}</h2>
+          <p className="settings-group-desc">{t("launch.detail")}</p>
+        </div>
+      </div>
       {kinds.map((kind) => {
         const text = launchSnippet(kind, server, info.platform);
         return (
@@ -493,7 +555,10 @@ export function LaunchConfigCopy({ info }: { info: DesktopInfo | null }) {
                   setError("");
                   void desktop
                     .invoke("clipboard:write", { text })
-                    .then(() => setCopied(kind))
+                    .then(() => {
+                      setCopied(kind);
+                      notify(t("copied"));
+                    })
                     .catch((reason) => setError(errorMessage(reason)));
                 }}
               >
@@ -573,10 +638,31 @@ function hostStatus(
   return { text: t("state.waiting"), tone: "ok" };
 }
 
+function resolveHostError(host: PluginInstallation): {
+  message: string;
+  details?: string;
+} {
+  if (!host.error) return { message: "" };
+  if (!host.errorCode) return { message: host.error };
+  const versionMatch = host.error.match(/\bv?\d+\.\d+(?:\.\d+)?\b/);
+  return pluginErrorText(
+    {
+      code: host.errorCode,
+      message: host.error,
+      details: {
+        host: host.host,
+        minimumVersion: versionMatch?.[0] ?? "latest",
+      },
+    },
+    host.host,
+  );
+}
+
 export default function PluginInstallSettings({ home }: { home: string }) {
   const t = useTranslator(messages);
   const ts = useTranslator(settingsMessages);
   const tv = useTranslator(onboardingMessages);
+  const tc = useTranslator(commonMessages);
   const {
     hosts,
     scanned,
@@ -594,6 +680,9 @@ export default function PluginInstallSettings({ home }: { home: string }) {
     setPath,
   } = usePluginHosts(home);
   const [batch, setBatch] = useState<PluginBatchResult | null>(null);
+  const [manualHost, setManualHost] = useState<PluginHost | null>(null);
+  const [dshHost, setDshHost] = useState<PluginHost | null>(null);
+  const [showUndetected, setShowUndetected] = useState(false);
   const installed = hosts.filter(
     (host) =>
       host.installed &&
@@ -610,6 +699,184 @@ export default function PluginInstallSettings({ home }: { home: string }) {
   const uncalled = installed.some(
     (host) => verify.states.get(host.host)?.kind !== "called",
   );
+  const detectedHosts = hosts.filter(
+    (host) =>
+      !!host.executable ||
+      host.installed ||
+      !!host.installedPath ||
+      !!host.manualPath ||
+      !!host.error,
+  );
+  const undetectedHosts = hosts.filter((host) => !detectedHosts.includes(host));
+  const manualTarget = manualHost
+    ? hosts.find((item) => item.host === manualHost)
+    : undefined;
+  const dshTarget = dshHost
+    ? hosts.find((item) => item.host === dshHost)
+    : undefined;
+  const dshTargetSteps = dshTarget
+    ? receipt?.host === dshTarget.host && receipt.dsh
+      ? receipt.dsh
+      : dshTarget.dsh && dshTarget.installedPath
+        ? dshTarget.dsh
+        : undefined
+    : undefined;
+
+  const renderHostRow = (host: PluginInstallation) => {
+    const state = verify.states.get(host.host);
+    const status = hostStatus(t, host, home, state, reason);
+    const failed = state?.kind === "failed" ? state : undefined;
+    const updateFailure = batch?.failed.find(
+      (item) => item.host === host.host,
+    );
+    const confirmed =
+      (state?.kind === "connected" || state?.kind === "called") &&
+      Date.parse(state.at) >= (installedAt[host.host] ?? 0);
+    const dsh =
+      receipt?.host === host.host && receipt.dsh
+        ? receipt.dsh
+        : host.dsh && host.installedPath
+          ? host.dsh
+          : undefined;
+    const hostErr = resolveHostError(host);
+    const canManual = !host.executable && host.host !== "deepseek";
+    const actionKey = pluginActionLabel(host, home);
+    return (
+      <div
+        className="settings-row plugin-host"
+        key={host.host}
+        data-host={host.host}
+      >
+        <AgentBrandIcon brand={host.host} />
+        <div className="settings-row-text">
+          <h3>
+            {pluginHostNames[host.host]}
+            {host.version && (
+              <span className="plugin-host-version">
+                {host.version.split("+")[0]}
+              </span>
+            )}
+          </h3>
+          <p className="plugin-host-state" data-tone={status.tone}>
+            {status.text}
+          </p>
+          {restart.has(host.host) && !confirmed && (
+            <p className="plugin-host-next" role="status">
+              {t(`next.${host.host}`)}
+            </p>
+          )}
+          {failed?.detail && (
+            <section className="plugin-verify-detail">
+              <h4 className="settings-section-heading">{tv("verify.details")}</h4>
+              <pre className="plugin-install-details">
+                {failed.code}: {failed.detail}
+              </pre>
+            </section>
+          )}
+          {host.manualPath && host.executable === host.manualPath && (
+            <p className="plugin-install-note">
+              {t("manualCurrent", { path: host.manualPath })}
+            </p>
+          )}
+          {updateFailure && (
+            <PluginError
+              message={updateFailure.message}
+              details={updateFailure.details}
+            />
+          )}
+          {hostErr.message && (
+            <PluginError message={hostErr.message} details={hostErr.details} />
+          )}
+        </div>
+        <div className="plugin-host-actions">
+          {canManual && (
+            <button
+              type="button"
+              className="settings-button"
+              disabled={!!busy}
+              onClick={() => setManualHost(host.host)}
+            >
+              {t("manualToggle")}
+            </button>
+          )}
+          {dsh && (
+            <button
+              type="button"
+              className="settings-button"
+              onClick={() => setDshHost(host.host)}
+            >
+              {t("dshStepsButton")}
+            </button>
+          )}
+          {updateFailure ? (
+            <button
+              type="button"
+              className="settings-button"
+              disabled={!!busy}
+              onClick={() =>
+                void updateAll([host.host]).then((result) =>
+                  setBatch((previous) => ({
+                    updated: [
+                      ...(previous?.updated ?? []).filter(
+                        (item) => item !== host.host,
+                      ),
+                      ...result.updated,
+                    ],
+                    failed: [
+                      ...(previous?.failed ?? []).filter(
+                        (item) => item.host !== host.host,
+                      ),
+                      ...result.failed,
+                    ],
+                  })),
+                )
+              }
+            >
+              {t("retryHost")}
+            </button>
+          ) : host.error ? (
+            <button
+              type="button"
+              className="settings-button"
+              disabled={!!busy}
+              onClick={() => void refreshHost(host.host)}
+            >
+              {t("rescanHost", { host: pluginHostNames[host.host] })}
+            </button>
+          ) : failed ? (
+            <button
+              type="button"
+              className="settings-button"
+              disabled={!!busy}
+              onClick={() => {
+                setBatch(null);
+                void install(host.host, {
+                  repairRuntime: RUNTIME_FAILURES.has(failed.code),
+                });
+              }}
+            >
+              {busy === host.host ? tv("verify.repairing") : tv("verify.repair")}
+            </button>
+          ) : (
+            !pluginActionBlocked(host) && (
+              <button
+                type="button"
+                className={`settings-button${actionKey === "install" || actionKey === "update" ? " settings-primary-button" : ""}`}
+                disabled={!!busy}
+                onClick={() => {
+                  setBatch(null);
+                  void install(host.host);
+                }}
+              >
+                {busy === host.host ? t("installing") : t(actionKey)}
+              </button>
+            )
+          )}
+        </div>
+      </div>
+    );
+  };
+
   return (
     <section
       className="settings-group plugin-install-settings"
@@ -617,27 +884,33 @@ export default function PluginInstallSettings({ home }: { home: string }) {
       aria-busy={!!busy}
     >
       <div className="settings-group-heading">
-        <h2 id="settings-plugins-title">{ts("localConnection")}</h2>
-        {outdated.length > 1 && (
+        <h2 id="settings-plugins-title">{ts("pluginSummaryTitle")}</h2>
+        <div className="library-space-actions">
+          {outdated.length > 1 && (
+            <button
+              type="button"
+              className="settings-button settings-primary-button"
+              disabled={!!busy}
+              onClick={() => {
+                setBatch(null);
+                void updateAll(outdated.map((host) => host.host)).then(
+                  setBatch,
+                );
+              }}
+            >
+              {busy === "all" ? t("updatingAll") : t("updateAll")}
+            </button>
+          )}
           <button
+            type="button"
             className="settings-button"
             disabled={!!busy}
-            onClick={() => {
-              setBatch(null);
-              void updateAll(outdated.map((host) => host.host)).then(setBatch);
-            }}
+            onClick={() => void refresh()}
           >
-            {busy === "all" ? t("updatingAll") : t("updateAll")}
+            <RefreshCw size={13} aria-hidden="true" />
+            {busy === "scan" ? t("scanning") : t("refresh")}
           </button>
-        )}
-        <button
-          className="settings-button"
-          disabled={!!busy}
-          onClick={() => void refresh()}
-        >
-          <RefreshCw size={13} aria-hidden="true" />
-          {busy === "scan" ? t("scanning") : t("refresh")}
-        </button>
+        </div>
       </div>
       {runtime && (
         <RuntimeRegistration
@@ -652,163 +925,103 @@ export default function PluginInstallSettings({ home }: { home: string }) {
         lines={3}
         minHeight={200}
       />
-      {hosts.map((host) => {
-        const state = verify.states.get(host.host);
-        const status = hostStatus(t, host, home, state, reason);
-        const failed = state?.kind === "failed" ? state : undefined;
-        const updateFailure = batch?.failed.find(
-          (item) => item.host === host.host,
-        );
-        const confirmed =
-          (state?.kind === "connected" || state?.kind === "called") &&
-          Date.parse(state.at) >= (installedAt[host.host] ?? 0);
-        const dsh =
-          receipt?.host === host.host && receipt.dsh
-            ? receipt.dsh
-            : host.dsh && host.installedPath
-              ? host.dsh
-              : undefined;
-        return (
-          <div
-            className="settings-row plugin-host"
-            key={host.host}
-            data-host={host.host}
-          >
-            <AgentBrandIcon brand={host.host} />
-            <div className="settings-row-text">
-              <h3>
-                {pluginHostNames[host.host]}
-                {host.version && (
-                  <span className="plugin-host-version">
-                    {host.version.split("+")[0]}
-                  </span>
-                )}
-              </h3>
-              <p className="plugin-host-state" data-tone={status.tone}>
-                {status.text}
-              </p>
-              {restart.has(host.host) && !confirmed && (
-                <p className="plugin-host-next" role="status">
-                  {t(`next.${host.host}`)}
-                </p>
-              )}
-              {failed?.detail && (
-                <section className="plugin-verify-detail">
-                  <h3 className="settings-section-heading">
-                    {tv("verify.details")}
-                  </h3>
-                  <pre className="plugin-install-details">
-                    {failed.code}: {failed.detail}
-                  </pre>
-                </section>
-              )}
-              {host.manualPath && host.executable === host.manualPath && (
-                <p className="plugin-install-note">
-                  {t("manualCurrent", { path: host.manualPath })}
-                </p>
-              )}
-              {updateFailure && (
-                <PluginError
-                  message={updateFailure.message}
-                  details={updateFailure.details}
-                />
-              )}
-              {host.error && (
-                <PluginError
-                  message={
-                    host.errorCode === "PLUGIN_HOST_TOO_OLD" ||
-                    host.errorCode === "PLUGIN_HOST_COMMAND_FAILED"
-                      ? t(`error.${host.errorCode}`, {
-                          host: pluginHostNames[host.host],
-                          version: "",
-                        })
-                      : host.error
-                  }
-                  details={host.errorCode ? host.error : undefined}
-                />
-              )}
-              {!host.executable && host.host !== "deepseek" && (
-                <ManualPath
-                  host={host}
-                  busy={!!busy}
-                  onSave={(path) => void setPath(host.host, path)}
-                />
-              )}
-              {dsh && <DshSteps steps={dsh} />}
+      {hosts.length > 0 && (
+        <div className="settings-card">
+          {detectedHosts.length > 0 ? (
+            detectedHosts.map(renderHostRow)
+          ) : (
+            <div className="settings-row">
+              <div className="settings-row-text">
+                <h3>{t("noDetectedAgents")}</h3>
+                <p>{t("noDetectedAgentsDetail")}</p>
+              </div>
             </div>
-            {updateFailure ? (
+          )}
+          {undetectedHosts.length > 0 && (
+            <div className="plugin-undetected-section">
               <button
-                className="settings-button"
-                disabled={!!busy}
-                onClick={() =>
-                  void updateAll([host.host]).then((result) =>
-                    setBatch((previous) => ({
-                      updated: [
-                        ...(previous?.updated ?? []).filter(
-                          (item) => item !== host.host,
-                        ),
-                        ...result.updated,
-                      ],
-                      failed: [
-                        ...(previous?.failed ?? []).filter(
-                          (item) => item.host !== host.host,
-                        ),
-                        ...result.failed,
-                      ],
-                    })),
-                  )
-                }
+                type="button"
+                className="plugin-undetected-toggle"
+                aria-expanded={showUndetected}
+                onClick={() => setShowUndetected((value) => !value)}
               >
-                {t("retryHost")}
+                <span>
+                  {showUndetected
+                    ? t("undetectedToggleHide")
+                    : t("undetectedToggleShow", {
+                        count: undetectedHosts.length,
+                      })}
+                </span>
+                <ChevronDown
+                  size={15}
+                  className={showUndetected ? "is-open" : undefined}
+                  aria-hidden="true"
+                />
               </button>
-            ) : host.error ? (
-              <button
-                className="settings-button"
-                disabled={!!busy}
-                onClick={() => void refreshHost(host.host)}
-              >
-                {t("rescanHost", { host: pluginHostNames[host.host] })}
-              </button>
-            ) : failed ? (
-              <button
-                className="settings-button"
-                disabled={!!busy}
-                onClick={() => {
-                  setBatch(null);
-                  void install(host.host, {
-                    repairRuntime: RUNTIME_FAILURES.has(failed.code),
-                  });
-                }}
-              >
-                {busy === host.host
-                  ? tv("verify.repairing")
-                  : tv("verify.repair")}
-              </button>
-            ) : (
-              !pluginActionBlocked(host) && (
-                <button
-                  className="settings-button"
-                  disabled={!!busy}
-                  onClick={() => {
-                    setBatch(null);
-                    void install(host.host);
-                  }}
-                >
-                  {busy === host.host
-                    ? t("installing")
-                    : t(pluginActionLabel(host, home))}
-                </button>
-              )
-            )}
+              {showUndetected && (
+                <div className="plugin-undetected-list">
+                  {undetectedHosts.map(renderHostRow)}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+      {uncalled && (
+        <div className="settings-card plugin-verify-card">
+          <div className="settings-card-section">
+            <div className="settings-row-text">
+              <h3>{t("verifySectionTitle")}</h3>
+            </div>
+            <VerifyPrompt label={t("verifyHint")} />
           </div>
-        );
-      })}
-      {uncalled && <VerifyPrompt label={t("verifyHint")} />}
+        </div>
+      )}
       <PluginError message={error} details={errorDetails} />
       {verify.error && (
         <p role="alert" className="plugin-install-error">
           {verify.error}
         </p>
+      )}
+      {manualTarget && (
+        <Dialog
+          title={`${pluginHostNames[manualTarget.host]} · ${t("manualPath")}`}
+          onClose={() => {
+            if (!busy) setManualHost(null);
+          }}
+        >
+          <div className="studio-dialog-body">
+            <ManualPath
+              host={manualTarget}
+              busy={!!busy}
+              onSave={(path) => {
+                void setPath(manualTarget.host, path).then(() => {
+                  setManualHost(null);
+                });
+              }}
+              onClose={() => setManualHost(null)}
+            />
+          </div>
+        </Dialog>
+      )}
+      {dshTarget && dshTargetSteps && (
+        <Dialog
+          title={pluginHostNames[dshTarget.host]}
+          onClose={() => setDshHost(null)}
+        >
+          <div className="studio-dialog-body studio-dialog-form">
+            <DshSteps steps={dshTargetSteps} />
+            <div className="studio-dialog-actions">
+              <button
+                type="button"
+                className="settings-button settings-primary-button"
+                onClick={() => setDshHost(null)}
+              >
+                {tc("done")}
+              </button>
+            </div>
+          </div>
+        </Dialog>
       )}
     </section>
   );

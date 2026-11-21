@@ -1,15 +1,14 @@
-import { writeSessionDraft } from "./session-draft";
-import { useState } from "react";
+import { readSessionDraft, writeSessionDraft } from "./session-draft";
+import { useEffect, useState } from "react";
 import { pluginNeedsUpdate, usePluginHosts } from "./usePluginHosts";
 import {
   Bot,
+  ChevronLeft,
+  Cloud,
   Puzzle,
-  ChevronRight,
-  Copy,
   Folder,
   Info,
   Keyboard,
-  Shapes,
   Monitor,
   Moon,
   Search,
@@ -17,6 +16,8 @@ import {
   Sun,
   Globe,
 } from "../ui/icons";
+import Select from "../ui/Select";
+import { appIconForTheme } from "../design/app-icon";
 import type { DesktopInfo } from "../host/protocol";
 import type { AppearancePreference } from "../design/appearance-preference";
 import {
@@ -28,60 +29,76 @@ import {
 import { useLanguagePreference, useTranslator } from "../i18n/react";
 import messages from "../i18n/messages/settings";
 import "./settings.css";
+import { SettingsPath } from "./SettingsPath";
 import LibrarySpace from "./LibrarySpace";
-import IconViewer from "./IconViewer";
 import SyncSettings, { type ProjectSyncRequest } from "./SyncSettings";
 import AgentSettings from "./AgentSettings";
 import WorkRecordsSettings from "./WorkRecordsSettings";
-import PluginInstallSettings, {
-  LaunchConfigCopy,
-} from "./PluginInstallSettings";
+import PluginInstallSettings from "./PluginInstallSettings";
 import RemoteMcpSettings from "./RemoteMcpSettings";
+import ShortcutsPanel from "./ShortcutsPanel";
 import remoteMcpMessages from "../i18n/messages/remoteMcp";
 import { workbenchCapabilities } from "./capabilities";
 import { AboutFeedback, type FeedbackRequest } from "./feedback/AboutFeedback";
 
+const SHORTCUTS_EVENT = "showai:settings-shortcuts";
+const SHORTCUTS_DRAFT_KEY = "settings.subpage";
+
 const sections = [
   {
-    id: "sync",
-    label: "section.sync",
-    icon: Folder,
-  },
-  {
     id: "general",
+    group: "workspace",
     label: "section.general",
     icon: Settings2,
   },
   {
     id: "appearance",
+    group: "workspace",
     label: "section.appearance",
     icon: Sun,
   },
   {
+    id: "sync",
+    group: "workspace",
+    label: "section.sync",
+    icon: Cloud,
+  },
+  {
+    id: "projects",
+    group: "workspace",
+    label: "section.projects",
+    icon: Folder,
+  },
+  {
     id: "agent",
+    group: "agent",
     label: "section.agent",
     icon: Bot,
   },
   {
     id: "plugins",
+    group: "agent",
     label: "section.plugins",
     icon: Puzzle,
   },
   {
     id: "remote",
+    group: "agent",
     label: "section.remote",
     icon: Globe,
   },
   {
-    id: "icons",
-    label: "section.icons",
-    icon: Shapes,
-  },
-  {
     id: "about",
+    group: "support",
     label: "section.about",
     icon: Info,
   },
+] as const;
+
+const navGroups = [
+  { id: "workspace", label: "navGroup.workspace" },
+  { id: "agent", label: "navGroup.agent" },
+  { id: "support", label: "navGroup.support" },
 ] as const;
 
 export type SettingsSection = (typeof sections)[number]["id"];
@@ -112,33 +129,49 @@ export function SettingsNavigation({
   const t = useTranslator(messages);
   const { hosts } = usePluginHosts(pluginHome ?? null);
   const updates = hosts.filter(pluginNeedsUpdate).length;
+  const visible = sections.filter(
+    ({ id }) => availableSettingsSection(id, platform) === id,
+  );
   return (
     <div className="settings-category-sidebar">
-      <div className="settings-nav-label">{t("title")}</div>
-      <nav className="settings-nav" aria-label={t("categories")}>
-        {sections
-          .filter(({ id }) => availableSettingsSection(id, platform) === id)
-          .map(({ id, label, icon: Icon }) => (
-            <button
-              key={id}
-              aria-label={t(label)}
-              aria-description={
-                id === "plugins" && updates > 0
-                  ? t("pluginUpdates", { count: updates })
-                  : undefined
-              }
-              aria-current={section === id ? "page" : undefined}
-              onClick={() => onSelect(id)}
-            >
-              <Icon size={17} strokeWidth={1.7} aria-hidden="true" />
-              {t(label)}
-              {id === "plugins" && updates > 0 && (
-                <span className="settings-nav-updates" aria-hidden="true">
-                  {updates}
-                </span>
-              )}
-            </button>
-          ))}
+      <nav className="settings-nav-groups" aria-label={t("categories")}>
+        {navGroups.map((group) => {
+          const items = visible.filter((item) => item.group === group.id);
+          if (!items.length) return null;
+          return (
+            <div className="settings-nav-group" key={group.id}>
+              <div className="settings-nav-label">{t(group.label)}</div>
+              <div className="settings-nav">
+                {items.map(({ id, label, icon: Icon }) => (
+                  <button
+                    key={id}
+                    type="button"
+                    aria-label={t(label)}
+                    aria-description={
+                      id === "plugins" && updates > 0
+                        ? t("pluginUpdates", { count: updates })
+                        : undefined
+                    }
+                    aria-current={section === id ? "page" : undefined}
+                    onClick={() => {
+                      writeSessionDraft(SHORTCUTS_DRAFT_KEY, "");
+                      window.dispatchEvent(new Event(SHORTCUTS_EVENT));
+                      onSelect(id);
+                    }}
+                  >
+                    <Icon size={16} strokeWidth={1.75} aria-hidden="true" />
+                    <span>{t(label)}</span>
+                    {id === "plugins" && updates > 0 && (
+                      <span className="settings-nav-updates" aria-hidden="true">
+                        {updates}
+                      </span>
+                    )}
+                  </button>
+                ))}
+              </div>
+            </div>
+          );
+        })}
       </nav>
     </div>
   );
@@ -147,58 +180,141 @@ export function SettingsNavigation({
 export function SettingsSearch({
   platform,
   onSelect,
-  onShortcuts,
 }: {
   platform?: string;
   onSelect: (section: SettingsSection) => void;
-  onShortcuts: () => void;
+  onShortcuts?: () => void;
 }) {
   const t = useTranslator(messages);
   const [query, setQuery] = useState("");
   const [searching, setSearching] = useState(false);
-  const options = sections
+  const hasGeneral = availableSettingsSection("general", platform) === "general";
+  const options: Array<{
+    id: SettingsSection;
+    name: string;
+    category: string;
+    target: string;
+  }> = sections
     .filter(({ id }) => availableSettingsSection(id, platform) === id)
-    .map(({ id, label }) => ({ id, name: t(label), target: "" }));
+    .map(({ id, label }) => ({
+      id,
+      name: t(label),
+      category: "",
+      target: "",
+    }));
   options.push(
-    { id: "appearance", name: t("language"), target: "settings-language" },
-    { id: "appearance", name: t("theme"), target: "settings-theme-title" },
-    { id: "about", name: t("keyboardShortcuts"), target: "shortcuts" },
+    {
+      id: "appearance",
+      name: t("theme"),
+      category: t("section.appearance"),
+      target: "settings-theme-title",
+    },
+    {
+      id: "appearance",
+      name: t("language"),
+      category: t("section.appearance"),
+      target: "settings-language",
+    },
+    {
+      id: hasGeneral ? "general" : "appearance",
+      name: t("keyboardShortcuts"),
+      category: t(hasGeneral ? "section.general" : "section.appearance"),
+      target: "shortcuts",
+    },
+    {
+      id: "projects",
+      name: t("searchProjects"),
+      category: t("section.projects"),
+      target: "",
+    },
+    {
+      id: "sync",
+      name: t("searchAccounts"),
+      category: t("section.sync"),
+      target: "",
+    },
+    {
+      id: "projects",
+      name: t("searchJoinProject"),
+      category: t("section.projects"),
+      target: "",
+    },
+    {
+      id: "agent",
+      name: t("searchModel"),
+      category: t("section.agent"),
+      target: "agent-sources-title",
+    },
+    {
+      id: "agent",
+      name: t("searchRuntime"),
+      category: t("section.agent"),
+      target: "agent-runtime-title",
+    },
+    {
+      id: "agent",
+      name: t("searchIpad"),
+      category: t("section.agent"),
+      target: "agent-device-settings",
+    },
+    {
+      id: "about",
+      name: t("searchUpdates"),
+      category: t("section.about"),
+      target: "feedback-product-card",
+    },
     {
       id: "about",
       name: t("searchDiagnostics"),
+      category: t("section.about"),
       target: "feedback-diagnostics-title",
     },
+    {
+      id: "about",
+      name: t("searchReport"),
+      category: t("section.about"),
+      target: "feedback-help-title",
+    },
   );
-  if (availableSettingsSection("general", platform) === "general")
+  if (hasGeneral)
     options.push(
-      { id: "general", name: t("library"), target: "settings-library-title" },
+      {
+        id: "general",
+        name: t("library"),
+        category: t("section.general"),
+        target: "settings-library-title",
+      },
       {
         id: "general",
         name: t("workRecords"),
+        category: t("section.general"),
         target: "settings-work-records-title",
       },
       {
         id: "general",
         name: t("searchBackup"),
+        category: t("section.general"),
         target: "settings-backup-title",
       },
     );
-  options.push({
-    id: "agent",
-    name: t("searchModel"),
-    target: "agent-sources-title",
-  });
-  const matches = options.filter(({ name }) =>
-    name.toLocaleLowerCase().includes(query.trim().toLocaleLowerCase()),
+  const normalized = query.trim().toLocaleLowerCase();
+  const matches = options.filter(
+    ({ name, category }) =>
+      name.toLocaleLowerCase().includes(normalized) ||
+      category.toLocaleLowerCase().includes(normalized),
   );
   function select(option: (typeof options)[number]) {
     setQuery("");
     setSearching(false);
-    onSelect(option.id);
     if (option.target === "shortcuts") {
-      onShortcuts();
+      writeSessionDraft(SHORTCUTS_DRAFT_KEY, "shortcuts");
+      onSelect(option.id);
+      window.dispatchEvent(new Event(SHORTCUTS_EVENT));
       return;
     }
+    writeSessionDraft(SHORTCUTS_DRAFT_KEY, "");
+    window.dispatchEvent(new Event(SHORTCUTS_EVENT));
+    onSelect(option.id);
     requestAnimationFrame(() => {
       const target =
         (option.target ? document.getElementById(option.target) : null) ??
@@ -254,11 +370,12 @@ export function SettingsSearch({
         <div className="settings-search-results">
           {matches.map((option) => (
             <button
-              key={option.target || option.id}
+              key={`${option.id}:${option.target || option.name}`}
               type="button"
               onClick={() => select(option)}
             >
-              {option.name}
+              <span>{option.name}</span>
+              {option.category && <small>{option.category}</small>}
             </button>
           ))}
           {!matches.length && <p>{t("noSettingsResults")}</p>}
@@ -275,7 +392,12 @@ function ThemePreview({ theme }: { theme: "light" | "dark" }) {
       aria-hidden="true"
     >
       <span className="settings-preview-sidebar">
-        <span className="settings-preview-brand">✳</span>
+        <img
+          className="settings-preview-brand"
+          src={appIconForTheme(theme)}
+          alt=""
+          draggable={false}
+        />
         <span className="settings-preview-nav active" />
         <span className="settings-preview-nav" />
         <span className="settings-preview-nav short" />
@@ -294,6 +416,34 @@ function ThemePreview({ theme }: { theme: "light" | "dark" }) {
         </span>
       </span>
     </span>
+  );
+}
+
+function ShortcutsSection({ onOpenShortcuts }: { onOpenShortcuts: () => void }) {
+  const t = useTranslator(messages);
+  return (
+    <section
+      className="settings-group"
+      aria-labelledby="settings-shortcuts-title"
+    >
+      <h2 id="settings-shortcuts-title">{t("keyboardShortcuts")}</h2>
+      <div className="settings-card">
+        <div className="settings-row">
+          <div className="settings-row-text">
+            <h3>{t("keyboardShortcuts")}</h3>
+            <p>{t("keyboardShortcutsDetail")}</p>
+          </div>
+          <button
+            type="button"
+            className="settings-button"
+            onClick={onOpenShortcuts}
+          >
+            <Keyboard size={14} aria-hidden="true" />
+            {t("showShortcuts")}
+          </button>
+        </div>
+      </div>
+    </section>
   );
 }
 
@@ -326,7 +476,7 @@ export function SettingsPanel({
   onCopyHome: () => void;
   onCopyConfig?: () => void;
   onMigrate: () => void;
-  onOpenShortcuts: () => void;
+  onOpenShortcuts?: () => void;
   feedbackRequest?: FeedbackRequest;
   onOpenDocs?: () => void;
   onOpenFaq?: () => void;
@@ -334,202 +484,286 @@ export function SettingsPanel({
   const t = useTranslator(messages);
   const language = useLanguagePreference();
   const tr = useTranslator(remoteMcpMessages);
+  const capabilities = workbenchCapabilities(info?.platform);
+  const hasGeneral =
+    availableSettingsSection("general", info?.platform) === "general";
   section = availableSettingsSection(section, info?.platform);
-  const current = sections.find((item) => item.id === section)!;
+  const [subpage, setSubpage] = useState<"shortcuts" | null>(() =>
+    readSessionDraft<string>(SHORTCUTS_DRAFT_KEY, "") === "shortcuts"
+      ? "shortcuts"
+      : null,
+  );
+  useEffect(() => {
+    const sync = () => {
+      setSubpage(
+        readSessionDraft<string>(SHORTCUTS_DRAFT_KEY, "") === "shortcuts"
+          ? "shortcuts"
+          : null,
+      );
+    };
+    window.addEventListener(SHORTCUTS_EVENT, sync);
+    return () => window.removeEventListener(SHORTCUTS_EVENT, sync);
+  }, []);
+  useEffect(() => {
+    if (section !== "general" && section !== "appearance") {
+      if (subpage) {
+        writeSessionDraft(SHORTCUTS_DRAFT_KEY, "");
+        setSubpage(null);
+      }
+    }
+  }, [section, subpage]);
+  const openShortcutsSubpage = () => {
+    writeSessionDraft(SHORTCUTS_DRAFT_KEY, "shortcuts");
+    setSubpage("shortcuts");
+  };
+  const closeShortcutsSubpage = () => {
+    writeSessionDraft(SHORTCUTS_DRAFT_KEY, "");
+    setSubpage(null);
+  };
+  const showShortcutsSubpage =
+    subpage === "shortcuts" &&
+    (section === "general" || section === "appearance");
+  void onOpenShortcuts;
   return (
-    <div className="studio-settings" key={section}>
-      {section !== "sync" && (
-        <header className="settings-heading">
-          <h2>{t(current.label)}</h2>
-        </header>
-      )}
-      {section === "icons" && <IconViewer />}
-      {section === "sync" && (
+    <div
+      className="studio-settings"
+      key={section === "sync" || section === "projects" ? "sync-family" : section}
+      data-settings-section={section}
+      data-settings-subpage={showShortcutsSubpage ? "shortcuts" : undefined}
+    >
+      {(section === "sync" || section === "projects") && (
         <SyncSettings
+          mode={section === "projects" ? "projects" : "accounts"}
+          onSelectSection={onSelectSection}
           request={syncRequest}
           onOpenProject={onOpenProject}
           home={info?.home}
         />
       )}
-      {section === "general" && (
-        <section
-          className="settings-group"
-          aria-labelledby="settings-library-title"
-        >
-          <h2 id="settings-library-title">{t("library")}</h2>
-          <div className="settings-row settings-location-heading">
-            <div className="settings-row-text">
-              <h3>{t("storageLocation")}</h3>
-            </div>
-          </div>
-          <div className="settings-path">
-            <Folder size={17} aria-hidden="true" />
-            <code>{info?.home ?? t("readingLibrary")}</code>
-            <button
-              type="button"
-              className="settings-button"
-              aria-label={t("copyLibraryPath")}
-              disabled={!info}
-              onClick={onCopyHome}
-            >
-              <Copy size={15} aria-hidden="true" />
-              {t("copyDirectory")}
-            </button>
-            <button
-              type="button"
-              className="settings-button"
-              disabled={!info}
-              onClick={onChooseHome}
-            >
-              {t("switchLibrary")}
-              <ChevronRight size={14} aria-hidden="true" />
-            </button>
-          </div>
-
-          {info?.libraryVersion === 1 && (
-            <div className="settings-row">
-              <div className="settings-row-text">
-                <h3>{t("upgradeLibrary")}</h3>
-                <p>{t("upgradeLibraryDetail")}</p>
-              </div>
-              <button className="settings-button" onClick={onMigrate}>
-                {t("upgradeLibrary")}
-                <ChevronRight size={14} />
+      {section === "general" &&
+        (showShortcutsSubpage ? (
+          <>
+            <div className="settings-subpage-bar">
+              <button
+                type="button"
+                className="settings-button settings-back-button"
+                onClick={closeShortcutsSubpage}
+              >
+                <ChevronLeft size={15} aria-hidden="true" />
+                {t("backToGeneral")}
               </button>
             </div>
-          )}
-        </section>
-      )}
-      {section === "general" && info && (
-        <WorkRecordsSettings key={`records:${info.home}`} />
-      )}
-      {section === "general" && info?.libraryVersion === 2 && (
-        <LibrarySpace key={`space:${info.home}`} home={info.home} />
-      )}
-      {section === "appearance" && (
-        <section
-          className="settings-group"
-          aria-labelledby="settings-theme-title"
-        >
-          <fieldset className="settings-theme-options">
-            <legend id="settings-theme-title" className="settings-theme-legend">
-              {t("theme")}
-            </legend>
-            {(["system", "light", "dark"] as const).map((option) => {
-              const selected = appearance === option;
-              const Icon =
-                option === "system" ? Monitor : option === "light" ? Sun : Moon;
-              return (
-                <label
-                  className={`settings-theme-option ${selected ? "selected" : ""}`}
-                  key={option}
-                >
-                  <input
-                    type="radio"
-                    name="settings-theme"
-                    value={option}
-                    aria-label={t(option === "system" ? "themeSystem" : option)}
-                    aria-describedby={
-                      option === "system"
-                        ? "settings-system-effective"
-                        : undefined
-                    }
-                    checked={selected}
-                    onChange={() => onAppearanceChange(option)}
+            <ShortcutsPanel
+              browser={info?.mode === "browser"}
+              tabs={capabilities.tabs}
+              windows={capabilities.windows}
+            />
+          </>
+        ) : (
+          <>
+            <section
+              className="settings-group"
+              aria-labelledby="settings-library-title"
+            >
+              <h2 id="settings-library-title">{t("library")}</h2>
+              <div className="settings-card">
+                <div className="settings-card-section">
+                  <div className="settings-row-head">
+                    <div className="settings-row-text">
+                      <h3>{t("storageLocation")}</h3>
+                      <p>{t("storageLocationDetail")}</p>
+                    </div>
+                    <div className="settings-row-actions">
+                      <button
+                        type="button"
+                        className="settings-button"
+                        disabled={!info}
+                        onClick={onChooseHome}
+                      >
+                        {t("switchLibrary")}
+                      </button>
+                    </div>
+                  </div>
+                  <SettingsPath
+                    value={info?.home ?? t("readingLibrary")}
+                    copyLabel={t("copyLibraryPath")}
+                    copiedLabel={t("directoryCopied")}
+                    disabled={!info}
+                    onCopy={onCopyHome}
                   />
-                  <ThemePreview
-                    theme={option === "system" ? currentTheme : option}
-                  />
-                  <span className="settings-theme-label">
-                    <Icon size={16} strokeWidth={1.7} aria-hidden="true" />
-                    <span>
-                      {t(option === "system" ? "themeSystem" : option)}
-                      {option === "system" && (
-                        <small
-                          id="settings-system-effective"
-                          className="settings-theme-effective"
-                        >
-                          {t("effectiveTheme", { theme: t(currentTheme) })}
-                        </small>
-                      )}
-                    </span>
-                    <span className="settings-radio-mark" aria-hidden="true" />
-                  </span>
-                </label>
-              );
-            })}
-          </fieldset>
-          <div className="settings-row">
-            <div className="settings-row-text">
-              <label htmlFor="settings-language">{t("language")}</label>
-            </div>
-            <div className="settings-select">
-              <select
-                className="showai-select"
-                id="settings-language"
-                value={language}
-                onChange={(event) => {
-                  if (isLanguagePreference(event.target.value))
-                    setLanguagePreference(event.target.value);
-                }}
+                </div>
+                {info?.libraryVersion === 1 && (
+                  <div className="settings-row">
+                    <div className="settings-row-text">
+                      <h3>{t("upgradeLibrary")}</h3>
+                      <p>{t("upgradeLibraryDetail")}</p>
+                    </div>
+                    <button
+                      type="button"
+                      className="settings-button settings-primary-button"
+                      onClick={onMigrate}
+                    >
+                      {t("upgradeLibrary")}
+                    </button>
+                  </div>
+                )}
+              </div>
+            </section>
+            {info && <WorkRecordsSettings key={`records:${info.home}`} />}
+            {info?.libraryVersion === 2 && (
+              <LibrarySpace key={`space:${info.home}`} home={info.home} />
+            )}
+            <ShortcutsSection onOpenShortcuts={openShortcutsSubpage} />
+          </>
+        ))}
+      {section === "appearance" &&
+        (showShortcutsSubpage && !hasGeneral ? (
+          <>
+            <div className="settings-subpage-bar">
+              <button
+                type="button"
+                className="settings-button settings-back-button"
+                onClick={closeShortcutsSubpage}
               >
-                <option value="system">{t("languageSystem")}</option>
-                {LOCALES.map((locale) => (
-                  <option key={locale} value={locale} lang={locale}>
-                    {LOCALE_NAMES[locale]}
-                  </option>
-                ))}
-              </select>
+                <ChevronLeft size={15} aria-hidden="true" />
+                {t("backToAppearance")}
+              </button>
             </div>
-          </div>
-        </section>
-      )}
+            <ShortcutsPanel
+              browser={info?.mode === "browser"}
+              tabs={capabilities.tabs}
+              windows={capabilities.windows}
+            />
+          </>
+        ) : (
+          <>
+            <section
+              className="settings-group"
+              aria-labelledby="settings-theme-title"
+            >
+              <h2 id="settings-theme-title">{t("theme")}</h2>
+              <div
+                className="settings-theme-options"
+                role="radiogroup"
+                aria-labelledby="settings-theme-title"
+              >
+                {(["system", "light", "dark"] as const).map((option) => {
+                  const selected = appearance === option;
+                  const Icon =
+                    option === "system"
+                      ? Monitor
+                      : option === "light"
+                        ? Sun
+                        : Moon;
+                  return (
+                    <label
+                      className={`settings-theme-option ${selected ? "selected" : ""}`}
+                      key={option}
+                    >
+                      <input
+                        type="radio"
+                        name="settings-theme"
+                        value={option}
+                        aria-label={t(
+                          option === "system" ? "themeSystem" : option,
+                        )}
+                        aria-describedby={
+                          option === "system"
+                            ? "settings-system-effective"
+                            : undefined
+                        }
+                        checked={selected}
+                        onChange={() => onAppearanceChange(option)}
+                      />
+                      <ThemePreview
+                        theme={option === "system" ? currentTheme : option}
+                      />
+                      <span className="settings-theme-label">
+                        <Icon size={16} strokeWidth={1.7} aria-hidden="true" />
+                        <span>
+                          {t(option === "system" ? "themeSystem" : option)}
+                          {option === "system" && (
+                            <small
+                              id="settings-system-effective"
+                              className="settings-theme-effective"
+                            >
+                              {t("effectiveTheme", { theme: t(currentTheme) })}
+                            </small>
+                          )}
+                        </span>
+                        <span className="settings-radio-mark" aria-hidden="true" />
+                      </span>
+                    </label>
+                  );
+                })}
+              </div>
+            </section>
+            <section
+              className="settings-group"
+              aria-labelledby="settings-interface-title"
+            >
+              <h2 id="settings-interface-title">{t("interface")}</h2>
+              <div className="settings-card">
+                <div className="settings-row">
+                  <div className="settings-row-text">
+                    <label htmlFor="settings-language">{t("language")}</label>
+                    <p>{t("languageDetail")}</p>
+                  </div>
+                  <div className="settings-select">
+                    <Select
+                      id="settings-language"
+                      value={language}
+                      onChange={(event) => {
+                        if (isLanguagePreference(event.target.value))
+                          setLanguagePreference(event.target.value);
+                      }}
+                    >
+                      <option value="system">{t("languageSystem")}</option>
+                      {LOCALES.map((locale) => (
+                        <option key={locale} value={locale} lang={locale}>
+                          {LOCALE_NAMES[locale]}
+                        </option>
+                      ))}
+                    </Select>
+                  </div>
+                </div>
+              </div>
+            </section>
+            {!hasGeneral && (
+              <ShortcutsSection onOpenShortcuts={openShortcutsSubpage} />
+            )}
+          </>
+        ))}
       {section === "agent" && (
         <AgentSettings
           onAccounts={() => {
-            writeSessionDraft(
-              `sync-settings-view:${info?.home ?? ""}`,
-              "accounts",
-            );
             onSelectSection("sync");
           }}
         />
       )}
       {section === "remote" &&
         (info?.mode === "browser" ? (
-          <p className="settings-help">{tr("desktopOnly")}</p>
+          <div className="settings-callout">
+            <p>{tr("desktopOnly")}</p>
+          </div>
         ) : (
           <RemoteMcpSettings home={info?.home} />
         ))}
-      {section === "plugins" && (
-        <>
-          {info && <PluginInstallSettings home={info.home} />}
-          <LaunchConfigCopy info={info} />
-        </>
+      {section === "plugins" && info && (
+        <PluginInstallSettings home={info.home} />
       )}
       {section === "about" && (
-        <>
-          <AboutFeedback
-            info={info}
-            request={feedbackRequest}
-            onOpenDocs={onOpenDocs}
-            onOpenFaq={onOpenFaq}
-          />
-          <section
-            className="settings-group"
-            aria-labelledby="settings-shortcuts-title"
-          >
-            <div className="settings-row">
-              <div className="settings-row-text">
-                <h3 id="settings-shortcuts-title">{t("keyboardShortcuts")}</h3>
-              </div>
-              <button className="settings-button" onClick={onOpenShortcuts}>
-                <Keyboard size={14} aria-hidden="true" />
-                {t("showShortcuts")}
-              </button>
-            </div>
-          </section>
-        </>
+        <AboutFeedback
+          info={info}
+          request={feedbackRequest}
+          onOpenDocs={onOpenDocs}
+          onOpenFaq={onOpenFaq}
+          onOpenPlugins={
+            availableSettingsSection("plugins", info?.platform) === "plugins"
+              ? () => onSelectSection("plugins")
+              : undefined
+          }
+        />
       )}
     </div>
   );

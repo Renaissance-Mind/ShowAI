@@ -5,6 +5,7 @@ import sidebarMessages from "../i18n/messages/sidebar";
 import onboardingMessages from "../i18n/messages/onboarding";
 import { messages } from "./messages";
 import { remoteConnectionFeature } from "./features/remote-connection";
+import { settingsAcceptance } from "./features/settings";
 import { workbenchMotion } from "./features/workbench-motion";
 import type { UiFeature, UiScene } from "./types";
 
@@ -111,6 +112,7 @@ export function uiFeatures(locale: Locale = "zh-CN"): UiFeature[] {
       ],
     },
     workbenchMotion(locale).feature,
+    settingsAcceptance(locale).feature,
   ];
 }
 export function uiScene(

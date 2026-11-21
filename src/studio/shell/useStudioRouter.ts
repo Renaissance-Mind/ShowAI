@@ -159,7 +159,7 @@ export function useStudioRouter({
         localStorage.setItem("showai:pending-invitation", link);
         delete host.showaiPendingInvite;
         setSyncRequest(undefined);
-        setSettingsSection("sync");
+        setSettingsSection("projects");
         setSyncNavigationKey((value) => value + 1);
         await navigate("settings");
       })()
@@ -202,7 +202,7 @@ export function useStudioRouter({
           focus: detail.itemId,
           key: Date.now(),
         });
-        setSettingsSection("sync");
+        setSettingsSection("projects");
         await navigate("settings");
       })().catch(report);
     };
@@ -735,7 +735,7 @@ export function useStudioRouter({
   const openProjectManagement = action(async () => {
     await settleOpenPage();
     setSyncRequest({ projectId: "", intent: "manage", key: Date.now() });
-    setSettingsSection("sync");
+    setSettingsSection("projects");
     await navigate("settings");
   });
   return {

@@ -88,14 +88,12 @@ export function remoteConnectionFlow(locale: Locale = "zh-CN"): UiFlow {
   for (const p of providers) {
     const id = (suffix: string) => `${p.id}.${suffix}`,
       root = `.remote-settings[data-remote-provider="${p.provider}"]`,
-      panel = (tab: string) =>
-        selector(
-          `${root}[data-remote-tab="${tab}"] .rm-detail-body > .rm-tab-panel:not([hidden])`,
-        );
+      stepFlow = selector(`${root} .rm-step-flow`),
+      publicNetwork = p.id !== "lan" && p.id !== "tailnet";
     const open = async (ctx: SceneContext) => {
       await home(ctx);
       await ctx.ui.click(button(t("configure", { name: p.name })));
-      await ctx.ui.expect(panel("network"));
+      await ctx.ui.expect(stepFlow);
     };
     const filled = async (ctx: SceneContext) => {
       await open(ctx);
@@ -118,7 +116,7 @@ export function remoteConnectionFlow(locale: Locale = "zh-CN"): UiFlow {
     const ready = async (ctx: SceneContext) => {
       await starting(ctx);
       await ctx.event("service.ready", { provider: p.provider });
-      await ctx.ui.expect(panel("clients"));
+      await ctx.ui.expect(selector(`${root} [data-client-view="setup"]`));
     };
     const configActions = [
       ...(p.id === "lan"
@@ -149,13 +147,8 @@ export function remoteConnectionFlow(locale: Locale = "zh-CN"): UiFlow {
                 }),
               ]
             : []),
+      b("selected", t("selected"), id("permissions.selected")),
       b("start", t("start"), id("starting")),
-      action(
-        "permissions",
-        t("permissions"),
-        { role: "tab", name: t("permissions") },
-        id("permissions"),
-      ),
       b("back", t("back"), "modes"),
     ];
     const variants = [id("setup"), id("starting"), id("error"), id("ready")];
@@ -170,12 +163,13 @@ export function remoteConnectionFlow(locale: Locale = "zh-CN"): UiFlow {
       variants,
       variantLabels: { [id("ready")]: t("on") },
       matches: [
-        { target: panel("network") },
+        { target: stepFlow },
         {
           target: selector(
             `${root}[data-remote-phase="stopped"],${root}[data-remote-phase="prepared"]`,
           ),
         },
+        { target: selector(`${root} .rm-permission-capabilities`) },
       ],
       enter: open,
       actions: configActions,
@@ -187,6 +181,7 @@ export function remoteConnectionFlow(locale: Locale = "zh-CN"): UiFlow {
       screen: id("network"),
       screenTitle: p.name,
       scene: p.id,
+      priority: 5,
       variants,
       matches: [{ target: selector(`${root} .rm-starting`) }],
       enter: starting,
@@ -202,7 +197,7 @@ export function remoteConnectionFlow(locale: Locale = "zh-CN"): UiFlow {
       variants,
       priority: 10,
       matches: [
-        { target: panel("network") },
+        { target: stepFlow },
         { target: selector(`${root} .rm-error`) },
       ],
       enter: async (ctx) => {
@@ -225,25 +220,32 @@ export function remoteConnectionFlow(locale: Locale = "zh-CN"): UiFlow {
       scene: p.id,
       variants,
       matches: [
-        { target: panel("network") },
         { target: selector(`${root}[data-remote-phase="running"]`) },
+        {
+          target: selector(
+            `${root} [data-client-view="setup"][data-client-type="other"]`,
+          ),
+        },
       ],
-      enter: async (ctx) => {
-        await ready(ctx);
-        await ctx.ui.click({ role: "tab", name: t("network") });
-      },
+      enter: ready,
       actions: [
         action(
           "copy",
           t("copy", { name: t("endpoint") }),
           selector(`${root} [data-copy-field="${t("endpoint")}"] button`),
         ),
-        action(
-          "clients",
-          t("clients"),
-          { role: "tab", name: t("clients") },
-          id("client"),
-        ),
+        b("prompt", t("setupPrompt")),
+        ...(p.id === "lan"
+          ? [
+              action("name", t("name"), {
+                role: "textbox" as const,
+                name: t("name"),
+              }),
+              b("key", t("generateKey"), id("key")),
+            ]
+          : [b("next", t("nextMessage"), id("verify"))]),
+        ...(publicNetwork ? [b("chatgpt", "ChatGPT", id("chatgpt"))] : []),
+        b("stop", t("stop"), id("setup")),
         b("back", t("back"), "modes"),
       ],
     });
@@ -273,10 +275,10 @@ export function remoteConnectionFlow(locale: Locale = "zh-CN"): UiFlow {
         screen: id("network"),
         screenTitle: p.name,
         scene: p.id,
-        priority: 5,
+        priority: 6,
         variants: [id("setup"), id("no-address")],
         matches: [
-          { target: panel("network") },
+          { target: stepFlow },
           { target: button(t("start")), state: "disabled" },
         ],
         when: (state) => !(state.addresses as unknown[])?.length,
@@ -288,11 +290,11 @@ export function remoteConnectionFlow(locale: Locale = "zh-CN"): UiFlow {
       });
     const permissions = async (ctx: SceneContext) => {
       await open(ctx);
-      await ctx.ui.click({ role: "tab", name: t("permissions") });
-      await ctx.ui.expect(panel("permissions"));
+      await ctx.ui.click(button(t("selected")));
+      await ctx.ui.expect(selector(`${root} .rm-permission-table`));
     };
     const permissionsActions = [
-      b("all", t("all")),
+      b("all", t("all"), id("setup")),
       b("selected", t("selected")),
       action(
         "read",
@@ -305,86 +307,42 @@ export function remoteConnectionFlow(locale: Locale = "zh-CN"): UiFlow {
         button(t("setAccess", { name: u("project"), access: t("editable") })),
       ),
       b("save", t("save")),
+      b("start", t("start"), id("starting")),
       b("back", t("back"), "modes"),
     ];
-    for (const selected of [false, true])
-      nodes.push({
-        id: id(selected ? "permissions.selected" : "permissions"),
-        title: t(selected ? "selected" : "all"),
-        parent: id("setup"),
-        screen: id("permissions"),
-        screenTitle: t("permissions"),
-        scene: p.id,
-        priority: selected ? 5 : 0,
-        variants: [id("permissions"), id("permissions.selected")],
-        matches: [
-          { target: panel("permissions") },
-          {
-            target: selector(
-              `${root} .rm-segmented > button[aria-pressed="true"]`,
-            ),
-          },
-          ...(selected
-            ? [{ target: selector(`${root} .rm-permission-table`) }]
-            : [{ target: selector(`${root} .rm-permission-capabilities`) }]),
-        ],
-        enter: async (ctx) => {
-          await permissions(ctx);
-          if (selected) {
-            await ctx.ui.click(button(t("selected")));
-            await ctx.ui.click(
-              button(
-                t("setAccess", { name: u("research"), access: t("readOnly") }),
-              ),
-            );
-            await ctx.ui.click(
-              button(
-                t("setAccess", { name: u("project"), access: t("editable") }),
-              ),
-            );
-          }
+    nodes.push({
+      id: id("permissions.selected"),
+      title: t("selected"),
+      parent: id("setup"),
+      screen: id("permissions"),
+      screenTitle: t("permissions"),
+      scene: p.id,
+      priority: 5,
+      variants: [id("setup"), id("permissions.selected")],
+      matches: [
+        { target: stepFlow },
+        {
+          target: selector(
+            `${root}[data-remote-phase="stopped"],${root}[data-remote-phase="prepared"]`,
+          ),
         },
-        actions: permissionsActions,
-      });
-    const publicNetwork = p.id !== "lan" && p.id !== "tailnet";
+        { target: selector(`${root} .rm-permission-table`) },
+      ],
+      enter: async (ctx) => {
+        await permissions(ctx);
+        await ctx.ui.click(
+          button(t("setAccess", { name: u("research"), access: t("readOnly") })),
+        );
+        await ctx.ui.click(
+          button(t("setAccess", { name: u("project"), access: t("editable") })),
+        );
+      },
+      actions: permissionsActions,
+    });
     const clientSetup = async (ctx: SceneContext, chatgpt = false) => {
       await ready(ctx);
       if (chatgpt) await ctx.ui.click(button("ChatGPT"));
     };
-    nodes.push({
-      id: id("client"),
-      title: t("serverSetup"),
-      parent: id("ready"),
-      screen: id("client"),
-      screenTitle: t("clients"),
-      scene: p.id,
-      matches: [
-        { target: panel("clients") },
-        {
-          target: selector(
-            `${root} [data-client-view="setup"][data-client-type="other"]`,
-          ),
-        },
-      ],
-      enter: (ctx) => clientSetup(ctx),
-      actions: [
-        action(
-          "copy",
-          t("copy", { name: t("endpoint") }),
-          selector(`${root} [data-copy-field="${t("endpoint")}"] button`),
-        ),
-        ...(p.id === "lan"
-          ? [
-              action("name", t("name"), {
-                role: "textbox" as const,
-                name: t("name"),
-              }),
-              b("key", t("generateKey"), id("key")),
-            ]
-          : [b("next", t("nextMessage"), id("verify"))]),
-        ...(publicNetwork ? [b("chatgpt", "ChatGPT", id("chatgpt"))] : []),
-      ],
-    });
     const withKey = async (ctx: SceneContext) => {
       await clientSetup(ctx);
       await ctx.ui.fill({ role: "textbox", name: t("name") }, u("client"));
@@ -395,12 +353,15 @@ export function remoteConnectionFlow(locale: Locale = "zh-CN"): UiFlow {
       nodes.push({
         id: id("key"),
         title: t("key"),
-        parent: id("client"),
+        parent: id("ready"),
         screen: id("client"),
         screenTitle: t("clients"),
         scene: p.id,
         priority: 5,
-        matches: [{ target: { role: "textbox", name: t("key") } }],
+        matches: [
+          { target: selector(`${root}[data-remote-phase="running"]`) },
+          { target: { role: "textbox", name: t("key") } },
+        ],
         enter: withKey,
         actions: [
           b("copy-key", t("copy", { name: t("key") })),
@@ -414,10 +375,11 @@ export function remoteConnectionFlow(locale: Locale = "zh-CN"): UiFlow {
         nodes.push({
           id: id("chatgpt"),
           title: "ChatGPT",
-          parent: id("client"),
+          parent: id("ready"),
           screen: id("client"),
           screenTitle: t("clients"),
           scene: p.id,
+          priority: 5,
           matches: [
             {
               target: selector(
@@ -432,7 +394,7 @@ export function remoteConnectionFlow(locale: Locale = "zh-CN"): UiFlow {
             );
           },
           actions: [
-            b("next", t("nextMessage"), id("chatgpt.verify")),
+            b("next", t("nextMessage"), id(suffix + "verify")),
             b("copy-oauth", t("copy", { name: r("oauthAuthorization") })),
             b("export", t("exportChatgptPlugin"), id("plugin")),
           ],
@@ -443,6 +405,7 @@ export function remoteConnectionFlow(locale: Locale = "zh-CN"): UiFlow {
         await ctx.ui.click(button(t("nextMessage")));
         await ctx.ui.expect(selector(`${root} [data-client-view="verify"]`));
       };
+      const setupParent = chatgpt ? "chatgpt" : p.id === "lan" ? "key" : "ready";
       const variants = [
         id(suffix + "verify"),
         ...(p.id !== "lan"
@@ -465,12 +428,12 @@ export function remoteConnectionFlow(locale: Locale = "zh-CN"): UiFlow {
               : condition === "denied"
                 ? t("denied")
                 : t("sendMessage"),
-          parent: id(chatgpt ? "chatgpt" : "client"),
+          parent: id(setupParent),
           screen: id(suffix + "verification"),
           screenTitle: t("sendMessage"),
           scene: p.id,
           variants,
-          priority: condition === "verify" ? 0 : 10,
+          priority: condition === "verify" ? 8 : 12,
           matches: [
             {
               target: selector(
@@ -523,7 +486,7 @@ export function remoteConnectionFlow(locale: Locale = "zh-CN"): UiFlow {
               "setup",
               t("serverSetup"),
               { role: "tab", name: t("serverSetup") },
-              id(chatgpt ? "chatgpt" : "client"),
+              id(setupParent),
             ),
           ],
         });
@@ -572,25 +535,21 @@ export function remoteConnectionFlow(locale: Locale = "zh-CN"): UiFlow {
         await ctx.ui.click(button(r("approvalAllow")));
       }
       await ctx.event("client.call", { provider: p.provider });
-      await ctx.ui.expect(selector(`${root} [data-client-view="list"]`));
+      await ctx.ui.expect(selector(`${root} [data-client-view="verified"]`));
     };
     nodes.push({
       id: id("connected"),
       title: t("connected"),
-      parent: id("client"),
-      screen: id("client"),
-      screenTitle: t("authorizedClients"),
+      parent: id("verify"),
+      screen: id("connected"),
+      screenTitle: t("verifiedState"),
       scene: p.id,
-      matches: [{ target: selector(`${root} [data-client-view="list"]`) }],
+      priority: 15,
+      matches: [{ target: selector(`${root} [data-client-view="verified"]`) }],
       enter: connected,
       actions: [
-        b("add", t("addClient"), id("client")),
-        b(
-          "revoke",
-          t("revoke", {
-            name: p.id === "lan" ? u("client") : "UI Lab MCP client",
-          }),
-        ),
+        b("overview-clients", t("viewAllClients"), "modes"),
+        b("add", t("addClient"), id("ready")),
       ],
     });
     if (publicNetwork)

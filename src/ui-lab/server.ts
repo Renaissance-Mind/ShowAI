@@ -22,6 +22,7 @@ import { AgentService } from "../agent/service";
 import motionMessages from "../i18n/messages/uiMotion";
 import { uiFeatures, uiScene } from "./registry";
 import { remoteConnectionFixture } from "./fixtures/remote-connection";
+import { settingsFixture } from "./fixtures/settings";
 import labMessages from "../i18n/messages/uiLab";
 import { messages } from "./messages";
 import type { LabSession, SceneFixture } from "./types";
@@ -156,15 +157,32 @@ export async function startUiLab(options: UiLabOptions) {
         );
       }
     }
+    const projectItems = projects.map((project) => ({
+      id: project.id,
+      name: project.name,
+    }));
+    const automatic = input.mode !== "test" && !input.flow;
     const fixture =
       scene.fixture === "remote-connection"
-        ? remoteConnectionFixture(
-            projects.map((project) => ({ id: project.id, name: project.name })),
-            input.mode !== "test" && !input.flow,
-          )
-        : empty;
+        ? remoteConnectionFixture(projectItems, automatic)
+        : scene.fixture === "settings"
+          ? settingsFixture(home, projectItems, automatic)
+          : empty;
     const trace: Session["trace"] = [];
-    const extra = new Set([...fixture.actions, "appUpdate:state"]);
+    const extra = new Set([...fixture.actions, "appUpdate:state", "appUpdate:check", "appUpdate:download", "appUpdate:setAutomatic"]);
+    let demoAppUpdate: {
+      supported: true;
+      automatic: boolean;
+      currentVersion: string;
+      phase: "current";
+      checkedAt: string;
+    } = {
+      supported: true,
+      automatic: true,
+      currentVersion: "0.12.0",
+      phase: "current",
+      checkedAt: "2026-11-21T06:00:00.000Z",
+    };
     const backend = await startBrowserServer({
       home,
       port: 0,
@@ -174,12 +192,13 @@ export async function startUiLab(options: UiLabOptions) {
       agentWorkspaceRoot: join(directory, "agent-workspaces"),
       registerAgentRuntime: false,
       additionalActions: extra,
+      disableNativeDialogs: input.mode === "test" || !!input.flow,
       development: { origin, token, sourceCommit },
       interceptInvoke: async (action, args, next) => {
         const mocked =
           fixture.actions.has(action) ||
           action.startsWith("plugins:") ||
-          action === "appUpdate:state";
+          action.startsWith("appUpdate:");
         if (action !== "remoteMcp:status" && action !== "remoteMcp:requests")
           trace.push({
             action,
@@ -190,7 +209,16 @@ export async function startUiLab(options: UiLabOptions) {
         if (fixture.actions.has(action)) return fixture.invoke(action, args);
         if (action === "plugins:status") return [];
         if (action === "plugins:runtime")
-          return { state: "not_registered", expected: { home }, home };
+          return {
+            path: join(home, "agent-runtime.json"),
+            state: "missing",
+            current: {
+              version: "0.12.0",
+              command: process.execPath,
+              entry: join(repository, "dist-runtime/scripts/cli.mjs"),
+              channel: "development",
+            },
+          };
         if (
           action.startsWith("plugins:") ||
           /^(fs:reveal|media:reveal|settings:chooseHome|agent:scan|agent:run|agent:authorize|sync:login|sync:configure|app:openWindow|app:openPageWindow)$/.test(
@@ -198,13 +226,22 @@ export async function startUiLab(options: UiLabOptions) {
           )
         )
           throw new Error(t("unavailable"));
-        if (action === "appUpdate:state")
-          return {
-            supported: false,
-            automatic: false,
-            currentVersion: "0.12.0",
-            phase: "idle",
+        if (action === "appUpdate:state") return { ...demoAppUpdate };
+        if (action === "appUpdate:check") {
+          demoAppUpdate = {
+            ...demoAppUpdate,
+            checkedAt: new Date().toISOString(),
           };
+          return { ...demoAppUpdate };
+        }
+        if (action === "appUpdate:download") return { ...demoAppUpdate };
+        if (action === "appUpdate:setAutomatic") {
+          demoAppUpdate = {
+            ...demoAppUpdate,
+            automatic: args.automatic === true,
+          };
+          return { ...demoAppUpdate };
+        }
         const result = await next();
         return action === "app:info"
           ? { ...(result as object), mode: "desktop", sourceCommit }

@@ -6,7 +6,7 @@ ShowAI lets your agent answer with interfaces — interactive, archived, and evo
 
 ## Install
 
-**Recommended: install from the ShowAI app.** Download the app from [GitHub Releases](https://github.com/Renaissance-Mind/ShowAI/releases/latest), open it, and use the plugin panel on the welcome screen or under **Settings → Plugins** to install the plugin for Claude Code, Codex or Antigravity. Install the agent first and make its command-line tool available. The app supplies the plugin and runtime; no source checkout or separate Node.js is needed. Restart the Claude Code or Antigravity session, or refresh plugins or restart Codex, then start a new conversation. The connection uses the app's current library; click **Update and enable** after switching libraries or moving the app. If the app reports a conflicting plugin source, disable the listed plugin in the host before installing the app version. See [Use ShowAI in Claude Code and Codex](https://github.com/Renaissance-Mind/ShowAI/blob/main/docs/codex.md).
+**Recommended: install from the ShowAI app.** Download the app from [GitHub Releases](https://github.com/Renaissance-Mind/ShowAI/releases/latest), open it, and use the plugin panel on the welcome screen or under **Settings → External Agent plugins** to install the plugin for Claude Code, Codex or Antigravity. Install the agent first and make its command-line tool available. The app supplies the plugin and runtime; no source checkout or separate Node.js is needed. Restart the Claude Code or Antigravity session, or refresh plugins or restart Codex, then start a new conversation. The connection uses the app's current library; click **Update and enable** after switching libraries or moving the app. If the app reports a conflicting plugin source, disable the listed plugin in the host before installing the app version. See [Use ShowAI in Claude Code and Codex](https://github.com/Renaissance-Mind/ShowAI/blob/main/docs/codex.md).
 
 ### From a source checkout
 
@@ -42,7 +42,7 @@ npm run plugin:antigravity -- --port <port> --json
 
 ### DeepSeek Harness
 
-DeepSeek Harness installs plugins itself, so ShowAI prepares one complete bundle ([dsh-showai](https://github.com/Renaissance-Mind/ShowAI/blob/main/plugins/dsh-showai/README.md)): the MCP tools bound to this runtime and library, these Skills, and inline page previews. In the App, open **Settings → Plugins → DeepSeek Harness → Prepare plugin**. From source, with a registered runtime:
+DeepSeek Harness installs plugins itself, so ShowAI prepares one complete bundle ([dsh-showai](https://github.com/Renaissance-Mind/ShowAI/blob/main/plugins/dsh-showai/README.md)): the MCP tools bound to this runtime and library, these Skills, and inline page previews. In the App, open **Settings → External Agent plugins → DeepSeek Harness → Prepare plugin**. From source, with a registered runtime:
 
 ```sh
 npm run plugin:dsh

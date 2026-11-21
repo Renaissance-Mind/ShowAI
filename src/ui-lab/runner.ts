@@ -70,7 +70,15 @@ export function playwrightDriver(page: Page): UiDriver {
       await locate(target).fill(value);
     },
     select: async (target, value) => {
-      await locate(target).selectOption(value);
+      const locator = locate(target);
+      if ((await locator.evaluate((el) => el.tagName)) === "SELECT")
+        await locator.selectOption(value);
+      else {
+        await locator.click();
+        await page
+          .locator(`[role="listbox"] [role="option"][data-value=${JSON.stringify(value)}]`)
+          .click();
+      }
     },
     async expect(target, state = "visible") {
       const locator = locate(target);

@@ -43,10 +43,11 @@ export function useRouteState({
       : "projects",
   );
   const [settingsSection, setSettingsSection] = useState<SettingsSection>(() =>
-    new URLSearchParams(location.search).has("invite") ||
-    !capabilities.manageLibrary
-      ? "sync"
-      : "general",
+    new URLSearchParams(location.search).has("invite")
+      ? "projects"
+      : !capabilities.manageLibrary
+        ? "sync"
+        : "general",
   );
   const [query, setQuery] = useState("");
   const [searchLibrary, setSearchLibrary] = useState(false);
