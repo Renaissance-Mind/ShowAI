@@ -53,6 +53,7 @@ import type { MenuState } from "./menus/useMenuState";
 import type { DirectoryState } from "./useDirectory";
 import type { StudioRouter } from "./useStudioRouter";
 import { focusAssistantInput, focusPageTitle } from "./focus";
+import { dshWorkbenchCanReference, sendDshWorkbenchReference } from "../../browser/dsh-workbench";
 import {
   DraftHeld,
   operation,
@@ -205,6 +206,11 @@ export function usePageActions({
       ...(record ? { expectedHash: record.hash } : {}),
     });
     const text = formatReference(reference, referenceHeading(ta, reference));
+    if (dshWorkbenchCanReference()) {
+      await sendDshWorkbenchReference(text);
+      setNotice(tcodex("dshReferenced", { version: referenceVersion(reference) }));
+      return;
+    }
     if (antigravityWorkbenchCanReference()) {
       await sendAntigravityWorkbenchReference(reference, text, target.components);
       setNotice(tcodex("antigravityReferenced", {

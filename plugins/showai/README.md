@@ -42,7 +42,7 @@ npm run plugin:antigravity -- --port <port> --json
 
 ### DeepSeek Harness
 
-DeepSeek Harness installs plugins itself, so ShowAI prepares one complete bundle ([dsh-showai](https://github.com/Renaissance-Mind/ShowAI/blob/main/plugins/dsh-showai/README.md)): the MCP tools bound to this runtime and library, these Skills, and inline page previews. In the App, open **Settings → Plugins → DeepSeek Harness → Prepare plugin**. From source, with a registered runtime:
+DeepSeek Harness installs plugins itself, so ShowAI prepares one complete bundle ([dsh-showai](https://github.com/Renaissance-Mind/ShowAI/blob/main/plugins/dsh-showai/README.md)): the MCP tools bound to this runtime and library, these Skills, inline previews, a session sidebar editor and a global workbench. In the App, open **Settings → Plugins → DeepSeek Harness → Prepare plugin**. From source, with a registered runtime:
 
 ```sh
 npm run plugin:dsh
@@ -63,7 +63,7 @@ Edit workflows in `plugins/showai/skills` and host delivery contracts in `plugin
 | Codex | `plugins/showai-codex` | Native MCP Apps views with a file-based fallback |
 | Claude Code | `plugins/showai-claude` | Host HTML display tool |
 | Antigravity | `plugins/showai-antigravity` | Native MCP Apps views, page cards, and side-pane workbench |
-| DeepSeek Harness | Prepared bundle directory | Automatic tool-result preview |
+| DeepSeek Harness | Prepared bundle directory | Inline preview, editable session sidebar, global workbench |
 | Kimi Work | `plugins-kimi/showai` | Offline Widget workspace and display action |
 | Universal | Six Skills; configure MCP in the host | MCP Apps view when supported, otherwise results and links |
 

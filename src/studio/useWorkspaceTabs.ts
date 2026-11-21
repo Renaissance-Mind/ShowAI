@@ -40,8 +40,10 @@ export function useWorkspaceTabs({
   beforeClose?: (tabId: string) => Promise<boolean>;
 }) {
   const embed = codexWorkbench();
+  const dsh = window.__SHOWAI_LOCAL__?.dshWorkbench;
   const storageKey = (library: string) =>
-    embed ? `showai:tabs:${library}:codex:${embed.instance}` : `showai:tabs:${library}`;
+    dsh ? `showai:tabs:${library}:dsh:${dsh.instance}` :
+      embed ? `showai:tabs:${library}:codex:${embed.instance}` : `showai:tabs:${library}`;
   const [state, setState] = useState(() => createWorkspace(entry));
   const current = useRef(state);
   const [switching, setSwitching] = useState(false);
@@ -64,7 +66,7 @@ export function useWorkspaceTabs({
     try {
       const bytes = JSON.stringify({ version: 1, ...next });
       sessionStorage.setItem(storageKey(library.current), bytes);
-      if (!embed) localStorage.setItem(`showai:tabs:last:${library.current}`, bytes);
+      if (!embed && !dsh) localStorage.setItem(`showai:tabs:last:${library.current}`, bytes);
     } catch (error) {
       latest.current.onError(error);
     }
@@ -145,7 +147,7 @@ export function useWorkspaceTabs({
         saved = parseWorkspaceTabs(
           sessionStorage.getItem(storageKey(home)),
         );
-        if (!embed && !saved && firstLibrary && params.get("restore") === "tabs") {
+        if (!embed && !dsh && !saved && firstLibrary && params.get("restore") === "tabs") {
           saved = parseWorkspaceTabs(
             localStorage.getItem(`showai:tabs:last:${home}`),
           );

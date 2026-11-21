@@ -22,6 +22,7 @@ export const DSH_BUNDLE_FILES = [
   "package.json",
   "cordis.patch.yml",
   "index.js",
+  "workbench.js",
   "skills.js",
   "client.js",
   "README.md",
@@ -125,6 +126,10 @@ export async function stageDshBundle({
   try {
     for (const file of DSH_BUNDLE_FILES)
       await cp(join(bundleRoot, file), join(staging, file));
+    await writeFile(join(staging, "workbench-binding.json"), JSON.stringify({
+      home,
+      runtimeConfig: server.env.SHOWAI_RUNTIME_CONFIG || join(home, "agent-runtime.json"),
+    }) + "\n");
     await bindHostSkills({
       source: pluginRoot,
       target: staging,

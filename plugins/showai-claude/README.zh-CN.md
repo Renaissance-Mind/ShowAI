@@ -42,7 +42,7 @@ npm run plugin:antigravity -- --port <端口> --json
 
 ### DeepSeek Harness
 
-DeepSeek Harness 由自己安装插件，因此 ShowAI 准备一个完整 bundle（[dsh-showai](https://github.com/Renaissance-Mind/ShowAI/blob/main/plugins/dsh-showai/README.md)），包含绑定当前运行时和内容库的 MCP 工具、上述 Skill 与对话内页面预览。App 中打开「设置 → 插件 → DeepSeek Harness → 准备插件」。源码方式在已登记运行时后执行：
+DeepSeek Harness 由自己安装插件，因此 ShowAI 准备一个完整 bundle（[dsh-showai](https://github.com/Renaissance-Mind/ShowAI/blob/main/plugins/dsh-showai/README.md)），包含绑定当前运行时和内容库的 MCP 工具、上述 Skill、对话内预览、会话右侧的编辑标签和左侧导航的全局工作台。App 中打开「设置 → 插件 → DeepSeek Harness → 准备插件」。源码方式在已登记运行时后执行：
 
 ```sh
 npm run plugin:dsh

@@ -41,7 +41,7 @@ const sync = (
 export const connectionCommands: CommandDeclaration[] = [
   {
     command: "serve",
-    options: { port: text, "no-open": flag },
+    options: { port: text, "no-open": flag, "dsh-origin": hiddenText },
     help: ["serve [--home PATH] [--port PORT] [--no-open]"],
     async run(args) {
       requireCount(args, 1);
@@ -49,6 +49,7 @@ export const connectionCommands: CommandDeclaration[] = [
       await runBrowser({
         home: option(args, "home"),
         port: option(args, "port"),
+        dshOrigin: option(args, "dsh-origin"),
         open: !args.options["no-open"],
         json: !!args.options.json,
       });

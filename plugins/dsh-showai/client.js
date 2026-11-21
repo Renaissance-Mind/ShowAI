@@ -29,6 +29,11 @@ window.__ModuleLoader__.load({
       "action.output": "工具输出",
       "action.hide": "隐藏页面",
       "action.show": "显示页面",
+      "action.sidebar": "在侧栏编辑",
+      "workbench.title": "ShowAI 工作台",
+      "workbench.loading": "正在打开 ShowAI 工作台…",
+      "workbench.failed": "无法连接工作台。请在 ShowAI 中重新准备插件，重启 Harness 后重试。",
+      "workbench.retry": "重试",
     };
     const en = {
       "row.title": "ShowAI page",
@@ -48,6 +53,11 @@ window.__ModuleLoader__.load({
       "action.output": "Tool output",
       "action.hide": "Hide page",
       "action.show": "Show page",
+      "action.sidebar": "Edit in sidebar",
+      "workbench.title": "ShowAI workbench",
+      "workbench.loading": "Opening the ShowAI workbench…",
+      "workbench.failed": "Could not connect. Prepare the plugin in ShowAI and restart Harness.",
+      "workbench.retry": "Retry",
     };
 
     const css = `
@@ -86,6 +96,128 @@ window.__ModuleLoader__.load({
       return /^[A-Za-z0-9_-]{1,96}$/.test(id)
         ? ROUTE + "/" + id + ".html?" + query
         : ROUTE + "/by-id?callId=" + encodeURIComponent(id) + "&" + query;
+    }
+
+    const WORKBENCH = "@showai/dsh-showai/workbench";
+    const PAGE_RESOURCE = "dsh-resource://showai-page/";
+    const validId = value => typeof value === "string" && /^[a-zA-Z0-9][a-zA-Z0-9_-]{0,127}$/.test(value);
+
+    function savedPage(data) {
+      return validId(data?.pageId) && validId(data?.projectId) && data.persistence?.savedToProject !== false
+        ? PAGE_RESOURCE + data.projectId + "/" + data.pageId : undefined;
+    }
+
+    function WorkbenchIcon() {
+      return h("svg", { width: 20, height: 20, viewBox: "0 0 24 24", fill: "none", stroke: "currentColor",
+        strokeWidth: 1.7, "aria-hidden": true }, h("rect", { x: 3, y: 4, width: 18, height: 16, rx: 3 }),
+        h("path", { d: "M9 4v16m3-5 2-3 2 1 2-4" }));
+    }
+
+    function WorkbenchFrame({ t, address, navigation, instance = "global", attachReference, global }) {
+      const frame = React.useRef(null);
+      const [attempt, retry] = React.useState(0);
+      const [url, setUrl] = React.useState("");
+      const [error, setError] = React.useState("");
+      const [ready, setReady] = React.useState(false);
+      const handled = React.useRef(navigation?.revision);
+      const session = typeof attachReference === "function";
+      React.useEffect(() => {
+        const controller = new AbortController();
+        setError(""); setUrl(""); setReady(false);
+        async function open() {
+          const response = await fetch("/showai-workbench", {
+            method: "POST",
+            headers: { "X-ShowAI-Workbench": location.protocol === "dsh-app:" && location.hostname === "app" ? "desktop" : "1" },
+            cache: "no-store", signal: controller.signal,
+          });
+          if (!response.ok) throw new Error(t("workbench.failed"));
+          const editor = new URL((await response.json()).url);
+          if (editor.protocol !== "http:" || editor.hostname !== "127.0.0.1") throw new Error(t("workbench.failed"));
+          if (session) editor.searchParams.set("dshSession", "1");
+          editor.searchParams.set("dshInstance", instance);
+          if (address?.startsWith(PAGE_RESOURCE)) {
+            const [project, page] = address.slice(PAGE_RESOURCE.length).split("/");
+            if (validId(project) && validId(page)) {
+              editor.searchParams.set("project", project);
+              editor.searchParams.set("page", page);
+            }
+          }
+          if (!controller.signal.aborted) setUrl(editor.href);
+        }
+        open().catch(failure => { if (!controller.signal.aborted) setError(failure.message); });
+        return () => controller.abort();
+      }, [address, instance, session, attempt]);
+      React.useEffect(() => {
+        if (!url || !attachReference) return;
+        const origin = new URL(url).origin;
+        function receive(event) {
+          if (event.origin !== origin || event.source !== frame.current?.contentWindow) return;
+          if (event.data?.type === "showai:editor-ready") { setReady(true); return; }
+          if (event.data?.type !== "showai:reference" || !event.ports[0]) return;
+          const port = event.ports[0];
+          try {
+            const text = event.data.text;
+            const ok = typeof text === "string" && text.length > 0 && text.length <= 64000 && attachReference(text);
+            port.postMessage({ ok: Boolean(ok) });
+          } catch { port.postMessage({ ok: false }); }
+          finally { port.close(); }
+        }
+        window.addEventListener("message", receive);
+        return () => window.removeEventListener("message", receive);
+      }, [url, attachReference]);
+      React.useEffect(() => {
+        if (!ready || !url || !address?.startsWith(PAGE_RESOURCE) || handled.current === navigation?.revision) return;
+        handled.current = navigation.revision;
+        const [project, page] = address.slice(PAGE_RESOURCE.length).split("/");
+        if (validId(project) && validId(page))
+          frame.current?.contentWindow?.postMessage({ type: "showai:open-page",
+            href: "showai://project/" + project + "/page/" + page }, new URL(url).origin);
+      }, [ready, url, address, navigation?.revision]);
+      return h("section", { "aria-label": t("workbench.title"), style: { height: "100%", minHeight: 0,
+        boxSizing: "border-box", display: "flex", flexDirection: "column",
+        ...(global ? { paddingTop: "var(--dsh-frame-top-clearance, 0px)" } : {}) } },
+        url ? h("iframe", { ref: frame, src: url, title: t("workbench.title"), referrerPolicy: "no-referrer",
+          style: { width: "100%", height: "100%", minHeight: 0, border: 0 },
+          allow: "clipboard-write", sandbox: "allow-scripts allow-same-origin allow-forms allow-modals allow-downloads allow-popups" })
+          : h("div", { role: "status", style: { padding: 16 } }, error || t("workbench.loading"),
+            error && h("button", { type: "button", onClick: () => retry(n => n + 1) }, t("workbench.retry"))));
+    }
+
+    function registerWorkbench(ctx, pageTitles) {
+      ctx.slots.inject("main", () => ctx.slots.register({ name: "main", key: WORKBENCH, locale: NS },
+        props => h(WorkbenchFrame, { t: props.t, global: true })));
+      ctx.slots.inject("sidebar.panellist", () => ctx.slots.register({
+        name: "sidebar.panellist", id: WORKBENCH, order: 30, label: "ShowAI", locale: NS,
+      }, WorkbenchIcon));
+      ctx.slots.inject("sidebar.right.pane.tab", () => {
+        const registry = ctx.get("sidebarRightTabs");
+        if (!registry) return;
+        ctx.effect(() => registry.register({
+          id: WORKBENCH, kind: "showai-workbench", patterns: [PAGE_RESOURCE + "**"], keepMounted: true,
+          title: address => pageTitles.get(address) || "ShowAI",
+          guide: [{ id: "library", order: 35, title: () => "ShowAI", icon: WorkbenchIcon }],
+        }), "showai: sidebar tab");
+        return ctx.slots.register({
+          name: "sidebar.right.pane.tab", key: WORKBENCH, locale: NS,
+          inject: sessionId => ({
+            sessionId,
+            attachReference: text => {
+              const scope = ctx.get("sessions")?.scope(sessionId);
+              const input = scope && ctx.get("conversation")?.input.for(scope);
+              if (!input) return false;
+              const { draft, draftRev, phase } = input.state.getSnapshot();
+              if (phase !== "plain") return false;
+              return scope.bail("slash/input-insert-text", {
+                text: (draft ? "\n" : "") + text, span: { start: draft.length, end: draft.length, draftRev },
+              }) === true;
+            },
+          }),
+        }, props => {
+          const { tab } = props.useTabInfo();
+          return h(WorkbenchFrame, { t: props.t, address: tab.contentId, navigation: tab.navigation,
+            instance: props.sessionId + "/" + tab.id, attachReference: props.attachReference });
+        });
+      });
     }
 
     function textOf(content) {
@@ -146,6 +278,7 @@ window.__ModuleLoader__.load({
         output,
         path,
         fullPath: htmlPath ?? inlinePath,
+        address: savedPage(data),
         title: typeof data?.title === "string" ? data.title : undefined,
         partial: requestedSelection(block),
         inlineAvailable: data?.display?.inlineAvailable === true,
@@ -269,6 +402,8 @@ window.__ModuleLoader__.load({
           h(
             "span",
             { className: "showai-page-actions", onClick: (event) => event.stopPropagation() },
+            model.address && props.openInSidebar && h("button", { type: "button", className: "showai-page-button",
+              onClick: () => props.openInSidebar(model.address, model.title) }, tr("action.sidebar")),
             model.hasPage
               ? h(
                   "button",
@@ -371,6 +506,7 @@ window.__ModuleLoader__.load({
         return {
           title: typeof data.title === "string" ? data.title : undefined,
           fullPath: typeof delivery.html === "string" ? delivery.html : delivery.inline,
+          address: savedPage(data),
         };
       }
       return undefined;
@@ -401,7 +537,7 @@ window.__ModuleLoader__.load({
         const presentation = presentationOf(message);
         if (presentation === undefined) return context.state;
         const pages = context.state.pages.filter((page) => page.callId !== callId);
-        pages.push({ callId, title: presentation.title, fullPath: presentation.fullPath, seq: match.event.seq });
+        pages.push({ callId, ...presentation, seq: match.event.seq });
         return { ...context.state, pages };
       },
       buildLocationData: (context, scope, previous) => {
@@ -433,11 +569,11 @@ window.__ModuleLoader__.load({
         : h(
             "div",
             { className: "showai-page-tail" },
-            pages.map((page) => h(ShowAIPageTailCard, { key: page.callId, page, openFile, tr })),
+            pages.map((page) => h(ShowAIPageTailCard, { key: page.callId, page, openFile, openInSidebar: props.openInSidebar, tr })),
           );
     }
 
-    function ShowAIPageTailCard({ page, openFile, tr }) {
+    function ShowAIPageTailCard({ page, openFile, openInSidebar, tr }) {
       const [open, setOpen] = React.useState(true);
       const [expanded, setExpanded] = React.useState(false);
       const [reload, setReload] = React.useState(0);
@@ -454,6 +590,8 @@ window.__ModuleLoader__.load({
           h(
             "span",
             { className: "showai-page-actions", style: { opacity: "1" } },
+            page.address && openInSidebar && h("button", { type: "button", className: "showai-page-button",
+              onClick: () => openInSidebar(page.address, page.title) }, tr("action.sidebar")),
             open
               ? h(
                   "button",
@@ -532,6 +670,16 @@ window.__ModuleLoader__.load({
           };
         }, "showai-page: styles");
         ctx.effect(() => ctx.locale.register(NS, { zh, en }), "showai-page: dictionaries");
+        const pageTitles = new Map();
+        registerWorkbench(ctx, pageTitles);
+        const sidebarActions = sessionId => {
+          const sidebar = ctx.get("sidebarRight");
+          return sidebar && sessionId ? { openInSidebar(address, title) {
+            pageTitles.set(address, title);
+            try { sidebar.openResourceIn(sessionId, address); }
+            finally { pageTitles.delete(address); }
+          } } : {};
+        };
         const conversation =
           ctx.uiConversation ?? (typeof ctx.get === "function" ? ctx.get("uiConversation") : undefined);
         if (conversation?.events !== undefined) {
@@ -541,14 +689,14 @@ window.__ModuleLoader__.load({
           }, "showai-page: turn records");
           ctx.slots.inject("conversation.chat.turnTail", () =>
             ctx.slots.register(
-              { name: "conversation.chat.turnTail", id: "@showai/dsh-showai/page-tail", locale: NS },
+              { name: "conversation.chat.turnTail", id: "@showai/dsh-showai/page-tail", locale: NS, inject: sidebarActions },
               ShowAIPageTail,
             ),
           );
         }
         for (const key of TOOLS) {
           ctx.slots.inject("tool.call.toolview", () =>
-            ctx.slots.register({ name: "tool.call.toolview", key, locale: NS }, ShowAIPageCard),
+            ctx.slots.register({ name: "tool.call.toolview", key, locale: NS, inject: sidebarActions }, ShowAIPageCard),
           );
         }
       },
