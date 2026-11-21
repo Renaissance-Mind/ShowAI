@@ -165,7 +165,7 @@ test("local OAuth protects projects and saves real pages directly to the desktop
     name: "showai_capabilities", arguments: { view: "presentation" },
   });
   expect(display.structuredContent).toEqual({
-    ok: true, data: { presentation: { declaredHostDisplay: "mcp-app", show: { maxComponents: 5 } } },
+    ok: true, data: { presentation: { declaredHostDisplay: "mcp-app", show: { maxComponents: 5, html: true } } },
   });
   const full = await anonymous.callTool({ name: "showai_capabilities", arguments: { view: "full" } });
   expect(full.structuredContent).toMatchObject({ data: { projects: { storage: "local" } } });
