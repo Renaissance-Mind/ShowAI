@@ -329,7 +329,7 @@ export async function renderReading(
     for (const frame of page.frames()) {
       if (!frame.parentFrame()) continue;
       if ((await frameOwner(frame)).html) {
-        await frame.waitForFunction(() => document.documentElement.dataset.showaiHtmlReady === "true");
+        await frame.waitForFunction(() => document.documentElement.dataset.showaiHtmlReady === "true", undefined, { polling: 50 });
         continue;
       }
       await frame.waitForFunction(
