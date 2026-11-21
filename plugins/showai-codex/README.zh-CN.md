@@ -65,7 +65,7 @@ npm run plugin:dsh
 | [create-template](skills/create-template/SKILL.md)       | 可复用模板文件夹与方法                         |
 | [collaborate-canvas](skills/collaborate-canvas/SKILL.md) | 画布协作、多端配对与保存状态                   |
 
-在任何宿主里展示内置组件都从 show-visual 开始。当前交付方式已知时，直接查轻量目录、读所选 guide、调用 `show_component`。只需核对未知连接的显示方式时，用 `showai_capabilities({view:"presentation"})` 取得显示声明和组件数上限。项目操作从 use-showai 开始，核对项目并保存后交付。明确要求独立文件时用 `render_document`。
+在聊天里做可视化时，用 show-visual 编写原创 HTML，直接调用 `show_component({html})`。多幅图按顺序传入数组，每次最多五幅。用户明确要求使用现有 ShowAI 组件时才查询目录，已知 ID 可直接读使用说明。需要核对宿主显示方式时用 `showai_capabilities({view:"presentation"})`。 项目操作从 use-showai 开始。
 
 ## 运行时与内容库
 

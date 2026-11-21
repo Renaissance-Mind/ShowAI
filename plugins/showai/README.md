@@ -80,7 +80,7 @@ The marketplace identity stays `showai@renaissance-mind`. The generated Codex an
 | [create-template](skills/create-template/SKILL.md)       | Reusable template folders and methods                                |
 | [collaborate-canvas](skills/collaborate-canvas/SKILL.md) | Co-editing on canvases, multi-device pairing                         |
 
-For public visuals, start with show-visual on any host. A known connection can go straight from the compact catalog to the chosen guide and `show_component`. If the connection's display is unknown, `showai_capabilities({view:"presentation"})` returns its display declaration and component limit. For project work, start with use-showai, confirm the project and save before delivery. Use `render_document` for standalone files.
+For a chat visual, use show-visual and call `show_component({html})` with the HTML you authored. Pass an ordered array of up to five fragments for separate visuals. The runtime renders the fragments directly. Read the catalog only when the user explicitly requests existing ShowAI components. A known ID goes straight to its guide. Use `showai_capabilities({view:"presentation"})` when the host display is unknown. For project work, use use-showai.
 
 ## Runtime and library
 

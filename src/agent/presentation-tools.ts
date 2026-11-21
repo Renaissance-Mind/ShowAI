@@ -20,6 +20,7 @@ import {
   presentationSchema,
   renderPresentation,
   renderComponents,
+  renderHtmlVisuals,
   showComponentSchema,
   compactPresentation,
   inlineReader,
@@ -46,6 +47,7 @@ import type { PageOperation } from "../core/model";
 import { withLocalResources } from "../core/local-resources";
 
 export type Presentation = Awaited<ReturnType<typeof renderPresentation>>;
+export type PresentationFiles = Omit<Presentation, "document">;
 export interface PresentationDelivery {
   artifactId?: string;
   html?: string;
@@ -229,7 +231,7 @@ export function registerPresentationTools(
   options: {
     transport: "stdio" | "http";
     storePresentation?: (
-      presentation: Presentation,
+      presentation: PresentationFiles,
     ) => Promise<PresentationDelivery>;
     widgetDomain?: string;
     privateProjects?: boolean;
@@ -349,7 +351,7 @@ export function registerPresentationTools(
         return mcpSuccess({
           presentation: {
             declaredHostDisplay: reportedDisplay,
-            show: { maxComponents: SHOW_COMPONENT_LIMIT },
+            show: { maxComponents: SHOW_COMPONENT_LIMIT, html: true },
           },
         });
       return mcpSuccess({
@@ -526,6 +528,7 @@ export function registerPresentationTools(
           show: {
             tool: "show_component",
             maxComponents: SHOW_COMPONENT_LIMIT,
+            html: true,
             deliveries: SHOW_DELIVERIES,
             savesContent: false,
             projectComponents: !!options.componentLibrary,
@@ -575,7 +578,7 @@ export function registerPresentationTools(
         cursor: z.string().optional(),
       },
       annotations: readOnly,
-      _meta: visualToolMeta,
+      _meta: { securitySchemes: noAuth },
     },
     (input) => safe(() => publicCatalog(input)),
   );
@@ -605,7 +608,7 @@ export function registerPresentationTools(
         file: z.string().optional(),
       },
       annotations: readOnly,
-      _meta: visualToolMeta,
+      _meta: { securitySchemes: noAuth },
     },
     ({ id, ...input }) => safe(() => describePublicResource(id, input)),
   );
@@ -668,23 +671,24 @@ export function registerPresentationTools(
   server.registerTool(
     "show_component",
     {
-      description: `Show 1–${SHOW_COMPONENT_LIMIT} components without saving. Built-ins need kind/data. auto follows the host. live requests updates.`,
+      description: `Render original HTML directly in chat (1–${SHOW_COMPONENT_LIMIT} visuals). Use kind/data or blocks only when existing components are requested.`,
       inputSchema: showComponentSchema,
       annotations: readOnly,
       _meta: { ...visualToolMeta, ...componentToolMeta },
     },
     async (input) => {
       try {
+        const authored = input.html === undefined ? undefined : renderHtmlVisuals({ ...input, html: input.html });
         if (input.projectId && !options.componentLibrary)
           throw new Error(
             "This connection cannot read saved project components. Show built-in components, pass componentSources, or save a Page in an authorized project.",
           );
-        const library = options.componentLibrary && {
+        const library = !authored && options.componentLibrary ? {
           root: options.componentLibrary.root,
           projectId: await options.componentLibrary.resolveProject(
             input.projectId,
           ),
-        };
+        } : undefined;
         const requestedDelivery = input.delivery && input.delivery !== "auto"
           ? input.delivery : declaredDisplay ? HOST_DISPLAYS[declaredDisplay] : undefined;
         if (input.live && (options.transport !== "stdio" || requestedDelivery !== "mcp-app"))
@@ -692,7 +696,8 @@ export function registerPresentationTools(
         expireViews();
         if (input.live && liveViews.size >= 32)
           throw new Error("Too many live presentations. Close one before creating another.");
-        const shown = await renderComponents(input, library);
+        const shown = authored ?? await renderComponents(input, library);
+        const inlineError = "inlineError" in shown ? shown.inlineError : undefined;
         const warnings = [...shown.warnings];
         let mode: Exclude<(typeof SHOW_DELIVERIES)[number], "auto"> =
           input.delivery && input.delivery !== "auto"
@@ -704,18 +709,18 @@ export function registerPresentationTools(
           warnings.push(
             "The plugin declared no host display. The MCP Apps view is attached; if this host shows nothing, call again with delivery image, compact or fragment-file according to the host's actual display.",
           );
-        if (shown.inlineError && mode !== "image") {
-          warnings.push(shown.inlineError);
+        if (inlineError && mode !== "image") {
+          warnings.push(inlineError);
           mode = "image";
         }
         let delivery: Record<string, unknown> = { mode };
         if (mode === "compact") {
-          const compact = await compactPresentation(shown.html);
+          const compact = authored ? authored.inline : await compactPresentation(shown.html);
           if (compact && Buffer.byteLength(compact) <= COMPACT_BYTES)
             delivery = {
               mode,
               compact,
-              note: "Pass this text unchanged to the host's model-written HTML visualization tool. It loads the ShowAI reader from public CDNs.",
+              note: "Pass this fragment unchanged to the host's HTML visualization tool.",
             };
           else {
             warnings.push(
@@ -726,7 +731,10 @@ export function registerPresentationTools(
             mode = "image";
           }
         }
-        if (mode === "fragment-file") {
+        const stored = authored && options.storePresentation ? await options.storePresentation(authored) : undefined;
+        if (mode === "fragment-file" && stored?.inline && options.transport === "stdio") {
+          delivery = { mode, inline: stored.inline };
+        } else if (mode === "fragment-file") {
           const directory = options.previewDirectory
             ? join(options.previewDirectory, "show-components")
             : undefined;
@@ -807,7 +815,7 @@ export function registerPresentationTools(
                   revision: snapshot.revision,
                   complete: false,
                 },
-                blocks: (shown.document.content.content ?? []).map((node) => ({
+                blocks: ("document" in shown ? shown.document.content.content ?? [] : []).map((node) => ({
                   id: node.attrs?.id,
                   type: node.type,
                   kind: node.attrs?.kind,
@@ -816,6 +824,7 @@ export function registerPresentationTools(
             : {}),
           ...(shown.title ? { title: shown.title } : {}),
           components: shown.components,
+          ...(stored?.source ? { source: stored.source, artifactId: stored.artifactId, expiresAt: stored.expiresAt } : {}),
           delivery,
           bytes: {
             inline: shown.inline ? Buffer.byteLength(shown.inline) : null,
@@ -828,10 +837,12 @@ export function registerPresentationTools(
           },
           persistence: {
             savedToProject: false,
-            files: mode === "fragment-file" ? "preview-directory" : "none",
+            files: stored ? "preview-cache" : mode === "fragment-file" ? "preview-directory" : "none",
           },
           ...(warnings.length ? { warnings } : {}),
-          next: "If the user asks to keep these components, save the same blocks with page_create({projectId,blocks}) or page_apply component.insert in the chosen project. Deliver the saved Page using the installed host adapter. Use page_present for a reading preview.",
+          next: authored
+            ? "For reuse only when requested: recover the selected HTML item from source or this tool input, parameterize its data and verify the same HTML with default and alternate data before component_save."
+            : "If the user asks to keep these components, save the same blocks with page_create({projectId,blocks}) or page_apply component.insert in the chosen project. Deliver the saved Page using the installed host adapter. Use page_present for a reading preview.",
         });
         return {
           ...result,
@@ -842,7 +853,7 @@ export function registerPresentationTools(
           _meta: {
             showai: {
               inline: shown.inline,
-              inlineError: shown.inlineError,
+              inlineError,
               ...(snapshot ? { live: snapshot } : {}),
             },
           },

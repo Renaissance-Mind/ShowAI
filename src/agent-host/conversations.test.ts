@@ -214,7 +214,10 @@ test("a conversation streams, persists and resumes the same Claude session", asy
   const first = await host.send({
     projectId: project.id,
     prompt: `Explain the selected passage using the following reference.\n${guide.slice(4_000, 27_500)}`,
-    target: { kind: "text", pageId: page.document.id, blockIds: [blockId], text: selectedText },
+    target: {
+      kind: "text", pageId: page.document.id, blockIds: [blockId], text: selectedText,
+      components: [{ blockId, name: "Related passage", model: { text: guide.slice(27_500, 33_500) } }],
+    },
   });
   const done = await settled(project.id, first.id);
   const [turn] = done.turns;
@@ -245,7 +248,9 @@ test("a conversation streams, persists and resumes the same Claude session", asy
   expect(sessionId).toBe(done.threadId);
   expect(calls[1].args[calls[1].args.indexOf("--resume") + 1]).toBe(sessionId);
   expect(calls[0].args).not.toContain(calls[0].prompt);
+  expect(calls[0].prompt).toContain("write original HTML");
   expect(calls[0].prompt.length).toBeGreaterThan(32_767);
+  expect(calls[0].prompt).not.toContain("Component directory:");
   expect(calls[1].prompt).toContain("Continue this ShowAI conversation");
   expect(calls[1].prompt).not.toContain("Component directory");
 

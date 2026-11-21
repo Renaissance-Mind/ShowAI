@@ -5,6 +5,12 @@ export const TOOL_CHANGES: {
   now: string;
 }[] = [
   {
+    date: "2026-11-22",
+    version: "0.12.0",
+    before: "Conversation previews required component kinds or source packages.",
+    now: "show_component accepts original HTML or an ordered list of HTML visuals without catalog lookup. component_save supports a parameterized .html entry with a distinct alternate example. Existing kind/data, blocks and live calls retain their contracts.",
+  },
+  {
     date: "2026-11-21",
     version: "0.12.0",
     before: "showai_capabilities always returned the full connection report.",

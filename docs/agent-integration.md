@@ -62,18 +62,18 @@ For deployment commands and acceptance gates, see [Cloudflare MCP operations](cl
 
 ### Public and authorized tools
 
-On stdio and HTTP, a public visual uses `public_catalog_list({kind:"component",view:"compact"})`, the selected ID's guide, then `show_component`. Go straight to the guide if you know the ID. A bound display needs no preliminary call. To check an unknown display, `showai_capabilities({view:"presentation"})` returns its declaration and component limit. The default full report covers project access, live updates and other capabilities.
+For a chat visual, use show-visual and call `show_component({html})` with the HTML you authored. Pass an ordered array of up to five fragments for separate visuals. The runtime renders the fragments directly. Read the catalog only when the user explicitly requests existing ShowAI components. A known ID goes straight to its guide. Use `showai_capabilities({view:"presentation"})` when the host display is unknown.
 
-| Client | How the three public visual tools become available |
+| Client | How the visual tools become available |
 | --- | --- |
-| Claude Code | The MCP server marks the three tools with `_meta["anthropic/alwaysLoad"]`. An explicit client setting can override it. [Tool loading](https://code.claude.com/docs/en/mcp#mark-a-tool-to-load-upfront-or-stay-deferred) |
-| Antigravity | The plugin requests eager loading for the three tools in `mcp_config.json`. [Eager tools](https://antigravity.google/docs/mcp#configure-eager-tools) |
+| Claude Code | The MCP server marks `show_component` with `_meta["anthropic/alwaysLoad"]`. An explicit client setting can override it. [Tool loading](https://code.claude.com/docs/en/mcp#mark-a-tool-to-load-upfront-or-stay-deferred) |
+| Antigravity | The plugin requests eager loading for `show_component` in `mcp_config.json`. [Eager tools](https://antigravity.google/docs/mcp#configure-eager-tools) |
 | Codex | Use the registered tools directly when visible. With tool search enabled, search together for the needed names. |
 | Kimi Work | Use the registered tools. In sessions that expose `select_tools`, select the needed names together. |
 | DeepSeek Harness | Its MCP client registers tools at connection time. The desktop and local Web UI show inline previews, a session sidebar for editing and quoting a Page into the draft, and a global workbench in the left navigation. |
 | ChatGPT MCP Apps and other HTTP clients | The server supplies the same tool schemas through `tools/list`. The client controls discovery and rendering. Clients without installed Skills can follow the tool descriptions. |
 
-ShowAI's built-in Agent receives the compact component index with project scopes, versions and integrity values. It can select a built-in directly from that index. The embedded text view can link the file returned by a local preview.
+The built-in Agent requests a component index when authoring a page or when the user asks to use existing components. Conversation HTML needs only the display tool. The embedded text view can link the file returned by a local preview.
 
 Public tools are `showai_capabilities`, `public_catalog_list`, `public_catalog_describe`, `render_document`, `show_component` and `presentation_source`. The last tool retrieves editable public render input in text chunks when a host cannot download the HTTP URL; it does not expose private project exports. The catalog includes built-in components and editable starter templates. All public rendering inputs come from the caller; anonymous operations do not read the user's content library.
 

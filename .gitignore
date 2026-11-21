@@ -93,6 +93,7 @@ plugins/showai/scripts/cli.mjs
 !/plugins/showai/skills/show-document/references/records.md
 !/plugins/showai/skills/use-showai/references/host-display.md
 !/plugins/showai/skills/show-visual/SKILL.md
+!/plugins/showai/skills/show-visual/references/catalog.md
 !/plugins/showai/skills/use-showai/SKILL.md
 !/plugins/showai/skills/use-showai/references/integration.md
 !/plugins/showai/skills/use-showai/references/runtime.md
@@ -241,6 +242,7 @@ plugins/showai/scripts/cli.mjs
 !/plugins/showai-antigravity/skills/show-document/SKILL.md
 !/plugins/showai-antigravity/skills/show-document/references/records.md
 !/plugins/showai-antigravity/skills/show-visual/SKILL.md
+!/plugins/showai-antigravity/skills/show-visual/references/catalog.md
 !/plugins/showai-antigravity/skills/use-showai/SKILL.md
 !/plugins/showai-antigravity/skills/use-showai/references/host-adapter.md
 !/plugins/showai-antigravity/skills/use-showai/references/host-display.md
@@ -271,6 +273,7 @@ plugins/showai/scripts/cli.mjs
 !/plugins/showai-claude/skills/show-document/SKILL.md
 !/plugins/showai-claude/skills/show-document/references/records.md
 !/plugins/showai-claude/skills/show-visual/SKILL.md
+!/plugins/showai-claude/skills/show-visual/references/catalog.md
 !/plugins/showai-claude/skills/use-showai/SKILL.md
 !/plugins/showai-claude/skills/use-showai/references/host-adapter.md
 !/plugins/showai-claude/skills/use-showai/references/host-display.md
@@ -301,6 +304,7 @@ plugins/showai/scripts/cli.mjs
 !/plugins/showai-codex/skills/show-document/SKILL.md
 !/plugins/showai-codex/skills/show-document/references/records.md
 !/plugins/showai-codex/skills/show-visual/SKILL.md
+!/plugins/showai-codex/skills/show-visual/references/catalog.md
 !/plugins/showai-codex/skills/use-showai/SKILL.md
 !/plugins/showai-codex/skills/use-showai/references/host-adapter.md
 !/plugins/showai-codex/skills/use-showai/references/host-display.md
@@ -329,6 +333,7 @@ plugins/showai/scripts/cli.mjs
 !/plugins-kimi/showai/skills/show-document/SKILL.md
 !/plugins-kimi/showai/skills/show-document/references/records.md
 !/plugins-kimi/showai/skills/show-visual/SKILL.md
+!/plugins-kimi/showai/skills/show-visual/references/catalog.md
 !/plugins-kimi/showai/skills/use-showai/SKILL.md
 !/plugins-kimi/showai/skills/use-showai/references/host-adapter.md
 !/plugins-kimi/showai/skills/use-showai/references/host-display.md

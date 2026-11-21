@@ -22,8 +22,6 @@ export const HOST_PROFILES = {
 export const HOST_GUIDE = "use-showai/references/host-adapter.md";
 export const DELIVERY_WORKFLOWS = ["show-visual/SKILL.md", "show-document/SKILL.md"];
 export const ANTIGRAVITY_EAGER_TOOLS = {
-  public_catalog_list: { eager: true },
-  public_catalog_describe: { eager: true },
   show_component: { eager: true },
 };
 const hash = (value) => createHash("sha256").update(value).digest("hex");

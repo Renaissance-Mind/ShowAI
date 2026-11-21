@@ -43,7 +43,7 @@ import {
 import {
   mcpSuccess,
   mcpFailure,
-  type Presentation,
+  type PresentationFiles,
 } from "./presentation-tools";
 import { inlinePresentation, inlineReader } from "./presentation";
 import { serverBaseUrl } from "../sync/server-url";
@@ -186,7 +186,7 @@ export async function createMcpHttpApp(options: McpHttpOptions) {
   }
   let renderCount = 0;
   const storePresentation = async (
-    value: Presentation,
+    value: PresentationFiles,
     publicSource = false,
     owner?: { grantId: string; projectId?: string },
   ) => {
@@ -248,7 +248,7 @@ export async function createMcpHttpApp(options: McpHttpOptions) {
     context?: RemoteWorkspaceContext,
     grant?: ProjectGrant,
   ) {
-    const storeForClient = (value: Presentation, publicSource = false) =>
+    const storeForClient = (value: PresentationFiles, publicSource = false) =>
       storePresentation(
         value,
         publicSource,
@@ -267,7 +267,7 @@ export async function createMcpHttpApp(options: McpHttpOptions) {
         channel: "mcp",
         ...(grant ? { readerId: `grant:${grant.id}` } : {}),
       },
-      instructions: "HTTP. Public visuals: public_catalog_list view=compact, public_catalog_describe view=guide, then show_component. Private operations require an authorized project.",
+      instructions: "HTTP. For chat visuals send original HTML to show_component. Look up catalog entries only when the user explicitly requests existing components. Private operations require an authorized project.",
       presentation: {
         transport: "http",
         storePresentation: (value) => storeForClient(value, true),
@@ -500,7 +500,6 @@ export async function createMcpHttpApp(options: McpHttpOptions) {
                       : await inlinePresentation(output);
                   const delivery = await storeForClient({
                     title: String(data.title ?? "ShowAI"),
-                    document: {} as Presentation["document"],
                     html:
                       args.format === "inline"
                         ? `<!doctype html><meta charset="utf-8">${output}`
@@ -604,7 +603,7 @@ export async function createMcpHttpApp(options: McpHttpOptions) {
       "presentation_source",
       {
         description:
-          "Retrieve the editable input for a public render_document result through MCP when the execution environment cannot download its URL. Reassemble text chunks in offset order, then parse JSON. This does not expose private project exports. The result is usable as render_document input, including original custom source packages.",
+          "Retrieve the editable input of a public HTML visual or render_document result. Reassemble text chunks in order, then parse JSON. Private exports are excluded.",
         inputSchema: {
           artifactId: z.string(),
           offset: z.number().int().min(0).optional(),
@@ -632,7 +631,7 @@ export async function createMcpHttpApp(options: McpHttpOptions) {
           );
         const parsed = JSON.parse(artifact.source);
         const source = JSON.stringify(
-          {
+          Array.isArray(parsed.html) ? { html: parsed.html } : {
             document: parsed.document,
             ...(parsed.componentSources?.length
               ? { componentSources: parsed.componentSources }

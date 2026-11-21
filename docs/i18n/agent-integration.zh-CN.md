@@ -52,18 +52,18 @@ showai mcp serve \
 
 ## 工具与授权
 
-本机 stdio 与远程 HTTP 共用三步：用 `public_catalog_list({kind:"component",view:"compact"})` 选组件，读所选 ID 的 guide，调用 `show_component`。已知 ID 可直接读 guide。交付方式已绑定时直接展示。只需核对未知连接的显示方式时，`showai_capabilities({view:"presentation"})` 返回显示声明与组件数上限。项目访问、持续更新等能力见默认的完整报告。
+在聊天里做可视化时，用 show-visual 编写原创 HTML，直接调用 `show_component({html})`。多幅图按顺序传入数组，每次最多五幅。用户明确要求使用现有 ShowAI 组件时才查询目录，已知 ID 可直接读使用说明。需要核对宿主显示方式时用 `showai_capabilities({view:"presentation"})`。
 
-| 客户端 | 三个公共展示工具的加载方式 |
+| 客户端 | 展示工具的加载方式 |
 | --- | --- |
-| Claude Code | 服务端用 `_meta["anthropic/alwaysLoad"]` 标记三个工具，用户显式设置具有优先权。[工具加载说明](https://code.claude.com/docs/en/mcp#mark-a-tool-to-load-upfront-or-stay-deferred) |
-| Antigravity | 安装包在 `mcp_config.json` 为三个工具声明 eager。[预加载说明](https://antigravity.google/docs/mcp#configure-eager-tools) |
+| Claude Code | 服务端用 `_meta["anthropic/alwaysLoad"]` 标记 `show_component`，用户显式设置具有优先权。[工具加载说明](https://code.claude.com/docs/en/mcp#mark-a-tool-to-load-upfront-or-stay-deferred) |
+| Antigravity | 安装包在 `mcp_config.json` 为 `show_component` 声明 eager。[预加载说明](https://antigravity.google/docs/mcp#configure-eager-tools) |
 | Codex | 当前可见时直接调用。开启工具搜索时，在一次查询里给出所需工具名。 |
 | Kimi Work | 直接使用已注册的工具。如果会话提供 `select_tools`，可一次选取需要的工具。 |
 | DeepSeek Harness | 自带的 MCP 客户端在连接时注册工具。本机图形界面支持对话内预览、右侧会话标签页编辑并引用到草稿、左侧导航打开全局工作台。 |
 | ChatGPT MCP Apps 及其他 HTTP 客户端 | 服务通过 `tools/list` 提供相同的工具声明，加载与显示由客户端控制。未安装 Skill 的客户端可按工具描述执行。 |
 
-ShowAI 内置 Agent 直接收到轻量组件索引，其中保留项目组件的作用域、版本和指纹。可从索引选择内置组件，文字界面可交付本机预览实际返回的文件链接。
+ShowAI 内置 Agent 在制作页面或用户指定已有组件时按需查询索引。聊天里的原创 HTML 可直接展示，文字界面可交付本机预览回执中的文件。
 
 公共工具包括 showai_capabilities、public_catalog_list/describe、render_document、show_component、presentation_source。presentation_source 分块取回公共渲染输入，不公开私有页面导出。匿名调用不会读取个人内容库。
 
