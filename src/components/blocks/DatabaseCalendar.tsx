@@ -99,43 +99,6 @@ export function resolveCalendar(
   };
 }
 
-export function pruneCalendarConfig(
-  config: DatabaseCalendarConfig | undefined,
-  columns: DatabaseColumn[],
-): DatabaseCalendarConfig | undefined {
-  if (!config) return undefined;
-  const next: DatabaseCalendarConfig = { ...config };
-  const keep = (
-    key:
-      | "dateColumn"
-      | "endDateColumn"
-      | "startTimeColumn"
-      | "endTimeColumn"
-      | "colorColumn"
-      | "doneColumn",
-    type: DatabaseColumn["type"],
-  ) => {
-    if (next[key] !== undefined && !pick(columns, next[key], type))
-      delete next[key];
-  };
-  keep("dateColumn", "date");
-  keep("endDateColumn", "date");
-  keep("startTimeColumn", "text");
-  keep("endTimeColumn", "text");
-  keep("colorColumn", "select");
-  keep("doneColumn", "checkbox");
-  if (
-    next.contextColumn !== undefined &&
-    !pick(columns, next.contextColumn, "text") &&
-    !pick(columns, next.contextColumn, "select")
-  )
-    delete next.contextColumn;
-  if (next.endDateColumn && next.endDateColumn === next.dateColumn)
-    delete next.endDateColumn;
-  if (!next.startTimeColumn) delete next.endTimeColumn;
-  return next;
-}
-
 const dateOf = (day: number) => new Date(day * DAY_MS);
 const monthStart = (day: number) => {
   const date = dateOf(day);
@@ -184,6 +147,12 @@ export function DatabaseCalendar({
   settings,
   editable,
   renderCell,
+  titleColumn,
+  labels,
+  onOpenRecord,
+  onModeChange,
+  selection,
+  viewId,
   onMove,
   onAdd,
   onRemove,
@@ -193,6 +162,12 @@ export function DatabaseCalendar({
   settings: CalendarView;
   editable: boolean;
   renderCell: (row: DatabaseRow, column: DatabaseColumn) => ReactNode;
+  titleColumn?: DatabaseColumn;
+  labels?: (row: DatabaseRow) => { name: string; value: string }[];
+  onOpenRecord?: (row: DatabaseRow) => void;
+  onModeChange?: (mode: Mode) => void;
+  selection?: ReadonlySet<string>;
+  viewId?: string;
   onMove?: (id: string, start: string, end?: string) => void;
   onAdd?: (date: string) => string | undefined;
   onRemove?: (id: string) => void;
@@ -204,11 +179,20 @@ export function DatabaseCalendar({
   const movable = (id: string) =>
     !sources?.get(id)?.readOnly.includes(settings.dateColumn?.id ?? "");
   const today = localDay();
-  const [mode, setMode] = useReaderState<Mode>("calendarMode", settings.mode, {
-    accept: (value) => ["month", "week", "heatmap"].includes(value as string),
-  });
+  const [readerMode, setReaderMode] = useReaderState<Mode>(
+    viewId && viewId !== "default" ? `calendarMode:${viewId}` : "calendarMode",
+    settings.mode,
+    {
+      accept: (value) => ["month", "week", "heatmap"].includes(value as string),
+    },
+  );
+  const mode = onModeChange ? settings.mode : readerMode;
+  const setMode = (next: Mode) => {
+    if (onModeChange) onModeChange(next);
+    else setReaderMode(next);
+  };
   const [anchor, setAnchor] = useReaderState(
-    "calendarDay",
+    viewId && viewId !== "default" ? `calendarDay:${viewId}` : "calendarDay",
     settings.initialDay ?? today,
     { accept: isIndex },
   );
@@ -223,13 +207,19 @@ export function DatabaseCalendar({
     endDateColumn,
     startTimeColumn,
     endTimeColumn,
-    colorColumn,
     doneColumn,
     contextColumn,
     weekStartsOn,
   } = settings;
+  const isShown = (column?: DatabaseColumn) =>
+    !!column && columns.some((item) => item.id === column.id);
+  const colorColumn = isShown(settings.colorColumn)
+    ? settings.colorColumn
+    : undefined;
   const primary =
-    columns.find((column) => column.type === "text") ?? columns[0];
+    titleColumn ??
+    columns.find((column) => column.type === "text") ??
+    columns[0];
   const entries = useMemo(
     () =>
       dateColumn
@@ -270,7 +260,7 @@ export function DatabaseCalendar({
       "--dbc-c-soft": `var(--dbc-${tone}-soft)`,
     }) as CSSProperties;
   const inFocus = (entry: Entry) =>
-    !focus || (colorColumn && text(entry.row[colorColumn.id]) === focus);
+    !focus || !colorColumn || text(entry.row[colorColumn.id]) === focus;
   useEffect(() => {
     const onKey = (event: globalThis.KeyboardEvent) => {
       if (event.key === "Escape") setSelectedId(null);
@@ -280,6 +270,13 @@ export function DatabaseCalendar({
     return () => window.removeEventListener("keydown", onKey);
   }, [selectedId]);
 
+  const selected = entries.find((entry) => entry.row.id === selectedId);
+  useEffect(() => {
+    if (selected && onOpenRecord) {
+      setSelectedId(null);
+      onOpenRecord(selected.row);
+    }
+  }, [selected, onOpenRecord]);
   if (!dateColumn)
     return (
       <EmptyState
@@ -326,7 +323,6 @@ export function DatabaseCalendar({
   const weekdays = range(0, 6).map((offset) =>
     format.weekday(startOfWeek(today, weekStartsOn) + offset),
   );
-  const selected = entries.find((entry) => entry.row.id === selectedId);
   const timeText = (entry: Entry) =>
     entry.startMinute === null
       ? ""
@@ -366,45 +362,66 @@ export function DatabaseCalendar({
   const chip = (entry: Entry, day: number, compact = false) => {
     const tone = toneOf(entry.row);
     const title = text(entry.row[primary?.id]) || t("untitled");
-    const context = contextColumn ? text(entry.row[contextColumn.id]) : "";
-    const time = timeText(entry);
+    const context = isShown(contextColumn)
+      ? text(entry.row[contextColumn!.id])
+      : "";
+    const time = isShown(startTimeColumn)
+      ? timeText(isShown(endTimeColumn) ? entry : { ...entry, endMinute: null })
+      : "";
+    const details = labels?.(entry.row) ?? [];
     return (
       <button
         type="button"
         key={entry.row.id}
         className={[
           "sb-dbc-chip",
-          entry.row.id === selectedId && "is-selected",
+          (selection?.has(entry.row.id) || entry.row.id === selectedId) &&
+            "is-selected",
           inFocus(entry) ? "" : "is-faded",
-          entry.done && "is-done",
+          isShown(doneColumn) && entry.done && "is-done",
           entry.start < day && "continues-before",
           entry.end > day && "continues-after",
-          context && "has-context",
+          (context || details.length > 0) && "has-context",
         ]
           .filter(Boolean)
           .join(" ")}
         style={toneStyle(tone)}
-        aria-pressed={entry.row.id === selectedId}
+        aria-pressed={
+          selection ? selection.has(entry.row.id) : entry.row.id === selectedId
+        }
         title={[context, [time, title].filter(Boolean).join(" ")]
           .filter(Boolean)
           .join("\n")}
-        draggable={Boolean(editable && onMove && movable(entry.row.id))}
+        draggable={Boolean(
+          !selection && editable && onMove && movable(entry.row.id),
+        )}
         onDragStart={() => setDragging(entry)}
         onDragEnd={() => setDragging(null)}
         onClick={() =>
-          setSelectedId(entry.row.id === selectedId ? null : entry.row.id)
+          onOpenRecord
+            ? onOpenRecord(entry.row)
+            : setSelectedId(entry.row.id === selectedId ? null : entry.row.id)
         }
       >
-        {doneColumn && (
+        {isShown(doneColumn) && (
           <span className="sb-dbc-check" aria-hidden="true">
             {entry.done ? "✓" : ""}
           </span>
         )}
-        {context ? (
+        {context || details.length > 0 ? (
           <span className="sb-dbc-chip-body">
-            <span className="sb-dbc-chip-context">{context}</span>
+            {context && <span className="sb-dbc-chip-context">{context}</span>}
             <span className="sb-dbc-chip-title">{title}</span>
             {time && !compact && <span className="sb-dbc-time">{time}</span>}
+            {details.map((item, index) => (
+              <span
+                className="sb-dbc-chip-context"
+                key={index}
+                title={item.name}
+              >
+                {item.value}
+              </span>
+            ))}
           </span>
         ) : (
           <>
@@ -873,7 +890,7 @@ export function DatabaseCalendar({
         </div>
       )}
       {mode === "month" ? month() : mode === "week" ? week() : heatmap()}
-      {selected && (
+      {selected && !onOpenRecord && (
         <div
           className="sb-dbc-detail"
           role="region"

@@ -102,6 +102,8 @@ import scene3dCss from "../components/blocks/scene3d.css?raw";
 import scene3dContract from "../components/blocks/scene3d-contract.mjs?raw";
 import chart from "../components/blocks/Chart.tsx?raw";
 import database from "../components/blocks/Database.tsx?raw";
+import databaseBulkEdit from "../components/blocks/DatabaseBulkEdit.tsx?raw";
+import databaseRecordControls from "../components/blocks/DatabaseRecordControls.tsx?raw";
 import metrics from "../components/blocks/Metrics.tsx?raw";
 import playground from "../components/blocks/Playground.tsx?raw";
 import gallery from "../components/blocks/Gallery.tsx?raw";
@@ -365,6 +367,8 @@ const sources: Record<string, string> = {
   "scene3d-contract.mjs": scene3dContract,
   "Chart.tsx": chart,
   "Database.tsx": database,
+  "DatabaseBulkEdit.tsx": databaseBulkEdit,
+  "DatabaseRecordControls.tsx": databaseRecordControls,
   "Metrics.tsx": metrics,
   "Playground.tsx": playground,
   "Gallery.tsx": gallery,
