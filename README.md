@@ -47,6 +47,21 @@ The agent saves the interface in ShowAI and shows it in the conversation (or as 
 | ChatGPT on the web                        | Self-hosted  | Enable Remote connection in the desktop App with your own Cloudflare or Tailscale account ([guide](docs/chatgpt.md))                    |
 | Other MCP clients (Gemini CLI, OpenCode…) | Experimental | Configure the stdio MCP entry by hand ([Agent integration](docs/agent-integration.md))                                                 |
 
+### Plugin paths by Agent host
+
+When installing ShowAI from this repository, use the row for your current Agent host. Paths are relative to the repository root. Start ShowAI or register its runtime before following the local installation steps.
+
+| Agent host                      | Repository directory or connection                            | Install or connect                                                                                                                                          |
+| ------------------------------- | ------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Codex                           | [plugins/showai-codex/](plugins/showai-codex/)                | Run `npm run plugin:install` from the checkout. [Source installation](docs/codex.md#install-from-a-source-checkout)                                         |
+| Claude Code                     | [plugins/showai-claude/](plugins/showai-claude/)              | Add this repository as a Claude Code marketplace and install `showai@renaissance-mind`. [Source installation](docs/codex.md#install-from-a-source-checkout) |
+| Antigravity                     | [plugins/showai-antigravity/](plugins/showai-antigravity/)    | Run `npm run plugin:antigravity` from the checkout. [Source installation](plugins/showai/README.md#from-a-source-checkout)                                  |
+| DeepSeek Harness                | [plugins/dsh-showai/](plugins/dsh-showai/) (bundle source)    | Run `npm run plugin:dsh` and add the prepared directory shown by the command in DeepSeek Harness. [Bundle setup](plugins/showai/README.md#deepseek-harness) |
+| Kimi Work                       | [plugins-kimi/showai/](plugins-kimi/showai/)                  | In Kimi Work, register and install this exact subdirectory. [Kimi Work setup](plugins-kimi/showai/README.md#install-and-update)                             |
+| ChatGPT on the web              | Remote MCP                                                    | [Set up the remote connection in ChatGPT](docs/chatgpt.md#connect-chatgpt).                                                                                 |
+| Qoder, TRAE, WorkBuddy          | Manual MCP setup                                              | Use the host's MCP settings to [configure a ShowAI connection](docs/agent-integration.md). Host-specific packages are pending.                              |
+| Other Agent Plugins 1.0 clients | [plugins/showai/](plugins/showai/) (universal package source) | [Generate and install the universal Skills package](plugins/showai/README.md#universal-plugin-and-manual-mcp-setup), then configure MCP in the host.        |
+
 ## 💡 See what it makes
 
 | [Kyoto in five days](https://showai.renaissancemind.ai/?project=173ce4da-05f8-4913-b66a-da214d23b4cb&page=f3641d0c-a605-44ca-a523-79fe532eac65) | [Attention, step by step](https://showai.renaissancemind.ai/?project=173ce4da-05f8-4913-b66a-da214d23b4cb&page=1d0f36da-d0e5-4f26-97bc-158217916fa8) | [Which foldable to buy?](https://showai.renaissancemind.ai/?project=173ce4da-05f8-4913-b66a-da214d23b4cb&page=cb8ed801-1670-45c1-bf19-d97dafddcea2) |

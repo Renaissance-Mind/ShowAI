@@ -47,6 +47,21 @@ Agent 会把界面保存到 ShowAI 并在对话中展示（不能内嵌显示的
 | 网页版 ChatGPT                             | 自行部署 | 在桌面 App 开启远程连接，使用自己的 Cloudflare 或 Tailscale 接入本机项目（[指南](chatgpt.zh-CN.md)）                                    |
 | 其他 MCP 客户端（Gemini CLI、OpenCode 等） | 实验   | 手动配置 stdio MCP（[Agent 接入](agent-integration.zh-CN.md)）                                                                 |
 
+### 按 Agent 宿主选择插件目录
+
+从本仓库安装 ShowAI 时，按当前运行的 Agent 宿主查下表。目录均相对于仓库根。本机接入前先启动 ShowAI 或登记其运行时。
+
+| Agent 宿主                          | 仓库目录或连接方式                                               | 安装或接入                                                                                                                                                |
+| ----------------------------------- | ---------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Codex                               | [plugins/showai-codex/](../../plugins/showai-codex/)             | 在源码目录运行 `npm run plugin:install`。[源码安装说明](codex.zh-CN.md#从源码安装)                                                                        |
+| Claude Code                         | [plugins/showai-claude/](../../plugins/showai-claude/)           | 将本仓库添加为 Claude Code 插件市场，安装 `showai@renaissance-mind`。[源码安装说明](codex.zh-CN.md#从源码安装)                                            |
+| Antigravity                         | [plugins/showai-antigravity/](../../plugins/showai-antigravity/) | 在源码目录运行 `npm run plugin:antigravity`。[源码安装说明](../../plugins/showai/README.zh-CN.md#从源码安装)                                              |
+| DeepSeek Harness                    | [plugins/dsh-showai/](../../plugins/dsh-showai/)（bundle 源码）  | 运行 `npm run plugin:dsh`，然后在 DeepSeek Harness 中添加命令返回的已准备目录。[准备并启用 bundle](../../plugins/showai/README.zh-CN.md#deepseek-harness) |
+| Kimi Work                           | [plugins-kimi/showai/](../../plugins-kimi/showai/)               | 在 Kimi Work 中指定这个子目录，注册后安装。[Kimi Work 安装说明](../../plugins-kimi/showai/README.md#安装与更新)                                           |
+| 网页版 ChatGPT                      | 远程 MCP                                                         | [在 ChatGPT 中建立远程连接](chatgpt.zh-CN.md#连接-chatgpt)。                                                                                              |
+| Qoder、TRAE、WorkBuddy              | 手动配置 MCP                                                     | 在当前宿主的 MCP 设置中[配置 ShowAI 连接](agent-integration.zh-CN.md)。专用包待接入。                                                                     |
+| 其他兼容 Agent Plugins 1.0 的客户端 | [plugins/showai/](../../plugins/showai/)（通用包源码）           | [生成并安装通用 Skills 包](../../plugins/showai/README.zh-CN.md#通用插件与手动连接)，然后在宿主中配置 MCP。                                               |
+
 ## 💡 看看做出来的样子
 
 | [京都五日：慢慢走](https://showai.renaissancemind.ai/?project=173ce4da-05f8-4913-b66a-da214d23b4cb&page=f3641d0c-a605-44ca-a523-79fe532eac65) | [注意力机制，一步步看懂](https://showai.renaissancemind.ai/?project=173ce4da-05f8-4913-b66a-da214d23b4cb&page=1d0f36da-d0e5-4f26-97bc-158217916fa8) | [该买哪台折叠屏？](https://showai.renaissancemind.ai/?project=173ce4da-05f8-4913-b66a-da214d23b4cb&page=cb8ed801-1670-45c1-bf19-d97dafddcea2) |
