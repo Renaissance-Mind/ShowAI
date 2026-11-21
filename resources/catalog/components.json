@@ -493,6 +493,70 @@
                   "additionalProperties": false
                 },
                 "description": "按顺序应用的排序；较早的单个 sort 仍可读取，修改视图时改写为 sorts。"
+              },
+              "hiddenColumns": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 200
+                },
+                "maxItems": 50,
+                "uniqueItems": true,
+                "description": "在此视图隐藏的字段 ID。记录标题始终显示，隐藏字段仍可用于筛选、排序、分组和日历排期。"
+              },
+              "calendar": {
+                "type": "object",
+                "description": "本视图的日历设置。省略时沿用数据库的 calendar。",
+                "properties": {
+                  "dateColumn": {
+                    "type": "string",
+                    "description": "开始日期列（date 类型）。"
+                  },
+                  "endDateColumn": {
+                    "type": "string",
+                    "description": "可选结束日期列（date 类型），记录会跨日显示。"
+                  },
+                  "startTimeColumn": {
+                    "type": "string",
+                    "description": "可选开始时间列（text 类型，HH:MM）；周视图据此画出时间轴。"
+                  },
+                  "endTimeColumn": {
+                    "type": "string",
+                    "description": "可选结束时间列（text 类型，HH:MM），需要同时设置 startTimeColumn。"
+                  },
+                  "colorColumn": {
+                    "type": "string",
+                    "description": "按哪一列（select 类型）着色并生成图例；空字符串表示不着色。"
+                  },
+                  "doneColumn": {
+                    "type": "string",
+                    "description": "完成标记列（checkbox 类型）；设置后热力图只统计已勾选记录。"
+                  },
+                  "contextColumn": {
+                    "type": "string",
+                    "description": "可选的上下文列（text 或 select 类型），在每条记录标题上方另起一行显示，例如所属项目。"
+                  },
+                  "mode": {
+                    "enum": ["month", "week", "heatmap"]
+                  },
+                  "initialDate": {
+                    "type": "string",
+                    "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+                    "description": "初始显示的日期，默认今天。"
+                  },
+                  "weekStartsOn": {
+                    "enum": [0, 1],
+                    "description": "一周从周日 (0) 还是周一 (1) 开始，默认 1。"
+                  },
+                  "weeks": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 53,
+                    "description": "热力图覆盖的周数，默认 12。"
+                  }
+                },
+                "additionalProperties": false
               }
             },
             "required": ["id", "name", "type"],
@@ -1578,19 +1642,21 @@
               "id": "progress",
               "name": "阅读进度",
               "type": "board",
-              "groupBy": "status"
+              "groupBy": "status",
+              "hiddenColumns": ["note"]
             }
           ]
         }
       }
     ],
-    "version": "1.4.1",
+    "version": "1.5.0",
     "effects": [
       "让读者筛选、排序和搜索一组记录，检查具体证据。",
-      "同一份数据可保存多个命名视图，在表格、看板与列表间切换，分别呈现属性对比、状态分组和简洁清单。",
+      "同一份记录可按多个命名视图呈现。复制视图会复制它的筛选、排序、列宽、分组、字段显隐与日历设置。",
       "日期记录可在月历、周时间轴和热力图之间切换，按类别着色，标出今天，点开记录查看与编辑。",
       "热力图统计每天的记录或已完成数，给出当前连续、最长连续与活跃天数。",
-      "页面属性把记录链接到项目里的页面，在工作台点击可从右侧预览，保留数据库上下文并编辑记录属性；在工作台新建记录会自动在数据库文件夹里新建并链接一个页面，记录名称与页面标题保持同步。"
+      "页面属性把记录链接到项目里的页面，在工作台点击可从右侧预览，保留数据库上下文并编辑记录属性；在工作台新建记录会自动在数据库文件夹里新建并链接一个页面，记录名称与页面标题保持同步。",
+      "在筛选视图新建时带入可确定的条件值。可选择多条记录，一次修改同一字段。"
     ]
   },
   {

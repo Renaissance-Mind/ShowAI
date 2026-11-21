@@ -1,9 +1,10 @@
+import { pruneCalendarConfig } from "./database-views";
 import { describe, expect, it } from "vitest";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import catalog from "../../../resources/catalog/components.json";
 import { DatabaseBlock } from "./Database";
-import { pruneCalendarConfig, resolveCalendar } from "./DatabaseCalendar";
+import { resolveCalendar } from "./DatabaseCalendar";
 import {
   calendarEntries,
   entriesByDay,

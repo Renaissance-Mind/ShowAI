@@ -6,6 +6,7 @@ import { PageLinkContext, type PageLinkBridge } from "../page-links";
 import { parsePageCell, validateDatabaseData } from "./database-contract.mjs";
 import {
   changeView,
+  duplicateDatabaseView,
   columnWidth,
   databaseViews,
   moveColumnTo,
@@ -145,6 +146,51 @@ describe("database views", () => {
       views: saved,
       saved: true,
     });
+  });
+  it("duplicates independent display and query settings with a fresh id and name", () => {
+    const original: DatabaseView = {
+      id: "week",
+      name: "Week",
+      type: "calendar",
+      calendar: { mode: "week", colorColumn: "" },
+      hiddenColumns: ["status"],
+      filter: { column: "status", value: "进行中" },
+      sorts: [{ column: "title", direction: "asc" }],
+      columnWidths: { title: 200 },
+    };
+    const suffix = (name: string) => name + " copy";
+    const copy = duplicateDatabaseView(original, [original], suffix);
+    expect(copy).toEqual({ ...original, id: "view-2", name: "Week copy" });
+    expect(duplicateDatabaseView(original, [original, copy], suffix).name).toBe(
+      "Week copy 2",
+    );
+    copy.hiddenColumns!.push("doc");
+    copy.calendar!.mode = "month";
+    expect(original.hiddenColumns).toEqual(["status"]);
+    expect(original.calendar?.mode).toBe("week");
+    expect(() =>
+      validateDatabaseData({ ...records(), views: [original, copy] }),
+    ).not.toThrow();
+    for (const hiddenColumns of [["status", "status"], [12]]) {
+      expect(() =>
+        validateDatabaseData({
+          ...records(),
+          views: [{ ...original, hiddenColumns }],
+        }),
+      ).toThrow(/hiddenColumns/);
+    }
+    expect(
+      pruneViews(
+        [
+          {
+            ...original,
+            hiddenColumns: ["gone", "status"],
+            calendar: { ...original.calendar, dateColumn: "gone" },
+          },
+        ],
+        columns,
+      )[0],
+    ).toEqual(original);
   });
   it("writes views in place of the older fields", () => {
     const next = withViews({ ...records(), view: "board", groupBy: "status" }, [

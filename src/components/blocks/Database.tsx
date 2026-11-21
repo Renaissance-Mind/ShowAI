@@ -1,5 +1,11 @@
 import { BlockDataState, BlockItemSources, BlockSettings } from "./action-host";
 import { canEdit } from "../../datasets/editable.mjs";
+import {
+  DatabaseBulkEdit,
+  SelectRecords,
+  type DatabaseSelection,
+} from "./DatabaseBulkEdit";
+import { RecordTitle, RecordDialog } from "./DatabaseRecordControls";
 import ExpandableSearch from "../ExpandableSearch";
 import {
   createContext,
@@ -13,6 +19,12 @@ import {
 import { createPortal } from "react-dom";
 import {
   Check,
+  CheckSquare,
+  Copy,
+  ArrowUp,
+  ArrowDown,
+  X,
+  Eye,
   Download,
   Filter,
   GripVertical,
@@ -22,14 +34,16 @@ import {
 } from "../../ui/icons";
 import { downloadFile, text, toCsv, uid } from "./helpers";
 import { BlockHeader, Field, blockLabel } from "./shared";
-import { pruneCalendarConfig, resolveCalendar } from "./DatabaseCalendar";
-import { parsePageCell } from "./database-contract.mjs";
+import { resolveCalendar } from "./DatabaseCalendar";
+import { MAX_DATABASE_VIEWS, parsePageCell } from "./database-contract.mjs";
 import {
   changeView,
   columnWidth,
   databaseViews as savedViews,
   moveColumnTo,
   newViewId,
+  duplicateDatabaseView,
+  pruneCalendarConfig,
   pruneViews,
   titleSyncActions,
   upgradeViewQuery,
@@ -40,7 +54,11 @@ import {
 import { usePropertyReorder } from "./database-reorder";
 import { useColumnResize } from "./database-column-resize";
 import { useDatabaseViewMotion } from "./database-view-motion";
-import { databaseRecordTargets } from "./database-records";
+import {
+  databaseRecordTargets,
+  recordFilterDefaults,
+  sameDatabaseValue,
+} from "./database-records";
 import { pageLink } from "../../document/page-link.mjs";
 import { usePageLinks } from "../page-links";
 import { getLocale } from "../../i18n";
@@ -363,9 +381,14 @@ export function DatabaseBlock({ data, onChange, readOnly }: BlockProps) {
     locale: getLocale(),
   };
   const typeOf = (column: DatabaseColumn) => valueTypeOf(column, context);
+  const writable = Boolean(onChange && !readOnly);
+  const rowsEditable =
+    writable && (!dataState || canEdit(dataState.editable, "rows", ""));
+  const canAdd = rowsEditable && rows.length < 5000;
   const editable =
-    Boolean(onChange && !readOnly) &&
-    (!dataState || canEdit(dataState.editable, "columns"));
+    writable && (!dataState || canEdit(dataState.editable, "columns"));
+  const viewEditable =
+    writable && (!dataState || canEdit(dataState.editable, "views"));
   const viewName = (type: DatabaseViewType) => t(databaseView(type).label);
   const { views } = savedViews(data, viewName);
   const [activeView, setActiveView] = useReaderState("activeView", "", {
@@ -377,7 +400,7 @@ export function DatabaseBlock({ data, onChange, readOnly }: BlockProps) {
   const savedView = views.find((view) => view.id === activeView) ?? views[0];
   const current: DatabaseView = {
     ...savedView,
-    ...(editable ? {} : overrides[savedView.id]),
+    ...(viewEditable ? {} : overrides[savedView.id]),
   };
   const view = current.type;
   const viewDefinition = databaseView(view);
@@ -385,11 +408,21 @@ export function DatabaseBlock({ data, onChange, readOnly }: BlockProps) {
     `${savedView.id}:${view}`,
     views.length > 1,
   );
+  const [selection, setSelection] = useState<Set<string> | null>(null);
+  const [lastBulk, setLastBulk] = useState<{
+    field: string;
+    type: DatabaseColumn["type"];
+    value: DatabaseValue;
+    before: Map<string, DatabaseValue | undefined>;
+  } | null>(null);
+  const [bulkError, setBulkError] = useState(false);
   const selectView = (id: string) => {
     if (id === savedView.id) return;
     motion.capture();
     setActiveView(id);
+    setSelection(null);
     setDraftViewName(null);
+    setCreatedRowId(null);
     setPage(0);
   };
   const sorts = readSorts(current);
@@ -398,7 +431,7 @@ export function DatabaseBlock({ data, onChange, readOnly }: BlockProps) {
     onChange?.(withViews(base, next));
   const changeCurrent = (changes: Partial<DatabaseView>) => {
     if (changes.type && changes.type !== current.type) motion.capture();
-    if (editable)
+    if (viewEditable)
       writeViews(
         views.map((item) =>
           item.id === savedView.id
@@ -420,12 +453,6 @@ export function DatabaseBlock({ data, onChange, readOnly }: BlockProps) {
         },
       }));
   };
-  const [calendarChoice, setCalendarChoice] =
-    useReaderState<DatabaseCalendarConfig>(
-      "calendar",
-      {},
-      { accept: isRecord },
-    );
   const [query, setQuery] = useState("");
   const [showFilter, setShowFilter] = useState(false);
   const [addingProperty, setAddingProperty] = useState(false);
@@ -436,13 +463,17 @@ export function DatabaseBlock({ data, onChange, readOnly }: BlockProps) {
   const [draftViewName, setDraftViewName] = useState<string | null>(null);
   const [error, setError] = useState("");
   const [page, setPage] = useReaderState("page", 0, { accept: isIndex });
+  const [localRecordId, setLocalRecordId] = useState<string | null>(null);
   const [pageError, setPageError] = useState("");
+  const [createdRowId, setCreatedRowId] = useState<string | null>(null);
+  const pendingRowPages = useRef(new Map<string, string>());
+  const linkingPages = useRef(new Set<string>());
   const latestData = useRef(data);
   latestData.current = data;
   const pageQueue = useRef<Promise<unknown>>(Promise.resolve());
   const sources = useContext(BlockItemSources);
   const cellEditable = (row: DatabaseRow, column: DatabaseColumn) =>
-    editable &&
+    writable &&
     !sources?.get(row.id)?.readOnly.includes(column.id) &&
     (!dataState || canEdit(dataState.editable, "rows", row.id, column.id));
   const removable = (row: DatabaseRow) =>
@@ -455,20 +486,134 @@ export function DatabaseBlock({ data, onChange, readOnly }: BlockProps) {
     groupable.find((column) => column.id === data.groupBy) ??
     groupable.find((column) => column.type === "select");
   const pageColumns = columns.filter((column) => column.type === "page");
+  const titleColumn =
+    columns.find(
+      (column) =>
+        column.id === pageColumns.find((item) => item.titleColumn)?.titleColumn,
+    ) ??
+    columns.find((column) => column.type === "text") ??
+    columns[0];
+  const defaultCalendar: DatabaseCalendarConfig =
+    data.calendar && typeof data.calendar === "object"
+      ? (data.calendar as DatabaseCalendarConfig)
+      : {};
+  const savedCalendar = current.calendar ?? defaultCalendar;
+  const calendar = resolveCalendar(columns, savedCalendar);
+  const calendarLabels = [
+    titleColumn,
+    calendar.contextColumn,
+    calendar.colorColumn,
+    calendar.doneColumn,
+    calendar.startTimeColumn,
+    calendar.endTimeColumn,
+  ];
+  const hidden = new Set(
+    current.hiddenColumns ??
+      (view === "calendar"
+        ? shownColumns
+            .filter(
+              (column) =>
+                !calendarLabels.some((label) => label?.id === column.id),
+            )
+            .map((column) => column.id)
+        : []),
+  );
+  const visibleColumns = shownColumns.filter(
+    (column) => column.id === titleColumn?.id || !hidden.has(column.id),
+  );
   const shownRows = queryRecords(
     rows,
     shownColumns,
     { search: query, filter, sorts },
     context,
   );
-  const savedCalendar: DatabaseCalendarConfig =
-    data.calendar && typeof data.calendar === "object"
-      ? (data.calendar as DatabaseCalendarConfig)
-      : {};
-  const calendar = resolveCalendar(columns, {
-    ...savedCalendar,
-    ...calendarChoice,
-  });
+  const selectedRows = selection
+    ? shownRows.filter((row) => selection.has(row.id))
+    : [];
+  const toggleRow = (row: DatabaseRow) =>
+    setSelection((old) => {
+      const next = new Set(old);
+      if (next.has(row.id)) next.delete(row.id);
+      else next.add(row.id);
+      return next.size ? next : null;
+    });
+  const toggleAll = (checked: boolean) =>
+    setSelection(checked ? new Set(shownRows.map((row) => row.id)) : null);
+  const selectionProps: DatabaseSelection | undefined = rowsEditable
+    ? {
+        active: !!selection,
+        selected: selection ?? new Set(),
+        count: selectedRows.length,
+        toggleAll,
+      }
+    : undefined;
+  const bulkColumns = selection
+    ? columns.filter(
+        (column) =>
+          !isDerivedColumn(column) &&
+          !typeOf(column).unknown &&
+          selectedRows.every((row) => cellEditable(row, column)),
+      )
+    : [];
+  const bulkApply = (
+    column: DatabaseColumn,
+    draft: DatabaseValue | undefined,
+  ) => {
+    if (
+      !selectedRows.length ||
+      !bulkColumns.some((field) => field.id === column.id)
+    )
+      return;
+    const value = draft ?? (typeOf(column).blank() as DatabaseValue);
+    if (typeOf(column).check(value, column)) return;
+    const before = new Map<string, DatabaseValue | undefined>();
+    const ids = new Set(selectedRows.map((row) => row.id));
+    const next = rows.map((row) => {
+      if (!ids.has(row.id) || sameDatabaseValue(row[column.id], value))
+        return row;
+      before.set(row.id, row[column.id]);
+      return { ...row, [column.id]: value };
+    });
+    if (before.size) {
+      onChange?.({ ...data, rows: next });
+      setLastBulk({ field: column.id, type: column.type, value, before });
+    }
+    setBulkError(false);
+    setSelection(null);
+  };
+  const undoBulk = () => {
+    if (!lastBulk) return;
+    const { field, type, value, before } = lastBulk;
+    const column = columns.find(
+      (item) => item.id === field && item.type === type,
+    );
+    const touched = rows.filter((row) => before.has(row.id));
+    if (
+      !column ||
+      isDerivedColumn(column) ||
+      touched.length !== before.size ||
+      !touched.every(
+        (row) =>
+          cellEditable(row, column) && sameDatabaseValue(row[field], value),
+      )
+    ) {
+      setBulkError(true);
+      return;
+    }
+    onChange?.({
+      ...data,
+      rows: rows.map((row) => {
+        if (!before.has(row.id)) return row;
+        const old = before.get(row.id);
+        const next = { ...row };
+        if (old === undefined) delete next[field];
+        else next[field] = old;
+        return next;
+      }),
+    });
+    setLastBulk(null);
+    setBulkError(false);
+  };
   const dateColumns = columns.filter((column) => column.type === "date");
   const selectColumns = columns.filter((column) => column.type === "select");
   const pageSize = 30,
@@ -478,7 +623,11 @@ export function DatabaseBlock({ data, onChange, readOnly }: BlockProps) {
     activePage * pageSize,
     (activePage + 1) * pageSize,
   );
-  const openRecord = (row: DatabaseRow, column: DatabaseColumn) => {
+  const openRecord = (
+    row: DatabaseRow,
+    column: DatabaseColumn,
+    navigation: string | string[] = column.id,
+  ) => {
     const target = parsePageCell(row[column.id]);
     if (!target || !pages?.openRecord) return;
     pages.openRecord({
@@ -486,9 +635,49 @@ export function DatabaseBlock({ data, onChange, readOnly }: BlockProps) {
       sourceId,
       recordId: row.id,
       title: text(data.title, t("database")),
-      records: databaseRecordTargets(shownRows, column.id),
+      records: databaseRecordTargets(
+        shownRows.some((item) => item.id === row.id)
+          ? shownRows
+          : [row, ...shownRows],
+        navigation,
+      ),
     });
   };
+  const openRow = (row: DatabaseRow) => {
+    const column = pageColumns.find((item) => parsePageCell(row[item.id]));
+    if (column && pages?.openRecord) {
+      setLocalRecordId(null);
+      openRecord(
+        row,
+        column,
+        pageColumns.map((item) => item.id),
+      );
+    } else {
+      pages?.closeRecord?.(sourceId);
+      setLocalRecordId(row.id);
+    }
+  };
+  const activateRow = selectionProps?.active ? toggleRow : openRow;
+  const localRow = localRecordId
+    ? rows.find((row) => row.id === localRecordId)
+    : undefined;
+  useEffect(() => {
+    if (!localRow || !pages?.openRecord) return;
+    const column = pageColumns.find((item) => parsePageCell(localRow[item.id]));
+    if (column) {
+      setLocalRecordId(null);
+      openRecord(
+        localRow,
+        column,
+        pageColumns.map((item) => item.id),
+      );
+    }
+  }, [localRow, pages?.openRecord, columns]);
+  const localIndex = shownRows.findIndex((row) => row.id === localRecordId);
+  const outsideRow =
+    createdRowId && !shownRows.some((row) => row.id === createdRowId)
+      ? rows.find((row) => row.id === createdRowId)
+      : undefined;
   const peek = pages?.recordPeek;
   const peekRow =
     peek?.sourceId === sourceId
@@ -537,79 +726,124 @@ export function DatabaseBlock({ data, onChange, readOnly }: BlockProps) {
     group?: string,
     preset: Record<string, DatabaseValue> = {},
   ) => {
-    const row: DatabaseRow = { id: uid(), ...blankRow(), ...preset };
+    const row: DatabaseRow = {
+      id: uid(),
+      ...blankRow(),
+      ...recordFilterDefaults(filter, columns),
+      ...preset,
+    };
     if (groupColumn && group !== undefined)
       row[groupColumn.id] = typeOf(groupColumn).regroup!(
         row[groupColumn.id],
         "",
         group,
       ) as DatabaseValue;
-    onChange?.({ ...data, rows: [...rows, row] });
-    setPage(Math.floor(rows.length / pageSize));
-    setQuery("");
-    if (filter) changeCurrent({ filter: undefined });
-    if (canCreatePages && pageColumns[0])
-      createLinkedPage(row.id, pageColumns[0]);
+    if (!canAdd || (dataState && !canEdit(dataState.editable, "rows", row.id)))
+      return;
+    const nextRows = [...rows, row];
+    const index = queryRecords(
+      nextRows,
+      shownColumns,
+      { search: query, filter, sorts },
+      context,
+    ).findIndex((item) => item.id === row.id);
+    if (index >= 0) setPage(Math.floor(index / pageSize));
+    if (canCreatePages && pageColumns[0] && cellEditable(row, pageColumns[0]))
+      pendingRowPages.current.set(row.id, pageColumns[0].id);
+    onChange?.({ ...data, rows: nextRows });
+    setCreatedRowId(index < 0 ? row.id : null);
+    setSelection(null);
     return row.id;
   };
-  const canCreatePages = editable && !!pages?.createPage;
+  const canCreatePages = rowsEditable && !!pages?.createPage;
   const createLinkedPage = (rowId: string, column: DatabaseColumn) => {
     const bridge = pages;
     if (!bridge?.createPage) return;
+    const previous = (latestData.current.rows as DatabaseRow[]).find(
+      (row) => row.id === rowId,
+    )?.[column.id];
+    const key = JSON.stringify([rowId, column.id]);
+    if (linkingPages.current.has(key)) return;
+    linkingPages.current.add(key);
     setPageError("");
-    pageQueue.current = pageQueue.current.then(async () => {
-      const base = latestData.current;
-      const savedColumn = (base.columns as DatabaseColumn[]).find(
-        (item) => item.id === column.id,
-      );
-      const record = (base.rows as DatabaseRow[]).find(
-        (item) => item.id === rowId,
-      );
-      if (!savedColumn || !record) return;
-      const titleColumn =
-        savedColumn.titleColumn ??
-        (base.columns as DatabaseColumn[]).find((item) => item.type === "text")
-          ?.id;
-      const name = titleColumn ? text(record[titleColumn]).trim() : "";
-      try {
-        const created = await bridge.createPage!({
-          ...(name ? { title: name } : {}),
-          ...(savedColumn.folder ? { folderId: savedColumn.folder } : {}),
-          folderName: text(base.title).trim() || t("database"),
-        });
-        const latest = latestData.current;
-        onChange?.({
-          ...latest,
-          columns: (latest.columns as DatabaseColumn[]).map((item) =>
-            item.id === column.id
-              ? {
-                  ...item,
-                  folder: created.folderId,
-                  ...(titleColumn ? { titleColumn } : {}),
-                }
-              : item,
-          ),
-          rows: (latest.rows as DatabaseRow[]).map((item) =>
-            item.id === rowId
-              ? {
-                  ...item,
-                  [column.id]: pageLink({
-                    projectId: bridge.projectId,
-                    pageId: created.pageId,
-                  }),
-                }
-              : item,
-          ),
-        });
-      } catch (reason) {
-        setPageError(
-          t("error.createPage", {
-            message: reason instanceof Error ? reason.message : String(reason),
-          }),
+    pageQueue.current = pageQueue.current
+      .then(async () => {
+        const base = latestData.current;
+        const savedColumn = (base.columns as DatabaseColumn[]).find(
+          (item) => item.id === column.id,
         );
-      }
-    });
+        const record = (base.rows as DatabaseRow[]).find(
+          (item) => item.id === rowId,
+        );
+        if (!savedColumn || !record || record[column.id] !== previous) return;
+        const titleColumn =
+          savedColumn.titleColumn ??
+          (base.columns as DatabaseColumn[]).find(
+            (item) => item.type === "text",
+          )?.id;
+        const name = titleColumn ? text(record[titleColumn]).trim() : "";
+        try {
+          const created = await bridge.createPage!({
+            ...(name ? { title: name } : {}),
+            ...(savedColumn.folder ? { folderId: savedColumn.folder } : {}),
+            folderName: text(base.title).trim() || t("database"),
+          });
+          const latest = latestData.current;
+          const currentRow = (latest.rows as DatabaseRow[]).find(
+            (item) => item.id === rowId,
+          );
+          if (
+            !currentRow ||
+            currentRow[column.id] !== previous ||
+            !(latest.columns as DatabaseColumn[]).some(
+              (item) => item.id === column.id && item.type === "page",
+            )
+          )
+            return;
+          onChange?.({
+            ...latest,
+            columns: !editable
+              ? latest.columns
+              : (latest.columns as DatabaseColumn[]).map((item) =>
+                  item.id === column.id
+                    ? {
+                        ...item,
+                        folder: created.folderId,
+                        ...(titleColumn ? { titleColumn } : {}),
+                      }
+                    : item,
+                ),
+            rows: (latest.rows as DatabaseRow[]).map((item) =>
+              item.id === rowId
+                ? {
+                    ...item,
+                    [column.id]: pageLink({
+                      projectId: bridge.projectId,
+                      pageId: created.pageId,
+                    }),
+                  }
+                : item,
+            ),
+          });
+        } catch (reason) {
+          setPageError(
+            t("error.createPage", {
+              message:
+                reason instanceof Error ? reason.message : String(reason),
+            }),
+          );
+        }
+      })
+      .finally(() => linkingPages.current.delete(key));
   };
+  useEffect(() => {
+    for (const [id, field] of pendingRowPages.current) {
+      if (!rows.some((row) => row.id === id)) continue;
+      pendingRowPages.current.delete(id);
+      const column = pageColumns.find((item) => item.id === field);
+      if (column && canCreatePages) createLinkedPage(id, column);
+    }
+  }, [rows, columns, canCreatePages]);
   const titlePageColumn = pageColumns.find((column) =>
     columns.some(
       (item) => item.id === column.titleColumn && item.type === "text",
@@ -710,8 +944,7 @@ export function DatabaseBlock({ data, onChange, readOnly }: BlockProps) {
       if (pair.stored === pair.live) {
         clearTimeout(rename.timer);
         renames.current.delete(pair.key);
-      }
-      else if (
+      } else if (
         !rename.saving &&
         !rename.timer &&
         rename.listed !== bridge.pages
@@ -804,7 +1037,7 @@ export function DatabaseBlock({ data, onChange, readOnly }: BlockProps) {
     });
   const columnResize = useColumnResize({
     viewId: savedView.id,
-    columns: shownColumns.map((column, index) => ({
+    columns: visibleColumns.map((column, index) => ({
       id: column.id,
       width: columnWidth(current, column.id, index),
       savedWidth: widths[column.id],
@@ -819,7 +1052,7 @@ export function DatabaseBlock({ data, onChange, readOnly }: BlockProps) {
     },
   });
   const tableReorder = usePropertyReorder<HTMLDivElement>({
-    ids: shownColumns.map((column) => column.id),
+    ids: visibleColumns.map((column) => column.id),
     disabled: !editable || !!columnResize.resizing,
     axis: "horizontal",
     onMove: placeColumn,
@@ -833,7 +1066,9 @@ export function DatabaseBlock({ data, onChange, readOnly }: BlockProps) {
         moveColumnTo(current, id, target, placement),
       ),
   });
-  const columnById = new Map(shownColumns.map((column) => [column.id, column]));
+  const columnById = new Map(
+    visibleColumns.map((column) => [column.id, column]),
+  );
   const tableColumns = tableReorder.orderedIds
     .map((id) => columnById.get(id))
     .filter((column): column is DatabaseColumn => !!column);
@@ -841,23 +1076,30 @@ export function DatabaseBlock({ data, onChange, readOnly }: BlockProps) {
   const settingsColumns = settingsReorder.orderedIds
     .map((id) => draftById.get(id))
     .filter((column): column is DatabaseColumn => !!column);
-  const addView = () => {
-    const created: DatabaseView = {
-      id: newViewId(views),
-      name: viewName("table"),
-      type: "table",
-    };
+  const addView = (copy: boolean) => {
+    if (views.length >= MAX_DATABASE_VIEWS) return;
+    const created: DatabaseView = copy
+      ? duplicateDatabaseView(
+          view === "calendar"
+            ? { ...current, calendar: savedCalendar }
+            : current,
+          views,
+          (name) => t("copyName", { name }),
+        )
+      : {
+          id: newViewId(views),
+          name: viewName("table"),
+          type: "table",
+        };
     writeViews([...views, created]);
-    setActiveView(created.id);
-    setPage(0);
+    selectView(created.id);
   };
   const removeView = () => {
     if (views.length < 2) return;
     const index = views.findIndex((item) => item.id === savedView.id);
     const remaining = views.filter((item) => item.id !== savedView.id);
     writeViews(remaining);
-    setActiveView(remaining[Math.max(0, index - 1)].id);
-    setPage(0);
+    selectView(remaining[Math.max(0, index - 1)].id);
   };
   const commitViewName = () => {
     const name = draftViewName?.trim();
@@ -947,7 +1189,7 @@ export function DatabaseBlock({ data, onChange, readOnly }: BlockProps) {
       ),
     };
     const calendarConfig = pruneCalendarConfig(
-      data.calendar ? savedCalendar : undefined,
+      data.calendar ? defaultCalendar : undefined,
       cleaned,
     );
     if (calendarConfig) next.calendar = calendarConfig;
@@ -958,7 +1200,6 @@ export function DatabaseBlock({ data, onChange, readOnly }: BlockProps) {
       delete next.view;
     if (Array.isArray(data.views)) next.views = pruneViews(views, cleaned);
     onChange?.(next);
-    setCalendarChoice({});
     setEditing(false);
   };
   const updateDraftColumn = (column: DatabaseColumn) =>
@@ -995,7 +1236,7 @@ export function DatabaseBlock({ data, onChange, readOnly }: BlockProps) {
   const cellText = (row: DatabaseRow, column: DatabaseColumn) =>
     typeOf(column).text(derived.value(row, column), column, context);
   const rowName = (row: DatabaseRow) =>
-    shownColumns[0] ? cellText(row, shownColumns[0]) : "";
+    (titleColumn ? cellText(row, titleColumn) : "") || t("untitled");
   const choices = (column: DatabaseColumn) => {
     if (column.type === "relation" && column.relation?.dataset) {
       const table = host?.related(column.relation.dataset);
@@ -1029,6 +1270,22 @@ export function DatabaseBlock({ data, onChange, readOnly }: BlockProps) {
     pages,
     openRecord: pages?.openRecord ? openRecord : undefined,
   };
+  const recordProperties = (row: DatabaseRow) => (
+    <div
+      className="sb-block sb-database-record-properties"
+      aria-label={t("property")}
+    >
+      {shownColumns.map((column) => (
+        <div className="sb-record-property" key={column.id}>
+          <span className="sb-record-property-name">
+            <span aria-hidden="true">{fieldUiOf(column).symbol}</span>
+            {column.name}
+          </span>
+          <div>{cell(row, column)}</div>
+        </div>
+      ))}
+    </div>
+  );
   const View = viewDefinition.View;
   return (
     <CellEnvironmentContext.Provider value={environment}>
@@ -1087,6 +1344,7 @@ export function DatabaseBlock({ data, onChange, readOnly }: BlockProps) {
                   label={t("searchDatabase")}
                   value={query}
                   onChange={(value) => {
+                    setSelection(null);
                     setQuery(value);
                     setPage(0);
                   }}
@@ -1100,10 +1358,23 @@ export function DatabaseBlock({ data, onChange, readOnly }: BlockProps) {
                 >
                   <Filter size={15} />
                 </button>
-                {editable && (
+                {rowsEditable && (
+                  <button
+                    type="button"
+                    className="sb-icon-button"
+                    aria-label={t("bulkEdit")}
+                    title={t("bulkEdit")}
+                    aria-pressed={!!selection}
+                    onClick={() => setSelection(selection ? null : new Set())}
+                  >
+                    <CheckSquare size={15} />
+                  </button>
+                )}
+                {rowsEditable && (
                   <button
                     type="button"
                     className="sb-button sb-primary sb-small"
+                    disabled={!canAdd}
                     onClick={() => addRow()}
                   >
                     <Plus size={14} />
@@ -1111,7 +1382,7 @@ export function DatabaseBlock({ data, onChange, readOnly }: BlockProps) {
                   </button>
                 )}
               </div>
-              {editable && (
+              {viewEditable && (
                 <div className="sb-board-grouping sb-view-settings">
                   {views.length > 1 && (
                     <input
@@ -1130,10 +1401,20 @@ export function DatabaseBlock({ data, onChange, readOnly }: BlockProps) {
                   <button
                     type="button"
                     className="sb-text-button"
-                    onClick={addView}
+                    disabled={views.length >= MAX_DATABASE_VIEWS}
+                    onClick={() => addView(false)}
                   >
                     <Plus size={13} aria-hidden="true" />
                     {t("newView")}
+                  </button>
+                  <button
+                    type="button"
+                    className="sb-text-button"
+                    disabled={views.length >= MAX_DATABASE_VIEWS}
+                    onClick={() => addView(true)}
+                  >
+                    <Copy size={13} aria-hidden="true" />
+                    {t("duplicateView")}
                   </button>
                   {views.length > 1 && (
                     <button
@@ -1145,6 +1426,37 @@ export function DatabaseBlock({ data, onChange, readOnly }: BlockProps) {
                     </button>
                   )}
                 </div>
+              )}
+              {viewEditable && (
+                <details className="sb-visible-fields">
+                  <summary>
+                    <Eye size={14} aria-hidden="true" />
+                    {t("visibleFields")}
+                  </summary>
+                  <div>
+                    {shownColumns.map((column) => (
+                      <label key={column.id}>
+                        <input
+                          className="showai-checkbox"
+                          type="checkbox"
+                          checked={
+                            column.id === titleColumn?.id ||
+                            !hidden.has(column.id)
+                          }
+                          disabled={column.id === titleColumn?.id}
+                          onChange={(event) =>
+                            changeCurrent({
+                              hiddenColumns: event.target.checked
+                                ? [...hidden].filter((id) => id !== column.id)
+                                : [...hidden, column.id],
+                            })
+                          }
+                        />
+                        {column.name}
+                      </label>
+                    ))}
+                  </div>
+                </details>
               )}
               {view === "board" && groupable.length > 0 && (
                 <div className="sb-board-grouping">
@@ -1204,12 +1516,15 @@ export function DatabaseBlock({ data, onChange, readOnly }: BlockProps) {
                         <select
                           className="showai-select"
                           value={calendar[key]?.id ?? ""}
-                          onChange={(event) =>
-                            setCalendarChoice((current) => ({
-                              ...current,
-                              [key]: event.target.value,
-                            }))
-                          }
+                          onChange={(event) => {
+                            const next = { ...savedCalendar };
+                            if (event.target.value || key === "colorColumn")
+                              next[key] = event.target.value;
+                            else delete next[key];
+                            changeCurrent({
+                              calendar: pruneCalendarConfig(next, columns),
+                            });
+                          }}
                         >
                           {optional && (
                             <option value="">{t("calendar.none")}</option>
@@ -1398,6 +1713,7 @@ export function DatabaseBlock({ data, onChange, readOnly }: BlockProps) {
             context={context}
             choices={choices}
             onFilter={(next: FilterGroup | undefined) => {
+              setSelection(null);
               changeCurrent({ filter: next });
               setPage(0);
             }}
@@ -1418,6 +1734,55 @@ export function DatabaseBlock({ data, onChange, readOnly }: BlockProps) {
             }}
           />
         )}
+        {rowsEditable && selection && (
+          <DatabaseBulkEdit
+            count={selectedRows.length}
+            total={shownRows.length}
+            columns={bulkColumns}
+            all={() => toggleAll(true)}
+            clear={() => setSelection(null)}
+            apply={bulkApply}
+            renderValue={(column, draft, change) => (
+              <Cell
+                column={column}
+                row={{
+                  id: "bulk-draft",
+                  [column.id]:
+                    draft ?? (typeOf(column).blank() as DatabaseValue),
+                }}
+                editable
+                update={change}
+              />
+            )}
+          />
+        )}
+        {rowsEditable && lastBulk && (
+          <div className="sb-record-notice" role="status">
+            {bulkError
+              ? t("bulkChanged")
+              : t("bulkUpdated", { count: lastBulk.before.size })}
+            {!bulkError && (
+              <button
+                type="button"
+                className="sb-text-button"
+                onClick={undoBulk}
+              >
+                {t("bulkUndo")}
+              </button>
+            )}
+            <button
+              type="button"
+              className="sb-icon-button"
+              aria-label={t("dismiss")}
+              onClick={() => {
+                setLastBulk(null);
+                setBulkError(false);
+              }}
+            >
+              <X size={14} />
+            </button>
+          </div>
+        )}
         <div className="sb-database-view-viewport" ref={motion.panel}>
           <div
             className="sb-database-view-content"
@@ -1430,13 +1795,42 @@ export function DatabaseBlock({ data, onChange, readOnly }: BlockProps) {
           >
             <View
               view={current}
-              columns={shownColumns}
+              columns={visibleColumns}
+              titleColumn={titleColumn}
+              openRow={activateRow}
+              selection={selectionProps}
+              titleCell={(row, showCheckbox) => (
+                <span className="sb-record-leading">
+                  {selectionProps &&
+                    (showCheckbox || selectionProps.active) && (
+                      <SelectRecords
+                        checked={selectionProps.selected.has(row.id)}
+                        label={t("selectRecord", { name: rowName(row) })}
+                        onChange={() => toggleRow(row)}
+                      />
+                    )}
+                  <RecordTitle
+                    selected={selection?.has(row.id)}
+                    name={rowName(row)}
+                    open={() => activateRow(row)}
+                    editor={
+                      !selection &&
+                      titleColumn &&
+                      cellEditable(row, titleColumn) &&
+                      !isDerivedColumn(titleColumn)
+                        ? cell(row, titleColumn)
+                        : undefined
+                    }
+                  />
+                </span>
+              )}
               rows={rows}
               shownRows={shownRows}
               pagedRows={pagedRows}
               editable={editable}
+              canAdd={canAdd}
               sources={sources}
-              cell={cell}
+              cell={selection ? readCell : cell}
               readCell={readCell}
               cellEditable={cellEditable}
               deleteButton={deleteButton}
@@ -1475,11 +1869,48 @@ export function DatabaseBlock({ data, onChange, readOnly }: BlockProps) {
               }}
               calendar={{
                 settings: calendar,
-                savedKey: JSON.stringify(savedCalendar),
+                labels: (row) =>
+                  visibleColumns
+                    .filter(
+                      (column) =>
+                        !calendarLabels.some(
+                          (label) => label?.id === column.id,
+                        ),
+                    )
+                    .map((column) => {
+                      const value = cellText(row, column);
+                      return value ? { name: column.name, value } : null;
+                    })
+                    .filter((item) => item !== null),
+                savedKey: JSON.stringify([savedView.id, savedCalendar]),
+                changeMode: viewEditable
+                  ? (mode) =>
+                      changeCurrent({ calendar: { ...savedCalendar, mode } })
+                  : undefined,
               }}
             />
           </div>
         </div>
+        {outsideRow && (
+          <div role="status" className="sb-record-notice">
+            {t("outsideView")}
+            <button
+              type="button"
+              className="sb-text-button"
+              onClick={() => openRow(outsideRow)}
+            >
+              {t("openRecord", { name: rowName(outsideRow) })}
+            </button>
+            <button
+              type="button"
+              className="sb-icon-button"
+              aria-label={t("dismiss")}
+              onClick={() => setCreatedRowId(null)}
+            >
+              <X size={14} />
+            </button>
+          </div>
+        )}
         {pageError && (
           <p role="alert" className="sb-error sb-database-error">
             {pageError}
@@ -1528,22 +1959,48 @@ export function DatabaseBlock({ data, onChange, readOnly }: BlockProps) {
       </section>
       {peekRow &&
         peek?.propertiesHost &&
+        createPortal(recordProperties(peekRow), peek.propertiesHost)}
+      {localRow &&
         createPortal(
-          <div
-            className="sb-block sb-database-record-properties"
-            aria-label={t("property")}
+          <RecordDialog
+            title={rowName(localRow)}
+            close={() => setLocalRecordId(null)}
+            actions={
+              <>
+                <button
+                  type="button"
+                  className="sb-icon-button"
+                  aria-label={t("previousRecord")}
+                  disabled={localIndex <= 0}
+                  onClick={() => openRow(shownRows[localIndex - 1])}
+                >
+                  <ArrowUp size={15} />
+                </button>
+                <button
+                  type="button"
+                  className="sb-icon-button"
+                  aria-label={t("nextRecord")}
+                  disabled={
+                    localIndex < 0 || localIndex >= shownRows.length - 1
+                  }
+                  onClick={() => openRow(shownRows[localIndex + 1])}
+                >
+                  <ArrowDown size={15} />
+                </button>
+                <button
+                  type="button"
+                  className="sb-icon-button"
+                  aria-label={t("closeRecord")}
+                  onClick={() => setLocalRecordId(null)}
+                >
+                  <X size={16} />
+                </button>
+              </>
+            }
           >
-            {shownColumns.map((column) => (
-              <div className="sb-record-property" key={column.id}>
-                <span className="sb-record-property-name">
-                  <span aria-hidden="true">{fieldUiOf(column).symbol}</span>
-                  {column.name}
-                </span>
-                <div>{cell(peekRow, column)}</div>
-              </div>
-            ))}
-          </div>,
-          peek.propertiesHost,
+            {recordProperties(localRow)}
+          </RecordDialog>,
+          document.body,
         )}
     </CellEnvironmentContext.Provider>
   );
