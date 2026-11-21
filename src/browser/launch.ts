@@ -44,6 +44,23 @@ export async function startCodexWorkbenchBrowser(options: {
   };
 }
 
+export async function startAntigravityWorkbenchBrowser(options: {
+  home: string;
+  profile: string;
+  key: string;
+}) {
+  if (!isAbsolute(options.profile))
+    throw new Error("Antigravity workbench profile must be an absolute directory.");
+  const runtime = await browserRuntime();
+  return startBrowserServer({
+    ...runtime,
+    home: options.home,
+    settingsPath: join(options.profile, "settings.json"),
+    agentWorkspaceRoot: join(options.profile, "agent-workspaces"),
+    antigravityWorkbench: { key: options.key },
+  });
+}
+
 export async function runBrowser(options: {
   home?: string;
   port?: string;

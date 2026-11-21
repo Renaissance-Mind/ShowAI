@@ -1,6 +1,7 @@
-import { randomUUID } from "node:crypto";
+import { randomBytes, randomUUID } from "node:crypto";
 import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
+import { pathToFileURL } from "node:url";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import lightLogo from "../../plugins/showai/assets/logo.svg?raw";
@@ -13,9 +14,12 @@ import type { AgentService } from "./service";
 import { mcpFailure, mcpSuccess } from "./presentation-tools";
 import {
   codexCardTarget,
+  codexPageReferenceExtension,
+  codexPageReferenceMaxLength,
   codexPageTarget,
   readCodexPageCards,
   readCodexPageTarget,
+  resolveCodexPageReference,
   type CodexCardTarget,
   type CodexPageTarget,
 } from "./codex-page-reference";
@@ -25,9 +29,16 @@ import cardView from "./codex-workbench-card-view.js?raw";
 import cardSpacingEditor from "./codex-workbench-card-spacing.js?raw";
 
 export const antigravityCardUri = "ui://showai/antigravity-card-v1.html";
+export const antigravityFileUri = "ui://showai/antigravity-file-v1.html";
 const NAV_FILE = "antigravity-workbench-nav.json";
 const STATE_FILE = "antigravity-workbench-state.json";
 const ACTIVE_STATE_MAX_AGE_MS = 15_000;
+
+export type OpenAntigravityWorkbench = (key: string) => Promise<{
+  url: string;
+  localUrl: string;
+  close(): Promise<void>;
+}>;
 
 const antigravityIcons = ([
   ["light", lightLogo],
@@ -68,17 +79,55 @@ export async function readAntigravityWorkbenchOpen(home: string) {
     const raw = await readFile(join(home, "local", STATE_FILE), "utf8");
     const parsed = JSON.parse(raw) as {
       openClients?: unknown;
+      visibleClients?: unknown;
       updatedAt?: unknown;
     };
+    const visibleCount =
+      typeof parsed?.visibleClients === "number"
+        ? parsed.visibleClients
+        : typeof parsed?.openClients === "number"
+          ? parsed.openClients
+          : 0;
     return (
-      typeof parsed?.openClients === "number" &&
-      parsed.openClients > 0 &&
+      visibleCount > 0 &&
       typeof parsed?.updatedAt === "number" &&
       Date.now() - parsed.updatedAt <= ACTIVE_STATE_MAX_AGE_MS
     );
   } catch {
     return false;
   }
+}
+
+export async function writeAntigravityTabReference(
+  service: AgentService,
+  target: CodexPageTarget,
+) {
+  const page = await readCodexPageTarget(service, target);
+  const title = page.title
+    .replace(/[<>:"/\\|?*\p{C}]/gu, " ")
+    .trim()
+    .slice(0, 65);
+  const name = "ShowAI - " + (title || "Page") + codexPageReferenceExtension;
+  const dir = join(
+    service.store.root,
+    "local",
+    "antigravity-page-tabs",
+    target.projectId,
+    target.pageId,
+  );
+  const path = join(dir, name);
+  await atomicWriteJson(path, {
+    format: "showai-page-reference",
+    version: target.blockId ? 2 : 1,
+    projectId: target.projectId,
+    pageId: target.pageId,
+    ...(target.blockId ? { blockId: target.blockId } : {}),
+  });
+  return {
+    path,
+    fileUri: pathToFileURL(path).href,
+    title: page.title,
+  };
 }
 
 export async function writeAntigravityNavTarget(
@@ -272,10 +321,20 @@ ${cardStyles}
         ...target,
         destination: targetDest,
       });
-      if (targetDest === "workbench" && data?.status === "queued" && noteNode) {
-        noteNode.dataset.kind = "info";
-        noteNode.textContent = t("antigravityQueued");
-        noteNode.hidden = false;
+      if (targetDest === "workbench" && data?.status === "queued") {
+        let openedAuxPane = false;
+        if (typeof data?.fileUri === "string" && data.fileUri.startsWith("file://")) {
+          const opened = await request("com.google.antigravity/toggle-aux-pane", {
+            tabType: "fileView",
+            uri: data.fileUri,
+          }).catch(() => ({ isError: true }));
+          openedAuxPane = !opened?.isError;
+        }
+        if (!openedAuxPane && noteNode) {
+          noteNode.dataset.kind = "info";
+          noteNode.textContent = t("antigravityQueued");
+          noteNode.hidden = false;
+        }
       }
     } catch (error) {
       if (noteNode) {
@@ -380,10 +439,279 @@ ${cardStyles}
 </script></body></html>`;
 }
 
-export function antigravityWorkbenchConnection(service: AgentService) {
+export function antigravityFileHtml() {
+  return `<!doctype html>
+<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<style>
+:root { color-scheme: light dark; font: 14px system-ui, sans-serif }
+html, body { margin: 0; width: 100%; height: 100%; overflow: hidden; background: var(--color-background-primary, Canvas); color: var(--color-text-primary, CanvasText) }
+#showai-status { display: flex; align-items: center; gap: 10px; padding: 18px; font-size: 13px; color: var(--color-text-secondary, CanvasText) }
+#showai-status[hidden], #showai-frame[hidden] { display: none }
+#showai-frame { display: block; width: 100%; height: 100%; border: 0 }
+</style></head><body>
+<div id="showai-status" role="status"><span id="showai-msg"></span></div>
+<iframe id="showai-frame" title="ShowAI" hidden></iframe>
+<script>
+(() => {
+  const translations = ${JSON.stringify(messages.catalogs)};
+  const referenceLimit = ${codexPageReferenceMaxLength};
+  const statusEl = document.getElementById("showai-status");
+  const msgEl = document.getElementById("showai-msg");
+  const frame = document.getElementById("showai-frame");
+  let locale = navigator.language.startsWith("zh") ? "zh-CN" : "en";
+  let initialized = false, contextSupported = false, hostTheme = "", toolPrefix = "";
+  let fileInput = null, readingFile = false, mountedPage = null, frameOrigin = "";
+  let sequence = 0;
+  const pending = new Map();
+  const t = key => translations[locale][key];
+
+  function request(method, params) {
+    const id = ++sequence;
+    return new Promise((resolve, reject) => {
+      const timeout = setTimeout(() => {
+        pending.delete(id);
+        reject(new Error(t("timedOut")));
+      }, 10000);
+      pending.set(id, { resolve, reject, timeout });
+      parent.postMessage({ jsonrpc: "2.0", id, method, params }, "*");
+    });
+  }
+
+  function notify(method, params) {
+    parent.postMessage({ jsonrpc: "2.0", method, params }, "*");
+  }
+
+  function showStatus(text) {
+    msgEl.textContent = text;
+    statusEl.hidden = false;
+  }
+
+  function applyHostContext(ctx) {
+    if (!ctx || typeof ctx !== "object") return;
+    if (typeof ctx.locale === "string") {
+      locale = ctx.locale.startsWith("zh") ? "zh-CN" : "en";
+      document.documentElement.lang = locale;
+    }
+    if (ctx.theme === "dark" || ctx.theme === "light") {
+      hostTheme = ctx.theme;
+      document.documentElement.style.colorScheme = ctx.theme;
+      if (frameOrigin && frame.contentWindow) {
+        frame.contentWindow.postMessage({ type: "showai:ag-host-theme", theme: ctx.theme }, frameOrigin);
+      }
+    }
+    const vars = ctx.styles?.variables;
+    if (vars && typeof vars === "object") {
+      for (const [k, v] of Object.entries(vars)) {
+        if (typeof v === "string") document.documentElement.style.setProperty(k, v);
+      }
+    }
+    const opener = ctx.toolInfo?.tool?.name;
+    if (typeof opener === "string" && opener.endsWith("workbench_open_file")) {
+      toolPrefix = opener.slice(0, -"workbench_open_file".length);
+    }
+  }
+
+  function resultPayload(result) {
+    const envelope = result?._meta ?? result;
+    return envelope?.mcp_tool_result ?? envelope?.call_tool_result ?? result;
+  }
+
+  function parseTextData(payload) {
+    const firstText = Array.isArray(payload?.content)
+      ? payload.content.find(c => c?.type === "text")?.text
+      : undefined;
+    if (typeof firstText !== "string") return undefined;
+    try {
+      return JSON.parse(firstText)?.data;
+    } catch {
+      return undefined;
+    }
+  }
+
+  async function callServerTool(baseName, args) {
+    const candidates = toolPrefix ? [toolPrefix + baseName, baseName] : [baseName];
+    let lastError;
+    for (const name of candidates) {
+      try {
+        const raw = await request("tools/call", { name, arguments: args });
+        const payload = resultPayload(raw);
+        if (payload?.isError) {
+          throw new Error(payload.structuredContent?.error?.message ?? t("unavailable"));
+        }
+        return payload?._meta?.showaiWorkbenchData ?? payload?.structuredContent?.data ?? parseTextData(payload) ?? {};
+      } catch (err) {
+        lastError = err;
+      }
+    }
+    throw lastError ?? new Error(t("unavailable"));
+  }
+
+  async function readReferenceFile(refreshOnly = false) {
+    if (!initialized || !fileInput || readingFile) return;
+    const currentFile = fileInput;
+    readingFile = true;
+    if (!mountedPage && !refreshOnly) showStatus(t("loading"));
+    try {
+      const response = await request("resources/read", { uri: currentFile.resourceUri });
+      const content = response?.contents?.[0];
+      let source = content?.text;
+      if (typeof source !== "string" && typeof content?.blob === "string" &&
+          content.blob.length <= Math.ceil(referenceLimit / 3) * 4) {
+        const bytes = Uint8Array.from(atob(content.blob), ch => ch.charCodeAt(0));
+        source = new TextDecoder("utf-8", { fatal: true }).decode(bytes);
+      }
+      if (typeof source !== "string" || !source.length || source.length > referenceLimit) {
+        throw new Error(t("invalidReferenceFile"));
+      }
+      const resolved = await callServerTool("workbench_resolve_reference", { source });
+      if (!resolved?.launchUrl || !resolved?.pageId) {
+        throw new Error(t("unavailable"));
+      }
+      const targetUrl = new URL(resolved.launchUrl);
+      frameOrigin = targetUrl.origin;
+      targetUrl.searchParams.set("project", resolved.projectId);
+      targetUrl.searchParams.set("page", resolved.pageId);
+      if (resolved.blockId) targetUrl.searchParams.set("block", resolved.blockId);
+      if (
+        mountedPage &&
+        mountedPage.projectId === resolved.projectId &&
+        mountedPage.pageId === resolved.pageId &&
+        frame.contentWindow
+      ) {
+        if (mountedPage.blockId !== resolved.blockId) {
+          mountedPage = resolved;
+          frame.contentWindow.postMessage(
+            { type: "showai:ag-open-page", detail: resolved },
+            frameOrigin,
+          );
+        }
+        return;
+      }
+      mountedPage = resolved;
+      frame.onload = () => {
+        statusEl.hidden = true;
+        frame.hidden = false;
+        if (hostTheme && frame.contentWindow) {
+          frame.contentWindow.postMessage({ type: "showai:ag-host-theme", theme: hostTheme }, frameOrigin);
+        }
+      };
+      frame.src = targetUrl.href;
+    } catch (err) {
+      if (!mountedPage) showStatus([t("failed"), err.message].filter(Boolean).join(" · "));
+    } finally {
+      readingFile = false;
+    }
+  }
+
+  window.addEventListener("message", async event => {
+    if (event.source === frame.contentWindow && frameOrigin && event.origin === frameOrigin) {
+      const data = event.data;
+      if (data?.type === "showai:ag-file-reference") {
+        try {
+          if (!contextSupported) throw new Error(t("unavailable"));
+          const content = data.reference ? [{ type: "text", text: String(data.text || "") }] : [];
+          if (Array.isArray(data.components) && data.components.length) {
+            content.push({
+              type: "text",
+              text: "Selected component preview state: " + JSON.stringify(data.components),
+            });
+          }
+          await request("ui/update-model-context", {
+            content,
+            structuredContent: data.reference
+              ? { showai: { reference: data.reference, ...(data.components?.length ? { components: data.components } : {}) } }
+              : {},
+          });
+          frame.contentWindow?.postMessage({ type: "showai:ag-file-reference-ack", id: data.id }, frameOrigin);
+        } catch (err) {
+          frame.contentWindow?.postMessage(
+            { type: "showai:ag-file-reference-ack", id: data.id, error: err.message },
+            frameOrigin,
+          );
+        }
+      }
+      return;
+    }
+    if (event.source !== parent || event.data?.jsonrpc !== "2.0") return;
+    const msg = event.data;
+    if (pending.has(msg.id)) {
+      const waiter = pending.get(msg.id);
+      pending.delete(msg.id);
+      clearTimeout(waiter.timeout);
+      msg.error ? waiter.reject(new Error(msg.error.message)) : waiter.resolve(msg.result);
+      return;
+    }
+    if (msg.method === "ui/notifications/tool-input") {
+      const f = msg.params?.arguments?.file;
+      if (typeof f?.resourceUri === "string" && f.resourceUri) {
+        fileInput = f;
+        if (initialized) void readReferenceFile();
+      }
+    } else if (msg.method === "ui/notifications/host-context-changed") {
+      applyHostContext(msg.params);
+    }
+  });
+
+  window.addEventListener("focus", () => {
+    if (initialized && fileInput && mountedPage) void readReferenceFile(true);
+  });
+
+  showStatus(t("loading"));
+  request("ui/initialize", {
+    appInfo: { name: "ShowAI", version: "1.0.0" },
+    appCapabilities: {},
+    protocolVersion: "2026-01-26",
+  })
+    .then(result => {
+      initialized = true;
+      contextSupported = !!result?.hostCapabilities?.updateModelContext;
+      applyHostContext(result?.hostContext);
+      notify("ui/notifications/initialized");
+      if (fileInput) void readReferenceFile();
+    })
+    .catch(err => showStatus(err.message));
+})();
+</script></body></html>`;
+}
+
+export function antigravityWorkbenchConnection(
+  service: AgentService,
+  open?: OpenAntigravityWorkbench,
+) {
   return {
     icons: antigravityIcons,
     configure(server: McpServer) {
+      const key = randomBytes(32).toString("hex");
+      let runtime: ReturnType<OpenAntigravityWorkbench> | undefined;
+      const ensureWorkbench = open
+        ? () =>
+            (runtime ??= open(key).catch((err) => {
+              runtime = undefined;
+              throw err;
+            }))
+        : undefined;
+
+      const closeRuntime = () => {
+        void runtime?.then(
+          (instance) => instance.close(),
+          () => undefined,
+        );
+      };
+      const prevClose = server.server.onclose;
+      server.server.onclose = () => {
+        prevClose?.();
+        closeRuntime();
+      };
+      process.stdin.once("end", closeRuntime);
+
+      async function workbenchLaunchUrl() {
+        if (!ensureWorkbench) return undefined;
+        const { url } = await ensureWorkbench();
+        const target = new URL(url);
+        target.searchParams.set("agWorkbench", key);
+        return { origin: target.origin, launchUrl: target.href };
+      }
+
       const mimeType = "text/html;profile=mcp-app";
       server.registerResource(
         "antigravity_page_card",
@@ -403,6 +731,95 @@ export function antigravityWorkbenchConnection(service: AgentService) {
             },
           ],
         }),
+      );
+
+      server.registerResource(
+        "antigravity_file_viewer",
+        antigravityFileUri,
+        { mimeType },
+        async () => {
+          const wb = await workbenchLaunchUrl();
+          return {
+            contents: [
+              {
+                uri: antigravityFileUri,
+                mimeType,
+                text: antigravityFileHtml(),
+                _meta: {
+                  ui: {
+                    ...(wb ? { csp: { frameDomains: [wb.origin] } } : {}),
+                    prefersBorder: false,
+                  },
+                },
+              },
+            ],
+          };
+        },
+      );
+
+      server.registerTool(
+        "workbench_open_file",
+        {
+          title: "ShowAI",
+          description: "Open the original Page linked by a ShowAI reference file.",
+          inputSchema: {
+            file: z.object({
+              name: z.string().min(1),
+              resourceUri: z.string().min(1),
+            }),
+          },
+          annotations: readOnly,
+          _meta: {
+            ui: { resourceUri: antigravityFileUri, visibility: ["app"] },
+            "com.google.antigravity/ui": {
+              entrypoints: [
+                {
+                  type: "file",
+                  title: "ShowAI",
+                  extensions: [codexPageReferenceExtension],
+                },
+              ],
+            },
+          },
+        },
+        async () => {
+          try {
+            const wb = await workbenchLaunchUrl();
+            const data = { status: "ready" as const, ...(wb ?? {}) };
+            return {
+              ...mcpSuccess(data),
+              _meta: { showaiWorkbenchData: data },
+            };
+          } catch (error) {
+            return mcpFailure(error);
+          }
+        },
+      );
+
+      server.registerTool(
+        "workbench_resolve_reference",
+        {
+          description:
+            "Verify a ShowAI reference file read through Antigravity and locate its saved Page.",
+          inputSchema: {
+            source: z.string().min(1).max(codexPageReferenceMaxLength),
+          },
+          annotations: readOnly,
+          _meta: appOnly,
+        },
+        async ({ source }) => {
+          try {
+            const page = await resolveCodexPageReference(service, source);
+            const wb = await workbenchLaunchUrl();
+            const data = { ...page, ...(wb ? { launchUrl: wb.launchUrl } : {}) };
+            return {
+              ...mcpSuccess(data),
+              _meta: { showaiWorkbenchData: data },
+            };
+          } catch (error) {
+            return mcpFailure(error);
+          }
+        },
       );
 
       async function presentCards(
@@ -504,6 +921,19 @@ export function antigravityWorkbenchConnection(service: AgentService) {
                 service.store.root,
                 target,
               );
+              if (nav.status === "queued") {
+                const tabRef = await writeAntigravityTabReference(service, target);
+                const wb = await workbenchLaunchUrl();
+                const enriched = {
+                  ...nav,
+                  fileUri: tabRef.fileUri,
+                  ...(wb ? { launchUrl: wb.launchUrl } : {}),
+                };
+                return {
+                  ...mcpSuccess(enriched),
+                  _meta: { showaiWorkbenchData: enriched },
+                };
+              }
               return {
                 ...mcpSuccess(nav),
                 _meta: { showaiWorkbenchData: nav },

@@ -320,12 +320,51 @@
     tryDispatch();
   }
 
+  const navClientId =
+    (window.crypto && typeof window.crypto.randomUUID === "function"
+      ? window.crypto.randomUUID()
+      : Math.random().toString(36).slice(2) + Date.now().toString(36));
+
+  function isWorkbenchVisible() {
+    return (
+      document.visibilityState === "visible" &&
+      window.innerWidth > 40 &&
+      window.innerHeight > 40
+    );
+  }
+
+  let lastReportedVisible = null;
+  function reportVisibility(forceVisible) {
+    const visible =
+      typeof forceVisible === "boolean" ? forceVisible : isWorkbenchVisible();
+    if (visible === lastReportedVisible) return;
+    lastReportedVisible = visible;
+    try {
+      void window.fetch("/_antigravity/client-visibility", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ clientId: navClientId, visible }),
+        keepalive: true,
+      });
+    } catch {
+      // Non-fatal if sidecar is restarting.
+    }
+  }
+
   if (typeof window.EventSource === "function") {
     try {
-      const navUrl = sidecarToken
-        ? "/_antigravity/nav-events?token=" + encodeURIComponent(sidecarToken)
-        : "/_antigravity/nav-events";
-      const navEvents = new window.EventSource(navUrl);
+      const qs = new URLSearchParams({
+        clientId: navClientId,
+        visible: isWorkbenchVisible() ? "1" : "0",
+      });
+      if (sidecarToken) qs.set("token", sidecarToken);
+      const navEvents = new window.EventSource(
+        "/_antigravity/nav-events?" + qs.toString(),
+      );
+      navEvents.onopen = () => {
+        lastReportedVisible = null;
+        reportVisibility();
+      };
       navEvents.onmessage = (event) => {
         try {
           dispatchShowaiOpenPage(JSON.parse(event.data));
@@ -333,6 +372,10 @@
           // Ignore malformed navigation payloads.
         }
       };
+      document.addEventListener("visibilitychange", () => reportVisibility());
+      window.addEventListener("resize", () => reportVisibility());
+      window.addEventListener("focus", () => reportVisibility());
+      window.addEventListener("pagehide", () => reportVisibility(false));
     } catch {
       // Non-fatal if EventSource is unavailable.
     }

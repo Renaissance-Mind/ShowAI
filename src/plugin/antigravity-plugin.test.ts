@@ -4,13 +4,14 @@ import { cp, mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { createInterface } from "node:readline";
-import { pathToFileURL } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { promisify } from "node:util";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { afterEach, describe, expect, test } from "vitest";
 import {
   antigravityCardUri,
+  antigravityFileUri,
   antigravityWorkbenchConnection,
   buildAntigravitySidecarUrl,
   writeAntigravityNavTarget,
@@ -70,7 +71,11 @@ describe("Antigravity page cards and live workbench navigation", () => {
     const home = await makeTempDir("showai-ag-cards-");
     await openLibrary(home);
     const service = new AgentService({ root: home });
-    const workbench = antigravityWorkbenchConnection(service);
+    const workbench = antigravityWorkbenchConnection(service, async (key) => ({
+      url: "http://127.0.0.1:43210/",
+      localUrl: `http://127.0.0.1:43210/?agWorkbench=${key}`,
+      close: async () => {},
+    }));
     const server = createLibraryMcpServer({
       root: home,
       icons: workbench.icons,
@@ -112,6 +117,19 @@ describe("Antigravity page cards and live workbench navigation", () => {
         (item) => item.name === "workbench_open_destination",
       )?._meta as { ui?: { visibility?: string[] } } | undefined;
       expect(openDestMeta?.ui?.visibility).toEqual(["app"]);
+      const openFileMeta = toolList.tools.find(
+        (item) => item.name === "workbench_open_file",
+      )?._meta as Record<string, any> | undefined;
+      expect(openFileMeta?.ui?.resourceUri).toBe(antigravityFileUri);
+      expect(openFileMeta?.["com.google.antigravity/ui"]?.entrypoints).toEqual([
+        { type: "file", title: "ShowAI", extensions: [".showai-ref"] },
+      ]);
+
+      const fileViewerRes = await client.readResource({ uri: antigravityFileUri });
+      const fvContent = fileViewerRes.contents[0];
+      expect((fvContent?._meta as any)?.ui?.csp?.frameDomains).toEqual([
+        "http://127.0.0.1:43210",
+      ]);
 
       const resource = await client.readResource({ uri: antigravityCardUri });
       expect(resource.contents).toHaveLength(1);
@@ -205,12 +223,18 @@ describe("Antigravity page cards and live workbench navigation", () => {
       expect((groupCards.structuredContent as any).data.cards).toHaveLength(2);
       expect((groupCards._meta as any).showaiCardGroup.cards).toHaveLength(2);
 
-      // Before any sidecar SSE client connects, navigation is queued with a sidecar:// URL
-      const queuedNav = await client.callTool({
-        name: "card_navigate",
-        arguments: { projectId, pageId: pageOneId, blockId: "blk-hero" },
+      // Before any visible sidecar SSE client connects, workbench_open_destination returns queued + .showai-ref fileUri for toggle-aux-pane
+      const closedPaneOpen = await client.callTool({
+        name: "workbench_open_destination",
+        arguments: {
+          projectId,
+          pageId: pageOneId,
+          blockId: "blk-hero",
+          destination: "workbench",
+        },
       });
-      expect((queuedNav.structuredContent as any).data).toMatchObject({
+      const closedData = (closedPaneOpen._meta as any).showaiWorkbenchData;
+      expect(closedData).toMatchObject({
         status: "queued",
         sidecarUrl: buildAntigravitySidecarUrl({
           projectId,
@@ -218,11 +242,25 @@ describe("Antigravity page cards and live workbench navigation", () => {
           blockId: "blk-hero",
         }),
       });
+      expect(closedData.fileUri).toMatch(/^file:\/\/.*\.showai-ref$/);
+      expect(closedData.launchUrl).toContain("http://127.0.0.1:43210/?agWorkbench=");
+      const refSource = await import("node:fs/promises").then((fs) =>
+        fs.readFile(fileURLToPath(closedData.fileUri), "utf8"),
+      );
+      const resolvedRef = await client.callTool({
+        name: "workbench_resolve_reference",
+        arguments: { source: refSource },
+      });
+      expect((resolvedRef._meta as any).showaiWorkbenchData).toMatchObject({
+        projectId,
+        pageId: pageOneId,
+        blockId: "blk-hero",
+      });
 
-      // Connect SSE client to /_antigravity/nav-events: receives queued navigation and marks workbench open
+      // Connect SSE client initially hidden (collapsed side pane): status stays queued so card still pops open side panel!
       const abort = new AbortController();
       const sseRes = await fetch(
-        `${sidecar.url}/_antigravity/nav-events?token=nav-token`,
+        `${sidecar.url}/_antigravity/nav-events?token=nav-token&clientId=c1&visible=0`,
         { signal: abort.signal },
       );
       expect(sseRes.status).toBe(200);
@@ -249,6 +287,28 @@ describe("Antigravity page cards and live workbench navigation", () => {
         pageId: pageOneId,
         blockId: "blk-hero",
       });
+
+      // While clientId=c1 has visible=0, card_navigate still reports queued (no false-positive from hidden background iframe!)
+      const whileHidden = await client.callTool({
+        name: "card_navigate",
+        arguments: { projectId, pageId: pageOneId },
+      });
+      expect((whileHidden.structuredContent as any).data.status).toBe("queued");
+      expect(await nextNavPayload()).toMatchObject({
+        projectId,
+        pageId: pageOneId,
+      });
+
+      // Mark sidecar client visible -> now workbench_open_destination reports accepted!
+      const visRes = await fetch(
+        `${sidecar.url}/_antigravity/client-visibility?token=nav-token`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ clientId: "c1", visible: true }),
+        },
+      );
+      expect(visRes.status).toBe(200);
 
       // Now that SSE client is active, workbench_open_destination returns accepted and streams live
       const liveJump = await client.callTool({

@@ -461,11 +461,19 @@ function createNavigationCoordinator(env = process.env) {
   const home = resolve(env.SHOWAI_HOME || join(homedir(), ".showai"));
   const navPath = join(home, "local", "antigravity-workbench-nav.json");
   const statePath = join(home, "local", "antigravity-workbench-state.json");
-  const clients = new Set();
+  const clients = new Map();
   let lastDeliveredId = null;
   let pollTimer = null;
   let heartbeatTimer = null;
   let closed = false;
+
+  function countVisibleClients() {
+    let n = 0;
+    for (const meta of clients.values()) {
+      if (meta.visible) n++;
+    }
+    return n;
+  }
 
   async function writeState() {
     try {
@@ -473,7 +481,11 @@ function createNavigationCoordinator(env = process.env) {
       const temp = `${statePath}.${process.pid}.${randomUUID()}.tmp`;
       await writeFile(
         temp,
-        JSON.stringify({ openClients: clients.size, updatedAt: Date.now() }) + "\n",
+        JSON.stringify({
+          openClients: clients.size,
+          visibleClients: countVisibleClients(),
+          updatedAt: Date.now(),
+        }) + "\n",
         "utf8",
       );
       await rename(temp, statePath);
@@ -498,9 +510,11 @@ function createNavigationCoordinator(env = process.env) {
         return;
       }
       lastDeliveredId = nav.id;
-      await rm(navPath, { force: true }).catch(() => {});
+      if (countVisibleClients() > 0) {
+        await rm(navPath, { force: true }).catch(() => {});
+      }
       const payload = `data: ${JSON.stringify(nav)}\n\n`;
-      for (const client of clients) {
+      for (const client of clients.keys()) {
         client.write(payload);
       }
     } catch {
@@ -517,7 +531,7 @@ function createNavigationCoordinator(env = process.env) {
     }
     if (!heartbeatTimer) {
       heartbeatTimer = setInterval(() => {
-        for (const client of clients) client.write(": ping\n\n");
+        for (const client of clients.keys()) client.write(": ping\n\n");
         void writeState();
       }, 5000);
       heartbeatTimer.unref?.();
@@ -536,7 +550,7 @@ function createNavigationCoordinator(env = process.env) {
     }
   }
 
-  function subscribe(req, res, corsHeaders) {
+  function subscribe(req, res, reqUrl, corsHeaders) {
     res.writeHead(200, {
       ...corsHeaders,
       "Content-Type": "text/event-stream; charset=utf-8",
@@ -545,7 +559,10 @@ function createNavigationCoordinator(env = process.env) {
     });
     res.flushHeaders?.();
     res.write(": connected\n\n");
-    clients.add(res);
+    const clientId = reqUrl.searchParams.get("clientId") || randomUUID();
+    const visibleParam = reqUrl.searchParams.get("visible");
+    const visible = visibleParam === null ? true : visibleParam === "1";
+    clients.set(res, { clientId, visible });
     startTimers();
     void writeState();
     void checkNav();
@@ -556,9 +573,24 @@ function createNavigationCoordinator(env = process.env) {
     });
   }
 
+  function updateVisibility(clientId, visible) {
+    if (typeof clientId !== "string" || !clientId) return;
+    let changed = false;
+    for (const meta of clients.values()) {
+      if (meta.clientId === clientId && meta.visible !== !!visible) {
+        meta.visible = !!visible;
+        changed = true;
+      }
+    }
+    if (changed) {
+      void writeState();
+      if (visible) void checkNav();
+    }
+  }
+
   async function close() {
     closed = true;
-    for (const client of clients) {
+    for (const client of clients.keys()) {
       client.end();
     }
     clients.clear();
@@ -566,7 +598,7 @@ function createNavigationCoordinator(env = process.env) {
     await writeState();
   }
 
-  return { subscribe, close };
+  return { subscribe, updateVisibility, close };
 }
 
 export async function startAntigravitySidecar(options = {}) {
@@ -694,7 +726,25 @@ export async function startAntigravitySidecar(options = {}) {
       return;
     }
     if (req.method === "GET" && pathname === "/_antigravity/nav-events") {
-      navCoordinator.subscribe(req, res, corsHeaders);
+      navCoordinator.subscribe(req, res, reqUrl, corsHeaders);
+      return;
+    }
+    if (req.method === "POST" && pathname === "/_antigravity/client-visibility") {
+      if (!validateToken(token, req, reqUrl)) {
+        res.writeHead(401, {
+          ...corsHeaders,
+          "Content-Type": "application/json",
+        });
+        res.end(JSON.stringify({ error: "unauthorized" }));
+        return;
+      }
+      const body = await readJsonBody(req).catch(() => ({}));
+      navCoordinator.updateVisibility(body?.clientId, body?.visible);
+      res.writeHead(200, {
+        ...corsHeaders,
+        "Content-Type": "application/json",
+      });
+      res.end(JSON.stringify({ ok: true }));
       return;
     }
     if (req.method === "POST" && pathname === "/_antigravity/restart") {

@@ -108,7 +108,15 @@ export const connectionCommands: CommandDeclaration[] = [
               presentationDirectory,
             )
           : process.env.SHOWAI_ANTIGRAVITY_WORKBENCH === "1"
-            ? (await import("../antigravity-workbench")).antigravityWorkbenchConnection(service)
+            ? (await import("../antigravity-workbench")).antigravityWorkbenchConnection(
+                service,
+                async (key) =>
+                  (await loadBrowser()).startAntigravityWorkbenchBrowser({
+                    home,
+                    profile: join(home, "local", "antigravity-workbench"),
+                    key,
+                  }),
+              )
             : undefined;
         await startLibraryMcp({ root: home, presentationDirectory, ...workbench });
       } else {
