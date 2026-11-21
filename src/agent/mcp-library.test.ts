@@ -16,9 +16,12 @@ const connections: {
   client: Client;
   server: ReturnType<typeof createMcpServer>;
 }[] = [];
-async function connect(server: ReturnType<typeof createMcpServer>) {
+async function connect(
+  server: ReturnType<typeof createMcpServer>,
+  clientName = "mcp-library-test",
+) {
   const [left, right] = InMemoryTransport.createLinkedPair();
-  const client = new Client({ name: "mcp-library-test", version: "1" });
+  const client = new Client({ name: clientName, version: "1" });
   await server.connect(right);
   await client.connect(left);
   connections.push({ client, server });
@@ -796,4 +799,45 @@ test("pages are authored through shallow blocks and component.insert", async () 
   });
   expect(both.isError).toBe(true);
   expect(JSON.stringify(both.content)).toContain("not both");
+});
+
+test("Cursor can read a presentation resource from the active library connection", async () => {
+  const cursor = await connect(createLibraryMcpServer({ root }), "cursor-vscode");
+  const { id: projectId } = await call(cursor, "project_create", {
+    name: "Cursor Preview",
+  });
+  const { document } = await call(cursor, "page_create", {
+    projectId,
+    title: "Cursor Preview Page",
+    blocks: [{ kind: "text", data: { format: "markdown", content: "Preview body" } }],
+  });
+  const args = { projectId, pageId: document.id };
+  const result = await cursor.callTool({ name: "page_present", arguments: args });
+  expect(result.isError, JSON.stringify(result.content)).not.toBe(true);
+  expect(result._meta).not.toHaveProperty("showai");
+  const output = result.structuredContent as {
+    data: unknown;
+    showai: { resourceUri: string };
+  };
+  expect(output.data).toMatchObject({ title: "Cursor Preview Page", projectId });
+  const { resourceUri } = output.showai;
+  const read = await cursor.readResource({ uri: resourceUri });
+  expect(read.contents[0]).toMatchObject({
+    uri: resourceUri,
+    mimeType: "application/json",
+  });
+  const resource = read.contents[0];
+  if (!("text" in resource)) throw new Error("Expected a text resource");
+  expect(JSON.parse(resource.text)).toMatchObject({
+    inline: expect.stringContaining("data-showai-inline-root"),
+  });
+  expect(JSON.stringify(await cursor.listResources())).not.toContain(resourceUri);
+
+  const other = await connect(createLibraryMcpServer({ root }));
+  await expect(other.readResource({ uri: resourceUri })).rejects.toThrow(/expired/);
+  const ordinary = await other.callTool({ name: "page_present", arguments: args });
+  expect(ordinary._meta?.showai).toMatchObject({
+    inline: expect.stringContaining("data-showai-inline-root"),
+  });
+  expect(ordinary.structuredContent).not.toHaveProperty("showai");
 });

@@ -1,0 +1,52 @@
+{
+  "$schema": "https://catalog.msh.team/misc/kimi.plugin.schema.json",
+  "name": "showai",
+  "version": "0.30.0",
+  "description": "通过本机 ShowAI MCP 在 Kimi Work 对话中展示组件，创建和续改可保存的交互页面，并使用 Widget 或离线 HTML 交付。",
+  "keywords": [
+    "showai",
+    "interactive-pages",
+    "html",
+    "widget",
+    "页面展示"
+  ],
+  "author": "Renaissance Mind",
+  "license": "MIT",
+  "skillInstructions": "",
+  "interface": {
+    "displayName": "ShowAI",
+    "shortDescription": "创作 ShowAI 页面并在 Kimi 对话内展示",
+    "longDescription": "连接所选内容库已注册的 ShowAI 运行时，在对话中展示组件，创作、修改和评审项目页面。使用 Kimi Work Widget 展示离线交互预览，或交付完整 HTML 文件。",
+    "developerName": "Renaissance Mind",
+    "websiteURL": "https://showai.renaissancemind.ai",
+    "iconUrl": "",
+    "category": "PRODUCTIVITY",
+    "defaultLocale": "zh-CN",
+    "locales": "./locales/",
+    "tryPrompts": [
+      "把这份调研做成 ShowAI 页面并展示在对话里",
+      "展示我的 ShowAI 项目里已有的页面",
+      "把这个 ShowAI 页面导出成 HTML 文件"
+    ],
+    "mcpOverrides": {
+      "showai": {
+        "displayName": "ShowAI",
+        "description": "读取、保存和展示所选内容库中的 ShowAI 页面与组件"
+      }
+    }
+  },
+  "skills": "./skills/",
+  "mcpServers": {
+    "showai": {
+      "command": "sh",
+      "args": [
+        "./mcp-run.sh"
+      ],
+      "env": {
+        "SHOWAI_HOST_DISPLAY": "fragment-file"
+      },
+      "startupTimeoutMs": 60000,
+      "toolTimeoutMs": 300000
+    }
+  }
+}

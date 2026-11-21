@@ -43,24 +43,27 @@ The agent saves the interface in ShowAI and shows it in the conversation (or as 
 | Antigravity                               | Supported    | ShowAI → **Settings → Plugins** → Install plugin                                                                                       |
 | Built-in agent                            | Supported    | Inside ShowAI, using your local Codex or Claude Code sign-in, a model API key or Cloud                                                 |
 | DeepSeek Harness                          | Preview      | ShowAI → **Settings → Plugins** → Prepare plugin, then add it in DeepSeek Harness ([steps](plugins/showai/README.md#deepseek-harness)) |
-| Kimi Work                                 | Preview      | Add ShowAI's MCP server and the [Kimi plugin](plugins-kimi/showai/README.md) in Kimi Work                                              |
-| ChatGPT on the web                        | Self-hosted  | Enable Remote connection in the desktop App with your own Cloudflare or Tailscale account ([guide](docs/chatgpt.md))                    |
+| Kimi Work                                 | Preview      | Add ShowAI's MCP server and the [Kimi plugin](plugins/showai-kimi/README.md) in Kimi Work                                              |
+| Cursor, Qoder, WorkBuddy                  | Preview      | Generate an installable package for your host ([desktop host setup](plugins/showai/README.md#cursor-qoder-and-workbuddy))              |
+| ChatGPT on the web                        | Self-hosted  | Enable Remote connection in the desktop App with your own Cloudflare or Tailscale account ([guide](docs/chatgpt.md))                   |
 | Other MCP clients (Gemini CLI, OpenCode…) | Experimental | Configure the stdio MCP entry by hand ([Agent integration](docs/agent-integration.md))                                                 |
 
 ### Plugin paths by Agent host
 
 When installing ShowAI from this repository, use the row for your current Agent host. Paths are relative to the repository root. Start ShowAI or register its runtime before following the local installation steps.
 
-| Agent host                      | Repository directory or connection                            | Install or connect                                                                                                                                          |
-| ------------------------------- | ------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Codex                           | [plugins/showai-codex/](plugins/showai-codex/)                | Run `npm run plugin:install` from the checkout. [Source installation](docs/codex.md#install-from-a-source-checkout)                                         |
-| Claude Code                     | [plugins/showai-claude/](plugins/showai-claude/)              | Add this repository as a Claude Code marketplace and install `showai@renaissance-mind`. [Source installation](docs/codex.md#install-from-a-source-checkout) |
-| Antigravity                     | [plugins/showai-antigravity/](plugins/showai-antigravity/)    | Run `npm run plugin:antigravity` from the checkout. [Source installation](plugins/showai/README.md#from-a-source-checkout)                                  |
-| DeepSeek Harness                | [plugins/dsh-showai/](plugins/dsh-showai/) (bundle source)    | Run `npm run plugin:dsh` and add the prepared directory shown by the command in DeepSeek Harness. [Bundle setup](plugins/showai/README.md#deepseek-harness) |
-| Kimi Work                       | [plugins-kimi/showai/](plugins-kimi/showai/)                  | In Kimi Work, register and install this exact subdirectory. [Kimi Work setup](plugins-kimi/showai/README.md#install-and-update)                             |
-| ChatGPT on the web              | Remote MCP                                                    | [Set up the remote connection in ChatGPT](docs/chatgpt.md#connect-chatgpt).                                                                                 |
-| Qoder, TRAE, WorkBuddy          | Manual MCP setup                                              | Use the host's MCP settings to [configure a ShowAI connection](docs/agent-integration.md). Host-specific packages are pending.                              |
-| Other Agent Plugins 1.0 clients | [plugins/showai/](plugins/showai/) (universal package source) | [Generate and install the universal Skills package](plugins/showai/README.md#universal-plugin-and-manual-mcp-setup), then configure MCP in the host.        |
+| Agent host                        | Repository directory or connection                                   | Install or connect                                                                                                                                                |
+| --------------------------------- | -------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Codex                             | [plugins/showai-codex/](plugins/showai-codex/)                       | Run `npm run plugin:install` from the checkout. [Source installation](docs/codex.md#install-from-a-source-checkout)                                               |
+| Claude Code                       | [plugins/showai-claude/](plugins/showai-claude/)                     | Add this repository as a Claude Code marketplace and install `showai@renaissance-mind`. [Source installation](docs/codex.md#install-from-a-source-checkout)       |
+| Antigravity                       | [plugins/showai-antigravity/](plugins/showai-antigravity/)           | Run `npm run plugin:antigravity` from the checkout. [Source installation](plugins/showai/README.md#from-a-source-checkout)                                        |
+| DeepSeek Harness                  | [plugins/showai-deepseek/](plugins/showai-deepseek/) (bundle source) | Run `npm run plugin:dsh` and add the prepared directory shown by the command in DeepSeek Harness. [Bundle setup](plugins/showai/README.md#deepseek-harness)       |
+| Kimi Work                         | [plugins/showai-kimi/](plugins/showai-kimi/)                         | In Kimi Work, register and install this exact subdirectory. [Kimi Work setup](plugins/showai-kimi/README.md#install-and-update)                                   |
+| Cursor                            | [plugins/showai/](plugins/showai/) → `--host cursor`                 | Generate a local Cursor plugin and reload the window. [Cursor setup](plugins/showai/README.md#cursor-qoder-and-workbuddy)                                         |
+| Qoder                             | [plugins/showai/](plugins/showai/) → `--host qoder`                  | Generate a ZIP and import it in **Extensions → Plugins → Add plugin**. [Qoder setup](plugins/showai/README.md#cursor-qoder-and-workbuddy)                         |
+| WorkBuddy                         | [plugins/showai/](plugins/showai/) → `--host workbuddy`              | Generate a local marketplace package, or add ShowAI in **Connectors → Custom connectors**. [WorkBuddy setup](plugins/showai/README.md#cursor-qoder-and-workbuddy) |
+| ChatGPT on the web                | [plugins/showai/](plugins/showai/) → `--chatgpt-app`                 | [Register a remote MCP connection](docs/chatgpt.md#connect-chatgpt) and attach it to a universal package if needed.                                               |
+| TRAE and other compatible clients | [plugins/showai/](plugins/showai/)                                   | [Generate the universal package](plugins/showai/README.md#universal-plugin-and-manual-mcp-setup) with a known connection, or use the included setup guide.        |
 
 ## 💡 See what it makes
 
@@ -163,7 +166,7 @@ All guides have paired English and Simplified Chinese editions. Browse the [comp
 | [Use in Claude Code and Codex](docs/codex.md) | [Template folders](docs/template-bundles.md)          | [Cloud and accounts](docs/cloud.md)            |
 | [Built-in agent](docs/agent-host.md)          | [Component parameters](docs/component-parameters.md)  | [Project sync](docs/project-sync.md)           |
 | [Page and Board](docs/page-surface.md)        | [Agent integration](docs/agent-integration.md)        | [Server operations](docs/server-operations.md) |
-| [ChatGPT web (local MCP)](docs/chatgpt.md)  | [Artifact format v3](docs/artifact-format.md)         | [MCP deployment](docs/cloud-mcp-deployment.md) |
+| [ChatGPT web (local MCP)](docs/chatgpt.md)    | [Artifact format v3](docs/artifact-format.md)         | [MCP deployment](docs/cloud-mcp-deployment.md) |
 
 ## 🛠️ Development and contributions
 

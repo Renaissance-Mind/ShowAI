@@ -1,6 +1,6 @@
 import { readFile } from "node:fs/promises";
 import { createHash } from "node:crypto";
-import { join } from "node:path";
+import { isAbsolute, join } from "node:path";
 import { crc32, deflateRawSync } from "node:zlib";
 import {
   DELIVERY_WORKFLOWS,
@@ -8,6 +8,91 @@ import {
   skillFiles,
   workflowWithHostDelivery,
 } from "./host-package.mjs";
+
+const MCP_SCHEMA = "https://agent-plugins.org/schemas/1.0.0/mcp.schema.json";
+const hostManifestPaths = {
+  cursor: ".cursor-plugin/plugin.json",
+  qoder: ".qoder-plugin/plugin.json",
+  workbuddy: ".workbuddy-plugin/plugin.json",
+};
+const hostPluginRoots = {
+  cursor: "${CURSOR_PLUGIN_ROOT}",
+  workbuddy: "${CODEBUDDY_PLUGIN_ROOT}",
+};
+
+async function mcpConnection(mcp, runtimeConfig, auth, host) {
+  if (
+    runtimeConfig !== undefined &&
+    (mcp !== "local" || !isAbsolute(runtimeConfig))
+  )
+    throw new Error(
+      "--runtime-config requires --mcp local and an absolute path.",
+    );
+  if (
+    auth !== undefined &&
+    (!mcp || mcp === "local" || !["oauth", "none"].includes(auth))
+  )
+    throw new Error("--mcp-auth requires a remote MCP URL and oauth or none.");
+  if (mcp === undefined) return;
+  if (mcp === "local") {
+    let binding;
+    if (runtimeConfig) {
+      const registered = JSON.parse(await readFile(runtimeConfig, "utf8"));
+      if (
+        registered?.format !== "showai-agent-runtime" ||
+        registered.protocol !== 1 ||
+        typeof registered.home !== "string" ||
+        !isAbsolute(registered.home)
+      )
+        throw new Error(
+          "Use a ShowAI agent-runtime.json with an absolute content library path.",
+        );
+      binding = {
+        SHOWAI_HOME: registered.home,
+        SHOWAI_RUNTIME_CONFIG: runtimeConfig,
+      };
+    }
+    return {
+      type: "stdio",
+      command: "node",
+      args: ["./mcp/launch.mjs"],
+      env: {
+        SHOWAI_HOST_DISPLAY: "mcp-app",
+        ...binding,
+      },
+    };
+  }
+  const url = new URL(mcp);
+  const loopback =
+    url.hostname === "localhost" ||
+    url.hostname === "[::1]" ||
+    /^127(?:\.\d{1,3}){3}$/.test(url.hostname);
+  if (
+    (url.protocol !== "https:" && !(url.protocol === "http:" && loopback)) ||
+    url.username ||
+    url.password ||
+    url.search ||
+    url.hash
+  )
+    throw new Error(
+      "Use an MCP HTTPS URL, or HTTP on loopback, without credentials, query or fragment.",
+    );
+  return {
+    type: "streamable-http",
+    url: url.href,
+    ...(auth &&
+      !host && {
+        extensions: {
+          "com.openai": {
+            auth:
+              auth === "oauth"
+                ? { type: "oauth", client: { mode: "dcr" } }
+                : { type: "none" },
+          },
+        },
+      }),
+  };
+}
 
 export async function universalPluginFiles(
   source,
@@ -17,12 +102,23 @@ export async function universalPluginFiles(
     appId,
     appAlias = name,
     setupUrl,
+    mcp,
+    mcpAuth,
+    runtimeConfig,
+    host,
   } = {},
 ) {
   if (!/^[a-z0-9][a-z0-9_-]*$/.test(name))
     throw new Error("Invalid plugin name.");
   if (appId !== undefined && !/^asdk_app_[A-Za-z0-9]+$/.test(appId))
     throw new Error("Use the ID of an existing ChatGPT MCP connection.");
+  if (appId !== undefined && (mcp !== undefined || host !== undefined))
+    throw new Error(
+      "Export the existing ChatGPT connection without another MCP or host binding.",
+    );
+  if (host !== undefined && !Object.hasOwn(hostManifestPaths, host))
+    throw new Error("Unknown plugin host: " + host);
+  const connection = await mcpConnection(mcp, runtimeConfig, mcpAuth, host);
   if (setupUrl !== undefined) {
     const url = new URL(setupUrl);
     if (
@@ -40,7 +136,9 @@ export async function universalPluginFiles(
     await readFile(join(source, "plugin.json"), "utf8"),
   );
   const description =
-    "Use ShowAI with an MCP connection configured in your agent. The included Skills guide first-time setup.";
+    connection || appId
+      ? "Use ShowAI with the included MCP connection. The Skills guide connection recovery and page creation."
+      : "Use ShowAI with an MCP connection configured in your agent. The included Skills guide first-time setup.";
   const manifest = {
     $schema: metadata.$schema,
     name,
@@ -62,15 +160,79 @@ export async function universalPluginFiles(
   };
   const json = (value) => Buffer.from(JSON.stringify(value, null, 2) + "\n");
   const files = new Map([["plugin.json", json(manifest)]]);
-  if (appId) files.set(".app.json", json({ apps: { [appAlias]: { id: appId } } }));
+  if (appId)
+    files.set(".app.json", json({ apps: { [appAlias]: { id: appId } } }));
+  if (host) {
+    files.set(
+      hostManifestPaths[host],
+      json({
+        name,
+        displayName,
+        version: manifest.version,
+        description,
+      }),
+    );
+    if (host === "workbuddy")
+      files.set(
+        ".workbuddy-plugin/marketplace.json",
+        json({
+          name: `${name}-local`,
+          owner: { name: "ShowAI" },
+          plugins: [
+            { name, source: "./", version: manifest.version, description },
+          ],
+        }),
+      );
+  }
+  if (connection) {
+    const local = connection.type === "stdio";
+    const serverName =
+      host === "cursor" || host === "workbuddy" ? name : "showai";
+    const core =
+      host === "cursor" && local
+        ? {
+            ...connection,
+            args: [`${hostPluginRoots.cursor}/mcp/launch.mjs`],
+          }
+        : connection;
+    files.set(
+      "mcp.json",
+      json({ $schema: MCP_SCHEMA, mcpServers: { [serverName]: core } }),
+    );
+    if (connection.type === "stdio")
+      files.set(
+        "mcp/launch.mjs",
+        await readFile(join(source, "mcp/launch.mjs")),
+      );
+    if (host === "qoder" || host === "workbuddy") {
+      const cwd = hostPluginRoots[host] ?? ".";
+      const native = local
+        ? {
+            ...connection,
+            args: [`${cwd}/mcp/launch.mjs`],
+            ...(host === "qoder" && { cwd }),
+          }
+        : {
+            type: "http",
+            url: connection.url,
+            ...(mcpAuth === "oauth" && { oauth: { enabled: true } }),
+          };
+      files.set(".mcp.json", json({ mcpServers: { [serverName]: native } }));
+    }
+  }
   const adapter = await readFile(
     join(source, "host-adapters/mcp-app.md"),
     "utf8",
   );
   const skillRoot = join(source, "skills");
   const snapshot = await skillFiles(skillRoot, { includeHidden: false });
-  if (Object.keys(snapshot).filter((file) => /^[^/]+\/SKILL\.md$/.test(file)).length !== 6)
-    throw new Error("Expected the six ShowAI workflows in the universal package.");
+  if (
+    Object.keys(snapshot).filter((file) => /^[^/]+\/SKILL\.md$/.test(file))
+      .length !== 6
+  )
+    throw new Error(
+      "Expected the six ShowAI workflows in the universal package.",
+    );
   for (const [file, digest] of Object.entries(snapshot)) {
     let data = await readFile(join(skillRoot, file));
     if (createHash("sha256").update(data).digest("hex") !== digest)
@@ -106,9 +268,9 @@ export async function universalPluginFiles(
       [
         `# ${displayName}`,
         "",
-        "Install this package in a compatible plugin host, or load its six skills/ folders in an Agent Skills client. In your agent, add or reconnect your ShowAI MCP server. Ask “Help me connect ShowAI” for guided setup.",
+        "Install this package in a compatible plugin host, or load its six skills/ folders in an Agent Skills client. Use the bundled or already configured ShowAI MCP connection. Ask “Help me connect ShowAI” when setup or reconnection is needed.",
         "",
-        "在支持插件包的宿主导入本包；支持 Agent Skills 的客户端可加载 skills/ 下的六个技能目录。在宿主中手动添加或重新连接 ShowAI MCP。对 Agent 说「帮我连接 ShowAI」，它会按当前环境逐步引导。",
+        "在支持插件包的宿主导入本包；支持 Agent Skills 的客户端可加载 skills/ 下的六个技能目录。优先使用随包提供或已经配置的 ShowAI MCP。需要设置或恢复连接时，对 Agent 说「帮我连接 ShowAI」。",
         "",
         ...(setupUrl
           ? [
@@ -175,7 +337,10 @@ export async function universalPluginArchive(source, options) {
     version,
     files: [...files.keys()],
     bytes: archive(
-      [...files].map(([path, data]) => ({ name: `${name}/${path}`, data })),
+      [...files].map(([path, data]) => ({
+        name: options?.host === "qoder" ? path : `${name}/${path}`,
+        data,
+      })),
     ),
   };
 }

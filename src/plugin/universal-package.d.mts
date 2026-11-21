@@ -4,6 +4,10 @@ interface UniversalPluginOptions {
   appId?: string;
   appAlias?: string;
   setupUrl?: string;
+  mcp?: string;
+  mcpAuth?: "oauth" | "none";
+  runtimeConfig?: string;
+  host?: "cursor" | "qoder" | "workbuddy";
 }
 export function universalPluginFiles(
   source: string,

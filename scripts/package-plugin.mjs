@@ -1,7 +1,9 @@
 import {
   access,
+  cp,
   copyFile,
   mkdir,
+  mkdtemp,
   readFile,
   readdir,
   rm,
@@ -14,10 +16,14 @@ import { packageSkillFormats } from "./package-skill-formats.mjs";
 import {
   bindHostSkills,
   bindWorkflowDelivery,
+  publishPluginDirectory,
   stageHostPlugin,
   writeHostLauncher,
 } from "../src/plugin/host-package.mjs";
-import { universalPluginFiles } from "../src/plugin/universal-package.mjs";
+import {
+  universalPluginArchive,
+  universalPluginFiles,
+} from "../src/plugin/universal-package.mjs";
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const plugin = join(root, "plugins/showai");
 await packageSkillFormats();
@@ -28,6 +34,10 @@ for (let i = 0; i < args.length; i += 2) {
   if (
     ![
       "--mcp-url",
+      "--mcp",
+      "--mcp-auth",
+      "--runtime-config",
+      "--host",
       "--out",
       "--name",
       "--display-name",
@@ -36,7 +46,7 @@ for (let i = 0; i < args.length; i += 2) {
     !args[i + 1]
   )
     throw new Error(
-      "Usage: package-plugin.mjs [--out NEW_PACKAGE_DIRECTORY [--mcp-url MANUAL_SETUP_HINT] [--name PLUGIN_NAME] [--display-name NAME] [--chatgpt-app asdk_app_ID]]",
+      "Usage: package-plugin.mjs [--out NEW_DIRECTORY_OR_ZIP [--host cursor|qoder|workbuddy] [--mcp local|MCP_URL] [--runtime-config ABSOLUTE_PATH] [--mcp-auth oauth|none] [--mcp-url MANUAL_SETUP_HINT] [--name PLUGIN_NAME] [--display-name NAME] [--chatgpt-app asdk_app_ID]]",
     );
   settings[args[i]] = args[i + 1];
 }
@@ -81,9 +91,10 @@ for (const path of workflowMetadata.guides)
 const demote = (markdown) =>
   markdown.replace(/^(#{1,5}) /gm, (_, marks) => `${marks}# `);
 const workflow = workflowParts.map(demote).join("\n\n");
-const visualPrinciples = /(?:^|\n)## 视觉表达原则\n+([\s\S]*?)(?=\n## |(?![\s\S]))/.exec(
-  workflowParts[0],
-)?.[1];
+const visualPrinciples =
+  /(?:^|\n)## 视觉表达原则\n+([\s\S]*?)(?=\n## |(?![\s\S]))/.exec(
+    workflowParts[0],
+  )?.[1];
 if (!visualPrinciples)
   throw new Error("The system workflow is missing its 视觉表达原则 section.");
 async function fill(path, slot, content) {
@@ -215,7 +226,7 @@ for (const profile of ["codex", "claude", "antigravity"]) {
   await stageHostPlugin({ source: plugin, target, profile });
   await validateGuidanceLinks(join(target, "skills"), target);
 }
-const kimi = join(root, "plugins-kimi/showai");
+const kimi = join(root, "plugins/showai-kimi");
 const kimiManifestPath = join(kimi, "kimi.plugin.json");
 const kimiManifest = JSON.parse(await readFile(kimiManifestPath, "utf8"));
 await writeFile(
@@ -227,30 +238,79 @@ await bindHostSkills({ source: plugin, target: kimi, profile: "kimi" });
 await mkdir(join(kimi, "mcp"), { recursive: true });
 await copyFile(join(plugin, "mcp/launch.mjs"), join(kimi, "mcp/launch.mjs"));
 await validateGuidanceLinks(join(kimi, "skills"), kimi);
+async function publishCompatibilityPackage(source, alias, exclude = []) {
+  const target = join(root, alias);
+  await mkdir(dirname(target), { recursive: true });
+  const staging = await mkdtemp(join(dirname(target), ".showai-compat-"));
+  try {
+    await cp(source, staging, {
+      recursive: true,
+      filter: (path) =>
+        !["node_modules", ...exclude].includes(
+          relative(source, path).split(sep)[0],
+        ),
+    });
+    await publishPluginDirectory(staging, target);
+  } finally {
+    await rm(staging, { recursive: true, force: true });
+  }
+}
+
+await publishCompatibilityPackage(kimi, "plugins-kimi/showai");
+await publishCompatibilityPackage(
+  join(root, "plugins/showai-deepseek"),
+  "plugins/dsh-showai",
+  ["test"],
+);
+
 if (Object.keys(settings).length) {
-  if (!settings["--out"]) throw new Error("Use --out NEW_DIRECTORY for a universal plugin.");
+  if (!settings["--out"])
+    throw new Error("Use --out NEW_DIRECTORY_OR_ZIP for a universal plugin.");
   const destination = resolve(settings["--out"]);
   const relativeDestination = relative(plugin, destination);
-  if (!relativeDestination || (!isAbsolute(relativeDestination) &&
-      relativeDestination !== ".." && !relativeDestination.startsWith(".." + sep)))
+  if (
+    !relativeDestination ||
+    (!isAbsolute(relativeDestination) &&
+      relativeDestination !== ".." &&
+      !relativeDestination.startsWith(".." + sep))
+  )
     throw new Error("Package outside the source plugin.");
-  const { name, files } = await universalPluginFiles(plugin, {
-    name: settings["--name"] ?? (settings["--mcp-url"] ? "showai-cloud" : "showai-universal"),
-    displayName: settings["--display-name"],
+  const host = settings["--host"];
+  const options = {
+    name:
+      settings["--name"] ??
+      (host
+        ? `showai-${host}`
+        : settings["--mcp-url"]
+          ? "showai-cloud"
+          : "showai-universal"),
+    displayName: settings["--display-name"] ?? (host ? "ShowAI" : undefined),
     appId: settings["--chatgpt-app"],
     setupUrl: settings["--mcp-url"],
-  });
-  await mkdir(destination, { recursive: false });
-  try {
-    for (const [file, contents] of files) {
-      const path = join(destination, file);
-      await mkdir(dirname(path), { recursive: true });
-      await writeFile(path, contents);
+    mcp: settings["--mcp"],
+    mcpAuth: settings["--mcp-auth"],
+    runtimeConfig: settings["--runtime-config"],
+    host,
+  };
+  if (destination.endsWith(".zip")) {
+    const bundle = await universalPluginArchive(plugin, options);
+    await writeFile(destination, bundle.bytes, { flag: "wx", mode: 0o600 });
+  } else {
+    const { files } = await universalPluginFiles(plugin, options);
+    await mkdir(destination, { recursive: false });
+    try {
+      for (const [file, contents] of files) {
+        const path = join(destination, file);
+        await mkdir(dirname(path), { recursive: true });
+        await writeFile(path, contents);
+      }
+      await validateGuidanceLinks(join(destination, "skills"), destination);
+    } catch (error) {
+      await rm(destination, { recursive: true, force: true });
+      throw error;
     }
-    await validateGuidanceLinks(join(destination, "skills"), destination);
-  } catch (error) {
-    await rm(destination, { recursive: true, force: true });
-    throw error;
   }
-  console.log(`Prepared ${name} in ${destination}. Configure the MCP connection in the host.`);
+  console.log(
+    `Prepared ${options.name} in ${destination}. Use the ShowAI connection guide when MCP setup or reconnection is needed.`,
+  );
 }

@@ -1,0 +1,17 @@
+{
+  "view": "html",
+  "viewport": {
+    "width": 1000,
+    "height": 900
+  },
+  "theme": "light",
+  "draft": false,
+  "actions": [
+    {
+      "type": "hover",
+      "blockId": "gantt",
+      "role": "button",
+      "name": "查看 交互与视觉设计，2026-10-08 至 2026-10-12，40%"
+    }
+  ]
+}

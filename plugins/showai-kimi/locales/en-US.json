@@ -1,0 +1,17 @@
+{
+  "displayName": "ShowAI",
+  "shortDescription": "Create ShowAI pages and present them inline in Kimi conversations",
+  "longDescription": "Connect to the ShowAI runtime registered for the selected library. Show components in the conversation, create, revise and review saved pages, and deliver offline interactive previews through Kimi Work Widgets or complete HTML files.",
+  "developerName": "Renaissance Mind",
+  "tryPrompts": [
+    "Turn this research into a ShowAI page and show it in our conversation",
+    "Show me a page from my ShowAI project",
+    "Export this ShowAI page as an HTML file"
+  ],
+  "mcpOverrides": {
+    "showai": {
+      "displayName": "ShowAI",
+      "description": "Read, save and present ShowAI pages and components in the selected library"
+    }
+  }
+}

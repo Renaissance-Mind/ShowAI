@@ -1988,7 +1988,7 @@ else {
             : join(runtimePath(), "assets/agent-plugin"),
         dshBundleRoot: () =>
           process.env.SHOWAI_DEV_URL
-            ? join(process.cwd(), "plugins/dsh-showai")
+            ? join(process.cwd(), "plugins/showai-deepseek")
             : join(runtimePath(), "assets/dsh-plugin"),
         runtime: () => info(),
         channel: app.isPackaged ? "packaged" : "development",

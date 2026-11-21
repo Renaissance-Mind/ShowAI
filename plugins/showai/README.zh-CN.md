@@ -42,7 +42,7 @@ npm run plugin:antigravity -- --port <端口> --json
 
 ### DeepSeek Harness
 
-DeepSeek Harness 由自己安装插件，因此 ShowAI 准备一个完整 bundle（[dsh-showai](https://github.com/Renaissance-Mind/ShowAI/blob/main/plugins/dsh-showai/README.md)），包含绑定当前运行时和内容库的 MCP 工具、上述 Skill、对话内预览、会话右侧的编辑标签和左侧导航的全局工作台。App 中打开「设置 → 插件 → DeepSeek Harness → 准备插件」。源码方式在已登记运行时后执行：
+DeepSeek Harness 由自己安装插件，因此 ShowAI 准备一个完整 bundle（[dsh-showai](https://github.com/Renaissance-Mind/ShowAI/blob/main/plugins/showai-deepseek/README.md)），包含绑定当前运行时和内容库的 MCP 工具、上述 Skill、对话内预览、会话右侧的编辑标签和左侧导航的全局工作台。App 中打开「设置 → 插件 → DeepSeek Harness → 准备插件」。源码方式在已登记运行时后执行：
 
 ```sh
 npm run plugin:dsh
@@ -87,7 +87,6 @@ page_present 返回完整离线 HTML/source 与聊天预览。预览容纳时使
 
 宿主可以显示 MCP Apps、使用返回的 Codex 本机可视化路径，或交付完整 HTML/source。显示能力取决于宿主。路径与 HTTP 预览是快照，项目中源页面持续可编辑。详见[对话展示](skills/use-showai/references/host-display.md)。
 
-
 ## 通用插件与手动连接
 
 五个专用包面向同一台电脑上的 Agent 和 ShowAI，一次安装六个 Skills 与本机 MCP 启动配置。DeepSeek Harness 启用 App 准备的插件包，Kimi Work 在宿主里注册并安装本地插件。
@@ -98,12 +97,34 @@ page_present 返回完整离线 HTML/source 与聊天预览。预览容纳时使
 npm run package:plugin -- --out NEW_DIRECTORY
 ```
 
-通用包提供六个 Skills 和离线[连接向导](skills/use-showai/references/connect-mcp.md)，MCP 在宿主中手动添加。旧命令中的 `--mcp-url` 只把地址写入 README 供手动填写；`--chatgpt-app` 可引用已手动注册的 ChatGPT 连接。
+通用包提供六个 Skills 和离线[连接向导](skills/use-showai/references/connect-mcp.md)。有已知连接时，附上 `--mcp local`（使用已登记的本机 ShowAI 运行时）或 `--mcp <MCP地址>`。本机版可用 `--runtime-config <绝对路径>` 绑定指定运行时。远程版可用 `--mcp-auth oauth` 声明 OAuth。旧命令中的 `--mcp-url` 只把地址写入 README 供手动填写，`--chatgpt-app` 引用已注册的 ChatGPT 连接。任务需要 MCP、工具不可用时，接入向导按宿主和实际环境补齐配置。
 
 ChatGPT 网页通过公网 HTTPS 和 OAuth 连接。Grok Bot 可选同一 tailnet 的私网设备授权或公网 HTTPS。其他客户端按运行位置选择本机 stdio、局域网或远程 HTTP。在客户端实际发起只读调用核验，见[在 Agent 中使用](https://showai.renaissancemind.ai/doc/agent-hosts)。
+
+### Cursor、Qoder 和 WorkBuddy
+
+先启动 ShowAI 登记内容库，在源码目录运行对应命令。桌面宿主用 `node` 启动包内 MCP。要绑定另一个已登记的内容库，可加入 `--runtime-config /绝对路径/agent-runtime.json`。
+
+| 宿主      | 生成安装包                                                                      | 安装                                                                                                                         |
+| --------- | ------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| Cursor    | `npm run package:plugin -- --host cursor --mcp local --out showai-cursor`       | 把生成的目录放到 `~/.cursor/plugins/local/`，重载 Cursor 窗口，在新的本机对话使用插件。                                      |
+| Qoder     | `npm run package:plugin -- --host qoder --mcp local --out showai-qoder.zip`     | 在 Qoder 桌面版打开「扩展 → 插件 → 添加插件 → 导入插件」，选择 ZIP。                                                         |
+| WorkBuddy | `npm run package:plugin -- --host workbuddy --mcp local --out showai-workbuddy` | 将生成的目录注册为 WorkBuddy 本地插件市场。也可以从 ShowAI 复制本机 MCP 配置，在「连接器 → 自定义连接器 → 添加 MCP」中填写。 |
+
+在 macOS 上可用 WorkBuddy 自带的 CodeBuddy CLI 安装本地市场。在源码目录生成 `showai-workbuddy` 后执行以下命令。
+
+```sh
+workbuddy_cli=/Applications/WorkBuddy.app/Contents/Resources/app.asar.unpacked/cli/dist/codebuddy-lite-wb.mjs
+CODEBUDDY_CONFIG_DIR="$HOME/.workbuddy" node "$workbuddy_cli" plugin marketplace add "$PWD/showai-workbuddy"
+CODEBUDDY_CONFIG_DIR="$HOME/.workbuddy" node "$workbuddy_cli" plugin install showai-workbuddy@showai-workbuddy-local
+```
+
+在新建的本机任务里用 `projects_list` 核对内容库。对话中的 MCP Apps 可提供交互预览。Qoder 还可在对话旁的内置浏览器打开导出的 HTML，Cursor 可在 Browser 面板打开导出文件。直接编辑时在 ShowAI 打开原页，也可以在宿主对话里让 Agent 通过 MCP 续改同一页。
 
 ## 宿主包与公共源码
 
 公共工作流只维护 `plugins/showai/skills`，宿主展示契约分别维护在 `plugins/showai/host-adapters`。运行 `npm run package:plugin` 自动生成 Codex、Claude Code、Antigravity 和 Kimi 的安装内容；DeepSeek 准备插件时绑定自己的适配，远程 MCP Apps 使用原生视图指南。
+
+安装包的主目录使用 `plugins/showai-<宿主>/`。Kimi Work 使用 `plugins/showai-kimi/`，DeepSeek Harness 的 bundle 源码位于 `plugins/showai-deepseek/`。打包时同步生成旧安装入口 `plugins-kimi/showai/` 和 `plugins/dsh-showai/`，沿用原插件 ID。
 
 Codex 市场指向 `plugins/showai-codex`，Claude Code 市场指向 `plugins/showai-claude`，Antigravity 安装包位于 `plugins/showai-antigravity`，插件身份沿用 showai@renaissance-mind。生成目录随仓库提交，供全新克隆直接安装。打包时将当前宿主的常规交付步骤写入 show-visual 和 show-document，完整指南放在 host-adapter.md。host-profile.json 记录适配身份、显示声明和文件指纹。App 安装入口使用同一套绑定逻辑。Codex 和 Antigravity 默认使用 MCP Apps 原生视图与原页卡片，宿主缺少原生视图时使用文件式交付。各宿主加载与 MCP 重连分别核验。

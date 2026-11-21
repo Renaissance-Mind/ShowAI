@@ -5,9 +5,9 @@ description: 在对话中直接展示 1–5 个 ShowAI 组件（图表、示意�
 
 # 对话展示
 
-通用插件已安装但没有 ShowAI 工具，或连接提示未授权时，按[连接向导](../use-showai/references/connect-mcp.md)完成手动接入，再回来展示。
-
 只在当前对话展示内置组件时，从本 Skill 开始。直接使用当前连接的 `public_catalog_list`、`public_catalog_describe` 和 `show_component`。如果工具按需加载，用宿主的工具搜索或选择功能一次取出本次需要的工具，沿用实际前缀。已知组件 ID 或已持有索引时只取后两项。在支持持续更新的宿主中，数据分批到达时先展示第一批有效内容，再更新同一显示区。展示结果不写入内容库。
+
+工具发现后仍缺少 ShowAI 工具或连接提示未授权时，按[连接向导](../use-showai/references/connect-mcp.md)恢复已有连接或完成配置，再回来展示。
 
 跨组件联动先读 showai_capabilities.componentRuntime 和组件 view:"contract"；按照公开事件与稳定对象绑定，legacy 包不推断事件能力。需要临时创建或改造组件时采用 create-component 的统一契约与真实编译验证。
 
@@ -72,4 +72,4 @@ description: 在对话中直接展示 1–5 个 ShowAI 组件（图表、示意�
 
 展示本身没有保存，不要说已保存；连接或保存失败时也不改用展示了事。
 
-在已连接且已刷新工具的旧运行时缺少 `show_component` 时，更新 App 后重新连接；本次可用 `render_document` 传入只含这些组件的文档代替，同样不保存。完全没有 ShowAI 连接时，说明连接不可用（见 [use-showai](../use-showai/SKILL.md)）；对话展示可以先用 Mermaid 或 Markdown 表格回答，并说明这不是 ShowAI 组件。
+在已连接且已刷新工具的旧运行时缺少 `show_component` 时，更新 App 后重新连接；本次可用 `render_document` 传入只含这些组件的文档代替，同样不保存。完全没有 ShowAI 连接时，按[连接向导](../use-showai/references/connect-mcp.md)处理。用户明确需要点击或调整控件时，说明互动所缺的连接。只需静态说明时，可以先用 Mermaid 或 Markdown 表格回答。

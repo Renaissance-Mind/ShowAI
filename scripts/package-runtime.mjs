@@ -26,7 +26,7 @@ await cp(join(root, "plugins/showai"), join(runtime, "assets/agent-plugin"), {
   verbatimSymlinks: true,
 });
 await rm(join(runtime, "assets/dsh-plugin"), { recursive: true, force: true });
-const dshBundle = join(root, "plugins/dsh-showai");
+const dshBundle = join(root, "plugins/showai-deepseek");
 await cp(dshBundle, join(runtime, "assets/dsh-plugin"), {
   recursive: true,
   filter: (source) =>

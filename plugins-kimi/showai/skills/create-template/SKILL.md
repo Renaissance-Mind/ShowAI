@@ -11,6 +11,8 @@ description: 创建、修改或提炼可复用的模板文件夹：README 概览
 
 Agent 选用模板时调用一次 template_context，一次读完 README 和全部指南，再在各环节叠加使用。所以指南按“这类内容需要的方法”组织即可，不必按环节切分；控制总量，只写这类内容确实需要的做法。
 
+还未连上 ShowAI 或项目归属不清时，先按 [use-showai](../use-showai/SKILL.md) 核对连接和目标项目。
+
 先查 `catalog_list({kind:"template",projectId})` 是否已有覆盖该场景的模板：已有则以新版本修改，没有才新建。核对 showai_capabilities.templateWorkflow.protocol 为 showai-template-workflow-v3。用户有成熟实例时先验证实例（读取完整 Page，按 show-document 的评审环节确认它确实支持读者任务，不把未通过的页面当作范例），再按 [实例提炼](references/template-abstraction.md) 创建；结构已明确时按 [直接创建](references/template-creation.md) 继续。只询问会改变方法的缺项；信息充分时完成可用的包与真实应用验证。template_save 保存到显式指定的 projectId；提升为全局是宿主管理操作，用户要跨项目使用时说明这一步。
 
 ## 文件夹与元信息

@@ -79,7 +79,7 @@ README、快速开始、横幅、应用欢迎文案和主页共用一套标语�
 
 ## Agent 插件与 Skill
 
-插件源码位于 `plugins/showai/`，包括 Skill、宿主适配说明和 MCP 启动器。`npm run package:plugin`（`npm run build` 也会执行）检查每个 Skill 的 frontmatter 和相对链接，然后重新生成宿主包 `plugins/showai-codex`、`plugins/showai-claude`、`plugins/showai-antigravity` 和 `plugins-kimi/showai`。只编辑 `plugins/showai/`，并把重新生成的副本一起提交。启动器源模板位于 `plugins/showai/host-adapters/launch.mjs.in`。打包同时从源码契约生成 Skill 的操作格式资源。
+插件源码位于 `plugins/showai/`，包括 Skill、宿主适配说明和 MCP 启动器。`npm run package:plugin`（`npm run build` 也会执行）检查每个 Skill 的 frontmatter 和相对链接，然后重新生成宿主包 `plugins/showai-codex`、`plugins/showai-claude`、`plugins/showai-antigravity` 和 `plugins/showai-kimi`。只编辑 `plugins/showai/`，并把重新生成的副本一起提交。启动器源模板位于 `plugins/showai/host-adapters/launch.mjs.in`。打包同时从源码契约生成 Skill 的操作格式资源。
 
 Skill 的 `description` 决定 Agent 何时加载它，正文由一个没有其他上下文的 Agent 阅读。修改其中任一部分后，在新的 Agent 会话中提供已安装的 Skill 和几个真实请求，检查它会选择哪个 Skill，以及只凭文字能否判断下一步该做什么。在拉取请求中写明这些请求和结果。
 

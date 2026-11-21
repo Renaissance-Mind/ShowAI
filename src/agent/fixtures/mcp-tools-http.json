@@ -3241,9 +3241,9 @@
     },
     "_meta": {
       "ui": {
-        "resourceUri": "ui://showai/reader-v4.html"
+        "resourceUri": "ui://showai/reader-v5.html"
       },
-      "openai/outputTemplate": "ui://showai/reader-v4.html",
+      "openai/outputTemplate": "ui://showai/reader-v5.html",
       "openai/toolInvocation/invoking": "正在生成 ShowAI 页面",
       "openai/toolInvocation/invoked": "ShowAI 页面已就绪",
       "securitySchemes": [
@@ -3504,9 +3504,9 @@
         }
       ],
       "ui": {
-        "resourceUri": "ui://showai/reader-v4.html"
+        "resourceUri": "ui://showai/reader-v5.html"
       },
-      "openai/outputTemplate": "ui://showai/reader-v4.html",
+      "openai/outputTemplate": "ui://showai/reader-v5.html",
       "openai/toolInvocation/invoking": "正在生成 ShowAI 页面",
       "openai/toolInvocation/invoked": "ShowAI 页面已就绪"
     }
@@ -3621,9 +3621,9 @@
       ],
       "anthropic/alwaysLoad": true,
       "ui": {
-        "resourceUri": "ui://showai/component-v2.html"
+        "resourceUri": "ui://showai/component-v3.html"
       },
-      "openai/outputTemplate": "ui://showai/component-v2.html",
+      "openai/outputTemplate": "ui://showai/component-v3.html",
       "openai/toolInvocation/invoking": "正在生成 ShowAI 组件",
       "openai/toolInvocation/invoked": "ShowAI 组件已就绪"
     }

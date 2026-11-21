@@ -5,24 +5,44 @@ import { join, resolve } from "node:path";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { remotePluginPackage, chatgptAppId } from "./plugin-package";
-import { universalPluginFiles } from "../plugin/universal-package.mjs";
+import {
+  universalPluginArchive,
+  universalPluginFiles,
+} from "../plugin/universal-package.mjs";
 const execute = promisify(execFile);
 test("the universal package guides a disconnected host without registering a server", async () => {
   const source = resolve("plugins/showai");
   const zip = await remotePluginPackage(source);
   expect(zip.name).toBe("showai-universal");
   expect(zip.endpoint).toBeUndefined();
-  expect(zip.files.filter((path) => path.endsWith("/SKILL.md"))).toHaveLength(6);
+  expect(zip.files.filter((path) => path.endsWith("/SKILL.md"))).toHaveLength(
+    6,
+  );
   expect(zip.files).toContain("skills/use-showai/references/connect-mcp.md");
-  for (const path of [".app.json", "mcp.json", ".mcp.json", "mcp/launch.mjs", ".claude-plugin/plugin.json"])
+  for (const path of [
+    ".app.json",
+    "mcp.json",
+    ".mcp.json",
+    "mcp/launch.mjs",
+    ".claude-plugin/plugin.json",
+  ])
     expect(zip.files).not.toContain(path);
-  const { files } = await universalPluginFiles(source, { setupUrl: "https://example.org/mcp" });
-  expect(files.get("README.md")?.toString()).toContain("https://example.org/mcp");
+  const { files } = await universalPluginFiles(source, {
+    setupUrl: "https://example.org/mcp",
+  });
+  expect(files.get("README.md")?.toString()).toContain(
+    "https://example.org/mcp",
+  );
   expect(files.get("plugin.json")?.toString()).not.toContain("example.org");
   expect(files.has("mcp.json")).toBe(false);
   expect(files.has(".mcp.json")).toBe(false);
-  expect(files.get("skills/use-showai/SKILL.md")?.toString()).toContain("references/connect-mcp.md");
-  const linked = await universalPluginFiles(source, { name: "showai-cloud", appId: "asdk_app_testconnection" });
+  expect(files.get("skills/use-showai/SKILL.md")?.toString()).toContain(
+    "references/connect-mcp.md",
+  );
+  const linked = await universalPluginFiles(source, {
+    name: "showai-cloud",
+    appId: "asdk_app_testconnection",
+  });
   expect(JSON.parse(linked.files.get(".app.json")!.toString()).apps).toEqual({
     "showai-cloud": { id: "asdk_app_testconnection" },
   });
@@ -58,7 +78,9 @@ with zipfile.ZipFile(sys.argv[1]) as z:
       ],
     );
     const archive = JSON.parse(stdout);
-    expect(archive.names.some((name: string) => name.includes(".local-note"))).toBe(false);
+    expect(
+      archive.names.some((name: string) => name.includes(".local-note")),
+    ).toBe(false);
     expect(
       archive.names.filter((n: string) => /skills\/[^/]+\/SKILL.md$/.test(n)),
     ).toHaveLength(6);
@@ -78,9 +100,12 @@ with zipfile.ZipFile(sys.argv[1]) as z:
       false,
     );
     expect(archive.adapter).toContain("mcp-app");
-    const delivery = archive.adapter.match(/<!-- showai-host-delivery:start -->[\s\S]+?<!-- showai-host-delivery:end -->/)?.[0];
+    const delivery = archive.adapter.match(
+      /<!-- showai-host-delivery:start -->[\s\S]+?<!-- showai-host-delivery:end -->/,
+    )?.[0];
     expect(delivery).toBeTruthy();
-    for (const workflow of archive.workflows) expect(workflow).toContain(delivery);
+    for (const workflow of archive.workflows)
+      expect(workflow).toContain(delivery);
     expect(
       (
         await remotePluginPackage(
@@ -112,4 +137,109 @@ test("web packages accept registered connection links and reject unrelated pages
   expect(() =>
     chatgptAppId("https://chatgpt.com/plugins/plugins_unrelated"),
   ).toThrow();
+});
+
+test("desktop packages include the selected runtime and the host's native entry", async () => {
+  const home = await mkdtemp(join(tmpdir(), "showai-plugin-runtime-"));
+  try {
+    const runtimeConfig = join(home, "agent-runtime.json");
+    await writeFile(
+      runtimeConfig,
+      JSON.stringify({
+        format: "showai-agent-runtime",
+        protocol: 1,
+        home,
+      }),
+    );
+    const source = resolve("plugins/showai");
+    for (const [host, root] of [
+      ["cursor", "${CURSOR_PLUGIN_ROOT}"],
+      ["qoder", "."],
+      ["workbuddy", "${CODEBUDDY_PLUGIN_ROOT}"],
+    ] as const) {
+      const { files } = await universalPluginFiles(source, {
+        host,
+        mcp: "local",
+        runtimeConfig,
+      });
+      const read = (path: string) => JSON.parse(files.get(path)!.toString());
+      expect(read(`.${host}-plugin/plugin.json`).version).toBe(
+        read("plugin.json").version,
+      );
+      const serverName = host === "qoder" ? "showai" : "showai-universal";
+      const connection = read("mcp.json").mcpServers[serverName];
+      expect(connection).toMatchObject({
+        type: "stdio",
+        args: [`${host === "cursor" ? root : "."}/mcp/launch.mjs`],
+        env: { SHOWAI_HOME: home, SHOWAI_RUNTIME_CONFIG: runtimeConfig },
+      });
+      expect(files.has("mcp/launch.mjs")).toBe(true);
+      if (host !== "cursor")
+        expect(read(".mcp.json").mcpServers[serverName]).toEqual({
+          ...connection,
+          args: [`${root}/mcp/launch.mjs`],
+          ...(host === "qoder" && { cwd: root }),
+        });
+      if (host === "workbuddy")
+        expect(
+          read(".workbuddy-plugin/marketplace.json").plugins[0],
+        ).toMatchObject({ source: "./", name: "showai-universal" });
+    }
+    const qoder = await universalPluginArchive(source, {
+      host: "qoder",
+      mcp: "local",
+      runtimeConfig,
+    });
+    const zipPath = join(home, "qoder.zip");
+    await writeFile(zipPath, qoder.bytes);
+    const { stdout } = await execute(
+      process.platform === "win32" ? "python" : "python3",
+      [
+        "-c",
+        "import sys,zipfile; z=zipfile.ZipFile(sys.argv[1]); assert z.testzip() is None; print('\\n'.join(z.namelist()))",
+        zipPath,
+      ],
+    );
+    expect(stdout.split("\n")).toContain(".qoder-plugin/plugin.json");
+    expect(stdout.split("\n")).toContain(".mcp.json");
+  } finally {
+    await rm(home, { recursive: true, force: true });
+  }
+});
+
+test("an explicit remote endpoint uses the host's transport without bundling credentials", async () => {
+  const source = resolve("plugins/showai");
+  const mcp = "https://showai.example/mcp";
+  const { files } = await universalPluginFiles(source, {
+    host: "qoder",
+    mcp,
+    mcpAuth: "oauth",
+  });
+  const read = (path: string) => JSON.parse(files.get(path)!.toString());
+  expect(read("mcp.json").mcpServers.showai).toEqual({
+    type: "streamable-http",
+    url: mcp,
+  });
+  const openai = await universalPluginFiles(source, { mcp, mcpAuth: "oauth" });
+  expect(
+    JSON.parse(openai.files.get("mcp.json")!.toString()).mcpServers.showai,
+  ).toEqual({
+    type: "streamable-http",
+    url: mcp,
+    extensions: {
+      "com.openai": { auth: { type: "oauth", client: { mode: "dcr" } } },
+    },
+  });
+  expect(read(".mcp.json").mcpServers.showai).toEqual({
+    type: "http",
+    url: mcp,
+    oauth: { enabled: true },
+  });
+  expect(files.has("mcp/launch.mjs")).toBe(false);
+  await expect(
+    universalPluginFiles(source, { mcp: mcp + "?token=secret" }),
+  ).rejects.toThrow();
+  await expect(
+    universalPluginFiles(source, { mcp, appId: "asdk_app_testconnection" }),
+  ).rejects.toThrow();
 });

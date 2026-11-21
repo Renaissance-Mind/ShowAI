@@ -1,0 +1,36 @@
+{
+  "name": "@showai/dsh-showai",
+  "version": "0.3.1",
+  "private": true,
+  "type": "module",
+  "description": "ShowAI MCP, Skills, inline previews, session sidebar and editable library workbench for DeepSeek Harness.",
+  "scripts": {
+    "test": "node --test"
+  },
+  "exports": {
+    ".": "./index.js",
+    "./skills": "./skills.js",
+    "./client": "./client.js",
+    "./package.json": "./package.json"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web",
+      "immediately": true
+    }
+  },
+  "files": [
+    "index.js",
+    "workbench.js",
+    "workbench-binding.json",
+    "skills.js",
+    "client.js",
+    "cordis.patch.yml",
+    "README.md",
+    "skills",
+    "mcp"
+  ]
+}

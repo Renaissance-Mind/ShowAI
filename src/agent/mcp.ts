@@ -32,6 +32,7 @@ import { recordConnections } from "./mcp-connections";
 import { recordMcpCalls } from "./mcp-call-log";
 import { mcpChangeContext } from "./mcp-actor";
 import { PROJECT_TOOLS } from "./mcp-tools";
+import { registerMcpAppResourceDelivery } from "./mcp-app-resources";
 import {
   registerTool,
   type McpServerOptions,
@@ -53,6 +54,7 @@ export function createMcpServer(options: McpServerOptions): McpServer {
       },
     ),
   );
+  const publishAppResult = registerMcpAppResourceDelivery(server);
   const register: McpServer["registerTool"] = (name, config, callback) => {
     const tool = server.registerTool(name, config, callback);
     const shape = getObjectShape(tool.inputSchema);
@@ -92,6 +94,12 @@ export function createMcpServer(options: McpServerOptions): McpServer {
         : handle,
     });
     options.decorateTool?.(name, tool);
+    if (name === "page_present") {
+      const present = tool.handler as ToolCallback<z.ZodRawShape>;
+      tool.update({
+        callback: async (args, extra) => publishAppResult(await present(args, extra)),
+      });
+    }
     return tool;
   };
   const inherited = options.sourceContext ?? changeContext();
@@ -198,6 +206,7 @@ export function createMcpServer(options: McpServerOptions): McpServer {
           )
         ).delivery,
     },
+    publishAppResult,
   );
   return server;
 }
