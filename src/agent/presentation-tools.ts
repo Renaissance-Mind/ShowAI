@@ -45,6 +45,7 @@ import { PresentationSession, MAX_LIVE_SOURCE_BYTES } from "./presentation-sessi
 import { CoreError } from "../core/model";
 import type { PageOperation } from "../core/model";
 import { withLocalResources } from "../core/local-resources";
+import { registerMcpAppResourceDelivery } from "./mcp-app-resources";
 
 export type Presentation = Awaited<ReturnType<typeof renderPresentation>>;
 export type PresentationFiles = Omit<Presentation, "document">;
@@ -244,6 +245,7 @@ export function registerPresentationTools(
     previewDirectory?: string;
     hostDisplay?: HostDisplay;
   },
+  publishAppResult = registerMcpAppResourceDelivery(server),
 ) {
   const declaredDisplay = options.hostDisplay ?? hostDisplay();
   const reportedDisplay = declaredDisplay ?? "undeclared";
@@ -274,8 +276,12 @@ export function registerPresentationTools(
     destructiveHint: false,
     openWorldHint: false,
   };
-  for (const uri of [readerResourceUri, "ui://showai/reader-v3.html"]) server.registerResource(
-    uri === readerResourceUri ? "showai-reader" : "showai-reader-legacy",
+  for (const [name, uri] of [
+    ["showai-reader", readerResourceUri],
+    ["showai-reader-v4", "ui://showai/reader-v4.html"],
+    ["showai-reader-legacy", "ui://showai/reader-v3.html"],
+  ]) server.registerResource(
+    name,
     uri,
     { mimeType: "text/html;profile=mcp-app" },
     async () => {
@@ -306,8 +312,12 @@ export function registerPresentationTools(
       };
     },
   );
-  for (const uri of [componentResourceUri, "ui://showai/component-v1.html"]) server.registerResource(
-    uri === componentResourceUri ? "showai-component" : "showai-component-legacy",
+  for (const [name, uri] of [
+    ["showai-component", componentResourceUri],
+    ["showai-component-v2", "ui://showai/component-v2.html"],
+    ["showai-component-legacy", "ui://showai/component-v1.html"],
+  ]) server.registerResource(
+    name,
     uri,
     { mimeType: "text/html;profile=mcp-app" },
     async () => {
@@ -625,7 +635,7 @@ export function registerPresentationTools(
       try {
         const presentation = await renderPresentation(input);
         const delivery = await options.storePresentation?.(presentation);
-        return {
+        return publishAppResult({
           ...mcpSuccess({
             title: presentation.title,
             persistence: presentation.persistence,
@@ -662,7 +672,7 @@ export function registerPresentationTools(
               ...(delivery ? { delivery } : {}),
             },
           },
-        };
+        });
       } catch (error) {
         return mcpFailure(error, "present");
       }
@@ -844,7 +854,7 @@ export function registerPresentationTools(
             ? "For reuse only when requested: recover the selected HTML item from source or this tool input, parameterize its data and verify the same HTML with default and alternate data before component_save."
             : "If the user asks to keep these components, save the same blocks with page_create({projectId,blocks}) or page_apply component.insert in the chosen project. Deliver the saved Page using the installed host adapter. Use page_present for a reading preview.",
         });
-        return {
+        return publishAppResult({
           ...result,
           content: [
             ...result.content,
@@ -857,7 +867,7 @@ export function registerPresentationTools(
               ...(snapshot ? { live: snapshot } : {}),
             },
           },
-        };
+        });
       } catch (error) {
         return mcpFailure(error, "present");
       }
@@ -895,9 +905,9 @@ export function registerPresentationTools(
     try {
       const snapshot = (await liveView(viewId)).snapshot();
       const changed = snapshot.revision !== sinceRevision;
-      return { ...mcpSuccess({ viewId, revision: snapshot.revision, complete: snapshot.complete, changed,
+      return publishAppResult({ ...mcpSuccess({ viewId, revision: snapshot.revision, complete: snapshot.complete, changed,
         ...(source ? { artifact: JSON.parse(snapshot.source) } : {}) }),
-        _meta: { showai: { ...(changed ? { live: snapshot } : {}) } } };
+        _meta: { showai: { ...(changed ? { live: snapshot } : {}) } } });
     } catch (error) { return mcpFailure(error, "present"); }
   });
   server.registerTool("show_component_close", {

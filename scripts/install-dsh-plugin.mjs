@@ -58,7 +58,7 @@ const pluginRoot = join(root, "plugins/showai");
 const target = options.get("--out") ?? join(dshHome(), "plugins/showai");
 const receipt = await stageDshBundle({
   target,
-  bundleRoot: join(root, "plugins/dsh-showai"),
+  bundleRoot: join(root, "plugins/showai-deepseek"),
   pluginRoot,
   runtime: { command: config.launch.command, env: {
     ...config.launch.env,

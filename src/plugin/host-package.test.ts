@@ -107,7 +107,7 @@ describe("host-specific plugin distributions", () => {
       ["codex", resolve("plugins/showai-codex")],
       ["claude", resolve("plugins/showai-claude")],
       ["antigravity", resolve("plugins/showai-antigravity")],
-      ["kimi", resolve("plugins-kimi/showai")],
+      ["kimi", resolve("plugins/showai-kimi")],
     ]) {
       const files = await skillFiles(join(target, "skills"));
       const launcher = await readFile(join(target, "mcp/launch.mjs"), "utf8");
@@ -132,11 +132,11 @@ describe("host-specific plugin distributions", () => {
       ).toMatchObject({ profile, commonVersion: version, commonFiles: common });
     }
     expect(
-      await readFile(resolve("plugins-kimi/showai/mcp/launch.mjs"), "utf8"),
+      await readFile(resolve("plugins/showai-kimi/mcp/launch.mjs"), "utf8"),
     ).toBe(await readFile(join(source, "mcp/launch.mjs"), "utf8"));
     expect(
       JSON.parse(
-        await readFile(resolve("plugins-kimi/showai/kimi.plugin.json"), "utf8"),
+        await readFile(resolve("plugins/showai-kimi/kimi.plugin.json"), "utf8"),
       ).version,
     ).toBe(version);
   });

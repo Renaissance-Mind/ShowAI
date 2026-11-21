@@ -1,5 +1,5 @@
-export const readerResourceUri = "ui://showai/reader-v4.html";
-export const componentResourceUri = "ui://showai/component-v2.html";
+export const readerResourceUri = "ui://showai/reader-v5.html";
+export const componentResourceUri = "ui://showai/component-v3.html";
 
 export const mcpReaderHtml = `<!doctype html>
 <html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
@@ -44,7 +44,8 @@ a{color:inherit}
     const result=await send('tools/call',{name:readTool,arguments:{viewId,sinceRevision:live.revision}});
     if(live?.viewId!==viewId)return;
     const error=failure(result);if(error)throw new Error(error);
-    const snapshot=payload(result)?.live;
+    const snapshot=(await readPayload(result))?.live;
+    if(live?.viewId!==viewId)return;
     if(snapshot)applyLive(snapshot);
     showStatus('');pollLive();
    }catch(error){if(live?.viewId!==viewId||!readerControl)return;showStatus('展示更新已暂停：'+error.message,'error');const retry=document.createElement('button');retry.type='button';retry.textContent='重试更新';retry.onclick=()=>{showStatus('正在重试更新…','busy');pollLive();};status.append(document.createTextNode(' '),retry);}
@@ -66,6 +67,14 @@ a{color:inherit}
  function appendDelivery(href){if(!href)return;if(/^https?:\\/\\//i.test(href)){const link=document.createElement('a');link.href=href;link.textContent='打开完整 HTML';link.target='_blank';link.rel='noopener noreferrer';link.addEventListener('click',event=>{event.preventDefault();openLink(link.href);});status.append(document.createTextNode(' '),link);return;}const path=document.createElement('code');path.textContent=href;status.append(document.createTextNode(' 完整 HTML 已保存到：'),path);}
 
  function payload(result){const m=result?.mcp_tool_result||result?.call_tool_result||result;return m?._meta?.showai||m?.showai||result?.structuredContent?.showai;}
+ async function readPayload(result){
+  const data=payload(result);
+  if(!data?.resourceUri)return data;
+  const {contents}=await send('resources/read',{uri:data.resourceUri});
+  const resource=contents?.find(item=>item.uri===data.resourceUri);
+  if(typeof resource?.text!=='string')throw new Error('ShowAI preview data is unavailable.');
+  return JSON.parse(resource.text);
+ }
  function failure(result){const output=result?.structuredContent;if(!result?.isError&&output?.ok!==false)return '';if(output?.error?.message)return String(output.error.message);const text=(result.content||[]).find(item=>item?.type==='text')?.text;if(!text)return '工具调用失败。';try{return String(JSON.parse(text)?.error?.message||text);}catch{return text;}}
  function theme(value){if(value!=='dark'&&value!=='light')return;hostTheme=value;document.documentElement.style.colorScheme=value;for(const node of document.querySelectorAll('[data-showai-inline-root]'))node.dataset.theme=value;}
  // The portable reader reads its initial theme from these options before it mounts.
@@ -74,12 +83,14 @@ a{color:inherit}
  function conversational(){return contextSupported&&!!(page.projectId&&page.pageId&&page.hash);}
  function waiting(args){if(settled||current)return;const title=args?.title||args?.document?.title;showStatus(title?'正在生成《'+String(title).slice(0,120)+'》…':'正在生成 ShowAI 页面…','busy');}
 
- function render(result){
+ async function render(result){
   if(!result)return;
   lastResult=result;
   const error=failure(result);
   if(error){settled=true;if(!current)showStatus('ShowAI 页面未能生成：'+error,'error');return;}
-  const data=payload(result);if(!data)return;
+  let data;
+  try{data=await readPayload(result);}catch(error){if(lastResult===result&&!current){settled=true;showStatus('无法加载 ShowAI 预览：'+error.message,'error');}return;}
+  if(lastResult!==result||!data)return;
   if(data.live&&live?.viewId===data.live.viewId){try{applyLive(data.live);pollLive();}catch(error){showStatus(error.message,'error');}return;}
   if(data.live&&!data.inline){showStatus('请先打开这份展示，再接收更新。','error');return;}
   settled=true;

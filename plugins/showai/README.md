@@ -42,7 +42,7 @@ npm run plugin:antigravity -- --port <port> --json
 
 ### DeepSeek Harness
 
-DeepSeek Harness installs plugins itself, so ShowAI prepares one complete bundle ([dsh-showai](https://github.com/Renaissance-Mind/ShowAI/blob/main/plugins/dsh-showai/README.md)): the MCP tools bound to this runtime and library, these Skills, inline previews, a session sidebar editor and a global workbench. In the App, open **Settings → External Agent plugins → DeepSeek Harness → Prepare plugin**. From source, with a registered runtime:
+DeepSeek Harness installs plugins itself, so ShowAI prepares one complete bundle ([dsh-showai](https://github.com/Renaissance-Mind/ShowAI/blob/main/plugins/showai-deepseek/README.md)): the MCP tools bound to this runtime and library, these Skills, inline previews, a session sidebar editor and a global workbench. In the App, open **Settings → External Agent plugins → DeepSeek Harness → Prepare plugin**. From source, with a registered runtime:
 
 ```sh
 npm run plugin:dsh
@@ -54,18 +54,40 @@ Then, once, in DeepSeek Harness: **Plugins → Add plugin**, paste the bundle pa
 - a hand-written `mcp-showai` entry in `$DSH_HOME/profiles/desktop/cordis.patch.yml`: delete that whole entry;
 - ShowAI Skill folders copied into `$DSH_HOME/skills`: delete them, otherwise they shadow the bundled Skills.
 
+### Cursor, Qoder, and WorkBuddy
+
+Start ShowAI to register the library, then run the applicable command from the source checkout. The desktop host needs `node` available to launch the bundled MCP entry. Add `--runtime-config /absolute/path/to/agent-runtime.json` to select another registered library.
+
+| Host      | Generate the package                                                            | Install                                                                                                                                                                         |
+| --------- | ------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Cursor    | `npm run package:plugin -- --host cursor --mcp local --out showai-cursor`       | Copy the generated directory into `~/.cursor/plugins/local/`, reload the Cursor window, then use the plugin in a new local chat.                                                |
+| Qoder     | `npm run package:plugin -- --host qoder --mcp local --out showai-qoder.zip`     | In Qoder desktop, open **Extensions → Plugins → Add plugin → Import plugin** and select the ZIP.                                                                                |
+| WorkBuddy | `npm run package:plugin -- --host workbuddy --mcp local --out showai-workbuddy` | Add the generated directory as a WorkBuddy local plugin marketplace. You can also copy the local MCP configuration from ShowAI to **Connectors → Custom connectors → Add MCP**. |
+
+For the WorkBuddy marketplace on macOS, use the CodeBuddy CLI shipped with WorkBuddy. Run these commands from the checkout after generating `showai-workbuddy`.
+
+```sh
+workbuddy_cli=/Applications/WorkBuddy.app/Contents/Resources/app.asar.unpacked/cli/dist/codebuddy-lite-wb.mjs
+CODEBUDDY_CONFIG_DIR="$HOME/.workbuddy" node "$workbuddy_cli" plugin marketplace add "$PWD/showai-workbuddy"
+CODEBUDDY_CONFIG_DIR="$HOME/.workbuddy" node "$workbuddy_cli" plugin install showai-workbuddy@showai-workbuddy-local
+```
+
+Start a new local task and check `projects_list` to confirm the active library. For an interactive reading preview, use MCP Apps in chat. Qoder can also open the exported HTML in its built-in browser beside the chat. Cursor can open an exported file in its Browser pane. Open saved pages in ShowAI for direct editing and use the chat agent to revise the same Page through MCP.
+
 ## Host packages and shared source
+
+Host packages use `plugins/showai-<host>/`. Kimi Work is packaged in `plugins/showai-kimi/` and the DeepSeek Harness bundle source lives in `plugins/showai-deepseek/`. Packaging also generates the original install paths `plugins-kimi/showai/` and `plugins/dsh-showai/` with the same plugin identities.
 
 Edit workflows in `plugins/showai/skills` and host delivery contracts in `plugins/showai/host-adapters`, then run `npm run package:plugin`. The source bundle uses the native MCP Apps guide. Packaging copies the selected adapter's delivery steps into show-visual and show-document and includes the full guide at `use-showai/references/host-adapter.md`.
 
-| Target | Distribution | Delivery adaptation |
-| --- | --- | --- |
-| Codex | `plugins/showai-codex` | Native MCP Apps views with a file-based fallback |
-| Claude Code | `plugins/showai-claude` | Host HTML display tool |
-| Antigravity | `plugins/showai-antigravity` | Native MCP Apps views, page cards, and side-pane workbench |
-| DeepSeek Harness | Prepared bundle directory | Inline preview, editable session sidebar, global workbench |
-| Kimi Work | `plugins-kimi/showai` | Offline Widget workspace and display action |
-| Universal | Six Skills; configure MCP in the host | MCP Apps view when supported, otherwise results and links |
+| Target           | Distribution                          | Delivery adaptation                                        |
+| ---------------- | ------------------------------------- | ---------------------------------------------------------- |
+| Codex            | `plugins/showai-codex`                | Native MCP Apps views with a file-based fallback           |
+| Claude Code      | `plugins/showai-claude`               | Host HTML display tool                                     |
+| Antigravity      | `plugins/showai-antigravity`          | Native MCP Apps views, page cards, and side-pane workbench |
+| DeepSeek Harness | Prepared bundle directory             | Inline preview, editable session sidebar, global workbench |
+| Kimi Work        | `plugins/showai-kimi`                 | Offline Widget workspace and display action                |
+| Universal        | Six Skills; configure MCP in the host | MCP Apps view when supported, otherwise results and links  |
 
 The marketplace identity stays `showai@renaissance-mind`. The generated Codex and Claude directories are committed so Git-backed marketplace installation also works in a fresh checkout. Regenerate them when changing shared source; do not edit generated Skills or launchers. `host-profile.json` records the profile, declared display and shared-file fingerprints. App installation binds the same adapters from bundled source resources. Each host must reload its installed plugin and reconnect separately; updating source does not replace an already running MCP process.
 
@@ -112,7 +134,7 @@ For another client, use **Settings → External Agent plugins** in ShowAI or gen
 npm run package:plugin -- --out NEW_DIRECTORY
 ```
 
-The universal package contains six Skills and an offline [connection guide](skills/use-showai/references/connect-mcp.md). Configure ShowAI MCP in the host. An existing `--mcp-url` argument adds the address to the setup README only. Optional `--chatgpt-app` references an already registered ChatGPT connection. No server, launcher or credentials are installed by the universal package.
+The universal package contains six Skills and an offline [connection guide](skills/use-showai/references/connect-mcp.md). For a known connection, pass `--mcp local` to use a registered local ShowAI runtime or `--mcp <MCP_URL>` for a remote server. Set `--runtime-config <absolute path>` to select a local runtime or `--mcp-auth oauth` to declare remote OAuth. The existing `--mcp-url` argument is a setup hint, and `--chatgpt-app` references a registered ChatGPT connection. When a task needs MCP and the tools are unavailable, the guide helps the user configure the connection for their host.
 
 ChatGPT web uses a public HTTPS endpoint and OAuth. A Grok Bot connector on the same tailnet can use Tailscale Serve and device approval, or choose public HTTPS. Other clients can use a local stdio command or a reachable HTTP endpoint. Check the connection in the client with a read-only call. See [Agent setup](https://showai.renaissancemind.ai/doc/agent-hosts).
 

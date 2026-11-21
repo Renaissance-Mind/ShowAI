@@ -39,7 +39,7 @@ async function packageSkill(
       "src/portable",
       "src/plugin",
       "src/agent",
-      "plugins-kimi/showai",
+      "plugins/showai-kimi",
       "resources/templates/system-presentation",
       "plugins/showai/skills/show-document",
       "plugins/showai/skills/show-visual",
@@ -68,8 +68,13 @@ async function packageSkill(
     { recursive: true },
   );
   await copyFile(
-    join(root, "plugins-kimi/showai/kimi.plugin.json"),
-    join(fixture, "plugins-kimi/showai/kimi.plugin.json"),
+    join(root, "plugins/showai-kimi/kimi.plugin.json"),
+    join(fixture, "plugins/showai-kimi/kimi.plugin.json"),
+  );
+  await cp(
+    join(root, "plugins/showai-deepseek"),
+    join(fixture, "plugins/showai-deepseek"),
+    { recursive: true },
   );
   await copyFile(
     join(root, "src/plugin/host-package.mjs"),

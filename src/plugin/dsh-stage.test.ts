@@ -13,7 +13,7 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { inspectDshProfile, stageDshBundle } from "./dsh-stage.mjs";
 // @ts-expect-error The Harness bundle is plain JavaScript without declarations.
-import { createProvider } from "../../plugins/dsh-showai/skills.js";
+import { createProvider } from "../../plugins/showai-deepseek/skills.js";
 
 const roots: string[] = [];
 afterEach(async () => {
@@ -27,7 +27,7 @@ async function stage() {
   const target = join(root, "plugins", "show ai");
   const receipt = await stageDshBundle({
     target,
-    bundleRoot: resolve("plugins/dsh-showai"),
+    bundleRoot: resolve("plugins/showai-deepseek"),
     pluginRoot: resolve("plugins/showai"),
     runtime: {
       command: "/Applications/ShowAI.app/Contents/MacOS/ShowAI",
@@ -90,7 +90,7 @@ test("stages the bundle with Skills, the launcher and a literal MCP row", async 
   expect(patch).toContain(`"NOTE": ${JSON.stringify('quote " and: colon')}`);
   const again = await stageDshBundle({
     target,
-    bundleRoot: resolve("plugins/dsh-showai"),
+    bundleRoot: resolve("plugins/showai-deepseek"),
     pluginRoot: resolve("plugins/showai"),
     runtime: {
       command: "/Applications/ShowAI.app/Contents/MacOS/ShowAI",
@@ -119,7 +119,7 @@ test("refuses to overwrite another package in the configured directory", async (
       target,
       home,
       runtime,
-      bundleRoot: resolve("plugins/dsh-showai"),
+      bundleRoot: resolve("plugins/showai-deepseek"),
       pluginRoot: resolve("plugins/showai"),
     }),
   ).rejects.toThrow("Another package");

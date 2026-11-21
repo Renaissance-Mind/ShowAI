@@ -30,7 +30,7 @@ for (const path of [
   "src",
   "resources",
   "plugins/showai",
-  "plugins/dsh-showai",
+  "plugins/showai-deepseek",
   "scripts",
   "public",
   "index.html",

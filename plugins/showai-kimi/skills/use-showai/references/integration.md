@@ -1,0 +1,30 @@
+# 跨宿主统一流程
+
+所有 Agent 使用同一套 ShowAI MCP 文档操作。入口由宿主配置，Agent不在 CLI 与 MCP之间自行选择。CLI保留启动、诊断、脚本与管理用途。缺少连接时按 [连接配置](runtime.md) 处理。
+
+脚本使用 CLI 时，`import` 和 `datasets transform` 支持 `--dry-run` 预览。其他命令拒绝该选项。使用 `--json` 时，参数错误返回 `ok:false`，原因在 `error.message` 中。
+
+## 项目操作
+
+1. 复用当前连接已核实的能力；连接信息未知或变化时调用一次 `showai_capabilities`。
+2. `project_context` / `projects_list` 核对连接与项目。本机 library连接的新正式内容用 `project_resolve({sourceDirectory})` 解析可信宿主目录；绑定和远程连接不提供这个动作。
+3. 创作任务按 [show-document](../../show-document/SKILL.md) 的制作流程进行；选用模板时调用一次 template_context，固定本轮模板并读入它的全部指南。本机启动绑定与网页显式引用使用同一协议。
+4. 续改用 `page_read` 取得完整内容与 hash/revision；新建遵循 [show-document](../../show-document/SKILL.md) 的选择：匹配模板用 `template_apply`，明确从空白开始或无匹配结构时用 `page_create`。
+5. `page_apply` / `page_save` 提交变更，检查保存及同步回执。
+6. 保存成功后按[当前宿主适配](host-adapter.md)交付原页。需要在对话里阅读已保存内容时，用 `page_present({projectId,pageId,blockIds?})` 生成阅读预览。
+
+正式内容默认保存到已选项目。只想在对话里看一眼的可视化走 [show-visual](../../show-visual/SKILL.md)：读所选组件的 guide 后调用 `show_component`，不需要项目，公共连接同样可用。用户要一份完整独立文件、又不入库时，查询 `public_catalog_list/describe`，使用 `render_document`。两者都不保存个人项目，persistence 明确返回 false。连接或保存失败不能自动触发这两条不保存的路径。
+
+## 相同工具，不同连接范围
+
+本机 library连接允许选择已存在项目，或按用户任务解析、创建项目。项目绑定连接只允许固定项目；传其他 ID 会失败。远程连接只操作当前连接已授权的项目：Tailscale 私网可由用户在 ShowAI 批准经核实的设备，同一设备上的 Agent 共用授权。局域网使用访问密钥，公网 HTTPS 和选择 OAuth 的私网连接使用 OAuth。用户可以从「设置 → 远程连接」复制当前连接的接入提示词给 Agent。桌面远程连接由 `projects.storage:local` 标识，权限来自 App 当前配置与该次授权的交集，直接保存到本机库。新连接默认完整内容库权限，包含后续项目与 project_create；扩大旧授权时，设备和 OAuth 客户端重新请求同意，局域网客户端可使用新的邀请或密钥。托管连接还检查服务器成员权限；托管账号范围授权包含 `projects.create` 时可用 `project_create` 新建项目。显式传 projectId，不能从其他连接照搬 ID。账号管理、连接配置与发布管理不属于普通文档工具的权限。
+
+本机和远程均用 `component_save` 传可编辑源码对象、`template_save` 传模板定义。不要让普通组件创作依赖远程无法访问的本机文件路径。服务端实际工具列表与 inputSchema 才是能力证据；缺少操作时说明限制。
+
+## 展示与同步
+
+按宿主实际能力选择展示方式，适配表与 delivery.inline / compact / online / html 的区别以 [宿主显示](host-display.md) 为准。
+
+page_present 的 blockIds只限制 inline预览，完整 HTML/source保留整个页面。page_export是明确文件导出的低层工具，其选区源码本身可以是局部；不得拿它覆盖整页。显示成功、保存成功与同步成功分别核实。
+
+托管远程项目操作执行授权副本的拉取、操作和推送。桌面远程连接直接保存本机 Page，检查 isError、ok 与 persistence.storage；保存成功不等于另行配置的云同步成功。托管连接检查 isError、ok 及 synchronization.state；本机已保存而远端同步失败时，保留内容并报告失败。HTTP交付链接有有效期，本机交付路径由宿主/运行时分配。输出目录不是正式内容的归属证据。

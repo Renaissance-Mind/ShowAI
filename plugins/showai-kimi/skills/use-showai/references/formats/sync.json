@@ -1,0 +1,3 @@
+{
+  "retained": "Shared origin records contain originalPath, both source accounts/devices/revisions and visible page IDs. Cross-device conflicts continue synchronizing after preserving both inputs."
+}

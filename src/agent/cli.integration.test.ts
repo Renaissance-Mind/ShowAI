@@ -252,7 +252,7 @@ test("show_component shows conversation components without a project and saves t
       const tools = await publicClient.listTools();
       const show = tools.tools.find((item) => item.name === "show_component");
       expect(show?._meta?.ui).toEqual({
-        resourceUri: "ui://showai/component-v2.html",
+        resourceUri: "ui://showai/component-v3.html",
       });
       const resource = await publicClient.readResource({
         uri: "ui://showai/component-v1.html",
@@ -2917,7 +2917,7 @@ test("Kimi installed package discovers tools, delivers offline previews and reje
     return (result.structuredContent as any).data;
   };
   try {
-    await cp(join(repository, "plugins-kimi/showai"), plugin, {
+    await cp(join(repository, "plugins/showai-kimi"), plugin, {
       recursive: true,
     });
     const manifest = JSON.parse(

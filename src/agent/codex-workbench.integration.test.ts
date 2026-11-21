@@ -107,7 +107,7 @@ it("opens both Codex workbench entries and saves into the MCP library", async ()
       text: expect.stringContaining("const useFileEntrypoint = true"),
     });
     expect(tools.find((tool) => tool.name === "show_component")?._meta?.ui)
-      .toEqual({ resourceUri: "ui://showai/component-v2.html" });
+      .toEqual({ resourceUri: "ui://showai/component-v3.html" });
 
     const resource = await client.readResource({ uri: codexWorkbenchUri });
     expect(resource.contents[0]).toMatchObject({ mimeType: "text/html;profile=mcp-app" });
