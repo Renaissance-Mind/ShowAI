@@ -1,7 +1,16 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
+import { fileURLToPath } from "node:url";
 import { buildReview, findExternalAssets } from "./pack.mjs";
+
+function reviewConfig(html) {
+  const payload = html.match(
+    /<script id="review-app" type="application\/json">([^<]+)<\/script>/,
+  );
+  assert.ok(payload);
+  return JSON.parse(payload[1]);
+}
 
 test("the copyable example embeds the current app and inspector", async () => {
   const app = await readFile(new URL("./search.html", import.meta.url), "utf8");
@@ -9,11 +18,7 @@ test("the copyable example embeds the current app and inspector", async () => {
     new URL("./preview.html", import.meta.url),
     "utf8",
   );
-  const payload = preview.match(
-    /<script id="review-app" type="application\/json">([^<]+)<\/script>/,
-  );
-  assert.ok(payload);
-  const config = JSON.parse(payload[1]);
+  const config = reviewConfig(preview);
   assert.equal(config.appHtml, app);
   assert.equal(
     await buildReview(app, {
@@ -48,8 +53,31 @@ test("the copyable example embeds the current app and inspector", async () => {
   const legacy = await buildReview(app, {
     title: config.title,
     lang: config.lang,
+    flow: false,
   });
   assert.doesNotMatch(legacy, /function createReviewFlowCanvas\(/);
+});
+
+test("standard builds capture the declared flow canvas", async () => {
+  const app = await readFile(new URL("./search.html", import.meta.url), "utf8");
+  const source = fileURLToPath(new URL("../../", import.meta.url));
+  const { flow } = reviewConfig(
+    await buildReview(app, { source, lang: "zh-CN" }),
+  );
+  assert.deepEqual(
+    flow.nodes.map(({ id, title }) => [id, title]),
+    [
+      ["all", "全部页面"],
+      ["matches", "有匹配结果"],
+      ["empty", "没有匹配结果"],
+    ],
+  );
+  assert.ok(
+    flow.nodes.every(({ image }) =>
+      image.startsWith("data:image/jpeg;base64,"),
+    ),
+  );
+  assert.equal(flow.edges.length, 4);
 });
 
 test("external assets in the embedded page are reported before packaging", async () => {
