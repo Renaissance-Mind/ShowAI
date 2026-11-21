@@ -579,7 +579,7 @@ export function registerPresentationTools(
     "public_catalog_list",
     {
       description:
-        "List all built-ins with kind=component, view=compact and no limit. Default view includes signatures.",
+        "Search the requested catalog. view=compact lists IDs and scenarios.",
       inputSchema: {
         kind: z.enum(["component", "template"]).optional(),
         query: z.string().optional(),
@@ -596,7 +596,7 @@ export function registerPresentationTools(
     "public_catalog_describe",
     {
       description:
-        "Read a public component or template. For a known ID use view=guide, then show_component.",
+        "Read a requested catalog item. view=guide gives its usage.",
       inputSchema: {
         id: z.string(),
         version: z.string().optional(),
@@ -681,7 +681,7 @@ export function registerPresentationTools(
   server.registerTool(
     "show_component",
     {
-      description: `Render original HTML directly in chat (1–${SHOW_COMPONENT_LIMIT} visuals). Use kind/data or blocks only when existing components are requested.`,
+      description: `Render 1–${SHOW_COMPONENT_LIMIT} original HTML visuals. Use kind/data or blocks for requested catalog components.`,
       inputSchema: showComponentSchema,
       annotations: readOnly,
       _meta: { ...visualToolMeta, ...componentToolMeta },
