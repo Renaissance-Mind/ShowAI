@@ -7,6 +7,15 @@ export type HostProfile =
   | "mcp-app";
 export const HOST_PROFILES: Record<HostProfile, string>;
 export const HOST_GUIDE: string;
+export const ANTIGRAVITY_EAGER_TOOLS: Record<
+  "public_catalog_list" | "public_catalog_describe" | "show_component",
+  { eager: true }
+>;
+export function bindWorkflowDelivery(
+  sourceSkills: string,
+  targetSkills: string,
+  adapter: string,
+): Promise<Record<string, string>>;
 export function skillFiles(root: string): Promise<Record<string, string>>;
 export function bindHostSkills(options: {
   source: string;
@@ -19,6 +28,7 @@ export function bindHostSkills(options: {
   commonVersion: string;
   commonSha256: string;
   commonFiles: Record<string, string>;
+  workflowFiles: Record<string, string>;
   adapterSha256: string;
   entrySha256?: string;
 }>;

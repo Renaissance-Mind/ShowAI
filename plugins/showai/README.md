@@ -56,7 +56,7 @@ Then, once, in DeepSeek Harness: **Plugins → Add plugin**, paste the bundle pa
 
 ## Host packages and shared source
 
-Edit workflows in `plugins/showai/skills` and host delivery contracts in `plugins/showai/host-adapters`, then run `npm run package:plugin`. The source bundle uses the native MCP Apps guide. Packaging copies every shared workflow unchanged and binds only `use-showai/references/host-adapter.md` for the selected host.
+Edit workflows in `plugins/showai/skills` and host delivery contracts in `plugins/showai/host-adapters`, then run `npm run package:plugin`. The source bundle uses the native MCP Apps guide. Packaging copies the selected adapter's delivery steps into show-visual and show-document and includes the full guide at `use-showai/references/host-adapter.md`.
 
 | Target | Distribution | Delivery adaptation |
 | --- | --- | --- |

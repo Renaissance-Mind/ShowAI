@@ -32,6 +32,7 @@ import {
 import { PluginInstallError, VERIFIED_HOST_VERSIONS } from "./plugin-errors";
 import {
   bindHostSkills,
+  ANTIGRAVITY_EAGER_TOOLS,
   HOST_PROFILES,
   writeAntigravityAssets,
   writeHostLauncher,
@@ -515,6 +516,7 @@ export class DesktopPluginInstaller {
       command: runtime.cli.command,
       args: [join(this.options.root, host, "plugins/showai/mcp/launch.mjs")],
       env,
+      ...(host === "antigravity" && { tools: ANTIGRAVITY_EAGER_TOOLS }),
     };
     if (host === "codex") {
       const launcher = launcherScript(server);

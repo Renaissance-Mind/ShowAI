@@ -77,10 +77,12 @@ export function publicTemplate(id: string): ShowDocument {
     `Unknown public template: ${id}. Public templates are the builtin folder templates listed by public_catalog_list.`,
   );
 }
+export const publicCatalogListView = z.enum(["compact", "detailed"]);
 export async function publicCatalog(
   input: {
     kind?: "component" | "template";
     query?: string;
+    view?: z.infer<typeof publicCatalogListView>;
     limit?: number;
     cursor?: string;
   } = {},
@@ -108,11 +110,26 @@ export async function publicCatalog(
           })
         ).items.filter((item) => folderTemplateIds.has(item.id));
   const items = [...components, ...folders];
+  const compact = input.view === "compact";
+  const page = catalogPage(items, {
+    limit: input.limit,
+    cursor: input.cursor,
+    key: {
+      kind: input.kind,
+      query: input.query,
+      ...(compact && { view: input.view }),
+    },
+  });
   return {
-    ...catalogPage(items, {
-      limit: input.limit,
-      cursor: input.cursor,
-      key: { kind: input.kind, query: input.query },
+    ...page,
+    ...(compact && {
+      columns: [...(input.kind ? [] : ["kind"]), "id", "name", "scenario"],
+      items: page.items.map((item) => [
+        ...(input.kind ? [] : [item.kind]),
+        item.id,
+        item.name,
+        item.scenarios[0] || item.description,
+      ]),
     }),
     requiresLogin: false,
     synchronizationRequired: false,

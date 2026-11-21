@@ -15,7 +15,7 @@
 ```sh
 showai runtime info --json
 showai guide integration --json
-showai public list --kind component --query chart --json
+showai public list --kind component --view compact --json
 showai public describe chart --view schema --json
 showai render --input presentation.json --out /absolute/output/page.html --json
 showai mcp --public
@@ -51,6 +51,8 @@ showai mcp serve \
 检查点失败不能返回成功。原状态密钥必须备份并在更新时保留；没有自动回收未引用加密块。构建或 dry-run 不证明生产、登录或 ChatGPT 交互通过，见 [部署指南](cloud-mcp-deployment.zh-CN.md)。
 
 ## 工具与授权
+
+Antigravity 安装包预加载 `public_catalog_list`、`public_catalog_describe` 和 `show_component`。在已绑定的本机插件中一次展示公共组件时，可直接用这三个工具，按工作流内的交付步骤和实际回执完成展示。连接未知、发生变化或需要持续更新等能力时，用 `showai_capabilities` 核对。
 
 公共工具包括 showai_capabilities、public_catalog_list/describe、render_document、show_component、presentation_source。presentation_source 分块取回公共渲染输入，不公开私有页面导出。匿名调用不会读取个人内容库。
 

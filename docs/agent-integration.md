@@ -20,7 +20,7 @@ The page model, component compiler, authoring service, revision checks, export r
 Find the actual runtime under **Settings → Plugins** (**Registered runtime** and the launch configuration) or in the selected library's `agent-runtime.json`. `showai` below abbreviates that executable and its arguments. Inspect `runtime info --json` and `guide integration --json`.
 
 ```sh
-showai public list --kind component --query chart --json
+showai public list --kind component --view compact --json
 showai public describe chart --view schema --json
 showai public describe explainer --kind template --view source --json
 showai render --input presentation.json --out /absolute/output/page.html --json
@@ -61,6 +61,8 @@ Private state is encrypted with the independent `SHOWAI_MCP_STATE_KEY` and check
 For deployment commands and acceptance gates, see [Cloudflare MCP operations](cloud-mcp-deployment.md). A local build or Worker dry-run does not establish a working Container deployment, provider login or ChatGPT acceptance.
 
 ### Public and authorized tools
+
+Antigravity packages eagerly load `public_catalog_list`, `public_catalog_describe` and `show_component`. A one-time display of public components through a bound local plugin can use these tools directly. Read the installed workflow's delivery steps and use the receipt to confirm the chosen mode. Use `showai_capabilities` to check unknown or changed connections and features such as live updates.
 
 Public tools are `showai_capabilities`, `public_catalog_list`, `public_catalog_describe`, `render_document`, `show_component` and `presentation_source`. The last tool retrieves editable public render input in text chunks when a host cannot download the HTTP URL; it does not expose private project exports. The catalog includes built-in components and editable starter templates. All public rendering inputs come from the caller; anonymous operations do not read the user's content library.
 

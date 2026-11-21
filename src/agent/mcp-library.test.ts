@@ -212,7 +212,7 @@ test("saved-page presentation keeps full source, selects preview and never mutat
   expect(await readdir(join(root, "local", "presentation-builds"))).toEqual([]);
 });
 
-test("catalog discovery returns all compact entries, with optional pagination beyond 50", async () => {
+test("catalog discovery returns all detailed entries, with optional pagination beyond 50", async () => {
   const client = await connect(createLibraryMcpServer({ root }));
   const project = await call(client, "project_create", {
     name: "Catalog discovery",
@@ -281,6 +281,45 @@ test("catalog discovery returns all compact entries, with optional pagination be
     view: "schema",
   });
   expect(details.schema.properties.series).toBeDefined();
+});
+
+test("the public compact view fits the complete component index into one small text result", async () => {
+  const client = await connect(createLibraryMcpServer({ root }));
+  const name = "public_catalog_list";
+  const args = { kind: "component", view: "compact" };
+  const result = await client.callTool({ name, arguments: args });
+  expect(result.isError).not.toBe(true);
+  const [{ text }] = result.content as { text: string }[];
+  expect(Buffer.byteLength(text)).toBeLessThan(8 * 1024);
+  const { data } = JSON.parse(text);
+  expect(result.structuredContent).toEqual({ ok: true, data });
+  const detailed = await call(client, name, { kind: "component" });
+  expect(data.columns).toEqual(["id", "name", "scenario"]);
+  expect(data.nextCursor).toBeNull();
+  expect(data.items).toEqual(
+    detailed.items.map((item: { id: string; name: string; scenarios: string[] }) => [
+      item.id, item.name, item.scenarios[0],
+    ]),
+  );
+  const first = await call(client, name, { ...args, limit: 50 });
+  const last = await call(client, name, {
+    ...args, limit: 50, cursor: first.nextCursor,
+  });
+  expect([...first.items, ...last.items]).toEqual(data.items);
+  expect(last.nextCursor).toBeNull();
+  const mismatch = await client.callTool({
+    name,
+    arguments: { kind: "component", cursor: first.nextCursor },
+  });
+  expect(mismatch.isError).toBe(true);
+  const mixed = await call(client, name, { view: "compact" });
+  expect(mixed.columns).toEqual(["kind", "id", "name", "scenario"]);
+  expect(new Set(mixed.items.map(([kind]: string[]) => kind))).toEqual(
+    new Set(["component", "template"]),
+  );
+  const filtered = await call(client, name, { ...args, query: "交互流程图" });
+  expect(filtered.items[0][0]).toBe("flowchart");
+  expect(filtered.total).toBeLessThan(data.total);
 });
 
 test("default component discovery combines built-ins and only the selected project", async () => {

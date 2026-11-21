@@ -25,6 +25,8 @@ Agent 通过 MCP 操作 ShowAI。App、网页、CLI 和 MCP 共用内容核心�
 
 ## 核对连接和归属
 
+使用已绑定展示适配的本机插件，一次展示 1–5 个内置组件时，直接按 show-visual 选择组件、读 guide、展示。无需先调 `showai_capabilities` 或查询项目。连接不明、发生变化、回执异常或涉及项目归属、跨组件事件、持续更新时，按对应流程核实能力。
+
 连接信息未知或发生变化时调用一次 `showai_capabilities`，复用当前连接已经核实的结果。它只提供连接、能力、版本与限制；操作方法按本 Skill 和所选工作流读取。工具可能带宿主前缀，使用实际暴露的名称。检查 `agentProtocol`、`transport`、`projects.access`、`projects.available` 和展示能力；HTTP 连接同时检查 `projects.storage`，`local` 表示桌面直接保存。调用 `project_context` 或 `projects_list` 核对目标。不能仅凭“Codex”“ChatGPT”判断连接或显示能力。
 
 - **library 本机连接**：`project_context` 返回固定内容库。纯查询用 `projects_list`、`pages_list`、`library_search`，不创建项目。新正式内容未指定项目时，`project_resolve({sourceDirectory})` 使用宿主提供的绝对项目目录；首次映射可创建项目。不要使用插件、预览或临时输出目录。宿主当前工作目录是用户的项目或代码仓库、且内容与之相关时可以作为可信目录；对话整理、与当前目录无关的内容或没有可信目录时询问归属。用户要求独立命名项目时才用 `project_create`。
@@ -43,7 +45,7 @@ Agent 通过 MCP 操作 ShowAI。App、网页、CLI 和 MCP 共用内容核心�
 
 源 Page 包含结构化内容树、稳定节点 ID、布局与组件数据。Page 按顺序阅读，Board 表达空间关系，两者可以嵌套。组件负责把数据渲染成图形与交互；模板提供复用结构。页面引用精确组件版本与指纹。
 
-内容库与代码目录不同。本机默认库是 `~/.showai`，以实际连接为准。HTML 是阅读交付物；HTML 所在目录不证明有无源 Page。正式文档默认在已选项目中保存为一份 Page，保存后按[当前宿主适配](references/host-adapter.md)交付。对话中看一眼的组件用 `show_component`；需要一份完整独立文件但不入库时才用 `render_document`。两者都返回 `savedToProject=false`，必须如实说明。
+内容库与代码目录不同。本机默认库是 `~/.showai`，以实际连接为准。HTML 是阅读交付物；HTML 所在目录不证明有无源 Page。正式文档默认在已选项目中保存为一份 Page，保存后按当前工作流的「当前宿主交付」给出原页入口。对话中看一眼的组件用 `show_component`；需要一份完整独立文件但不入库时才用 `render_document`。两者都返回 `savedToProject=false`，必须如实说明。
 
 ## 保存与冲突
 
@@ -61,9 +63,9 @@ Agent 通过 MCP 操作 ShowAI。App、网页、CLI 和 MCP 共用内容核心�
 - [导入与导入器](references/import.md)：Notion、Word、Markdown 导入的计划与回执，以及新增一种格式的导入器。
 - [扩展点](references/extension-points.md)：快速跳转命令、@ 菜单、数据库字段类型、页面目录和导入器这几个可填入的位置，各由谁提供、填入者声明什么，以及用 `catalog_list({kind:"contribution"})` 一次查出已填入的内容。
 - [共享数据](references/shared-data.md)、[页面与 Board 阅读](references/page-reading.md)、[Board 对象编辑](references/board-authoring.md)、[容量与大文件](references/capacity.md)。
-- [宿主显示](references/host-display.md) 与 [当前宿主适配](references/host-adapter.md)：展示组件和页面前先读。
+- [宿主显示](references/host-display.md) 与 [完整宿主适配](references/host-adapter.md)：回执与工作流不符、显示失败或需要特殊交付时查阅。
 - [连接配置](references/runtime.md) 与 [集成](references/integration.md)：连接、错误码、远程授权与反馈。
 
 ## Antigravity 侧栏工作台与自动预览
 
-此插件在 Antigravity 侧栏提供实时可编辑的 **ShowAI 工作台**（`sidecar://showai/workbench/`），并通过插件 Hook 自动将预览包装并同步到当前会话的 Artifact 目录。展示组件、保存页面后给出侧栏工作台直达胶囊，或处理用户从侧栏发来的页面/组件引用前，先读 [当前宿主适配](references/host-adapter.md)。
+对话展示按 show-visual 的「当前宿主交付」，保存页面按 show-document 的同名小节。收到侧栏传来的页面或组件引用时，按[用户引用](references/user-references.md)核对原页和选区。

@@ -1,6 +1,12 @@
 {
   "changes": [
     {
+      "date": "2026-11-21",
+      "version": "0.12.0",
+      "before": "public_catalog_list returned detailed entries with signatures and scenarios.",
+      "now": "Optional view=compact returns columns and rows with one scenario per entry. Omit limit and cursor for the complete index. Existing calls keep their detailed response and cursors."
+    },
+    {
       "date": "2026-11-20",
       "version": "0.12.0",
       "before": "Local Codex card_present targets used projectId, pageId and optional blockId.",

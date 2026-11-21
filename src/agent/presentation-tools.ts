@@ -15,6 +15,7 @@ import { CATALOG_VIEWS } from "./disclosure";
 import { version } from "../../package.json";
 import {
   publicCatalog,
+  publicCatalogListView,
   describePublicResource,
   presentationSchema,
   renderPresentation,
@@ -555,10 +556,11 @@ export function registerPresentationTools(
     "public_catalog_list",
     {
       description:
-        "List public components/templates with scenarios and props signatures.",
+        "List public components/templates. Use view=compact without limit for the whole index in one call; detailed (default) includes signatures.",
       inputSchema: {
         kind: z.enum(["component", "template"]).optional(),
         query: z.string().optional(),
+        view: publicCatalogListView.optional(),
         limit: z.number().int().min(1).max(50).optional(),
         cursor: z.string().optional(),
       },

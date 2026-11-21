@@ -190,6 +190,13 @@ describe.skipIf(!output || !config)(
           await readFile(join(changed.installedPath, manifestName), "utf8"),
         );
         const server = manifest.mcpServers.showai;
+        if (host === "antigravity") {
+          expect(server.tools).toEqual({
+            public_catalog_list: { eager: true },
+            public_catalog_describe: { eager: true },
+            show_component: { eager: true },
+          });
+        } else expect(server.tools).toBeUndefined();
         expect(
           await readFile(join(changed.installedPath, "mcp/launch.mjs"), "utf8"),
         ).toBe(

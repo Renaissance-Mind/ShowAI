@@ -43,6 +43,8 @@ showai pages save PAGE --project PROJECT --input revised.showai.json --base-hash
 
 ## 查询目录与参数
 
+通过已绑定的本机插件一次展示内置组件时，调用 `public_catalog_list({kind:"component",view:"compact"})`，省略 `limit` 与 `cursor` 即可取全目录。每行按 `columns` 列出 ID、名称和一个使用场景。已知 ID 可直接用 `public_catalog_describe` 的 `view:"guide"` 读用法，再调用 `show_component`。已安装的 show-visual 包含宿主交付步骤。连接未知、发生变化、实际回执与说明不符，或需要访问项目、持续更新时，再核对相应能力。
+
 ```sh
 showai catalog list --kind component --project PROJECT --json
 showai catalog describe chart --kind component --project PROJECT --view guide --json

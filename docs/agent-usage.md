@@ -57,6 +57,8 @@ Ordinary research, comparison and report tasks default to **one resource Page**.
 
 ## Discover resources, then request one view
 
+For a one-time display of built-in components through a bound local plugin, call `public_catalog_list({kind:"component",view:"compact"})` once. Omit `limit` and `cursor` for the full index. Each row contains an ID, a name and one use case in the order given by `columns`. If you already know the ID, go straight to `public_catalog_describe` with `view:"guide"`, then call `show_component`. The installed show-visual Skill includes the host's delivery steps. Check capabilities when the connection is unknown or has changed, the delivery differs from the installed instructions, or the task needs project access or live updates.
+
 Read the full accessible catalog of names, descriptions, scenarios and one-line component signatures before inspecting individual resources:
 
 ```sh

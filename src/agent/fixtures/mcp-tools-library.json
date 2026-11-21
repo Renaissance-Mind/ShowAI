@@ -3307,7 +3307,7 @@
   },
   {
     "name": "public_catalog_list",
-    "description": "List public components/templates with scenarios and props signatures.",
+    "description": "List public components/templates. Use view=compact without limit for the whole index in one call; detailed (default) includes signatures.",
     "inputSchema": {
       "type": "object",
       "properties": {
@@ -3320,6 +3320,13 @@
         },
         "query": {
           "type": "string"
+        },
+        "view": {
+          "type": "string",
+          "enum": [
+            "compact",
+            "detailed"
+          ]
         },
         "limit": {
           "type": "integer",

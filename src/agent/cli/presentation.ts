@@ -5,6 +5,7 @@ import { pageExport } from "../operations/pages";
 import {
   describePublicResource,
   publicCatalog,
+  publicCatalogListView,
   renderPresentation,
   writePresentation,
 } from "../presentation";
@@ -25,12 +26,21 @@ export const presentationCommands: CommandDeclaration[] = [
   {
     command: "public",
     actions: ["list"],
-    options: { kind: text, query: text, cursor: hiddenText, limit: hiddenText },
-    help: ["public list [--kind component|template] [--query TEXT]"],
+    options: {
+      kind: text,
+      query: text,
+      view: text,
+      cursor: hiddenText,
+      limit: hiddenText,
+    },
+    help: [
+      "public list [--kind component|template] [--query TEXT] [--view compact|detailed]",
+    ],
     async run(args) {
       return publicCatalog({
         kind: option(args, "kind") as "component" | "template" | undefined,
         query: option(args, "query"),
+        view: publicCatalogListView.optional().parse(option(args, "view")),
         cursor: option(args, "cursor"),
         limit: option(args, "limit") ? Number(option(args, "limit")) : undefined,
       });

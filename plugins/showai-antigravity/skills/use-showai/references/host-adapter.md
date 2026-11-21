@@ -2,6 +2,14 @@
 
 此插件面向 Antigravity 2.0，声明 `SHOWAI_HOST_DISPLAY=fragment-file`，同时内置 **ShowAI 侧栏工作台 Sidecar**（`sidecar://showai/workbench/`）与 **预览自动暂存 Hook**。
 
+<!-- showai-host-delivery:start -->
+
+- 对话展示用 `show_component` 的 `delivery:"auto"`。本插件绑定 `fragment-file`，以本次回执的 `delivery.mode` 和 `display.reader` 为准。
+- Hook 会将 `bundled` 片段暂存到当前会话的 Artifact 目录。收到 Hook 提供的 `<agent-embed src="file:///…"></agent-embed>` 后，在回复中单独一行原样输出。缺少暂存标签、阅读器为 `cdn` 或出现 `inlineError` 时查完整宿主适配。
+- 新建或续改保存成功后，用回执的项目和页面 ID 给出 `[在 ShowAI 工作台打开《标题》](sidecar://showai/workbench/?project=<projectId>&page=<pageId>)`、项目名和 `openUrl`。需要在聊天里预览局部时，用 `page_present` 选择相应的 `blockIds`。
+
+<!-- showai-host-delivery:end -->
+
 ## 1. 侧栏实时工作台（推荐用于已保存页面与深度编辑）
 
 ShowAI 在 Antigravity 右侧 Auxiliary Pane 运行完整实时工作台，支持直接编辑、浏览项目、自动关联当前打开的代码仓库，并支持把选区或组件一键「引用到 Antigravity 对话」。

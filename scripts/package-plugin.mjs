@@ -14,6 +14,7 @@ import { parseTemplateReadme } from "../src/portable/template-bundle.mjs";
 import { packageSkillFormats } from "./package-skill-formats.mjs";
 import {
   bindHostSkills,
+  bindWorkflowDelivery,
   stageHostPlugin,
   writeHostLauncher,
 } from "../src/plugin/host-package.mjs";
@@ -56,6 +57,11 @@ const manifest = JSON.parse(
 await copyFile(
   join(plugin, "host-adapters/mcp-app.md"),
   join(plugin, "skills/use-showai/references/host-adapter.md"),
+);
+await bindWorkflowDelivery(
+  join(plugin, "skills"),
+  join(plugin, "skills"),
+  await readFile(join(plugin, "host-adapters/mcp-app.md"), "utf8"),
 );
 const workflowSource = await readFile(
   join(root, "resources/templates/system-presentation/README.md"),

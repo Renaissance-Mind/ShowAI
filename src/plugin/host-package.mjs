@@ -20,6 +20,11 @@ export const HOST_PROFILES = {
   "mcp-app": "mcp-app",
 };
 export const HOST_GUIDE = "use-showai/references/host-adapter.md";
+export const ANTIGRAVITY_EAGER_TOOLS = {
+  public_catalog_list: { eager: true },
+  public_catalog_describe: { eager: true },
+  show_component: { eager: true },
+};
 const hash = (value) => createHash("sha256").update(value).digest("hex");
 
 export async function skillFiles(root) {
@@ -38,6 +43,25 @@ export async function skillFiles(root) {
   }
   await visit(root);
   return files;
+}
+
+export async function bindWorkflowDelivery(sourceSkills, targetSkills, adapter) {
+  const section =
+    /<!-- showai-host-delivery:start -->[\s\S]*?<!-- showai-host-delivery:end -->/;
+  const delivery = adapter.match(section)?.[0];
+  if (!delivery)
+    throw new Error("The host adapter is missing its delivery section.");
+  const hashes = {};
+  for (const file of ["show-visual/SKILL.md", "show-document/SKILL.md"]) {
+    const workflow = await readFile(join(sourceSkills, file), "utf8");
+    if (!section.test(workflow))
+      throw new Error(`${file} is missing its host delivery section.`);
+    const bound = workflow.replace(section, () => delivery);
+    if (sourceSkills !== targetSkills || bound !== workflow)
+      await writeFile(join(targetSkills, file), bound);
+    hashes[file] = hash(bound);
+  }
+  return hashes;
 }
 
 export async function bindHostSkills({ source, target, profile }) {
@@ -62,7 +86,12 @@ export async function bindHostSkills({ source, target, profile }) {
   const commonFiles = Object.fromEntries(
     Object.entries(sourceFiles).filter(([name]) => name !== HOST_GUIDE),
   );
-  const expected = { ...commonFiles };
+  const workflowFiles = await bindWorkflowDelivery(
+    join(source, "skills"),
+    join(target, "skills"),
+    adapter,
+  );
+  const expected = { ...commonFiles, ...workflowFiles };
   const entry = "use-showai/SKILL.md";
   const notePath =
     profile === "codex"
@@ -102,6 +131,7 @@ export async function bindHostSkills({ source, target, profile }) {
     ).version,
     commonSha256: hash(JSON.stringify(commonFiles)),
     commonFiles,
+    workflowFiles,
     adapterSha256: hash(adapter),
     ...(note !== undefined && { entrySha256: expected[entry] }),
   };
@@ -381,6 +411,7 @@ export async function stageHostPlugin({ source, target, profile }) {
           {
             mcpServers: {
               showai: {
+                tools: ANTIGRAVITY_EAGER_TOOLS,
                 command: "node",
                 args: ["./mcp/launch.mjs"],
                 cwd: "./",

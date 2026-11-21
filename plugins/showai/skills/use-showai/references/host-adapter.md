@@ -1,6 +1,12 @@
 # MCP Apps 展示适配
 
-此连接使用 MCP Apps 原生视图，声明 `mcp-app`。show_component 使用 `delivery:"auto"`；工具附带组件视图。page_present 和 render_document 同样由宿主呈现附带的阅读器。
+<!-- showai-host-delivery:start -->
+
+- 此连接声明 `mcp-app`。临时组件用 `show_component` 的 `delivery:"auto"`，由宿主呈现附带的 MCP Apps 组件视图。
+- 新作品保存后用 `page_present` 展示。续改说明改动、所在项目和可用的原页链接。用户要求在聊天里阅读原页或片段时用 `page_present`。
+- 视图出现后只补充必要解释。出现 `inlineError` 或视图加载失败时查完整宿主适配。
+
+<!-- showai-host-delivery:end -->
 
 最终回复只补充必要解释，不输出本机文件引用或其他宿主的展示指令。远程 delivery 中的 URL 是可访问的交付地址，不是本机路径；不要读取服务端文件系统，也不要为了展示配置本机启动器。
 

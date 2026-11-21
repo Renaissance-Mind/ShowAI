@@ -38,13 +38,28 @@ async function expectedWorkflowHashes(
   common: Record<string, string>,
   profile: string,
 ) {
+  const expected = { ...common };
+  const adapter = await readFile(
+    join(source, "host-adapters", profile + ".md"),
+    "utf8",
+  );
+  const slot =
+    /<!-- showai-host-delivery:start -->[\s\S]*?<!-- showai-host-delivery:end -->/;
+  const delivery = adapter.match(slot)?.[0];
+  expect(delivery).toBeTruthy();
+  for (const file of ["show-visual/SKILL.md", "show-document/SKILL.md"]) {
+    const commonWorkflow = await readFile(join(source, "skills", file), "utf8");
+    expect(commonWorkflow).toMatch(slot);
+    const bound = commonWorkflow.replace(slot, () => delivery!);
+    expected[file] = createHash("sha256").update(bound).digest("hex");
+  }
   const noteName =
     profile === "codex"
       ? "codex-entry.md"
       : profile === "antigravity"
         ? "antigravity-entry.md"
         : undefined;
-  if (!noteName) return common;
+  if (!noteName) return expected;
   const entry = "use-showai/SKILL.md";
   const original = await readFile(join(source, "skills", entry), "utf8");
   const note = await readFile(
@@ -53,7 +68,7 @@ async function expectedWorkflowHashes(
   );
   const bound = original.trimEnd() + "\n\n" + note;
   return {
-    ...common,
+    ...expected,
     [entry]: createHash("sha256").update(bound).digest("hex"),
   };
 }
@@ -117,7 +132,7 @@ describe("host-specific plugin distributions", () => {
       ).version,
     ).toBe(version);
   });
-  test("all profiles share identical workflows, bind only their own guide and remove stale skills", async () => {
+  test("each profile binds its delivery steps in both workflows and removes stale skills", async () => {
     const target = await directory();
     const original = await skillFiles(join(source, "skills"));
     const common = Object.fromEntries(
@@ -136,6 +151,10 @@ describe("host-specific plugin distributions", () => {
         ),
       ).toEqual(await expectedWorkflowHashes(common, profile));
       expect(receipt.commonFiles).toEqual(common);
+      expect(receipt.workflowFiles).toEqual({
+        "show-document/SKILL.md": actual["show-document/SKILL.md"],
+        "show-visual/SKILL.md": actual["show-visual/SKILL.md"],
+      });
       const adapter = await readFile(
         join(target, "skills", HOST_GUIDE),
         "utf8",
@@ -178,6 +197,13 @@ describe("host-specific plugin distributions", () => {
       const launch = JSON.parse(await readFile(join(target, manifest), "utf8"))
         .mcpServers.showai;
       expect(launch.env.SHOWAI_HOST_DISPLAY).toBe(first.declaredHostDisplay);
+      if (profile === "antigravity") {
+        expect(launch.tools).toEqual({
+          public_catalog_list: { eager: true },
+          public_catalog_describe: { eager: true },
+          show_component: { eager: true },
+        });
+      } else expect(launch.tools).toBeUndefined();
       for (const other of ["mcp.json", ".mcp.json", "mcp_config.json"].filter(
         (name) => name !== manifest,
       ))

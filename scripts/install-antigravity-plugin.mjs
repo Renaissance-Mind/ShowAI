@@ -18,6 +18,7 @@ import { createInterface } from "node:readline";
 import { fileURLToPath } from "node:url";
 import { parseArgs, promisify } from "node:util";
 import {
+  ANTIGRAVITY_EAGER_TOOLS,
   antigravityHookConfig,
   antigravityManifest,
   antigravitySidecarConfig,
@@ -313,6 +314,7 @@ async function install(executable) {
     command: binding.launch.command,
     args: [join(targetInstallPath, "mcp/launch.mjs")],
     env: serverEnv,
+    tools: ANTIGRAVITY_EAGER_TOOLS,
   };
   await writeJson(join(plugin, "mcp_config.json"), {
     mcpServers: { showai: server },
