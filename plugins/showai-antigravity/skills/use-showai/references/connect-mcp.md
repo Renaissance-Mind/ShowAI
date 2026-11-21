@@ -31,7 +31,7 @@
 
 | 位置 | 手动配置 |
 | --- | --- |
-| 与 ShowAI 同机，支持 stdio | 从 ShowAI「设置 → 插件 → 手动添加 MCP」复制真实启动配置，在宿主的 MCP 设置里填写命令、参数和环境，使用选定的内容库。 |
+| 与 ShowAI 同机，支持 stdio | 在 ShowAI「设置 → 外部 Agent 插件」安装对应插件，或按源码包说明为宿主配置本机 MCP 启动命令与选定内容库路径。 |
 | 同一可信局域网 | 在 ShowAI 启用局域网连接，填入显示的 Streamable HTTP 地址，在客户端凭据设置中填写 ShowAI 的访问密钥。只接受 HTTPS 的客户端改走 Tailscale 或公网。 |
 | 同一 tailnet | 使用上面的 Tailscale 私网路径。能填 URL 的客户端直接使用 HTTPS；只支持 stdio 的客户端用 App 提示词中的桥接命令。 |
 | 云端或跨网络 | 使用客户端可达的公网 HTTPS 与 OAuth。仅支持 stdio 时先确认运行桥接命令的设备能访问该地址并完成 OAuth。 |

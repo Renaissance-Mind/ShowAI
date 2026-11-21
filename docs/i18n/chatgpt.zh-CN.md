@@ -48,7 +48,7 @@ ChatGPT 网页从云端发起请求，需要公网地址。其他设备上运行
 
 ## 连接 ChatGPT
 
-尚未添加 MCP 时，就可以在桌面「设置 → 插件 → 导出通用插件」取得六个 Skills。安装后请 Agent 带你手动连接。已有 ChatGPT 连接时，下文的 Personal 导出可引用它。
+尚未添加 MCP 时，可先从源码生成通用包或从「设置 → 外部 Agent 插件」准备插件取得六个 Skills，安装后请 Agent 带你手动连接。已有 ChatGPT 连接时，下文的 Personal 导出可引用它。
 
 公网连接通过检查后选择「ChatGPT」，按三步填写：
 

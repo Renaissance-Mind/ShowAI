@@ -106,7 +106,7 @@ Follow the distribution’s bound host adapter for display. The shared workflows
 
 The five host-specific packages install six Skills and the local MCP launch configuration together. Run the Agent and ShowAI on the same computer and use the host's installer. DeepSeek Harness enables the bundle prepared by ShowAI; Kimi Work installs its registered local plugin.
 
-For another client, export the universal ZIP from **Settings → Plugins → Export universal plugin**, or generate the directory from source:
+For another client, use **Settings → External Agent plugins** in ShowAI or generate the universal directory from source:
 
 ```sh
 npm run package:plugin -- --out NEW_DIRECTORY

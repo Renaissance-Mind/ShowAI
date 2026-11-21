@@ -91,7 +91,7 @@ OAuth 提供发现、DCR、S256 PKCE、resource 绑定、过期访问 token、�
 
 对话预览优先带压缩本地阅读器；超预算后可使用固定版本的在线阅读器，从 ShowAI reader 源、jsDelivr、unpkg 加载。delivery.compact 面向模型写 HTML 的宿主。reader:bundled 与 SHOWAI_READER_CDN=off 禁止在线回退；reader:cdn 明确联网。预览链接一小时到期，应保存到项目或保留源数据。纯文本宿主可以交付完整 HTML/source 和项目回执。
 
-可在桌面「设置 → 插件 → 导出通用插件」取得 ZIP，也可以用 `npm run package:plugin -- --out NEW_DIRECTORY` 生成目录。安装六个 Skills 后，在宿主手动添加 MCP。可选的 ChatGPT Personal 导出可引用已经注册的连接。旧命令提供的 `--mcp-url` 仅写入 README 供手动填写。见[在 Agent 中使用](https://showai.renaissancemind.ai/doc/agent-hosts)。
+可在桌面「设置 → 外部 Agent 插件」或通过 `npm run package:plugin -- --out NEW_DIRECTORY` 生成目录取得六个 Skills 后，在宿主手动添加 MCP。可选的 ChatGPT Personal 导出可引用已经注册的连接。旧命令提供的 `--mcp-url` 仅写入 README 供手动填写。见[在 Agent 中使用](https://showai.renaissancemind.ai/doc/agent-hosts)。
 
 ## 已保存页面的展示约定
 

@@ -92,7 +92,7 @@ page_present 返回完整离线 HTML/source 与聊天预览。预览容纳时使
 
 五个专用包面向同一台电脑上的 Agent 和 ShowAI，一次安装六个 Skills 与本机 MCP 启动配置。DeepSeek Harness 启用 App 准备的插件包，Kimi Work 在宿主里注册并安装本地插件。
 
-在其他客户端使用时，可在桌面「设置 → 插件 → 导出通用插件」保存 ZIP，也可从源码生成目录：
+在其他客户端使用时，可在桌面「设置 → 外部 Agent 插件」安装，也可从源码生成通用目录：
 
 ```sh
 npm run package:plugin -- --out NEW_DIRECTORY

@@ -107,7 +107,7 @@ MCP Apps resources use `text/html;profile=mcp-app` and `_meta.ui.resourceUri`, w
 
 The same skill source supports local and remote connections. For a remote package:
 
-Generate an unbound universal package with `npm run package:plugin -- --out NEW_DIRECTORY`, or export the ZIP from desktop Settings → Plugins. Install the six Skills in the host and configure its MCP connection manually. The optional ChatGPT Personal export can reference a connection the user has already registered. A supplied `--mcp-url` is a manual setup hint in the README. See [Set up an agent](https://showai.renaissancemind.ai/doc/agent-hosts).
+Generate an unbound universal package with `npm run package:plugin -- --out NEW_DIRECTORY`, or export the ZIP from desktop Settings → External Agent plugins. Install the six Skills in the host and configure its MCP connection manually. The optional ChatGPT Personal export can reference a connection the user has already registered. A supplied `--mcp-url` is a manual setup hint in the README. See [Set up an agent](https://showai.renaissancemind.ai/doc/agent-hosts).
 
 ## Saved-page presentation contract
 
