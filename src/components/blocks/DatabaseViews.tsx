@@ -6,6 +6,7 @@ import {
   LayoutDashboard,
   LayoutList,
   List,
+  MoreHorizontal,
   Plus,
   Table2,
 } from "../../ui/icons";
@@ -279,15 +280,29 @@ function BoardView(props: DatabaseViewProps) {
     null,
   );
   const group = board.column;
+  const [titleColumn, ...properties] = columns.filter(
+    (column) => column.id !== group?.id,
+  );
   return (
     <div className="sb-board">
       {board.groups.map((name, index) => {
         const groupRows = group
           ? shownRows.filter((row) => board.groupsOf(row).includes(name))
           : shownRows;
+        const emptyUnassigned =
+          group && !name && !groupRows.length && board.groups.length > 1;
+        if (emptyUnassigned && !editable) return null;
+        const label = group ? board.label(name) : t("allRecords");
+        const tone = !name
+          ? "sb-tag sb-tone-gray"
+          : group?.type === "select" || group?.type === "multiSelect"
+            ? optionClass(group, name)
+            : `sb-tag sb-tag-${index % 5}`;
         return (
-          <div
+          <section
             className={`sb-board-column ${dragging ? "is-droppable" : ""}`}
+            aria-label={label}
+            data-empty-unassigned={emptyUnassigned || undefined}
             key={name}
             onDragOver={(event) => {
               if (editable && group && dragging) event.preventDefault();
@@ -300,86 +315,103 @@ function BoardView(props: DatabaseViewProps) {
               setDragging(null);
             }}
           >
-            <div className="sb-board-column-header">
-              <span
-                className={
-                  group?.type === "select" || group?.type === "multiSelect"
-                    ? optionClass(group, name)
-                    : `sb-tag sb-tag-${index % 5}`
-                }
-              >
-                {group ? board.label(name) : t("allRecords")}
+            <header className={`sb-board-column-header ${tone}`}>
+              <span className="sb-board-group-label" title={label}>
+                {label}
               </span>
-              <span>{groupRows.length}</span>
+              <span
+                className="sb-board-count"
+                aria-label={t("recordCount", { count: groupRows.length })}
+              >
+                {groupRows.length}
+              </span>
               {editable && (
                 <button
                   type="button"
                   className="sb-icon-button"
-                  aria-label={t("newRecordIn", { group: board.label(name) })}
+                  aria-label={t("newRecordIn", { group: label })}
                   onClick={() => props.addRow(name)}
                 >
-                  <Plus size={14} />
+                  <Plus size={15} />
                 </button>
               )}
-            </div>
+            </header>
             {groupRows.map((row) => (
-              <div
+              <article
+                aria-label={props.rowName(row) || t("untitled")}
                 className={`sb-board-card ${dragging?.id === row.id ? "is-dragging" : ""}`}
                 key={row.id}
                 draggable={!!group && props.cellEditable(row, group)}
                 onDragStart={() => setDragging({ id: row.id, from: name })}
                 onDragEnd={() => setDragging(null)}
               >
-                {columns
-                  .filter((column) => column.id !== group?.id)
-                  .map((column, position) => (
-                    <div
-                      key={column.id}
-                      className={
-                        position === 0
-                          ? "sb-board-card-title"
-                          : "sb-board-card-field"
-                      }
-                    >
-                      {position > 0 && <span>{column.name}</span>}
-                      {props.cell(row, column)}
-                    </div>
-                  ))}
-                {editable && (
-                  <div className="sb-board-card-footer">
-                    {group && group.type !== "multiSelect" && (
-                      <select
-                        className="showai-select"
-                        aria-label={t("moveToGroup")}
-                        disabled={!props.cellEditable(row, group)}
-                        value={name}
-                        onChange={(event) =>
-                          board.move(row, name, event.target.value)
-                        }
+                <div className="sb-board-card-title">
+                  {titleColumn
+                    ? props.cell(row, titleColumn)
+                    : props.rowName(row) || t("untitled")}
+                </div>
+                {properties.length > 0 && (
+                  <dl className="sb-board-card-properties">
+                    {properties.map((column) => (
+                      <div
+                        key={column.id}
+                        className="sb-board-card-field"
+                        data-type={column.type}
                       >
-                        {board.groups.map((option) => (
-                          <option key={option} value={option}>
-                            {board.label(option)}
-                          </option>
-                        ))}
-                      </select>
-                    )}
-                    {props.deleteButton(row, t("deleteRecord"))}
-                  </div>
+                        <dt title={column.name}>{column.name}</dt>
+                        <dd>{props.cell(row, column)}</dd>
+                      </div>
+                    ))}
+                  </dl>
                 )}
-              </div>
+                {editable && (
+                  <details className="sb-board-card-actions">
+                    <summary
+                      className="sb-icon-button"
+                      aria-label={t("recordActionsFor", {
+                        name: props.rowName(row) || t("untitled"),
+                      })}
+                    >
+                      <MoreHorizontal size={16} aria-hidden="true" />
+                    </summary>
+                    <div className="sb-board-card-footer">
+                      {group && (
+                        <select
+                          className="showai-select"
+                          aria-label={t("moveToGroup")}
+                          disabled={!props.cellEditable(row, group)}
+                          value={name}
+                          onChange={(event) =>
+                            board.move(row, name, event.target.value)
+                          }
+                        >
+                          {board.groups.map((option) => (
+                            <option key={option} value={option}>
+                              {board.label(option)}
+                            </option>
+                          ))}
+                        </select>
+                      )}
+                      {props.deleteButton(
+                        row,
+                        t("deleteNamedRecord", { name: props.rowName(row) }),
+                      )}
+                    </div>
+                  </details>
+                )}
+              </article>
             ))}
-            {editable && (
+            {editable && !emptyUnassigned && (
               <button
                 type="button"
                 className="sb-add-row"
                 onClick={() => props.addRow(name)}
               >
-                <Plus size={13} />
+                <Plus size={14} />
                 {t("addRecord")}
               </button>
             )}
-          </div>
+          </section>
         );
       })}
     </div>

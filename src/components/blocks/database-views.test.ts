@@ -349,6 +349,36 @@ describe("database rendering", () => {
     expect(html).toContain("sb-database-list");
     expect(html).not.toContain("sb-database-table");
   });
+  it("keeps configured board lanes and offers an unassigned drop target in the editor", () => {
+    const data = {
+      columns: [
+        { id: "title", name: "Title", type: "text" },
+        {
+          id: "status",
+          name: "Status",
+          type: "select",
+          options: ["Open", "Closed"],
+        },
+      ],
+      rows: [{ id: "a", title: "First", status: "Open" }],
+      view: "board",
+      groupBy: "status",
+    };
+    const reading = render(data, true);
+    expect(reading).toContain('aria-label="Closed"');
+    expect(reading).toContain('aria-label="First"');
+    expect(reading).not.toContain("data-empty-unassigned");
+    expect(reading).not.toContain("sb-board-card-actions");
+    const editing = render(data, false);
+    expect(editing).toContain('data-empty-unassigned="true"');
+    expect(editing).toContain("sb-board-card-actions");
+    expect(editing).toContain('draggable="true"');
+    const unassigned = render(
+      { ...data, rows: [{ id: "a", title: "First" }] },
+      true,
+    );
+    expect(unassigned.match(/class="sb-board-column /g)).toHaveLength(3);
+  });
   it("sizes table columns from the view and offers adding properties", () => {
     const html = render(
       {
