@@ -22,12 +22,17 @@ test("the universal package guides a disconnected host without registering a ser
   expect(files.has("mcp.json")).toBe(false);
   expect(files.has(".mcp.json")).toBe(false);
   expect(files.get("skills/use-showai/SKILL.md")?.toString()).toContain("references/connect-mcp.md");
+  const linked = await universalPluginFiles(source, { name: "showai-cloud", appId: "asdk_app_testconnection" });
+  expect(JSON.parse(linked.files.get(".app.json")!.toString()).apps).toEqual({
+    "showai-cloud": { id: "asdk_app_testconnection" },
+  });
 });
 test("a real ZIP includes complete workflows and a remote connection without local launchers", async () => {
   const directory = await mkdtemp(join(tmpdir(), "showai-plugin-zip-"));
   try {
     const source = join(directory, "bundle");
     await cp(resolve("plugins/showai"), source, { recursive: true });
+    await writeFile(join(source, "skills/.local-note"), "local only");
     for (const skill of ["show-visual", "show-document"]) {
       const file = `skills/${skill}/SKILL.md`;
       await cp(resolve("plugins/showai-claude", file), join(source, file));
@@ -53,6 +58,7 @@ with zipfile.ZipFile(sys.argv[1]) as z:
       ],
     );
     const archive = JSON.parse(stdout);
+    expect(archive.names.some((name: string) => name.includes(".local-note"))).toBe(false);
     expect(
       archive.names.filter((n: string) => /skills\/[^/]+\/SKILL.md$/.test(n)),
     ).toHaveLength(6);

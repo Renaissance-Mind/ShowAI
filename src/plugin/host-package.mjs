@@ -28,12 +28,13 @@ export const ANTIGRAVITY_EAGER_TOOLS = {
 };
 const hash = (value) => createHash("sha256").update(value).digest("hex");
 
-export async function skillFiles(root) {
+export async function skillFiles(root, { includeHidden = true } = {}) {
   const files = {};
   async function visit(directory, prefix = "") {
     for (const entry of (
       await readdir(directory, { withFileTypes: true })
     ).sort((a, b) => a.name.localeCompare(b.name))) {
+      if (!includeHidden && entry.name.startsWith(".")) continue;
       const name = prefix + entry.name;
       if (entry.isDirectory())
         await visit(join(directory, entry.name), name + "/");

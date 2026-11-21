@@ -18,7 +18,7 @@ export function bindWorkflowDelivery(
   targetSkills: string,
   adapter: string,
 ): Promise<Record<string, string>>;
-export function skillFiles(root: string): Promise<Record<string, string>>;
+export function skillFiles(root: string, options?: { includeHidden?: boolean }): Promise<Record<string, string>>;
 export function bindHostSkills(options: {
   source: string;
   target: string;

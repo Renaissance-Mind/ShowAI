@@ -2,6 +2,7 @@ interface UniversalPluginOptions {
   name?: string;
   displayName?: string;
   appId?: string;
+  appAlias?: string;
   setupUrl?: string;
 }
 export function universalPluginFiles(

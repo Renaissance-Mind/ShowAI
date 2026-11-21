@@ -15,6 +15,7 @@ export async function universalPluginFiles(
     name = "showai-universal",
     displayName = "ShowAI Universal",
     appId,
+    appAlias = name,
     setupUrl,
   } = {},
 ) {
@@ -61,13 +62,15 @@ export async function universalPluginFiles(
   };
   const json = (value) => Buffer.from(JSON.stringify(value, null, 2) + "\n");
   const files = new Map([["plugin.json", json(manifest)]]);
-  if (appId) files.set(".app.json", json({ apps: { showai: { id: appId } } }));
+  if (appId) files.set(".app.json", json({ apps: { [appAlias]: { id: appId } } }));
   const adapter = await readFile(
     join(source, "host-adapters/mcp-app.md"),
     "utf8",
   );
   const skillRoot = join(source, "skills");
-  const snapshot = await skillFiles(skillRoot);
+  const snapshot = await skillFiles(skillRoot, { includeHidden: false });
+  if (Object.keys(snapshot).filter((file) => /^[^/]+\/SKILL\.md$/.test(file)).length !== 6)
+    throw new Error("Expected the six ShowAI workflows in the universal package.");
   for (const [file, digest] of Object.entries(snapshot)) {
     let data = await readFile(join(skillRoot, file));
     if (createHash("sha256").update(data).digest("hex") !== digest)

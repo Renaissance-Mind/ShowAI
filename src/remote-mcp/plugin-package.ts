@@ -50,6 +50,7 @@ export async function remotePluginPackage(
           name: `showai-personal-${createHash("sha256").update(url.href).digest("hex").slice(0, 12)}`,
           displayName: "ShowAI Personal",
           appId: chatgptAppId(connection),
+          appAlias: "showai",
         }
       : undefined;
   return {
