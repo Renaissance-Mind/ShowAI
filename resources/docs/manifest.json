@@ -150,6 +150,18 @@
     }
    ],
    "pages": {
+    "e8c001a7-4e9f-5515-a2e4-8ed6085ef46d": {
+     "title": "在 Agent 中使用",
+     "icon": "🤝",
+     "file": "zh-CN/pages/e8c001a7-4e9f-5515-a2e4-8ed6085ef46d.json",
+     "sha256": "5841fbc6974962dc9404c98d81b17102fc866a681bf393f4b53f085ddf12680b",
+     "components": [
+      "zh-CN/components/doc-hero@1.0.0-7c2bbe84b003.json",
+      "zh-CN/components/doc-compare@1.0.0-3a5b6ff02c26.json",
+      "zh-CN/components/doc-steps@1.0.0-660edad476b2.json",
+      "zh-CN/components/doc-cards@1.0.0-96ea3af150bd.json"
+     ]
+    },
     "1c7a263c-bd9f-40ce-bc58-1870022f978b": {
      "title": "通用插件连接向导",
      "icon": "🤝",
@@ -159,18 +171,6 @@
       "zh-CN/components/doc-hero@1.0.0-7c2bbe84b003.json",
       "zh-CN/components/doc-compare@1.0.0-3a5b6ff02c26.json",
       "zh-CN/components/doc-steps@1.0.0-660edad476b2.json"
-     ]
-    },
-    "e8c001a7-4e9f-5515-a2e4-8ed6085ef46d": {
-     "title": "在 Agent 中使用",
-     "icon": "🤝",
-     "file": "zh-CN/pages/e8c001a7-4e9f-5515-a2e4-8ed6085ef46d.json",
-     "sha256": "82e9d2c36542f358b91908dac25d63a22df0e8678f63624c5d45a7c610894fe5",
-     "components": [
-      "zh-CN/components/doc-hero@1.0.0-7c2bbe84b003.json",
-      "zh-CN/components/doc-compare@1.0.0-3a5b6ff02c26.json",
-      "zh-CN/components/doc-steps@1.0.0-660edad476b2.json",
-      "zh-CN/components/doc-cards@1.0.0-96ea3af150bd.json"
      ]
     },
     "2e9af66b-0a83-58f6-b3f5-a480f0f6abab": {
@@ -551,6 +551,18 @@
     }
    ],
    "pages": {
+    "e8c001a7-4e9f-5515-a2e4-8ed6085ef46d": {
+     "title": "Use with an Agent",
+     "icon": "🤝",
+     "file": "en/pages/e8c001a7-4e9f-5515-a2e4-8ed6085ef46d.json",
+     "sha256": "4df62a390d3086955e63023c1c538b76e91d2afd4b7ce0abc22545072e00888d",
+     "components": [
+      "en/components/doc-hero@1.0.0-6aa1b6a2a0e9.json",
+      "en/components/doc-compare@1.0.0-6450bf2fc82c.json",
+      "en/components/doc-steps@1.0.0-0c4f6546ba7a.json",
+      "en/components/doc-cards@1.0.0-25e52118b12f.json"
+     ]
+    },
     "1c7a263c-bd9f-40ce-bc58-1870022f978b": {
      "title": "Universal plugin connection guide",
      "icon": "🤝",
@@ -560,18 +572,6 @@
       "en/components/doc-hero@1.0.0-6aa1b6a2a0e9.json",
       "en/components/doc-compare@1.0.0-6450bf2fc82c.json",
       "en/components/doc-steps@1.0.0-0c4f6546ba7a.json"
-     ]
-    },
-    "e8c001a7-4e9f-5515-a2e4-8ed6085ef46d": {
-     "title": "Use with an Agent",
-     "icon": "🤝",
-     "file": "en/pages/e8c001a7-4e9f-5515-a2e4-8ed6085ef46d.json",
-     "sha256": "21e48918649d0f96b9831859ff671242853350e6dee2e455e79bf80a2bea7442",
-     "components": [
-      "en/components/doc-hero@1.0.0-6aa1b6a2a0e9.json",
-      "en/components/doc-compare@1.0.0-6450bf2fc82c.json",
-      "en/components/doc-steps@1.0.0-0c4f6546ba7a.json",
-      "en/components/doc-cards@1.0.0-25e52118b12f.json"
      ]
     },
     "2e9af66b-0a83-58f6-b3f5-a480f0f6abab": {
