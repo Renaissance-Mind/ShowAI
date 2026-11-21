@@ -504,6 +504,9 @@ export class DesktopPluginInstaller {
       SHOWAI_HOME: runtime.home,
       SHOWAI_RUNTIME_CONFIG: record,
       SHOWAI_HOST_DISPLAY: HOST_PROFILES[host],
+      ...(host === "antigravity" && {
+        SHOWAI_ANTIGRAVITY_WORKBENCH: "1",
+      }),
       ...(host === "codex" && {
         SHOWAI_CODEX_PLUGIN_ID: identity,
         SHOWAI_CODEX_WORKBENCH_PROFILE: join(
@@ -1020,12 +1023,11 @@ export class DesktopPluginInstaller {
       if (
         (validation.components?.mcpServers ?? 0) < 1 ||
         (validation.components?.sidecars ?? 0) < 1 ||
-        (validation.components?.hooks ?? 0) < 1 ||
         (validation.findings?.length ?? 0) > 0
       )
         throw new PluginInstallError(
           "PLUGIN_NOT_CONFIRMED",
-          "Antigravity plugin validation did not confirm MCP, hooks, and sidecar workbench.",
+          "Antigravity plugin validation did not confirm MCP and sidecar workbench.",
           { host, installedPath, validation },
         );
     }

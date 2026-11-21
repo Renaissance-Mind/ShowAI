@@ -177,9 +177,9 @@ description: 创作或修改要保存的作品：可交互报告、讲解页面�
 
 <!-- showai-host-delivery:start -->
 
-- 对话展示用 `show_component` 的 `delivery:"auto"`。本插件绑定 `fragment-file`，以本次回执的 `delivery.mode` 和 `display.reader` 为准。
-- Hook 会将 `bundled` 片段暂存到当前会话的 Artifact 目录。收到 Hook 提供的 `<agent-embed src="file:///…"></agent-embed>` 后，在回复中单独一行原样输出。缺少暂存标签、阅读器为 `cdn` 或出现 `inlineError` 时查完整宿主适配。
-- 新建或续改保存成功后，用回执的项目和页面 ID 给出 `[在 ShowAI 工作台打开《标题》](sidecar://showai/workbench/?project=<projectId>&page=<pageId>)`、项目名和 `openUrl`。需要在聊天里预览局部时，用 `page_present` 选择相应的 `blockIds`。
+- 临时组件用 `show_component` 的 `delivery:"auto"` 在 MCP Apps 原生视图直接展示。视图已挂在工具调用处，回复只补充图中的结论，**不要再输出 `<agent-embed>` 或复制 `.inline.html`**。
+- 新建或续改保存成功后，用最终回执的项目和页面 ID 调用 `card_present` 交付原页卡片；同一页只交付一次，多页放入同一次调用的 `additionalTargets`。
+- 用户明确要求在消息里阅读原页或片段时用 `page_present`（按需传 `blockIds`）；要求在右侧/侧栏工作台打开页面或跳到某组件时用 `card_navigate`。缺少卡片工具或原生视图未出现时查完整宿主适配。
 
 <!-- showai-host-delivery:end -->
 

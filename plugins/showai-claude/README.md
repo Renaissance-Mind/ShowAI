@@ -62,7 +62,7 @@ Edit workflows in `plugins/showai/skills` and host delivery contracts in `plugin
 | --- | --- | --- |
 | Codex | `plugins/showai-codex` | Native MCP Apps views with a file-based fallback |
 | Claude Code | `plugins/showai-claude` | Host HTML display tool |
-| Antigravity | `plugins/showai-antigravity` | Bundled offline Artifact and inline embed |
+| Antigravity | `plugins/showai-antigravity` | Native MCP Apps views, page cards, and side-pane workbench |
 | DeepSeek Harness | Prepared bundle directory | Automatic tool-result preview |
 | Kimi Work | `plugins-kimi/showai` | Offline Widget workspace and display action |
 | Remote MCP Apps | Remote plugin with installed Skills | Attached native view |

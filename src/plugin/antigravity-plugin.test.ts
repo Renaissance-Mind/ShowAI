@@ -1,23 +1,24 @@
 import { execFile, spawn } from "node:child_process";
 import { createServer } from "node:http";
-import { cp, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { cp, mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { createInterface } from "node:readline";
 import { pathToFileURL } from "node:url";
 import { promisify } from "node:util";
+import { Client } from "@modelcontextprotocol/sdk/client/index.js";
+import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { afterEach, describe, expect, test } from "vitest";
-
-interface HookModule {
-  handleHookEvent(
-    payload: Record<string, unknown>,
-    env?: Record<string, string | undefined>,
-  ): Promise<{
-    injectSteps?: { systemMessage?: { systemMessage?: string } }[];
-  }>;
-  isOfflineBundledFragment(html: string): boolean;
-  wrapForAntigravityEmbed(html: string, options?: { title?: string }): string;
-}
+import {
+  antigravityCardUri,
+  antigravityWorkbenchConnection,
+  buildAntigravitySidecarUrl,
+  writeAntigravityNavTarget,
+} from "../agent/antigravity-workbench";
+import { createLibraryMcpServer } from "../agent/mcp-library";
+import { AgentService } from "../agent/service";
+import { openLibrary } from "../core/open-library";
+import { syncManager } from "../sync/manager";
 
 interface SidecarModule {
   isAllowedSidecarOrigin(
@@ -40,16 +41,6 @@ interface SidecarModule {
     close(): Promise<void>;
   }>;
 }
-
-const {
-  handleHookEvent,
-  isOfflineBundledFragment,
-  wrapForAntigravityEmbed,
-} = (await import(
-  pathToFileURL(
-    resolve("plugins/showai/host-adapters/antigravity/hooks/preview-hook.mjs"),
-  ).href
-)) as HookModule;
 
 const { isAllowedSidecarOrigin, startAntigravitySidecar } = (await import(
   pathToFileURL(
@@ -74,217 +65,226 @@ async function makeTempDir(prefix: string) {
   return dir;
 }
 
-describe("Antigravity preview hook", () => {
-  test("wraps bundled inline fragments with Antigravity theme sync and stages via PostToolUse + PreInvocation", async () => {
-    const root = await makeTempDir("showai-ag-hook-");
-    const home = join(root, "home");
-    const previewDir = join(home, "local/agent-previews/abc");
-    const artifactDir = join(root, "artifacts");
-    const transcriptPath = join(root, "transcript.jsonl");
-    await mkdir(previewDir, { recursive: true });
-    await mkdir(artifactDir, { recursive: true });
+describe("Antigravity page cards and live workbench navigation", () => {
+  test("card_present, card_navigate, workbench_open_destination, and sidecar nav-events SSE coordinate end-to-end", async () => {
+    const home = await makeTempDir("showai-ag-cards-");
+    await openLibrary(home);
+    const service = new AgentService({ root: home });
+    const workbench = antigravityWorkbenchConnection(service);
+    const server = createLibraryMcpServer({
+      root: home,
+      icons: workbench.icons,
+    });
+    workbench.configure(server);
+    const [left, right] = InMemoryTransport.createLinkedPair();
+    const client = new Client({ name: "antigravity-card-test", version: "1" });
+    await server.connect(right);
+    await client.connect(left);
 
-    const inlineFile = join(previewDir, "page.inline.html");
-    const fragment =
-      '<section id="showai-1" data-showai-inline-root><p>Hello ShowAI</p></section>';
-    await writeFile(inlineFile, fragment, "utf8");
+    const upstream = createServer((_req, res) => {
+      res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
+      res.end("<!doctype html><html><head></head><body>studio</body></html>");
+    });
+    await new Promise<void>((done) => upstream.listen(0, "127.0.0.1", done));
+    const addr = upstream.address();
+    const upstreamPort = typeof addr === "object" && addr ? addr.port : 0;
+    const upstreamUrl = new URL(`http://127.0.0.1:${upstreamPort}/`);
 
-    const toolOutput = {
-      ok: true,
-      data: {
-        title: "架构演进报告",
-        projectId: "proj-1",
-        pageId: "page-2",
-        openUrl: "showai://project/proj-1/page/page-2",
-        display: { reader: "bundled" },
-        delivery: {
-          mode: "fragment-file",
-          inline: inlineFile,
-          html: join(previewDir, "page.html"),
+    const sidecar = await startAntigravitySidecar({
+      port: 0,
+      token: "nav-token",
+      env: { ...process.env, SHOWAI_HOME: home },
+      backend: {
+        ensure: async () => ({ url: upstreamUrl, home }),
+        stop: async () => {},
+        status: () => ({ running: true, url: upstreamUrl.href, home }),
+      },
+    });
+
+    try {
+      const toolList = await client.listTools();
+      const cardPresentMeta = toolList.tools.find(
+        (item) => item.name === "card_present",
+      )?._meta as { ui?: { resourceUri?: string; visibility?: string[] } } | undefined;
+      expect(cardPresentMeta?.ui?.resourceUri).toBe(antigravityCardUri);
+      expect(cardPresentMeta?.ui?.visibility).toEqual(["model", "app"]);
+      const openDestMeta = toolList.tools.find(
+        (item) => item.name === "workbench_open_destination",
+      )?._meta as { ui?: { visibility?: string[] } } | undefined;
+      expect(openDestMeta?.ui?.visibility).toEqual(["app"]);
+
+      const resource = await client.readResource({ uri: antigravityCardUri });
+      expect(resource.contents).toHaveLength(1);
+      const cardContent = resource.contents[0];
+      expect(cardContent?.mimeType).toBe("text/html;profile=mcp-app");
+      const htmlText = cardContent && "text" in cardContent ? cardContent.text : "";
+      expect(htmlText).toContain("showai-page-card");
+      expect(htmlText).toContain("workbench_open_destination");
+
+      const createdProject = await client.callTool({
+        name: "project_create",
+        arguments: { name: "Antigravity 卡片测试" },
+      });
+      const projectId = (createdProject.structuredContent as any).data.id as string;
+
+      const pageOne = await client.callTool({
+        name: "page_create",
+        arguments: {
+          projectId,
+          title: "系统架构总览",
         },
-      },
-    };
-    await writeFile(
-      transcriptPath,
-      JSON.stringify({
-        type: "GENERIC",
-        content: [{ type: "text", text: JSON.stringify(toolOutput) }],
-      }) + "\n",
-      "utf8",
-    );
-
-    const postResult = await handleHookEvent(
-      {
-        hookEventName: "PostToolUse",
-        artifactDirectoryPath: artifactDir,
-        transcriptPath,
-        toolCall: {
-          id: "call_1",
-          name: "mcp_showai_page_present",
-          args: { projectId: "proj-1", pageId: "page-2" },
+      });
+      const pageOneCreated = (pageOne.structuredContent as any).data;
+      const pageOneId = pageOneCreated.document.id as string;
+      const savedPageOne = await client.callTool({
+        name: "page_apply",
+        arguments: {
+          projectId,
+          pageId: pageOneId,
+          baseHash: pageOneCreated.hash,
+          baseRevision: pageOneCreated.revision,
+          operations: [
+            {
+              type: "block.insert",
+              node: {
+                type: "heading",
+                attrs: { id: "blk-hero", level: 2 },
+                content: [{ type: "text", text: "核心模块" }],
+              },
+            },
+          ],
         },
-      },
-      { SHOWAI_HOME: home },
-    );
-    expect(postResult).toEqual({});
+      });
+      expect(savedPageOne.isError, JSON.stringify(savedPageOne.content)).not.toBe(true);
 
-    const preResult = await handleHookEvent({
-      hookEventName: "PreInvocation",
-      artifactDirectoryPath: artifactDir,
-    });
-    const injected =
-      preResult.injectSteps?.[0]?.systemMessage?.systemMessage ?? "";
-    expect(injected).toContain("<agent-embed src=\"file://");
-    expect(injected).toContain(
-      "[在 ShowAI 工作台打开《架构演进报告》](sidecar://showai/workbench/?project=proj-1&page=page-2)",
-    );
-    expect(injected).toContain("Do NOT run `cp` or `write_file`");
-
-    const match = /showai-preview-[0-9a-f]+\.html/.exec(injected);
-    expect(match).toBeTruthy();
-    const stagedHtml = await readFile(join(artifactDir, match![0]), "utf8");
-    expect(stagedHtml).toMatch(/^<!DOCTYPE html>/);
-    expect(stagedHtml).toContain("Hello ShowAI");
-    expect(stagedHtml).toContain('addEventListener("themechange"');
-
-    // Second PreInvocation is a no-op because the pending file was consumed.
-    const secondPre = await handleHookEvent({
-      hookEventName: "PreInvocation",
-      artifactDirectoryPath: artifactDir,
-    });
-    expect(secondPre).toEqual({});
-  });
-
-  test("handles Antigravity lazy MCP call_mcp_tool payload with PascalCase ToolName and timestamped transcript content", async () => {
-    const root = await makeTempDir("showai-ag-hook-lazy-");
-    const home = join(root, "home");
-    const previewDir = join(home, "local/agent-previews/show-components/u1");
-    const artifactDir = join(root, "artifacts");
-    const transcriptPath = join(root, "transcript.jsonl");
-    await mkdir(previewDir, { recursive: true });
-    await mkdir(artifactDir, { recursive: true });
-
-    const inlineFile = join(previewDir, "component.inline.html");
-    await writeFile(
-      inlineFile,
-      '<section id="showai-lazy" data-showai-inline-root><p>Lazy MCP</p></section>',
-      "utf8",
-    );
-
-    const resultPayload = JSON.stringify({
-      ok: true,
-      data: {
-        title: "实时验证",
-        display: { reader: "bundled" },
-        delivery: { mode: "fragment-file", inline: inlineFile },
-      },
-    });
-    await writeFile(
-      transcriptPath,
-      JSON.stringify({
-        step_index: 294,
-        type: "GENERIC",
-        status: "DONE",
-        content: `Created At: 2026-11-20T22:10:12+08:00\nCompleted At: 2026-11-20T22:11:04+08:00\n${resultPayload}`,
-      }) + "\n",
-      "utf8",
-    );
-
-    await handleHookEvent(
-      {
-        hookEventName: "PostToolUse",
-        artifactDirectoryPath: artifactDir,
-        transcriptPath,
-        toolCall: {
-          id: "call_lazy",
-          name: "call_mcp_tool",
-          args: {
-            ServerName: "showai_showai",
-            ToolName: "show_component",
-            Arguments: { kind: "flowchart", delivery: "auto" },
-          },
+      const pageTwo = await client.callTool({
+        name: "page_create",
+        arguments: {
+          projectId,
+          title: "数据流设计",
         },
-      },
-      { SHOWAI_HOME: home },
-    );
+      });
+      const pageTwoId = (pageTwo.structuredContent as any).data.document.id as string;
 
-    const pre = await handleHookEvent({
-      hookEventName: "PreInvocation",
-      artifactDirectoryPath: artifactDir,
-    });
-    const message = pre.injectSteps?.[0]?.systemMessage?.systemMessage ?? "";
-    expect(message).toContain("<agent-embed src=\"file://");
-    expect(message).toContain("showai-preview-");
-  });
+      // Single card presentation
+      const singleCard = await client.callTool({
+        name: "card_present",
+        arguments: {
+          projectId,
+          pageId: pageOneId,
+          blockId: "blk-hero",
+          description: "新增核心模块章节与导航结构。",
+        },
+      });
+      expect(singleCard.isError).not.toBe(true);
+      expect((singleCard.structuredContent as any).data).toMatchObject({
+        projectId,
+        pageId: pageOneId,
+        blockId: "blk-hero",
+        title: "系统架构总览",
+        description: "新增核心模块章节与导航结构。",
+      });
+      expect((singleCard._meta as any).showaiPageCard).toMatchObject({
+        projectId,
+        pageId: pageOneId,
+        blockId: "blk-hero",
+      });
 
-  test("rejects CDN fragments, errored tool calls, and files outside preview roots", async () => {
-    const root = await makeTempDir("showai-ag-hook-guard-");
-    const home = join(root, "home");
-    const previewDir = join(home, "local/agent-previews/cdn");
-    const artifactDir = join(root, "artifacts");
-    const outsideFile = join(root, "secret.inline.html");
-    await mkdir(previewDir, { recursive: true });
-    await mkdir(artifactDir, { recursive: true });
+      // Multi-card group presentation
+      const groupCards = await client.callTool({
+        name: "card_present",
+        arguments: {
+          projectId,
+          pageId: pageOneId,
+          additionalTargets: [{ projectId, pageId: pageTwoId }],
+          adjustSpacing: true,
+        },
+      });
+      expect(groupCards.isError).not.toBe(true);
+      expect((groupCards.structuredContent as any).data.adjustSpacing).toBe(true);
+      expect((groupCards.structuredContent as any).data.cards).toHaveLength(2);
+      expect((groupCards._meta as any).showaiCardGroup.cards).toHaveLength(2);
 
-    const cdnHtml =
-      '<section data-showai-inline-root></section><script src="https://cdn.example.com/reader.js"></script>';
-    expect(isOfflineBundledFragment(cdnHtml)).toBe(false);
-    const cdnFile = join(previewDir, "cdn.inline.html");
-    await writeFile(cdnFile, cdnHtml, "utf8");
-    await writeFile(outsideFile, "<section>outside</section>", "utf8");
-
-    const transcriptOutside = join(root, "outside.jsonl");
-    await writeFile(
-      transcriptOutside,
-      JSON.stringify({
-        content: JSON.stringify({
-          data: {
-            display: { reader: "bundled" },
-            delivery: { inline: outsideFile },
-          },
+      // Before any sidecar SSE client connects, navigation is queued with a sidecar:// URL
+      const queuedNav = await client.callTool({
+        name: "card_navigate",
+        arguments: { projectId, pageId: pageOneId, blockId: "blk-hero" },
+      });
+      expect((queuedNav.structuredContent as any).data).toMatchObject({
+        status: "queued",
+        sidecarUrl: buildAntigravitySidecarUrl({
+          projectId,
+          pageId: pageOneId,
+          blockId: "blk-hero",
         }),
-      }) + "\n",
-    );
+      });
 
-    await handleHookEvent(
-      {
-        hookEventName: "PostToolUse",
-        artifactDirectoryPath: artifactDir,
-        transcriptPath: transcriptOutside,
-        toolCall: { name: "show_component", args: {} },
-      },
-      { SHOWAI_HOME: home },
-    );
-    expect(
-      await handleHookEvent({
-        hookEventName: "PreInvocation",
-        artifactDirectoryPath: artifactDir,
-      }),
-    ).toEqual({});
+      // Connect SSE client to /_antigravity/nav-events: receives queued navigation and marks workbench open
+      const abort = new AbortController();
+      const sseRes = await fetch(
+        `${sidecar.url}/_antigravity/nav-events?token=nav-token`,
+        { signal: abort.signal },
+      );
+      expect(sseRes.status).toBe(200);
+      expect(sseRes.headers.get("content-type")).toContain("text/event-stream");
+      const reader = sseRes.body!.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+      const nextNavPayload = async () => {
+        while (true) {
+          const match = /data:\s*(\{[^\n]+\})\n\n/.exec(buffer);
+          if (match) {
+            buffer = buffer.slice(match.index + match[0].length);
+            return JSON.parse(match[1]);
+          }
+          const { value, done } = await reader.read();
+          if (done) throw new Error("SSE stream closed early");
+          buffer += decoder.decode(value, { stream: true });
+        }
+      };
 
-    // Verify fallback scan skips CDN fragments too.
-    await handleHookEvent(
-      {
-        hookEventName: "PostToolUse",
-        artifactDirectoryPath: artifactDir,
-        toolCall: { name: "show_component", args: {} },
-      },
-      { SHOWAI_HOME: home },
-    );
-    expect(
-      await handleHookEvent({
-        hookEventName: "PreInvocation",
-        artifactDirectoryPath: artifactDir,
-      }),
-    ).toEqual({});
-  });
+      const initialDelivered = await nextNavPayload();
+      expect(initialDelivered).toMatchObject({
+        projectId,
+        pageId: pageOneId,
+        blockId: "blk-hero",
+      });
 
-  test("wrapForAntigravityEmbed preserves full HTML documents while adding theme sync", () => {
-    const wrapped = wrapForAntigravityEmbed(
-      "<!DOCTYPE html><html><body><div data-showai-inline-root></div></body></html>",
-    );
-    expect(wrapped).toContain('addEventListener("themechange"');
-    expect(wrapped.match(/<!DOCTYPE html>/gi)?.length).toBe(1);
+      // Now that SSE client is active, workbench_open_destination returns accepted and streams live
+      const liveJump = await client.callTool({
+        name: "workbench_open_destination",
+        arguments: {
+          projectId,
+          pageId: pageTwoId,
+          destination: "workbench",
+        },
+      });
+      expect(liveJump.isError).not.toBe(true);
+      expect((liveJump._meta as any).showaiWorkbenchData).toMatchObject({
+        status: "accepted",
+      });
+      const secondDelivered = await nextNavPayload();
+      expect(secondDelivered).toMatchObject({
+        projectId,
+        pageId: pageTwoId,
+      });
+
+      // Direct helper check as well
+      const helperResult = await writeAntigravityNavTarget(home, {
+        projectId,
+        pageId: pageOneId,
+      });
+      expect(helperResult.status).toBe("accepted");
+
+      abort.abort();
+      await reader.cancel().catch(() => {});
+    } finally {
+      await sidecar.close();
+      await new Promise<void>((done) => upstream.close(() => done()));
+      await client.close();
+      await server.close();
+      await syncManager(home).stop();
+    }
   });
 });
 
@@ -669,7 +669,7 @@ describe("Antigravity committed package validation", () => {
       name: "showai",
       agentPluginsSpec: false,
       components: {
-        hooks: 1,
+        hooks: 0,
         mcpServers: 1,
         sidecars: 1,
         skills: 6,

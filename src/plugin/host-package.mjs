@@ -14,7 +14,7 @@ import { dirname, isAbsolute, join, resolve, relative, sep } from "node:path";
 export const HOST_PROFILES = {
   codex: "mcp-app",
   claude: "model-html",
-  antigravity: "fragment-file",
+  antigravity: "mcp-app",
   deepseek: "fragment-file",
   kimi: "fragment-file",
   "mcp-app": "mcp-app",
@@ -189,30 +189,6 @@ export async function publishPluginDirectory(staging, target) {
   if (moved) await rm(previous, { recursive: true });
 }
 
-function shellQuote(value) {
-  if (process.platform === "win32") {
-    return `"${String(value).replaceAll('"', '""')}"`;
-  }
-  return `'${String(value).replaceAll("'", `'\\''`)}'`;
-}
-
-function antigravityHookCommand(launch) {
-  if (!launch?.command) return "node ./hooks/preview-hook.mjs";
-  const envEntries = Object.entries(launch.env ?? {}).filter(
-    ([key, value]) =>
-      ["ELECTRON_RUN_AS_NODE", "SHOWAI_HOME", "SHOWAI_PRESENTATION_DIR"].includes(key) &&
-      typeof value === "string",
-  );
-  if (process.platform === "win32") {
-    const sets = envEntries.map(([key, value]) => `set "${key}=${value}"`);
-    return [...sets, `${shellQuote(launch.command)} ./hooks/preview-hook.mjs`].join(" && ");
-  }
-  const prefix = envEntries.map(([key, value]) => `${key}=${shellQuote(value)}`).join(" ");
-  return [prefix, shellQuote(launch.command), "./hooks/preview-hook.mjs"]
-    .filter(Boolean)
-    .join(" ");
-}
-
 export function antigravityManifest(manifest, version = manifest.version) {
   return {
     name: manifest.name || "showai",
@@ -232,34 +208,6 @@ export function antigravityManifest(manifest, version = manifest.version) {
       "Draw an interactive architecture diagram in ShowAI.",
       "Open my recent ShowAI pages in the workbench.",
     ],
-  };
-}
-
-export function antigravityHookConfig(launch) {
-  const command = antigravityHookCommand(launch);
-  return {
-    "showai-preview": {
-      PostToolUse: [
-        {
-          matcher:
-            ".*(?:show_component|page_present|render_document).*|call_mcp_tool|mcp_tool",
-          hooks: [
-            {
-              type: "command",
-              command,
-              timeout: 15,
-            },
-          ],
-        },
-      ],
-      PreInvocation: [
-        {
-          type: "command",
-          command,
-          timeout: 10,
-        },
-      ],
-    },
   };
 }
 
@@ -307,19 +255,14 @@ export async function writeAntigravityAssets({
   launch,
 }) {
   const assetsRoot = join(source, "host-adapters/antigravity");
-  await cp(join(assetsRoot, "hooks"), join(target, "hooks"), {
-    recursive: true,
-  });
+  await rm(join(target, "hooks"), { recursive: true, force: true });
+  await rm(join(target, "hooks.json"), { force: true });
   await cp(join(assetsRoot, "sidecars"), join(target, "sidecars"), {
     recursive: true,
   });
   await writeFile(
     join(target, "plugin.json"),
     JSON.stringify(antigravityManifest(manifest, version), null, 2) + "\n",
-  );
-  await writeFile(
-    join(target, "hooks.json"),
-    JSON.stringify(antigravityHookConfig(launch), null, 2) + "\n",
   );
   const sidecarRevision = launch
     ? hash(
@@ -420,7 +363,10 @@ export async function stageHostPlugin({ source, target, profile }) {
                 command: "node",
                 args: ["./mcp/launch.mjs"],
                 cwd: "./",
-                env: { SHOWAI_HOST_DISPLAY: receipt.declaredHostDisplay },
+                env: {
+                  SHOWAI_HOST_DISPLAY: receipt.declaredHostDisplay,
+                  SHOWAI_ANTIGRAVITY_WORKBENCH: "1",
+                },
               },
             },
           },

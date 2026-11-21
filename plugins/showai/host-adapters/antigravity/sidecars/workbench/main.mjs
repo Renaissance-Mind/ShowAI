@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 import { execFileSync, spawn } from "node:child_process";
-import { createHash, timingSafeEqual } from "node:crypto";
+import { createHash, randomUUID, timingSafeEqual } from "node:crypto";
 import { existsSync, readFileSync } from "node:fs";
-import { mkdir, readFile, stat, writeFile } from "node:fs/promises";
+import { mkdir, readFile, rename, stat, writeFile } from "node:fs/promises";
 import { createServer, request as httpRequest } from "node:http";
 import { homedir } from "node:os";
 import { dirname, isAbsolute, join, resolve } from "node:path";
@@ -457,6 +457,117 @@ async function readJsonBody(req) {
   return raw.trim() ? JSON.parse(raw) : {};
 }
 
+function createNavigationCoordinator(env = process.env) {
+  const home = resolve(env.SHOWAI_HOME || join(homedir(), ".showai"));
+  const navPath = join(home, "local", "antigravity-workbench-nav.json");
+  const statePath = join(home, "local", "antigravity-workbench-state.json");
+  const clients = new Set();
+  let lastDeliveredId = null;
+  let pollTimer = null;
+  let heartbeatTimer = null;
+  let closed = false;
+
+  async function writeState() {
+    try {
+      await mkdir(dirname(statePath), { recursive: true });
+      const temp = `${statePath}.${process.pid}.${randomUUID()}.tmp`;
+      await writeFile(
+        temp,
+        JSON.stringify({ openClients: clients.size, updatedAt: Date.now() }) + "\n",
+        "utf8",
+      );
+      await rename(temp, statePath);
+    } catch {
+      // Ignore transient filesystem errors.
+    }
+  }
+
+  async function checkNav() {
+    if (closed || !clients.size) return;
+    try {
+      const raw = await readFile(navPath, "utf8");
+      const nav = JSON.parse(raw);
+      if (
+        !nav ||
+        typeof nav.id !== "string" ||
+        nav.id === lastDeliveredId ||
+        typeof nav.pageId !== "string" ||
+        typeof nav.requestedAt !== "number" ||
+        Date.now() - nav.requestedAt > 60_000
+      ) {
+        return;
+      }
+      lastDeliveredId = nav.id;
+      const payload = `data: ${JSON.stringify(nav)}\n\n`;
+      for (const client of clients) {
+        client.write(payload);
+      }
+    } catch {
+      // No pending navigation file yet.
+    }
+  }
+
+  function startTimers() {
+    if (!pollTimer) {
+      pollTimer = setInterval(() => {
+        void checkNav();
+      }, 250);
+      pollTimer.unref?.();
+    }
+    if (!heartbeatTimer) {
+      heartbeatTimer = setInterval(() => {
+        for (const client of clients) client.write(": ping\n\n");
+        void writeState();
+      }, 5000);
+      heartbeatTimer.unref?.();
+    }
+  }
+
+  function stopTimersIfIdle() {
+    if (clients.size > 0) return;
+    if (pollTimer) {
+      clearInterval(pollTimer);
+      pollTimer = null;
+    }
+    if (heartbeatTimer) {
+      clearInterval(heartbeatTimer);
+      heartbeatTimer = null;
+    }
+  }
+
+  function subscribe(req, res, corsHeaders) {
+    res.writeHead(200, {
+      ...corsHeaders,
+      "Content-Type": "text/event-stream; charset=utf-8",
+      "Cache-Control": "no-cache",
+      Connection: "keep-alive",
+    });
+    res.flushHeaders?.();
+    res.write(": connected\n\n");
+    clients.add(res);
+    startTimers();
+    void writeState();
+    void checkNav();
+    req.on("close", () => {
+      clients.delete(res);
+      stopTimersIfIdle();
+      void writeState();
+    });
+  }
+
+  async function close() {
+    closed = true;
+    for (const client of clients) {
+      client.end();
+    }
+    clients.clear();
+    stopTimersIfIdle();
+    await writeState();
+  }
+
+  return { subscribe, close };
+}
+
 export async function startAntigravitySidecar(options = {}) {
   const env = { ...process.env, ...options.env };
   const port =
@@ -470,6 +581,7 @@ export async function startAntigravitySidecar(options = {}) {
   const preloadJs = loadPreloadJs();
   const backend = options.backend ?? createBackendManager(env);
   const classicBundler = createClassicBundleCompiler(env);
+  const navCoordinator = createNavigationCoordinator(env);
   let lastClassicBundle = null;
   let actualPort = port;
 
@@ -578,6 +690,10 @@ export async function startAntigravitySidecar(options = {}) {
         "Content-Type": "application/json; charset=utf-8",
       });
       res.end(JSON.stringify({ ok: true, backend: backend.status() }));
+      return;
+    }
+    if (req.method === "GET" && pathname === "/_antigravity/nav-events") {
+      navCoordinator.subscribe(req, res, corsHeaders);
       return;
     }
     if (req.method === "POST" && pathname === "/_antigravity/restart") {
@@ -838,6 +954,7 @@ export async function startAntigravitySidecar(options = {}) {
   actualPort = typeof address === "object" && address ? address.port : port;
 
   const close = async () => {
+    await navCoordinator.close();
     await backend.stop();
     await new Promise((done) => {
       server.close(() => done());

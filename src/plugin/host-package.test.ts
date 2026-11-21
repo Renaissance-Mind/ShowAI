@@ -82,6 +82,14 @@ describe("host-specific plugin distributions", () => {
       "mcp-app",
     );
     expect(HOST_PROFILES.codex).toBe("mcp-app");
+    expect(HOST_PROFILES.antigravity).toBe("mcp-app");
+    const antigravityConfig = JSON.parse(
+      await readFile(resolve("plugins/showai-antigravity/mcp_config.json"), "utf8"),
+    );
+    expect(antigravityConfig.mcpServers.showai.env).toMatchObject({
+      SHOWAI_HOST_DISPLAY: "mcp-app",
+      SHOWAI_ANTIGRAVITY_WORKBENCH: "1",
+    });
     const common = Object.fromEntries(
       Object.entries(await skillFiles(join(source, "skills"))).filter(
         ([name]) => name !== HOST_GUIDE,
@@ -168,8 +176,10 @@ describe("host-specific plugin distributions", () => {
         "utf8",
       );
       expect(entrySkill.includes("## Codex 工作台")).toBe(profile === "codex");
-      expect(entrySkill.includes("`card_present`")).toBe(profile === "codex");
-      expect(entrySkill.includes("## Antigravity 侧栏工作台与自动预览")).toBe(
+      expect(entrySkill.includes("`card_present`")).toBe(
+        profile === "codex" || profile === "antigravity",
+      );
+      expect(entrySkill.includes("## Antigravity 工作台与页面卡片")).toBe(
         profile === "antigravity",
       );
       if (profile !== "codex") expect(adapter).not.toContain("visualize");
@@ -210,6 +220,10 @@ describe("host-specific plugin distributions", () => {
         expect(await readdir(target)).not.toContain(other);
       expect(await readdir(target)).not.toContain("host-adapters");
       if (profile === "antigravity") {
+        expect(launch.env.SHOWAI_ANTIGRAVITY_WORKBENCH).toBe("1");
+        const pluginEntries = await readdir(target);
+        expect(pluginEntries).not.toContain("hooks");
+        expect(pluginEntries).not.toContain("hooks.json");
         const pluginManifest = JSON.parse(
           await readFile(join(target, "plugin.json"), "utf8"),
         );
@@ -221,11 +235,6 @@ describe("host-specific plugin distributions", () => {
         expect(pluginManifest.$schema).toBeUndefined();
         expect(pluginManifest.extensions).toBeUndefined();
         expect(pluginManifest.suggestedPrompts).toHaveLength(3);
-        const hooks = JSON.parse(
-          await readFile(join(target, "hooks.json"), "utf8"),
-        );
-        expect(hooks["showai-preview"].PostToolUse).toHaveLength(1);
-        expect(hooks["showai-preview"].PreInvocation).toHaveLength(1);
         const sidecar = JSON.parse(
           await readFile(join(target, "sidecars/workbench/sidecar.json"), "utf8"),
         );

@@ -44,10 +44,6 @@ export function antigravityManifest(
   manifest: { name?: string; version: string },
   version?: string,
 ): Record<string, unknown>;
-export function antigravityHookConfig(launch?: {
-  command: string;
-  env?: Record<string, string | undefined>;
-}): Record<string, unknown>;
 export function antigravitySidecarConfig(launch?: {
   command: string;
   env?: Record<string, string | undefined>;

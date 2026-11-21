@@ -111,4 +111,4 @@ node scripts/install-codex-plugin.mjs --remote-url HTTPS_MCP_URL --marketplace-r
 
 公共工作流只维护 `plugins/showai/skills`，宿主展示契约分别维护在 `plugins/showai/host-adapters`。运行 `npm run package:plugin` 自动生成 Codex、Claude Code、Antigravity 和 Kimi 的安装内容；DeepSeek 准备插件时绑定自己的适配，远程 MCP Apps 使用原生视图指南。
 
-Codex 市场指向 `plugins/showai-codex`，Claude Code 市场指向 `plugins/showai-claude`，Antigravity 安装包位于 `plugins/showai-antigravity`，插件身份沿用 showai@renaissance-mind。生成目录随仓库提交，供全新克隆直接安装。打包时将当前宿主的常规交付步骤写入 show-visual 和 show-document，完整指南放在 host-adapter.md。host-profile.json 记录适配身份、显示声明和文件指纹。App 安装入口使用同一套绑定逻辑。Codex 默认使用 MCP Apps 原生视图，宿主缺少原生视图时使用文件式交付。各宿主加载与 MCP 重连分别核验。
+Codex 市场指向 `plugins/showai-codex`，Claude Code 市场指向 `plugins/showai-claude`，Antigravity 安装包位于 `plugins/showai-antigravity`，插件身份沿用 showai@renaissance-mind。生成目录随仓库提交，供全新克隆直接安装。打包时将当前宿主的常规交付步骤写入 show-visual 和 show-document，完整指南放在 host-adapter.md。host-profile.json 记录适配身份、显示声明和文件指纹。App 安装入口使用同一套绑定逻辑。Codex 和 Antigravity 默认使用 MCP Apps 原生视图与原页卡片，宿主缺少原生视图时使用文件式交付。各宿主加载与 MCP 重连分别核验。

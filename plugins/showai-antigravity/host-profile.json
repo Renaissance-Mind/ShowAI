@@ -1,7 +1,7 @@
 {
   "protocol": "showai-host-profile-v1",
   "profile": "antigravity",
-  "declaredHostDisplay": "fragment-file",
+  "declaredHostDisplay": "mcp-app",
   "commonVersion": "0.29.3",
   "commonSha256": "e322009298ad773621c2c2d3a6e8b788c9261036b6ce37da3d5194cadad957c7",
   "commonFiles": {
@@ -47,9 +47,9 @@
     "use-showai/SKILL.md": "2fa3b7846a8787cd5176f3ff324d63eed0a55c34cbc933b3728c37cb29a085cd"
   },
   "workflowFiles": {
-    "show-visual/SKILL.md": "b6793b6ac4a525052f00a5fc5b91e5da1953c42fbbed4e6c86844d1d241aad1c",
-    "show-document/SKILL.md": "781ef0078e6533c8d7283d7dcdeb86d83095466e2fe83bda131f1b9af4f21763"
+    "show-visual/SKILL.md": "cb0e8f78e944b11b2309412ad85aa0e35385b8dd665d7177fb77b8a40b280d48",
+    "show-document/SKILL.md": "7d705d6bcc1c257a2c1f178880c2f5aea9df45336bf671abedb7f6286dc06dc1"
   },
-  "adapterSha256": "fd841966af0ee1a69f62983d95633d1c3fa10b3f9b5a50e3b7782c72ffc79490",
-  "entrySha256": "1cdfd86f530824245ed1ba5828e3e900fbbcd296fdcff565c61604c35b842a38"
+  "adapterSha256": "6df42034fc6fd8ee357a4f842047d27eb4bef523c994c48dd3bb62de87336d4b",
+  "entrySha256": "0fdf4752e5eb85dfc3dd1ccf622ba7192dedbaea0a66c70713138fc6cf255e6c"
 }

@@ -292,6 +292,52 @@
     return best;
   }
 
+  let hasExplicitNav = false;
+
+  function dispatchShowaiOpenPage(nav) {
+    if (!nav || typeof nav.pageId !== "string" || !nav.pageId) return;
+    hasExplicitNav = true;
+    let attempts = 0;
+    const tryDispatch = () => {
+      if (window.showai) {
+        setTimeout(() => {
+          window.dispatchEvent(
+            new CustomEvent("showai:open-page", {
+              detail: {
+                projectId: nav.projectId,
+                pageId: nav.pageId,
+                blockId: nav.blockId,
+              },
+            }),
+          );
+        }, 60);
+        return;
+      }
+      if (++attempts < 160) {
+        setTimeout(tryDispatch, 50);
+      }
+    };
+    tryDispatch();
+  }
+
+  if (typeof window.EventSource === "function") {
+    try {
+      const navUrl = sidecarToken
+        ? "/_antigravity/nav-events?token=" + encodeURIComponent(sidecarToken)
+        : "/_antigravity/nav-events";
+      const navEvents = new window.EventSource(navUrl);
+      navEvents.onmessage = (event) => {
+        try {
+          dispatchShowaiOpenPage(JSON.parse(event.data));
+        } catch {
+          // Ignore malformed navigation payloads.
+        }
+      };
+    } catch {
+      // Non-fatal if EventSource is unavailable.
+    }
+  }
+
   async function syncWorkspaceProject(uris) {
     if (document.readyState === "loading") {
       await new Promise((resolve) =>
@@ -299,7 +345,7 @@
       );
     }
     const params = new URLSearchParams(window.location.search);
-    if (params.has("project") || params.has("page")) return;
+    if (hasExplicitNav || params.has("project") || params.has("page")) return;
     const token = window.__SHOWAI_LOCAL__ && window.__SHOWAI_LOCAL__.token;
     if (!token || !Array.isArray(uris) || !uris.length) return;
     const paths = uris.map(fileUriToPath).filter(Boolean);

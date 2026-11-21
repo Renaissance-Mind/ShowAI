@@ -377,8 +377,17 @@ describe.skipIf(!output || !config)(
               arguments: { viewId: initial.live.viewId },
             });
           } else if (host === "antigravity") {
-            expect(delivery.mode).toBe("fragment-file");
-            expect(await readFile(delivery.inline, "utf8")).toContain("<");
+            expect(delivery.mode).toBe("mcp-app");
+            expect(
+              tools.tools.some(
+                (item: { name?: string }) => item.name === "card_present",
+              ),
+            ).toBe(true);
+            expect(
+              tools.tools.some(
+                (item: { name?: string }) => item.name === "card_navigate",
+              ),
+            ).toBe(true);
           } else if (delivery.mode === "compact")
             expect(delivery.compact).toContain("<");
           else {
