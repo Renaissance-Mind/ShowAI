@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { flushSync } from "react-dom";
-import { browserSearch, codexWorkbench } from "../browser/codex-workbench";
+import { antigravityWorkbench, browserSearch, codexWorkbench, isSinglePageWorkbench } from "../browser/codex-workbench";
 import {
   addWorkspaceTab,
   closeWorkspaceTab,
@@ -41,9 +41,10 @@ export function useWorkspaceTabs({
 }) {
   const embed = codexWorkbench();
   const dsh = window.__SHOWAI_LOCAL__?.dshWorkbench;
-  const storageKey = (library: string) =>
-    dsh ? `showai:tabs:${library}:dsh:${dsh.instance}` :
-      embed ? `showai:tabs:${library}:codex:${embed.instance}` : `showai:tabs:${library}`;
+  const ag = antigravityWorkbench();
+  const hostScope = dsh ? `:dsh:${dsh.instance}` :
+    embed ? `:codex:${embed.instance}` : ag ? ":antigravity" : "";
+  const storageKey = (library: string) => `showai:tabs:${library}${hostScope}`;
   const [state, setState] = useState(() => createWorkspace(entry));
   const current = useRef(state);
   const [switching, setSwitching] = useState(false);
@@ -66,7 +67,7 @@ export function useWorkspaceTabs({
     try {
       const bytes = JSON.stringify({ version: 1, ...next });
       sessionStorage.setItem(storageKey(library.current), bytes);
-      if (!embed && !dsh) localStorage.setItem(`showai:tabs:last:${library.current}`, bytes);
+      if (!hostScope) localStorage.setItem(`showai:tabs:last:${library.current}`, bytes);
     } catch (error) {
       latest.current.onError(error);
     }
@@ -145,9 +146,11 @@ export function useWorkspaceTabs({
       const params = browserSearch();
       try {
         saved = parseWorkspaceTabs(
-          sessionStorage.getItem(storageKey(home)),
+          sessionStorage.getItem(storageKey(home)) ??
+            (ag ? sessionStorage.getItem(`showai:tabs:${home}`) : null),
+          isSinglePageWorkbench(),
         );
-        if (!embed && !dsh && !saved && firstLibrary && params.get("restore") === "tabs") {
+        if (!hostScope && !saved && firstLibrary && params.get("restore") === "tabs") {
           saved = parseWorkspaceTabs(
             localStorage.getItem(`showai:tabs:last:${home}`),
           );

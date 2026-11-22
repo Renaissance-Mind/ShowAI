@@ -394,7 +394,7 @@ export function useStudioRouter({
           if (await page.open(projectId, pageId, workspace.activeId)) {
             setView("page");
             void loadCatalog().catch(report);
-            if (blocks.length) revealPageBlocks(blocks, codexWorkbench()?.mode === "thread");
+            if (blocks.length) revealPageBlocks(blocks, capabilities.singlePage);
           }
           const parentId =
             loaded.pages.find((item) => item.id === pageId)?.parentId ?? null;

@@ -162,6 +162,10 @@ export async function startBrowserServer(options: BrowserServerOptions) {
     "unknown";
   const osVersion = await systemVersion();
   const clients = new Map<ServerResponse, string>();
+  const agTabs = new Map<
+    string,
+    { response: ServerResponse; projectId: string; pageId: string; visible: boolean }
+  >();
   const ownWrites = new OwnWrites();
   const clientId = (value: unknown) =>
     typeof value === "string" && /^[\w-]{1,100}$/.test(value) ? value : "";
@@ -642,7 +646,8 @@ export async function startBrowserServer(options: BrowserServerOptions) {
       }
       if (url.pathname.startsWith("/api/")) {
         const supplied =
-          url.pathname === "/api/events"
+          url.pathname === "/api/events" ||
+          url.pathname === "/api/antigravity-tab-events"
             ? url.searchParams.get("token")
             : request.headers.authorization?.replace(/^Bearer /, "");
         if (
@@ -664,6 +669,36 @@ export async function startBrowserServer(options: BrowserServerOptions) {
           );
           clients.set(response, clientId(url.searchParams.get("client")));
           request.on("close", () => clients.delete(response));
+          return;
+        }
+        if (
+          antigravityEmbedding &&
+          url.pathname === "/api/antigravity-tab-events" &&
+          request.method === "GET"
+        ) {
+          const tabId = (url.searchParams.get("tabId") ?? "").slice(0, 80);
+          const tabProjectId = (url.searchParams.get("project") ?? "").slice(0, 128);
+          const tabPageId = (url.searchParams.get("page") ?? "").slice(0, 128);
+          if (!tabId || !tabProjectId || !tabPageId) {
+            response.writeHead(400);
+            response.end();
+            return;
+          }
+          response.writeHead(200, {
+            "Content-Type": "text/event-stream",
+            Connection: "keep-alive",
+          });
+          response.write(": connected\n\n");
+          const entry = {
+            response,
+            projectId: tabProjectId,
+            pageId: tabPageId,
+            visible: url.searchParams.get("visible") !== "0",
+          };
+          agTabs.set(tabId, entry);
+          request.on("close", () => {
+            if (agTabs.get(tabId) === entry) agTabs.delete(tabId);
+          });
           return;
         }
         if (request.method !== "POST") {
@@ -767,6 +802,21 @@ export async function startBrowserServer(options: BrowserServerOptions) {
           const origin = clientId(request.headers["x-showai-client"]);
           if (action === "pages:save" && origin && typeof saved === "string")
             await ownWrites.record(origin, saved);
+        } else if (
+          antigravityEmbedding &&
+          url.pathname === "/api/antigravity-tab-visibility"
+        ) {
+          const tabId =
+            typeof input.tabId === "string" ? input.tabId.slice(0, 80) : "";
+          const entry = tabId ? agTabs.get(tabId) : undefined;
+          if (entry) {
+            entry.visible = Boolean(input.visible);
+            if (typeof input.projectId === "string" && input.projectId)
+              entry.projectId = input.projectId.slice(0, 128);
+            if (typeof input.pageId === "string" && input.pageId)
+              entry.pageId = input.pageId.slice(0, 128);
+          }
+          data = { ok: true };
         } else {
           response.writeHead(404);
           response.end();
@@ -828,8 +878,84 @@ export async function startBrowserServer(options: BrowserServerOptions) {
         const agBridge =
           agEmbedded && !preview
             ? `<script>(() => {
-  let seq = 0;
+  const params = new URLSearchParams(location.search);
+  const initialTheme = params.get("theme");
+  if (initialTheme === "dark" || initialTheme === "light") {
+    document.documentElement.style.colorScheme = initialTheme;
+    document.documentElement.dataset.theme = initialTheme;
+  }
+  let seq = 0, notifiedReady = false, parentVisible = true;
   const pending = new Map();
+  const wantsPage = params.has("page");
+  function checkReady() {
+    if (notifiedReady) return;
+    const readyEl = wantsPage
+      ? document.querySelector(".studio-page-title-input, .page-surface, .board-surface")
+      : document.querySelector(".studio-main");
+    if (!readyEl) return;
+    notifiedReady = true;
+    requestAnimationFrame(() => {
+      window.parent.postMessage({ type: "showai:ag-page-ready" }, "*");
+    });
+  }
+  const mo = new MutationObserver(() => {
+    checkReady();
+    if (notifiedReady) mo.disconnect();
+  });
+  mo.observe(document.documentElement, { childList: true, subtree: true });
+  let syncVisibility = () => {};
+  const initialProject = params.get("project") || "";
+  const initialPage = params.get("page") || "";
+  const localToken = window.__SHOWAI_LOCAL__?.token || "";
+  if (initialProject && initialPage && localToken) {
+    const tabId = (typeof crypto !== "undefined" && crypto.randomUUID)
+      ? crypto.randomUUID()
+      : Math.random().toString(36).slice(2) + Date.now().toString(36);
+    const isVisible = () =>
+      parentVisible &&
+      document.visibilityState === "visible" &&
+      window.innerWidth > 40 &&
+      window.innerHeight > 40;
+    let lastVisible = isVisible();
+    const sseParams = new URLSearchParams({
+      token: localToken,
+      tabId,
+      project: initialProject,
+      page: initialPage,
+      visible: lastVisible ? "1" : "0",
+    });
+    const tabEvents = new EventSource("/api/antigravity-tab-events?" + sseParams.toString());
+    tabEvents.onmessage = (ev) => {
+      try {
+        const detail = JSON.parse(ev.data);
+        if (detail?.pageId) {
+          window.dispatchEvent(new CustomEvent("showai:open-page", { detail }));
+        }
+      } catch {}
+    };
+    syncVisibility = (force) => {
+      const next = typeof force === "boolean" ? force : isVisible();
+      if (next === lastVisible && typeof force !== "boolean") return;
+      lastVisible = next;
+      fetch("/api/antigravity-tab-visibility", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: "Bearer " + localToken,
+        },
+        body: JSON.stringify({ tabId, visible: next }),
+        keepalive: next === false,
+      }).catch(() => {});
+    };
+    tabEvents.onopen = () => syncVisibility(isVisible());
+    document.addEventListener("visibilitychange", () => syncVisibility());
+    window.addEventListener("resize", () => syncVisibility());
+    window.addEventListener("focus", () => syncVisibility());
+    window.addEventListener("pagehide", () => {
+      syncVisibility(false);
+      tabEvents.close();
+    });
+  }
   window.__SHOWAI_ANTIGRAVITY_HOST__ = {
     canReference() { return window.parent !== window; },
     attachReference(reference, text, components) {
@@ -852,6 +978,9 @@ export async function startBrowserServer(options: BrowserServerOptions) {
     } else if (msg.type === "showai:ag-host-theme" && (msg.theme === "dark" || msg.theme === "light")) {
       document.documentElement.style.colorScheme = msg.theme;
       document.documentElement.dataset.theme = msg.theme;
+    } else if (msg.type === "showai:ag-host-visibility" && typeof msg.visible === "boolean") {
+      parentVisible = msg.visible;
+      syncVisibility();
     } else if (msg.type === "showai:ag-open-page" && msg.detail?.pageId) {
       window.dispatchEvent(new CustomEvent("showai:open-page", { detail: msg.detail }));
     }
@@ -913,6 +1042,7 @@ export async function startBrowserServer(options: BrowserServerOptions) {
   });
   const heartbeat = setInterval(() => {
     for (const client of clients.keys()) client.write(": heartbeat\n\n");
+    for (const tab of agTabs.values()) tab.response.write(": heartbeat\n\n");
   }, 15000);
   heartbeat.unref();
   try {
@@ -944,6 +1074,8 @@ export async function startBrowserServer(options: BrowserServerOptions) {
       await maintenance?.stop();
       await presence?.remove();
       for (const client of clients.keys()) client.end();
+      for (const tab of agTabs.values()) tab.response.end();
+      agTabs.clear();
       await new Promise<void>((done, reject) => {
         server.close((error) => (error ? reject(error) : done()));
         server.closeAllConnections();
@@ -963,6 +1095,24 @@ export async function startBrowserServer(options: BrowserServerOptions) {
     home: store.root,
     close,
     connectedClients: () => clients.size,
+    navigateAntigravityTab(target: {
+      projectId: string;
+      pageId: string;
+      blockId?: string;
+    }) {
+      let delivered = false;
+      for (const tab of agTabs.values()) {
+        if (
+          tab.visible &&
+          tab.projectId === target.projectId &&
+          tab.pageId === target.pageId
+        ) {
+          tab.response.write(`data: ${JSON.stringify(target)}\n\n`);
+          delivered = true;
+        }
+      }
+      return delivered;
+    },
     workbench: {
       async request(route: WorkbenchRoute, args: Record<string, unknown>, client: string) {
         const response = await fetch(`${origin}/api/${route}`, {

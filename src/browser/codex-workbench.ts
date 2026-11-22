@@ -57,6 +57,14 @@ export function antigravityWorkbench() {
   return window.__SHOWAI_ANTIGRAVITY_HOST__;
 }
 
+/** The host already owns the surrounding page tabs in its conversation pane. */
+export function isSinglePageWorkbench() {
+  if (typeof window === "undefined") return false;
+  return codexWorkbench()?.mode === "thread" ||
+    window.__SHOWAI_LOCAL__?.dshWorkbench?.session === true ||
+    !!antigravityWorkbench();
+}
+
 export function antigravityWorkbenchCanReference() {
   return window.__SHOWAI_ANTIGRAVITY_HOST__?.canReference() === true;
 }

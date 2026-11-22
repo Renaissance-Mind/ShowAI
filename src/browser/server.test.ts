@@ -7,6 +7,7 @@ import {
   test,
 } from "vitest";
 import { build } from "esbuild";
+import { chromium } from "playwright-core";
 import { rawSourcePlugin } from "../../scripts/raw-source-plugin.mjs";
 import { execFile, spawn, type ChildProcess } from "node:child_process";
 import { promisify } from "node:util";
@@ -239,6 +240,43 @@ let bundle: string,
   settingsPath: string,
   token: string;
 let server: Awaited<ReturnType<typeof startBrowserServer>>;
+
+test.each(["Antigravity page", "Harness session", "Harness global"] as const)(
+  "%s opens the saved Page with the appropriate workspace controls",
+  async (surface) => {
+    await server.close();
+    const key = "b".repeat(64);
+    const antigravity = surface === "Antigravity page";
+    server = await startBrowserServer({
+      home, webRoot: join(bundle, "web"), cliEntry: cli, settingsPath,
+      ...(antigravity ? { antigravityWorkbench: { key } } :
+        { dshWorkbench: { key, parentOrigin: "dsh-app://app" } }),
+    });
+    const url = new URL(server.url);
+    url.searchParams.set(antigravity ? "agWorkbench" : "dshWorkbench", key);
+    if (surface === "Harness session") url.searchParams.set("dshSession", "1");
+    token = pageToken(await (await fetch(url)).text())!;
+    const project = await invoke<{ id: string }>("projects:create", { name: "Pane layout" });
+    const page = await invoke<LoadedPage>("pages:create", {
+      projectId: project.id, document: { ...blankDocument(), title: "Editable pane" },
+    });
+    url.searchParams.set("project", project.id);
+    url.searchParams.set("page", page.document.id);
+    const browser = await chromium.launch({ headless: true });
+    try {
+      const editor = await browser.newPage();
+      await editor.goto(url.href);
+      const title = editor.locator('.studio-page-title-input[value="Editable pane"]');
+      await title.waitFor({ state: "visible" });
+      expect(await title.isEditable()).toBe(true);
+      const count = surface === "Harness global" ? 1 : 0;
+      expect(await editor.locator(".studio-window-topbar [role=tablist]").count()).toBe(count);
+      expect(await editor.locator("#studio-project-navigation").count()).toBe(count);
+    } finally {
+      await browser.close();
+    }
+  },
+);
 
 test.each(["http://127.0.0.1:48362", "dsh-app://app"])("Harness scopes the bound editor to %s and its session", async (parentOrigin) => {
   await server.close();
