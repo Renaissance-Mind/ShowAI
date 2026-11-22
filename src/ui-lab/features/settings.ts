@@ -562,7 +562,10 @@ export function settingsAcceptance(locale: Locale = "zh-CN"): {
     matches: [
       { target: selector('.studio-settings[data-settings-section="plugins"]') },
     ],
-    enter: openSection("plugins"),
+    enter: async (ctx) => {
+      await openSection("plugins")(ctx);
+      await ctx.ui.expect(selector('[data-host="cursor-ide"] .plugin-host-actions button:not(:disabled)'));
+    },
     checks: [zeroDetailsCheck],
     actions: [
       action("rescan", pl("refresh"), button(pl("refresh"))),

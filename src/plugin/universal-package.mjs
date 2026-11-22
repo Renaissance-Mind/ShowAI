@@ -37,6 +37,7 @@ async function mcpConnection(mcp, runtimeConfig, auth, host) {
   if (mcp === undefined) return;
   if (mcp === "local") {
     let binding;
+    let command = "node";
     if (runtimeConfig) {
       const registered = JSON.parse(await readFile(runtimeConfig, "utf8"));
       if (
@@ -52,16 +53,21 @@ async function mcpConnection(mcp, runtimeConfig, auth, host) {
         SHOWAI_HOME: registered.home,
         SHOWAI_RUNTIME_CONFIG: runtimeConfig,
       };
+      if (host !== "kimi-code" && typeof registered.launch?.command === "string" &&
+          isAbsolute(registered.launch.command)) {
+        command = registered.launch.command;
+        binding = { ...registered.launch.env, ...binding };
+      }
     }
     return {
       type: "stdio",
-      command: "node",
+      command,
       args: ["./mcp/launch.mjs"],
       env: {
+        ...binding,
         SHOWAI_HOST_DISPLAY: host === "kimi-code" ? "fragment-file" : "mcp-app",
         ...(host === "qoder" && { SHOWAI_QODER_WORKBENCH: "1" }),
         ...(host !== "qoder" && { SHOWAI_LINKED_WORKBENCH: "1" }),
-        ...binding,
       },
     };
   }

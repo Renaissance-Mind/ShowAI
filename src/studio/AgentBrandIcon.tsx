@@ -13,6 +13,7 @@ import kimiWork from "./assets/agent-brands/kimi-work.png";
 import cursor from "./assets/agent-brands/cursor.png";
 import qoder from "./assets/agent-brands/qoder.png";
 import workbuddy from "./assets/agent-brands/workbuddy.png";
+import trae from "./assets/agent-brands/trae.png";
 import deepseekHarness from "./assets/agent-brands/deepseek-harness.png";
 
 const icons = new Map([
@@ -20,6 +21,7 @@ const icons = new Map([
   ["cursor", cursor],
   ["qoder", qoder],
   ["workbuddy", workbuddy],
+  ["trae", trae],
   ["deepseek-harness", deepseekHarness],
   ["codex", codex],
   ["kimi", kimiCli],
@@ -39,6 +41,7 @@ export default function AgentBrandIcon({ brand }: { brand: string }) {
   return (
     <span
       className={`agent-brand-icon${icon ? "" : " agent-brand-custom"}`}
+      data-brand={brand}
       aria-hidden="true"
     >
       {icon ? <img src={icon} alt="" /> : <Settings2 size={21} />}

@@ -151,15 +151,15 @@
                   },
                   {
                     "title": "Cursor Agents · Cursor IDE · TRAE IDE",
-                    "body": "Select the host under Settings → Agent plugins. Cursor Agents uses a local plugin directory. In Cursor IDE or TRAE IDE, install the VSIX from Extensions and configure local MCP as prompted."
+                    "body": "Install a detected Cursor or TRAE host under Settings → Agent plugins. Reload the Cursor window to load the plugin. In TRAE, confirm the MCP import or copy the configuration when prompted."
                   },
                   {
                     "title": "Kimi Code · Qoder · WorkBuddy",
-                    "body": "Prepare the package on the same settings page. In Kimi Code, install the custom plugin directory in Plugins. In Qoder, import the ZIP from Extensions. In WorkBuddy, add the local marketplace and install the plugin."
+                    "body": "Install a detected WorkBuddy host from the same settings page and start a new task. For Kimi Code or Qoder, prepare the package in ShowAI, then import the directory in Kimi Code or the ZIP from Extensions in Qoder."
                   },
                   {
                     "title": "Gemini CLI · OpenCode",
-                    "body": "Copy the MCP configuration from the host row, add it to the client configuration and start a new conversation."
+                    "body": "Choose Configure MCP for a detected Gemini CLI. For OpenCode, copy the configuration into the client settings. Start a new conversation to load the connection."
                   }
                 ]
               },

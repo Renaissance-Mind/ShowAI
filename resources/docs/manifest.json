@@ -419,7 +419,7 @@
      "title": "在 Agent 中使用",
      "icon": "🤝",
      "file": "zh-CN/projects/a23f1819-edaf-4c0c-824b-7662cb670a52/pages/e8c001a7-4e9f-5515-a2e4-8ed6085ef46d.json",
-     "sha256": "ccbb7afe98d674347fc53fe411610083480dd102acd34af2aed0a013bb57467b",
+     "sha256": "9ef1823520b29e61b16e31f008d16b49bbe8c6e8aad58a8c7d0bc434ccbb8766",
      "components": [
       "zh-CN/projects/a23f1819-edaf-4c0c-824b-7662cb670a52/packages/components/doc-hero/1.0.0/compiled.json",
       "zh-CN/projects/a23f1819-edaf-4c0c-824b-7662cb670a52/packages/components/doc-compare/1.0.0/compiled.json",
@@ -820,7 +820,7 @@
      "title": "Use with an Agent",
      "icon": "🤝",
      "file": "en/projects/a23f1819-edaf-4c0c-824b-7662cb670a52/pages/e8c001a7-4e9f-5515-a2e4-8ed6085ef46d.json",
-     "sha256": "896c55808f9aa2545a8cb698fdb33872ed601e0ef339724e68e158eadcff1fc8",
+     "sha256": "f78c77889d46c81a1059881ac55daf32c8dd86cb0423021f56c33ddbafc98c11",
      "components": [
       "en/projects/a23f1819-edaf-4c0c-824b-7662cb670a52/packages/components/doc-hero/1.0.0/compiled.json",
       "en/projects/a23f1819-edaf-4c0c-824b-7662cb670a52/packages/components/doc-compare/1.0.0/compiled.json",

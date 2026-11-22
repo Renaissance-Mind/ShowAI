@@ -151,15 +151,15 @@
                   },
                   {
                     "title": "Cursor Agents · Cursor IDE · TRAE IDE",
-                    "body": "在「设置 → Agent 插件」选对应宿主。Cursor Agents 使用本地插件目录；Cursor IDE、TRAE IDE 从扩展菜单安装 VSIX，并按提示配置本机 MCP。"
+                    "body": "在「设置 → Agent 插件」安装已检测到的 Cursor 或 TRAE。安装后重载 Cursor 窗口。TRAE 按提示确认导入 MCP，或复制配置。"
                   },
                   {
                     "title": "Kimi Code · Qoder · WorkBuddy",
-                    "body": "在同一设置页准备安装包。Kimi Code 在 Plugins 中安装自定义插件目录，Qoder 从扩展菜单导入 ZIP，WorkBuddy 添加本地插件市场再安装。"
+                    "body": "在同一设置页安装已检测到的 WorkBuddy，然后新建任务。Kimi Code 和 Qoder 先在 ShowAI 准备安装包，再分别导入插件目录和 ZIP。"
                   },
                   {
                     "title": "Gemini CLI · OpenCode",
-                    "body": "在对应宿主行复制 MCP 配置，加入该客户端的配置文件后开启新对话。"
+                    "body": "在已检测到的 Gemini CLI 行点击「配置 MCP」。OpenCode 可复制配置到客户端。开启新对话来加载连接。"
                   }
                 ]
               },

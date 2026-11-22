@@ -54,7 +54,9 @@ The settings page identifies earlier registrations that may need cleanup. The de
 
 ### Cursor, Qoder, and WorkBuddy
 
-Start ShowAI to register the library, then run the applicable command from the source checkout. The desktop host needs `node` available to launch the bundled MCP entry. Add `--runtime-config /absolute/path/to/agent-runtime.json` to select another registered library.
+Use **Install plugin** in ShowAI **Settings → Agent plugins** for a detected Cursor or WorkBuddy installation. Reload the Cursor window or start a new WorkBuddy task to load the plugin. For Qoder, choose **Prepare package** in ShowAI, then import the ZIP and review access in Qoder.
+
+For manual installation, start ShowAI to register the library and run the matching command from the source checkout. Add `--runtime-config /absolute/path/to/agent-runtime.json` to select another registered library. A source export without a runtime binding uses Node from the host.
 
 | Host      | Generate the package                                                            | Install                                                                                                                                                                         |
 | --------- | ------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -71,7 +73,7 @@ CODEBUDDY_CONFIG_DIR="$HOME/.workbuddy" node "$workbuddy_cli" plugin marketplace
 CODEBUDDY_CONFIG_DIR="$HOME/.workbuddy" node "$workbuddy_cli" plugin install showai-workbuddy@showai-workbuddy-local
 ```
 
-Start a new local task and check `projects_list` to confirm the active library. The packages share the six Skills, but use the host's own installation format and delivery instructions:
+In a new local task, call `project_context` to verify the library and `projects_list` to check project access. Each full plugin includes the six Skills and the host's delivery instructions. Adding an MCP connection separately loads the tools available over that connection.
 
 | Host | Conversation | Saved pages and workspace |
 | --- | --- | --- |
@@ -86,7 +88,11 @@ Qoder's workbench entry points require the local package and a registered ShowAI
 
 In ShowAI **Settings → Agent plugins**, prepare the package bound to your library. In **Kimi Code**, choose **Install custom plugin** on the **Plugins** settings page and enter the folder path. You can also merge the copied MCP configuration into `~/.kimi-code/mcp.json`. Kimi Code Desktop can open HTML in its file preview and a live ShowAI editor in its right-side browser. The CLI gives you the file and editor link. [Kimi Code plugins](https://www.kimi.com/code/docs/en/kimi-code-cli/customization/plugins.html)
 
-In **TRAE IDE**, import the VSIX from Extensions and add the copied local MCP configuration in Settings. Use **ShowAI: Open Workbench** to browse projects or open a `.showai-ref` in the editor. To build the VSIX from source, run `npm run package:cursor -- --host trae --out showai-trae.vsix`. [TRAE extensions](https://docs.trae.cn/ide_manage-extensions) · [TRAE MCP setup](https://docs.trae.cn/ide_add-mcp-servers)
+For a detected **TRAE IDE**, choose **Install plugin** in ShowAI. TRAE CN opens its own MCP import confirmation after the extension is installed. You can also copy the configuration into TRAE MCP settings. Use **ShowAI: Open Workbench** or open a `.showai-ref` file. To build a manual VSIX, run `npm run package:cursor -- --host trae --out showai-trae.vsix`. [TRAE extensions](https://docs.trae.cn/ide_manage-extensions) · [TRAE MCP install links](https://docs.trae.cn/ide_mcp-server-install-links)
+
+### Gemini CLI and OpenCode
+
+Choose **Configure MCP** for a detected Gemini CLI in ShowAI **Settings → Agent plugins**, then start a new CLI session. For a manual setup, use **Copy MCP config** and merge the configuration into `~/.gemini/settings.json` for Gemini CLI or `opencode.json` for OpenCode. This configures the ShowAI tools through MCP. [Gemini CLI MCP docs](https://geminicli.com/docs/tools/mcp-server/)
 
 ## Host packages and shared source
 

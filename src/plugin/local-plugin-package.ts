@@ -22,15 +22,34 @@ import {
   universalPluginFiles,
 } from "./universal-package.mjs";
 
+function versionWorkBuddyPackage(files: Map<string, Buffer>, version: string) {
+  // WorkBuddy's plugin manager reuses the cached directory for the same version.
+  const fingerprint = [...files].sort(([a], [b]) => a.localeCompare(b)).map(([name, bytes]) =>
+    [name, createHash("sha256").update(bytes).digest("hex")],
+  );
+  const build = createHash("sha256").update(JSON.stringify(fingerprint)).digest("hex").slice(0, 12);
+  const boundVersion = version.split("+")[0] + "+desktop." + build;
+  const pluginPath = ".workbuddy-plugin/plugin.json";
+  const marketPath = ".workbuddy-plugin/marketplace.json";
+  const plugin = JSON.parse(files.get(pluginPath)!.toString("utf8"));
+  const market = JSON.parse(files.get(marketPath)!.toString("utf8"));
+  files.set(pluginPath, Buffer.from(JSON.stringify({ ...plugin, version: boundVersion }, null, 2) + "\n"));
+  files.set(marketPath, Buffer.from(JSON.stringify({
+    ...market, plugins: market.plugins.map((item: Record<string, unknown>) => ({ ...item, version: boundVersion })),
+  }, null, 2) + "\n"));
+}
+
+export interface LocalPluginPackageOptions {
+  root: string;
+  pluginRoot: () => string;
+  kimiBundleRoot: () => string;
+  runtime: () => { home: string; cli: RuntimeLaunch };
+  channel: RuntimeChannel;
+}
+
 export async function prepareLocalPlugin(
   host: unknown,
-  options: {
-    root: string;
-    pluginRoot: () => string;
-    kimiBundleRoot: () => string;
-    runtime: () => { home: string; cli: RuntimeLaunch };
-    channel: RuntimeChannel;
-  },
+  options: LocalPluginPackageOptions,
 ) {
   if (
     host !== "kimi" &&
@@ -91,10 +110,11 @@ export async function prepareLocalPlugin(
             await rename(join(staging, file), join(root, file));
             return { path: join(root, file) };
           }
-          const { files } = await universalPluginFiles(
+          const { files, version } = await universalPluginFiles(
             options.pluginRoot(),
             config,
           );
+          if (host === "workbuddy") versionWorkBuddyPackage(files, version);
           for (const [file, bytes] of files) {
             const path = join(staging, file);
             await mkdir(dirname(path), { recursive: true });

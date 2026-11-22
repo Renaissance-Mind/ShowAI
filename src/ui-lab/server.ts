@@ -195,10 +195,11 @@ export async function startUiLab(options: UiLabOptions) {
       disableNativeDialogs: input.mode === "test" || !!input.flow,
       development: { origin, token, sourceCommit },
       interceptInvoke: async (action, args, next) => {
-        const preparesLocalFiles = action === "plugins:prepareLocal" || action === "plugins:launchConfig";
+        const readOrPrepareLocalPlugin = action === "plugins:prepareLocal" || action === "plugins:launchConfig" ||
+          action === "plugins:localHosts";
         const mocked =
           fixture.actions.has(action) ||
-          (action.startsWith("plugins:") && !preparesLocalFiles) ||
+          (action.startsWith("plugins:") && !readOrPrepareLocalPlugin) ||
           action.startsWith("appUpdate:");
         if (action !== "remoteMcp:status" && action !== "remoteMcp:requests")
           trace.push({
@@ -208,7 +209,7 @@ export async function startUiLab(options: UiLabOptions) {
             at: new Date().toISOString(),
           });
         if (fixture.actions.has(action)) return fixture.invoke(action, args);
-        if (preparesLocalFiles) return next();
+        if (readOrPrepareLocalPlugin) return next();
         if (action === "plugins:status") return [];
         if (action === "plugins:runtime")
           return {

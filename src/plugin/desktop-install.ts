@@ -11,6 +11,8 @@ import {
   writeFile,
 } from "node:fs/promises";
 import { prepareLocalPlugin } from "./local-plugin-package";
+import { installLocalAgent, localInstallHosts, type LocalInstallReceipt } from "./local-install";
+import { openSystemUrl } from "../host/local-system";
 import { constants } from "node:fs";
 import { createHash } from "node:crypto";
 import { homedir } from "node:os";
@@ -109,6 +111,8 @@ export const desktopPluginActions = new Set([
   "plugins:setPath",
   "plugins:launchConfig",
   "plugins:prepareLocal",
+  "plugins:localHosts",
+  "plugins:installLocal",
   "mcp:settings",
   "mcp:setLogRetention",
   "mcp:callHistory",
@@ -140,6 +144,10 @@ export function pluginInstallerAction(
       return installer.setPath(args);
     case "plugins:prepareLocal":
       return installer.prepareLocal(args.host);
+    case "plugins:localHosts":
+      return localInstallHosts();
+    case "plugins:installLocal":
+      return installer.installLocal(args.host);
     case "plugins:launchConfig":
       return installer.launchConfig();
     default:
@@ -787,8 +795,7 @@ export class DesktopPluginInstaller {
     );
   }
 
-  async install(input: unknown): Promise<PluginInstallReceipt> {
-    const host = pluginHost(input);
+  private async whileInstalling<T>(operation: () => Promise<T>): Promise<T> {
     if (this.pending)
       throw new PluginInstallError(
         "PLUGIN_BUSY",
@@ -796,12 +803,29 @@ export class DesktopPluginInstaller {
       );
     this.pending = true;
     try {
-      return host === "deepseek"
-        ? await this.installDsh()
-        : await this.installHost(host);
+      return await operation();
     } finally {
       this.pending = false;
     }
+  }
+
+  async install(input: unknown): Promise<PluginInstallReceipt> {
+    const host = pluginHost(input);
+    return this.whileInstalling(() => host === "deepseek" ? this.installDsh() : this.installHost(host));
+  }
+
+  installLocal(input: unknown): Promise<LocalInstallReceipt> {
+    return this.whileInstalling(async () => {
+      const { approvalUrl, ...receipt } = await installLocalAgent(input, this.options);
+      if (!approvalUrl) return receipt;
+      try {
+        await openSystemUrl(approvalUrl);
+        return { ...receipt, next: "trae-confirm" };
+      } catch (error) {
+        console.error("Opening TRAE MCP setup failed:", (error as NodeJS.ErrnoException).code ?? "unknown");
+        return receipt;
+      }
+    });
   }
 
   private async installDsh(): Promise<PluginInstallReceipt> {

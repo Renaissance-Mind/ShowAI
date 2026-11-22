@@ -670,7 +670,7 @@ export default function PluginInstallSettings({ home }: { home: string }) {
       />
       <div className="settings-card">
         {hosts.map(renderHostRow)}
-        <LocalPluginSetups key={home} />
+        <LocalPluginSetups key={home} hostStatus={hosts} />
       </div>
       <PluginError message={error} details={errorDetails} />
       {verify.error && (

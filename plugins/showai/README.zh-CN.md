@@ -103,7 +103,9 @@ ChatGPT 网页通过公网 HTTPS 和 OAuth 连接。Grok Bot 可选同一 tailne
 
 ### Cursor、Qoder 和 WorkBuddy
 
-先启动 ShowAI 登记内容库，在源码目录运行对应命令。桌面宿主用 `node` 启动包内 MCP。要绑定另一个已登记的内容库，可加入 `--runtime-config /绝对路径/agent-runtime.json`。
+在 ShowAI「设置 → Agent 插件」对已检测到的 Cursor 或 WorkBuddy 点击「安装插件」。重载 Cursor 窗口或新建 WorkBuddy 任务后加载插件。Qoder 先在 ShowAI 点「准备安装包」，再到 Qoder 导入 ZIP 并检查权限。
+
+手动安装时，先启动 ShowAI 登记内容库，再在源码目录运行对应命令。加入 `--runtime-config /绝对路径/agent-runtime.json` 可绑定另一个已登记的内容库。未绑定运行时的源码安装包使用宿主环境里的 Node。
 
 | 宿主      | 生成安装包                                                                      | 安装                                                                                                                         |
 | --------- | ------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
@@ -120,7 +122,7 @@ CODEBUDDY_CONFIG_DIR="$HOME/.workbuddy" node "$workbuddy_cli" plugin marketplace
 CODEBUDDY_CONFIG_DIR="$HOME/.workbuddy" node "$workbuddy_cli" plugin install showai-workbuddy@showai-workbuddy-local
 ```
 
-在新建的本机任务里用 `projects_list` 核对内容库。三个包共用六个 Skill，安装格式和交付方式按宿主适配：
+新建本机任务后，用 `project_context` 核对内容库，用 `projects_list` 检查项目访问。完整插件包含六个 Skill 和各宿主的交付说明。单独配置 MCP 时，可使用该连接提供的工具。
 
 | 宿主 | 对话中 | 保存的页面与工作台 |
 | --- | --- | --- |
@@ -135,7 +137,11 @@ Qoder 的工作台入口需要本机插件和支持 Qoder 工作台的已登记 
 
 在 ShowAI「设置 → Agent 插件」准备关联当前内容库的安装包。在 **Kimi Code** 在插件设置页选择「安装自定义插件」，输入本地插件目录，也可以把复制的 MCP 配置合并到 `~/.kimi-code/mcp.json`。桌面版能在文件预览打开 HTML，并在任务右侧的 Browser 编辑原页。CLI 会交付文件和编辑链接。[Kimi Code 插件说明](https://www.kimi.com/code/docs/kimi-code-cli/customization/plugins.html)
 
-**TRAE IDE** 在扩展市场导入 VSIX，在 MCP 设置中加入复制的本机配置。用命令面板的「ShowAI：打开工作台」浏览项目，或打开 `.showai-ref` 在 IDE 中编辑原页。从源码生成 VSIX 的命令为 `npm run package:cursor -- --host trae --out showai-trae.vsix`。[TRAE 扩展市场](https://docs.trae.cn/ide_manage-extensions) · [TRAE MCP 配置](https://docs.trae.cn/ide_add-mcp-servers)
+检测到 **TRAE IDE** 时，可在 ShowAI 点击「安装插件」。扩展装好后，TRAE 中国版会打开 MCP 导入确认，也可以把配置复制到 TRAE 的 MCP 设置。用命令面板的「ShowAI：打开工作台」浏览项目，或打开 `.showai-ref` 编辑原页。从源码生成 VSIX 的命令为 `npm run package:cursor -- --host trae --out showai-trae.vsix`。[TRAE 扩展市场](https://docs.trae.cn/ide_manage-extensions) · [TRAE MCP 安装链接](https://docs.trae.cn/ide_mcp-server-install-links)
+
+### Gemini CLI 和 OpenCode
+
+在 ShowAI「设置 → Agent 插件」对已检测到的 Gemini CLI 点击「配置 MCP」，再启动新会话。手动安装时点击「复制 MCP 配置」，将配置合并到 Gemini CLI 的 `~/.gemini/settings.json` 或 OpenCode 的 `opencode.json`。这一步接入 ShowAI 的 MCP 工具。[Gemini CLI MCP 文档](https://geminicli.com/docs/tools/mcp-server/)
 
 ## 宿主包与公共源码
 

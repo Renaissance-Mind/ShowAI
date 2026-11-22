@@ -46,10 +46,10 @@ ShowAI 在你已经在用的 Agent 里工作：装上插件后，Agent 就能把
 | 内置 Agent                                 | 正式     | 在 ShowAI 中使用本机 Codex 或 Claude Code 的登录、模型 API Key 或 Cloud                                                        |
 | DeepSeek Harness                           | 预览     | 完全退出 DeepSeek Harness，在 ShowAI「设置 → Agent 插件」点「安装插件」（[步骤](../../plugins/showai/README.zh-CN.md#deepseek-harness)） |
 | Kimi Work                                  | 预览     | 在「设置 → Agent 插件」准备插件目录，再[在 Kimi Work 中安装](../../plugins/showai-kimi/README.md)                                      |
-| Cursor、Qoder、WorkBuddy                   | 预览     | 在「设置 → Agent 插件」准备对应的安装包，再[在宿主中安装](../../plugins/showai/README.zh-CN.md#cursorqoder-和-workbuddy)                      |
+| Cursor、Qoder、WorkBuddy                   | 预览     | 「设置 → Agent 插件」可直接安装已检测到的 Cursor 和 WorkBuddy。Qoder 通过 ZIP 导入。[安装说明](../../plugins/showai/README.zh-CN.md#cursorqoder-和-workbuddy) |
 | 网页版 ChatGPT                             | 自行部署 | 在桌面 App 开启远程连接，使用自己的 Cloudflare 或 Tailscale 接入本机项目（[指南](chatgpt.zh-CN.md)）                           |
-| Kimi Code、TRAE IDE | 预览 | 在「设置 → Agent 插件」准备对应安装包。[Kimi Code 与 TRAE 接入](../../plugins/showai/README.zh-CN.md#kimi-code-和-trae) |
-| Gemini CLI、OpenCode | 实验 | 从「设置 → Agent 插件」复制该宿主的本地 MCP 配置。[Agent 接入](agent-integration.zh-CN.md) |
+| Kimi Code、TRAE IDE | 预览 | 在「设置 → Agent 插件」准备 Kimi Code 安装包，或直接安装已检测到的 TRAE 扩展。[接入说明](../../plugins/showai/README.zh-CN.md#kimi-code-和-trae) |
+| Gemini CLI、OpenCode | 实验 | 在「设置 → Agent 插件」为已检测到的 Gemini CLI 配置 MCP，或复制相应客户端的配置。[Agent 接入](agent-integration.zh-CN.md) |
 
 ### 按 Agent 宿主选择插件目录
 

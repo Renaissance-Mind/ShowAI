@@ -46,10 +46,10 @@ A chat visualization is a temporary preview. The sample explicitly requests a sa
 | Built-in agent                            | Supported    | Inside ShowAI, using your local Codex or Claude Code sign-in, a model API key or Cloud                                                 |
 | DeepSeek Harness                          | Preview      | Quit DeepSeek Harness, then choose **Settings → Agent plugins → Install plugin** in ShowAI ([steps](plugins/showai/README.md#deepseek-harness)) |
 | Kimi Work                                 | Preview      | Prepare the plugin directory in **Settings → Agent plugins**, then [install it in Kimi Work](plugins/showai-kimi/README.md)                                              |
-| Cursor, Qoder, WorkBuddy                  | Preview      | Prepare the host package in **Settings → Agent plugins**, then [import it in the host](plugins/showai/README.md#cursor-qoder-and-workbuddy)              |
+| Cursor, Qoder, WorkBuddy                  | Preview      | Install Cursor and WorkBuddy from **Settings → Agent plugins** when detected. For Qoder, prepare a ZIP and [import it in Qoder](plugins/showai/README.md#cursor-qoder-and-workbuddy). |
 | ChatGPT on the web                        | Self-hosted  | Enable Remote connection in the desktop App with your own Cloudflare or Tailscale account ([guide](docs/chatgpt.md))                   |
-| Kimi Code, TRAE IDE | Preview | Prepare the host package from **Settings → Agent plugins**. [Kimi Code and TRAE setup](plugins/showai/README.md#kimi-code-and-trae) |
-| Gemini CLI, OpenCode | Experimental | Copy the host’s local MCP configuration from **Settings → Agent plugins** ([Agent integration](docs/agent-integration.md)) |
+| Kimi Code, TRAE IDE | Preview | Prepare the Kimi Code bundle or install the detected TRAE extension in **Settings → Agent plugins**. [Kimi Code and TRAE setup](plugins/showai/README.md#kimi-code-and-trae) |
+| Gemini CLI, OpenCode | Experimental | Configure Gemini CLI when detected or copy the local MCP settings from **Settings → Agent plugins**. [Agent integration](docs/agent-integration.md) |
 
 ### Plugin paths by Agent host
 
