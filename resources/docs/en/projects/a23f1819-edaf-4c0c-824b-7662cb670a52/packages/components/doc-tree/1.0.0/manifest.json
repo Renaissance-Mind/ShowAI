@@ -1,0 +1,679 @@
+{
+  "id": "doc-tree",
+  "version": "1.0.0",
+  "name": "Document Structure Browser",
+  "description": "Annotated tree browser: Expandable folder/file or JSON structure on the left, path, type, description and reproducible example of the selected item on the right.",
+  "category": "data",
+  "entry": "index.tsx",
+  "reader": "readData",
+  "scenarios": [
+    "Explain the field structure of the page file (.showai.json)",
+    "Describes the directory layout of a component package, template folder, or content library",
+    "A step-by-step explanation of the fields in a configuration file or API return value"
+  ],
+  "documentation": {
+    "version": 2,
+    "reuse": {
+      "kind": "domain",
+      "boundaries": [
+        "Used for hierarchical structures that need to be explained item by item in ShowAI documents: folder layout, JSON fields, and configuration items.",
+        "It is recommended that the total number of items should not exceed 60 and the level should not exceed 6 levels; larger structures should be split into several trees, or only the parts needed by readers should be displayed.",
+        "Read-only display: Expanding and selecting only change the local view and do not modify the page data."
+      ]
+    },
+    "usage": {
+      "purpose": "Let readers look and check the structure: see the overall shape on the left, select any item and read what it is, what type it is, and how to write it on the right.",
+      "structure": [
+        "Tree on the left: collapse arrow, icons by kind (folder, file, {} object, [ ] array, field), name, type in monospaced font, and logo on the right; thin guide lines between levels.",
+        "Details on the right: path (you can click on the ancestor to return), name and type, category and number of sub-items, summary, detail (inline markers, blank line segments, lines starting with \"-\" become a list), sample code with a copy button, and a clickable sub-item list.",
+        "Details appear below the tree when width is less than 640px."
+      ],
+      "inputs": [
+        {
+          "path": "nodes",
+          "meaning": "Top-level nodes, in order of display."
+        },
+        {
+          "path": "nodes[].name",
+          "meaning": "Node name, such as a file name, folder name (can have a trailing /), or field name. Paths consist of level names concatenated with / (remove the trailing /)."
+        },
+        {
+          "path": "nodes[].kind",
+          "meaning": "The node type determines the type text in the icon and details: dir folder, file file, object object, array array, field field.",
+          "omission": {
+            "behavior": "fallback",
+            "description": "When there are children, it is regarded as dir, otherwise it is regarded as file.",
+            "computedFrom": [
+              "nodes[].children"
+            ]
+          }
+        },
+        {
+          "path": "nodes[].type",
+          "meaning": "Type or format, shown after the name in a fixed-width font, for example, string, \"page\" | \"board\", JSON.",
+          "omission": {
+            "behavior": "omit",
+            "description": "The type is not shown."
+          }
+        },
+        {
+          "path": "nodes[].badge",
+          "meaning": "Short logos such as required, optional, entry. No more than 16 characters, 2–4 Chinese characters recommended.",
+          "omission": {
+            "behavior": "omit",
+            "description": "No logo shown."
+          }
+        },
+        {
+          "path": "nodes[].summary",
+          "meaning": "One-sentence description, displayed at the top of details and in the parent node's child list; supports inline markup.",
+          "omission": {
+            "behavior": "omit",
+            "description": "Details do not show summaries; subitem lists only show names."
+          }
+        },
+        {
+          "path": "nodes[].detail",
+          "meaning": "For more instructions, support **bold**,`代码`, [link](href); blank lines are segmented, and the paragraphs starting with \"-\" in each line are displayed as a list.",
+          "omission": {
+            "behavior": "omit",
+            "description": "No further description is shown."
+          }
+        },
+        {
+          "path": "nodes[].example",
+          "meaning": "Sample code, displayed as-is in the code panel with a copy button.",
+          "omission": {
+            "behavior": "omit",
+            "description": "The code panel is not displayed."
+          }
+        },
+        {
+          "path": "nodes[].exampleLang",
+          "meaning": "Sample language tags, displayed in the upper left corner of the code panel, such as json, tsx, sh.",
+          "omission": {
+            "behavior": "fallback",
+            "description": "Display \"Example\".",
+            "value": "Examples"
+          }
+        },
+        {
+          "path": "nodes[].children",
+          "meaning": "Child nodes have the same structure as nodes and can continue to be nested.",
+          "omission": {
+            "behavior": "omit",
+            "description": "Leaf node: There is no collapse arrow, and the child list is not displayed in the details."
+          }
+        },
+        {
+          "path": "nodes[].open",
+          "meaning": "Whether to initially expand (only valid for items with child nodes). Readers can expand or collapse it at any time.",
+          "omission": {
+            "behavior": "fallback",
+            "description": "Put away. The ancestors of initial and initial itself are always expanded; without initial and without any open the first top-level node is expanded.",
+            "value": false
+          }
+        },
+        {
+          "path": "initial",
+          "meaning": "The path of the initial selection: the names of each level are connected with /, for example, document/content. The item and all its ancestors are expanded.",
+          "omission": {
+            "behavior": "fallback",
+            "description": "Select the first top-level node. The same process occurs when the path does not exist, and the initialResolved of readData is false.",
+            "from": {
+              "path": "nodes[].name",
+              "selection": "first"
+            }
+          }
+        },
+        {
+          "path": "caption",
+          "meaning": "A line of description below the tree that supports inline markup and document links.",
+          "omission": {
+            "behavior": "omit",
+            "description": "No description is shown."
+          }
+        }
+      ],
+      "recipes": [
+        {
+          "title": "Explain a JSON structure",
+          "steps": [
+            "Only keep the fields that readers need to understand; top-level fields are written in nodes, and nested fields are written in children.",
+            "Use kind object for objects, array for arrays, and field for leaf fields; type writes the type or optional value.",
+            "Required/optional are written in badge; write a summary for each item, and add detail and example for complex fields.",
+            "Write the path of the field worth looking at first into initial, and use readData to confirm that initialResolved is true."
+          ],
+          "exampleIndex": 0
+        },
+        {
+          "title": "Describe a folder layout",
+          "steps": [
+            "The folder uses kind dir (the name can have a trailing /), and the file uses kind file, type writing format.",
+            "Folders that require readers to see the content first are set to open: true."
+          ],
+          "exampleIndex": 1
+        }
+      ],
+      "interactions": [
+        {
+          "action": "Click on an item in the tree",
+          "effect": "Select and display the description on the right; click the collapsed folder/object to expand it at the same time, click the selected item again to collapse it.",
+          "persistence": "view"
+        },
+        {
+          "action": "Click the collapse arrow",
+          "effect": "Only expand or collapse the selected items without changing them.",
+          "persistence": "view"
+        },
+        {
+          "action": "Keyboard ↑ ↓ Home End",
+          "effect": "Moves the selection between visible items.",
+          "persistence": "view"
+        },
+        {
+          "action": "Keyboard → / ←",
+          "effect": "Expand or go to first child / Collapse or go back to parent.",
+          "persistence": "view"
+        },
+        {
+          "action": "Keyboard Enter or Space",
+          "effect": "Expand or collapse the current item.",
+          "persistence": "view"
+        },
+        {
+          "action": "Click on an ancestor in a path or an item in a list of children",
+          "effect": "Select the item and expand its ancestors.",
+          "persistence": "view"
+        },
+        {
+          "action": "Click to copy",
+          "effect": "Copy the example; the sandbox prohibits copying when selecting code and prompting you to press ⌘C / Ctrl+C.",
+          "persistence": "none"
+        }
+      ],
+      "constraints": [
+        "Reading operations do not modify page data.",
+        "The name under the same parent node should be unique; if there is a duplicate name, the path of the latter will be suffixed with ~2 and ~3.",
+        "Do not use internal scrolling areas: When the tree is fully expanded, the height increases with the content, so the scale should be controlled."
+      ],
+      "editing": {
+        "data": [
+          "To add or delete nodes, you only need to modify nodes / children; after changing the name, the initial will be updated simultaneously."
+        ],
+        "implementation": [
+          "Adding new node types requires a new version, and adding icons and names to KindIcon and KIND_LABEL."
+        ]
+      }
+    },
+    "development": {
+      "entryPoints": [
+        {
+          "path": "index.tsx",
+          "purpose": "Components, path index index(), keyboard navigation, details panel, CodePanel copy, md() / mdBlock() and readData."
+        },
+        {
+          "path": "style.css",
+          "purpose": "Design tokens (including dark colors), tree rows and guide lines, icons, details and code panels, narrow screen stacking."
+        }
+      ],
+      "architecture": [
+        "index() expands nested nodes into a path-keyed Map, recording depth, parent path, category, and child path; the visible list is calculated from the expanded set.",
+        "The tree adopts WAI-ARIA tree mode: role=tree/treeitem, aria-level, aria-expanded, aria-selected. The selected item is the only Tab stop point (roving tabindex), and the selection follows the focus.",
+        "The copy button first executes execCommand('copy') with a hidden textarea. If it fails, the code text is selected and prompted for manual copying."
+      ],
+      "extensionPoints": [
+        "The category icon is drawn in KindIcon; the child item list and empty state of the details area are both in DocTree."
+      ],
+      "invariants": [
+        "The component does not call onChange; all interactions only change local state.",
+        "Do not use dangerouslySetInnerHTML; inline markup is generated by md() React elements."
+      ],
+      "verification": [
+        "Example 0: The initial document/content is parsed successfully, document and content are expanded, and the details display the JSON example and 3 sub-items.",
+        "Keyboard: ↓ moves to the next item, → expands, ← returns to the parent item, Enter collapses; Tab only stops on the selected item.",
+        "Check out the tree, leader lines, logo and code panel at 1000 px, 390 px with dark theme."
+      ]
+    }
+  },
+  "defaultData": {
+    "nodes": [
+      {
+        "name": "format",
+        "kind": "field",
+        "type": "\"showai\"",
+        "badge": "Required",
+        "summary": "Fixed to `showai `, indicating that this is the ShowAI page file."
+      },
+      {
+        "name": "version",
+        "kind": "field",
+        "type": "3",
+        "badge": "Required",
+        "summary": "File format version. The new file is written to 3; the old files of versions 1 and 2 can still be read. After reading, press Page / Board to adapt."
+      },
+      {
+        "name": "document",
+        "kind": "object",
+        "type": "object",
+        "badge": "Required",
+        "summary": "The page itself: metadata plus a root container.",
+        "open": true,
+        "detail": "Metadata includes `title `,`icon `,`cover `,`parentId `(in the project folder),`createdAt `/`updatedAt `, etc. The title is metadata and is not included in the text.",
+        "children": [
+          {
+            "name": "id",
+            "kind": "field",
+            "type": "string",
+            "summary": "Resource ID that identifies this file. It is not the same thing as `attrs.id `of the root container."
+          },
+          {
+            "name": "title",
+            "kind": "field",
+            "type": "string",
+            "summary": "Page title, displayed at the top of the page and in the table of contents."
+          },
+          {
+            "name": "icon",
+            "kind": "field",
+            "type": "string",
+            "badge": "Optional",
+            "summary": "The page icon, usually an emoji."
+          },
+          {
+            "name": "content",
+            "kind": "object",
+            "type": "surface",
+            "badge": "root container",
+            "summary": "Root container: a Page or a Board, the text is in its `content `.",
+            "detail": "`attrs.kind `is `page `(content arranged in order) or `board `(freely placed canvas), **New resources default to Page**.\n\nAll non-text nodes (including containers) have a unique and stable `attrs.id `; containers can be nested, see [Page and Board](doc:page-board) for details.",
+            "example": "{\n  \"type\": \"surface\",\n  \"attrs\": { \"id\": \"root\", \"kind\": \"page\", \"name\": \"Installation and operation\" },\n  \"content\": [\n    { \"type\": \"paragraph\", \"content\": [ … ] },\n    { \"type\": \"widget\", \"attrs\": { \"kind\": \"custom\", \"data\": { … } } }\n  ]\n}",
+            "exampleLang": "json",
+            "children": [
+              {
+                "name": "type",
+                "kind": "field",
+                "type": "\"surface\"",
+                "summary": "Fixed to `surface `."
+              },
+              {
+                "name": "attrs",
+                "kind": "object",
+                "type": "object",
+                "summary": "Container properties.",
+                "children": [
+                  {
+                    "name": "id",
+                    "kind": "field",
+                    "type": "string",
+                    "badge": "Required",
+                    "summary": "Container ID, unique and stable within the entire file."
+                  },
+                  {
+                    "name": "kind",
+                    "kind": "field",
+                    "type": "\"page\" | \"board\"",
+                    "summary": "Container type."
+                  },
+                  {
+                    "name": "name",
+                    "kind": "field",
+                    "type": "string",
+                    "summary": "Container name, displayed on the module title when nested."
+                  }
+                ]
+              },
+              {
+                "name": "content",
+                "kind": "array",
+                "type": "Block[]",
+                "summary": "Blocks of content in a container, arranged in reading order.",
+                "open": true,
+                "children": [
+                  {
+                    "name": "paragraph",
+                    "kind": "object",
+                    "type": "block",
+                    "summary": "Paragraph: It consists of `text `nodes, and the text can be marked with bold, code, link, etc.",
+                    "detail": "Write `content: []`for an empty paragraph; **Empty text nodes are invalid**. Links only accept HTTP(S),`mailto:`,`tel:`or in-page anchors.",
+                    "example": "{\n  \"type\": \"paragraph\",\n  \"content\": [\n    { \"type\": \"text\", \"text\": \"Run\" },\n    { \"type\": \"text\", \"text\": \"npm run browser\", \"marks\": [{ \"type\": \"code\" }] }\n  ]\n}",
+                    "exampleLang": "json"
+                  },
+                  {
+                    "name": "widget",
+                    "kind": "object",
+                    "type": "block",
+                    "badge": "components",
+                    "summary": "Component block: Both built-in and custom components use the same shell.",
+                    "detail": "`attrs.kind `is the component type; the type of custom React component is fixed to `custom `, and the specific component is specified by `attrs.data `.",
+                    "children": [
+                      {
+                        "name": "attrs",
+                        "kind": "object",
+                        "type": "object",
+                        "summary": "Component block properties.",
+                        "children": [
+                          {
+                            "name": "id",
+                            "kind": "field",
+                            "type": "string",
+                            "summary": "Block ID used by `--blocks `to select content when exporting."
+                          },
+                          {
+                            "name": "kind",
+                            "kind": "field",
+                            "type": "\"custom\"",
+                            "summary": "Component type. Built-in components have their own names, such as `mindmap `,`g2-bar `."
+                          },
+                          {
+                            "name": "data",
+                            "kind": "object",
+                            "type": "object",
+                            "summary": "Custom component reference: which component, which version, and what parameters are passed in.",
+                            "example": "{\n  \"componentId\": \"doc-compare\",\n  \"version\": \"1.0.0\",\n  \"props\": {\n    \"columns\": [{ \"id\": \"desktop\", \"label\": \"Desktop\" }],\n    \"rows\": [{ \"label\": \"Complete workbench\", \"values\": { \"desktop\": true } }]\n  }\n}",
+                            "exampleLang": "json",
+                            "children": [
+                              {
+                                "name": "componentId",
+                                "kind": "field",
+                                "type": "string",
+                                "summary": "Component ID: lowercase letters, numbers, and hyphens."
+                              },
+                              {
+                                "name": "version",
+                                "kind": "field",
+                                "type": "semver",
+                                "summary": "The **exact** semantic version, such as `1.0.0 `."
+                              },
+                              {
+                                "name": "props",
+                                "kind": "field",
+                                "type": "object",
+                                "summary": "The data passed to the component must meet the `props.schema.json `of this version."
+                              },
+                              {
+                                "name": "integrity",
+                                "kind": "field",
+                                "type": "string",
+                                "badge": "Optional",
+                                "summary": "The expected compiled package hash, written by the service when saved."
+                              }
+                            ]
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "name": "layout",
+        "kind": "object",
+        "type": "object",
+        "badge": "Optional",
+        "summary": "The frames saved by the parent container for the child modules:`x `,`y `,`width `, and optionally `height `and `heightMode `."
+      },
+      {
+        "name": "surfaceViews",
+        "kind": "object",
+        "type": "object",
+        "badge": "Optional",
+        "summary": "The saved view and reading order of each container; by default, it is automatically completed when reading."
+      }
+    ],
+    "initial": "document/content",
+    "caption": "Click any item on the left to view the description; use ↑ ↓ to move, → to expand, ← to collapse. See [Page File Format](doc:file-format) for complete rules."
+  },
+  "examples": [
+    {
+      "name": "ShowAI page file structure (initially selected root container)",
+      "data": {
+        "nodes": [
+          {
+            "name": "format",
+            "kind": "field",
+            "type": "\"showai\"",
+            "badge": "Required",
+            "summary": "Fixed to `showai `, indicating that this is the ShowAI page file."
+          },
+          {
+            "name": "version",
+            "kind": "field",
+            "type": "3",
+            "badge": "Required",
+            "summary": "File format version. The new file is written to 3; the old files of versions 1 and 2 can still be read. After reading, press Page / Board to adapt."
+          },
+          {
+            "name": "document",
+            "kind": "object",
+            "type": "object",
+            "badge": "Required",
+            "summary": "The page itself: metadata plus a root container.",
+            "open": true,
+            "detail": "Metadata includes `title `,`icon `,`cover `,`parentId `(in the project folder),`createdAt `/`updatedAt `, etc. The title is metadata and is not included in the text.",
+            "children": [
+              {
+                "name": "id",
+                "kind": "field",
+                "type": "string",
+                "summary": "Resource ID that identifies this file. It is not the same thing as `attrs.id `of the root container."
+              },
+              {
+                "name": "title",
+                "kind": "field",
+                "type": "string",
+                "summary": "Page title, displayed at the top of the page and in the table of contents."
+              },
+              {
+                "name": "icon",
+                "kind": "field",
+                "type": "string",
+                "badge": "Optional",
+                "summary": "The page icon, usually an emoji."
+              },
+              {
+                "name": "content",
+                "kind": "object",
+                "type": "surface",
+                "badge": "root container",
+                "summary": "Root container: a Page or a Board, the text is in its `content `.",
+                "detail": "`attrs.kind `is `page `(content arranged in order) or `board `(freely placed canvas), **New resources default to Page**.\n\nAll non-text nodes (including containers) have a unique and stable `attrs.id `; containers can be nested, see [Page and Board](doc:page-board) for details.",
+                "example": "{\n  \"type\": \"surface\",\n  \"attrs\": { \"id\": \"root\", \"kind\": \"page\", \"name\": \"Installation and operation\" },\n  \"content\": [\n    { \"type\": \"paragraph\", \"content\": [ … ] },\n    { \"type\": \"widget\", \"attrs\": { \"kind\": \"custom\", \"data\": { … } } }\n  ]\n}",
+                "exampleLang": "json",
+                "children": [
+                  {
+                    "name": "type",
+                    "kind": "field",
+                    "type": "\"surface\"",
+                    "summary": "Fixed to `surface `."
+                  },
+                  {
+                    "name": "attrs",
+                    "kind": "object",
+                    "type": "object",
+                    "summary": "Container properties.",
+                    "children": [
+                      {
+                        "name": "id",
+                        "kind": "field",
+                        "type": "string",
+                        "badge": "Required",
+                        "summary": "Container ID, unique and stable within the entire file."
+                      },
+                      {
+                        "name": "kind",
+                        "kind": "field",
+                        "type": "\"page\" | \"board\"",
+                        "summary": "Container type."
+                      },
+                      {
+                        "name": "name",
+                        "kind": "field",
+                        "type": "string",
+                        "summary": "Container name, displayed on the module title when nested."
+                      }
+                    ]
+                  },
+                  {
+                    "name": "content",
+                    "kind": "array",
+                    "type": "Block[]",
+                    "summary": "Blocks of content in a container, arranged in reading order.",
+                    "open": true,
+                    "children": [
+                      {
+                        "name": "paragraph",
+                        "kind": "object",
+                        "type": "block",
+                        "summary": "Paragraph: It consists of `text `nodes, and the text can be marked with bold, code, link, etc.",
+                        "detail": "Write `content: []`for an empty paragraph; **Empty text nodes are invalid**. Links only accept HTTP(S),`mailto:`,`tel:`or in-page anchors.",
+                        "example": "{\n  \"type\": \"paragraph\",\n  \"content\": [\n    { \"type\": \"text\", \"text\": \"Run\" },\n    { \"type\": \"text\", \"text\": \"npm run browser\", \"marks\": [{ \"type\": \"code\" }] }\n  ]\n}",
+                        "exampleLang": "json"
+                      },
+                      {
+                        "name": "widget",
+                        "kind": "object",
+                        "type": "block",
+                        "badge": "components",
+                        "summary": "Component block: Both built-in and custom components use the same shell.",
+                        "detail": "`attrs.kind `is the component type; the type of custom React component is fixed to `custom `, and the specific component is specified by `attrs.data `.",
+                        "children": [
+                          {
+                            "name": "attrs",
+                            "kind": "object",
+                            "type": "object",
+                            "summary": "Component block properties.",
+                            "children": [
+                              {
+                                "name": "id",
+                                "kind": "field",
+                                "type": "string",
+                                "summary": "Block ID used by `--blocks `to select content when exporting."
+                              },
+                              {
+                                "name": "kind",
+                                "kind": "field",
+                                "type": "\"custom\"",
+                                "summary": "Component type. Built-in components have their own names, such as `mindmap `,`g2-bar `."
+                              },
+                              {
+                                "name": "data",
+                                "kind": "object",
+                                "type": "object",
+                                "summary": "Custom component reference: which component, which version, and what parameters are passed in.",
+                                "example": "{\n  \"componentId\": \"doc-compare\",\n  \"version\": \"1.0.0\",\n  \"props\": {\n    \"columns\": [{ \"id\": \"desktop\", \"label\": \"Desktop\" }],\n    \"rows\": [{ \"label\": \"Complete workbench\", \"values\": { \"desktop\": true } }]\n  }\n}",
+                                "exampleLang": "json",
+                                "children": [
+                                  {
+                                    "name": "componentId",
+                                    "kind": "field",
+                                    "type": "string",
+                                    "summary": "Component ID: lowercase letters, numbers, and hyphens."
+                                  },
+                                  {
+                                    "name": "version",
+                                    "kind": "field",
+                                    "type": "semver",
+                                    "summary": "The **exact** semantic version, such as `1.0.0 `."
+                                  },
+                                  {
+                                    "name": "props",
+                                    "kind": "field",
+                                    "type": "object",
+                                    "summary": "The data passed to the component must meet the `props.schema.json `of this version."
+                                  },
+                                  {
+                                    "name": "integrity",
+                                    "kind": "field",
+                                    "type": "string",
+                                    "badge": "Optional",
+                                    "summary": "The expected compiled package hash, written by the service when saved."
+                                  }
+                                ]
+                              }
+                            ]
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "name": "layout",
+            "kind": "object",
+            "type": "object",
+            "badge": "Optional",
+            "summary": "The frames saved by the parent container for the child modules:`x `,`y `,`width `, and optionally `height `and `heightMode `."
+          },
+          {
+            "name": "surfaceViews",
+            "kind": "object",
+            "type": "object",
+            "badge": "Optional",
+            "summary": "The saved view and reading order of each container; by default, it is automatically completed when reading."
+          }
+        ],
+        "initial": "document/content",
+        "caption": "Click any item on the left to view the description; use ↑ ↓ to move, → to expand, ← to collapse. See [Page File Format](doc:file-format) for complete rules."
+      }
+    },
+    {
+      "name": "Component package folder",
+      "data": {
+        "nodes": [
+          {
+            "name": "doc-compare/",
+            "kind": "dir",
+            "summary": "A component package is a folder, which is read as a whole when imported.",
+            "open": true,
+            "detail": "Use `showai catalog import --input <文件夹>`to import the current project. The packages of the same `id `and `version `cannot be changed after being imported; the version number is increased when the implementation is modified.",
+            "children": [
+              {
+                "name": "manifest.json",
+                "kind": "file",
+                "type": "JSON",
+                "badge": "Required",
+                "summary": "Component identity and description:`id `,`name `,`version `,`entry `, default data, examples and documentation.",
+                "detail": "-`id `: lowercase letters, numbers and hyphens\n-`version `: precise semantic version\n-`defaultData `and every `examples[].data `must pass props.schema.json\n- New component provided `documentation `(version 2)",
+                "example": "{\n  \"id\": \"doc-compare\",\n  \"name\": \"Document comparison matrix\",\n  \"version\": \"1.0.0\",\n  \"entry\": \"index.tsx\",\n  \"reader\": \"readData\"\n}",
+                "exampleLang": "json"
+              },
+              {
+                "name": "props.schema.json",
+                "kind": "file",
+                "type": "JSON Schema",
+                "badge": "Required",
+                "summary": "JSON Schema for component parameters; props in the page must satisfy it.",
+                "detail": "Use `additionalProperties: false `to close undeclared fields so that both Agent and readers can find the meaning of each parameter."
+              },
+              {
+                "name": "index.tsx",
+                "kind": "file",
+                "type": "React",
+                "badge": "Entrance",
+                "summary": "The default export component;`readData `can be additionally exported for the Agent to read derived data.",
+                "detail": "The component received `{ data, readOnly, onChange }`. Only `react `,`react/jsx-runtime `,`react-dom/client `and files in the package can be imported.",
+                "example": "import React from 'react';\nimport './style.css';\n\nexport default function DocCompare({ data }) {\n  return <div className=\"dk dk-compare\">…</div>;\n}",
+                "exampleLang": "tsx"
+              },
+              {
+                "name": "style.css",
+                "kind": "file",
+                "type": "CSS",
+                "summary": "Component style, imported by index.tsx; provides both light and dark colors."
+              }
+            ]
+          }
+        ],
+        "caption": "The minimal structure of a component package."
+      }
+    }
+  ]
+}

@@ -1,3 +1,4 @@
+import { docsIndexPlugin } from "./scripts/docs-project.mjs";
 import { buildIdentityPlugin } from "./scripts/build-info.mjs";
 import { defineConfig, type Plugin } from "vite";
 import react from "@vitejs/plugin-react";
@@ -31,7 +32,7 @@ function workbenchCatalogPlugin(): Plugin {
 }
 
 export default defineConfig({
-  plugins: [react(), buildIdentityPlugin(), workbenchCatalogPlugin()],
+  plugins: [react(), buildIdentityPlugin(), docsIndexPlugin(), workbenchCatalogPlugin()],
   base: "./",
   server: { host: "127.0.0.1", port: 5173, strictPort: true },
   build: { target: "es2022" },

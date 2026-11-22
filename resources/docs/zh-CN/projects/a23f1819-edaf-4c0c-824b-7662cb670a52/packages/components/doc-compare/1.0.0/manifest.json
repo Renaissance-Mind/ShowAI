@@ -1,0 +1,444 @@
+{
+  "id": "doc-compare",
+  "version": "1.0.0",
+  "name": "文档对比矩阵",
+  "description": "文档中的对比矩阵：列是可选方案，行是能力或差异，支持 ✓ / — / ◐ 部分 / 文字四种取值，可按分组排列，点击列头突出显示一个方案。",
+  "category": "table",
+  "entry": "index.tsx",
+  "reader": "readData",
+  "scenarios": [
+    "对比桌面版、本地浏览器版与源码运行等安装方式",
+    "对比 Page 与 Board、导出格式、Agent 接入方式等选项",
+    "列出不同方案对某项能力的支持程度"
+  ],
+  "documentation": {
+    "version": 2,
+    "reuse": {
+      "kind": "domain",
+      "boundaries": [
+        "用于 ShowAI 文档中 2–6 个方案在若干维度上的定性对比；每个格子是 是 / 否 / 部分 / 一句短文字。",
+        "不用于数值数据或需要排序、筛选的大表；数值对比使用图表或内置表格。",
+        "只读展示：点击列头只改变本地视图，不修改页面数据。"
+      ]
+    },
+    "usage": {
+      "purpose": "帮读者在几个方案之间做选择：一眼看出每个方案支持什么、不支持什么、差在哪里。",
+      "structure": [
+        "表头每列一个方案：色点、名称和一行说明；点击列头让整列浅色突出，再次点击取消。",
+        "第一列是对比项（名称与小字提示），横向滚动时固定在左侧。",
+        "相同 group 的行聚在一起，组名作为分组标题；分组按首次出现的顺序排列。",
+        "格子：true 显示方案颜色的对勾，false 显示浅色短横，\"partial\" 显示半圆与「部分」，其他字符串按行内标记显示为文字。",
+        "表格下方可有一行说明 note。窄屏时表格横向滚动，右侧渐隐提示还有更多列。"
+      ],
+      "inputs": [
+        {
+          "path": "columns",
+          "meaning": "方案列，按显示顺序排列。建议 2–4 列，最多 8 列；3 列及以上在手机宽度需要横向滚动。"
+        },
+        {
+          "path": "columns[].id",
+          "meaning": "列标识，在 rows[].values 与 highlight 中引用，同一表内唯一。"
+        },
+        {
+          "path": "columns[].label",
+          "meaning": "方案名称，显示在表头，宜短（不超过 8 个汉字）。"
+        },
+        {
+          "path": "columns[].sub",
+          "meaning": "方案的一行补充说明，显示在名称下方。",
+          "omission": {
+            "behavior": "omit",
+            "description": "不显示补充说明。"
+          }
+        },
+        {
+          "path": "columns[].tone",
+          "meaning": "列的颜色：色点、对勾、部分支持图标与突出显示底色。brand | teal | warm | violet | rose | slate。",
+          "omission": {
+            "behavior": "fallback",
+            "description": "使用 brand。",
+            "value": "brand"
+          }
+        },
+        {
+          "path": "rows",
+          "meaning": "对比项，按顺序显示；同组的行会聚到该组第一次出现的位置。最多 80 行，建议不超过 20 行。"
+        },
+        {
+          "path": "rows[].label",
+          "meaning": "对比项名称，支持 **粗体**、`代码` 与 [链接](href)。"
+        },
+        {
+          "path": "rows[].hint",
+          "meaning": "对比项下方的小字说明，支持行内标记。",
+          "omission": {
+            "behavior": "omit",
+            "description": "不显示说明。"
+          }
+        },
+        {
+          "path": "rows[].group",
+          "meaning": "分组名称；相同名称的行聚在同一个分组标题下。",
+          "omission": {
+            "behavior": "omit",
+            "description": "该行不属于任何分组，与其他未分组的行一起显示且没有分组标题。"
+          }
+        },
+        {
+          "path": "rows[].values",
+          "meaning": "以列 id 为键的取值：true = 支持（对勾），false = 不支持（短横），\"partial\" = 部分支持，其他字符串 = 文字说明（支持行内标记）。缺少某列的键时该格留空（显示一个浅点）；不属于任何列的键被忽略，readData 在 unknownColumnKeys 中列出。",
+          "opaque": true
+        },
+        {
+          "path": "highlight",
+          "meaning": "初始突出显示的列 id。读者仍可点击列头切换或取消。",
+          "omission": {
+            "behavior": "omit",
+            "description": "初始不突出任何列。"
+          }
+        },
+        {
+          "path": "note",
+          "meaning": "表格下方的一行说明或出处，支持行内标记与文档链接。",
+          "omission": {
+            "behavior": "omit",
+            "description": "不显示说明。"
+          }
+        }
+      ],
+      "recipes": [
+        {
+          "title": "写一个方案对比",
+          "steps": [
+            "先确定读者要做的选择，列出 2–4 个方案作为 columns，给每个方案一个 tone。",
+            "每行写一个读者关心的差异；能用是/否表达的用 true/false，有条件的用 \"partial\" 并在 hint 说明条件，其余用一句短文字。",
+            "行多于 6 行时用 group 分成 2–4 组；把推荐方案的 id 填到 highlight。",
+            "用 readData 检查 unknownColumnKeys 为空，每列的 supported/partial/unsupported 计数符合预期。"
+          ],
+          "exampleIndex": 0
+        }
+      ],
+      "interactions": [
+        {
+          "action": "点击或用键盘激活列头",
+          "effect": "整列以该列颜色浅色突出；再次激活取消。",
+          "persistence": "view"
+        },
+        {
+          "action": "在窄屏横向滚动表格",
+          "effect": "第一列固定在左侧，右侧渐隐提示还有更多列。",
+          "persistence": "view"
+        },
+        {
+          "action": "点击格子或说明中的链接",
+          "effect": "由宿主打开链接；文档站链接在站内打开。",
+          "persistence": "none"
+        }
+      ],
+      "constraints": [
+        "阅读操作不修改页面数据。",
+        "格子内容宜短：一句话以内；长解释放在表格外的正文或 note 中。",
+        "宽度小于 640px 时第一列收窄到 116px，每列至少 112px：390px 宽的屏幕能完整显示 2 列，3 列及以上横向滚动。"
+      ],
+      "editing": {
+        "data": [
+          "增删列时同步更新每行 values 的键与 highlight。",
+          "改分组只需修改 rows[].group。"
+        ],
+        "implementation": [
+          "新增取值类型（例如数值或评分）需要新版本并更新 readData。"
+        ]
+      },
+      "rules": [
+        {
+          "kind": "unique",
+          "path": "columns[].id"
+        },
+        {
+          "kind": "reference",
+          "path": "highlight",
+          "target": "columns[].id"
+        }
+      ]
+    },
+    "development": {
+      "entryPoints": [
+        {
+          "path": "index.tsx",
+          "purpose": "组件、分组 sections()、取值标记 Mark、行内标记 md() 与 readData。"
+        },
+        {
+          "path": "style.css",
+          "purpose": "设计令牌（含深色）、表格、固定首列、列突出、横向滚动渐隐与窄屏规则。"
+        }
+      ],
+      "architecture": [
+        "使用语义化 <table>：表头 th[scope=col] 内的按钮切换突出列，行首 th[scope=row]，每个分组一个 <tbody>。",
+        "突出列通过给该列的每个单元格（含分组标题行的空格）加 is-on 类实现，因此底色贯穿整列高度。",
+        "滚动容器监听 scroll 与 ResizeObserver，计算是否还能向右滚动，控制渐隐提示与首列分隔线。"
+      ],
+      "extensionPoints": [
+        "颜色由 tone 映射到 --tc / --ts 两个变量；新增取值类型在 kindOf 与 Mark 中扩展。"
+      ],
+      "invariants": [
+        "组件不调用 onChange；所有交互只改变本地状态。",
+        "不使用 dangerouslySetInnerHTML；行内标记由 md() 生成 React 元素。"
+      ],
+      "verification": [
+        "示例 0：3 列 8 行 3 组，本地浏览器版初始突出；readData 中 desktop supported=3、unsupported=3。",
+        "在 1000 px、390 px 宽度及深色主题下检查表头、对勾、部分支持与横向滚动渐隐。"
+      ]
+    }
+  },
+  "defaultData": {
+    "columns": [
+      {
+        "id": "desktop",
+        "label": "桌面版",
+        "sub": "独立窗口的桌面 App",
+        "tone": "brand"
+      },
+      {
+        "id": "browser",
+        "label": "本地浏览器版",
+        "sub": "解压发行包，在浏览器中使用",
+        "tone": "teal"
+      },
+      {
+        "id": "source",
+        "label": "源码运行",
+        "sub": "Git + Node.js 22.12+ + npm",
+        "tone": "violet"
+      }
+    ],
+    "rows": [
+      {
+        "group": "安装",
+        "label": "需要自行安装 Node.js",
+        "values": {
+          "desktop": false,
+          "browser": false,
+          "source": true
+        },
+        "hint": "浏览器发行包自带独立 Node"
+      },
+      {
+        "group": "安装",
+        "label": "启动方式",
+        "values": {
+          "desktop": "打开 App",
+          "browser": "`start.command` · `start.sh` · `start.cmd`",
+          "source": "`npm run browser` 或 `npm run desktop`"
+        }
+      },
+      {
+        "group": "使用",
+        "label": "完整工作台",
+        "values": {
+          "desktop": true,
+          "browser": true,
+          "source": true
+        }
+      },
+      {
+        "group": "使用",
+        "label": "不需要云端账号",
+        "values": {
+          "desktop": true,
+          "browser": true,
+          "source": true
+        },
+        "hint": "内容保存在本机文件库"
+      },
+      {
+        "group": "使用",
+        "label": "关闭前等待保存完成",
+        "values": {
+          "desktop": true,
+          "browser": "partial",
+          "source": "取决于选择的入口"
+        },
+        "hint": "浏览器只能提示离开确认，离开前检查保存状态"
+      },
+      {
+        "group": "使用",
+        "label": "默认内容库",
+        "values": {
+          "desktop": "`~/.showai`",
+          "browser": "`~/.showai`",
+          "source": "开发入口用 `.showai-dev/library`"
+        }
+      },
+      {
+        "group": "开发",
+        "label": "热更新开发",
+        "hint": "`npm run dev:browser`",
+        "values": {
+          "desktop": false,
+          "browser": false,
+          "source": true
+        }
+      },
+      {
+        "group": "开发",
+        "label": "修改本地服务与 CLI",
+        "values": {
+          "desktop": false,
+          "browser": false,
+          "source": true
+        }
+      }
+    ],
+    "highlight": "browser",
+    "note": "三种方式使用相同的文档格式和内容库；指向同一目录时看到同一批项目。详见 [安装与运行](https://showai.renaissancemind.ai/doc/install)。"
+  },
+  "examples": [
+    {
+      "name": "三种运行方式对比（分组、突出显示本地浏览器版）",
+      "data": {
+        "columns": [
+          {
+            "id": "desktop",
+            "label": "桌面版",
+            "sub": "独立窗口的桌面 App",
+            "tone": "brand"
+          },
+          {
+            "id": "browser",
+            "label": "本地浏览器版",
+            "sub": "解压发行包，在浏览器中使用",
+            "tone": "teal"
+          },
+          {
+            "id": "source",
+            "label": "源码运行",
+            "sub": "Git + Node.js 22.12+ + npm",
+            "tone": "violet"
+          }
+        ],
+        "rows": [
+          {
+            "group": "安装",
+            "label": "需要自行安装 Node.js",
+            "values": {
+              "desktop": false,
+              "browser": false,
+              "source": true
+            },
+            "hint": "浏览器发行包自带独立 Node"
+          },
+          {
+            "group": "安装",
+            "label": "启动方式",
+            "values": {
+              "desktop": "打开 App",
+              "browser": "`start.command` · `start.sh` · `start.cmd`",
+              "source": "`npm run browser` 或 `npm run desktop`"
+            }
+          },
+          {
+            "group": "使用",
+            "label": "完整工作台",
+            "values": {
+              "desktop": true,
+              "browser": true,
+              "source": true
+            }
+          },
+          {
+            "group": "使用",
+            "label": "不需要云端账号",
+            "values": {
+              "desktop": true,
+              "browser": true,
+              "source": true
+            },
+            "hint": "内容保存在本机文件库"
+          },
+          {
+            "group": "使用",
+            "label": "关闭前等待保存完成",
+            "values": {
+              "desktop": true,
+              "browser": "partial",
+              "source": "取决于选择的入口"
+            },
+            "hint": "浏览器只能提示离开确认，离开前检查保存状态"
+          },
+          {
+            "group": "使用",
+            "label": "默认内容库",
+            "values": {
+              "desktop": "`~/.showai`",
+              "browser": "`~/.showai`",
+              "source": "开发入口用 `.showai-dev/library`"
+            }
+          },
+          {
+            "group": "开发",
+            "label": "热更新开发",
+            "hint": "`npm run dev:browser`",
+            "values": {
+              "desktop": false,
+              "browser": false,
+              "source": true
+            }
+          },
+          {
+            "group": "开发",
+            "label": "修改本地服务与 CLI",
+            "values": {
+              "desktop": false,
+              "browser": false,
+              "source": true
+            }
+          }
+        ],
+        "highlight": "browser",
+        "note": "三种方式使用相同的文档格式和内容库；指向同一目录时看到同一批项目。详见 [安装与运行](https://showai.renaissancemind.ai/doc/install)。"
+      }
+    },
+    {
+      "name": "Page 与 Board（两列、无分组）",
+      "data": {
+        "columns": [
+          {
+            "id": "page",
+            "label": "Page",
+            "sub": "按阅读顺序排列",
+            "tone": "brand"
+          },
+          {
+            "id": "board",
+            "label": "Board",
+            "sub": "在画布上自由摆放",
+            "tone": "warm"
+          }
+        ],
+        "rows": [
+          {
+            "label": "适合",
+            "values": {
+              "page": "报告、讲解、文档",
+              "board": "草图、关系、布局探索"
+            }
+          },
+          {
+            "label": "嵌套另一个容器",
+            "values": {
+              "page": true,
+              "board": true
+            }
+          },
+          {
+            "label": "导出为 HTML",
+            "values": {
+              "page": true,
+              "board": true
+            }
+          }
+        ]
+      }
+    }
+  ]
+}

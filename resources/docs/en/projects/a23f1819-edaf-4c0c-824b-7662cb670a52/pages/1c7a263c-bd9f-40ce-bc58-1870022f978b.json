@@ -1,0 +1,381 @@
+{
+  "format": "showai",
+  "version": 3,
+  "document": {
+    "id": "1c7a263c-bd9f-40ce-bc58-1870022f978b",
+    "title": "Universal plugin connection guide",
+    "icon": "🤝",
+    "cover": "none",
+    "parentId": "79fa3b16-d74e-58cd-81a0-2c01bd8a9499",
+    "favorite": false,
+    "archived": false,
+    "createdAt": "2026-11-21T18:49:39.016Z",
+    "updatedAt": "2026-11-22T12:10:34.990Z",
+    "content": {
+      "type": "surface",
+      "attrs": {
+        "id": "root",
+        "kind": "page",
+        "name": "Universal plugin connection guide",
+        "widthMode": "standard"
+      },
+      "content": [
+        {
+          "type": "widget",
+          "attrs": {
+            "kind": "custom",
+            "data": {
+              "componentId": "doc-hero",
+              "version": "1.0.0",
+              "props": {
+                "title": "Connect your agent to ShowAI",
+                "art": "agent",
+                "lead": "After installing the six Skills, tell your agent “Help me connect ShowAI.” It checks for existing tools and asks one question at a time. You can also follow the matching path below.",
+                "actions": [
+                  {
+                    "label": "Download the universal plugin ZIP",
+                    "href": "https://showai.renaissancemind.ai/downloads/showai-universal.zip",
+                    "primary": true
+                  },
+                  {
+                    "label": "Use with an Agent",
+                    "href": "https://showai.renaissancemind.ai/doc/agent-hosts"
+                  }
+                ]
+              },
+              "integrity": "sha256-6aa1b6a2a0e9657120847e829da416cc95c91acb8b96f04da0960c1b732e5e84"
+            },
+            "id": "connect-hero"
+          }
+        },
+        {
+          "type": "heading",
+          "attrs": {
+            "id": "connect-status",
+            "level": 2
+          },
+          "content": [
+            {
+              "type": "text",
+              "text": "Have you already configured ShowAI?"
+            }
+          ]
+        },
+        {
+          "type": "widget",
+          "attrs": {
+            "kind": "custom",
+            "data": {
+              "componentId": "doc-compare",
+              "version": "1.0.0",
+              "props": {
+                "columns": [
+                  {
+                    "id": "next",
+                    "label": "Next",
+                    "tone": "brand"
+                  }
+                ],
+                "rows": [
+                  {
+                    "label": "Tools are available",
+                    "values": {
+                      "next": "Reuse the connection and continue the task. Use projects_list if you want to verify project access."
+                    }
+                  },
+                  {
+                    "label": "Connection exists but asks you to sign in",
+                    "values": {
+                      "next": "Open the existing ShowAI connection and reconnect or reauthorize. Refresh tools after approval."
+                    }
+                  },
+                  {
+                    "label": "Skills are present but tools are missing",
+                    "values": {
+                      "next": "For the universal package, add MCP in the host. For a local host plugin, check plugin enablement, the runtime and the selected library."
+                    }
+                  }
+                ]
+              },
+              "integrity": "sha256-6450bf2fc82c6750eddbcc964d4133ab036484132eb122fee1599efa18c7a12c"
+            },
+            "id": "connect-states"
+          }
+        },
+        {
+          "type": "heading",
+          "attrs": {
+            "id": "connect-chatgpt",
+            "level": 2
+          },
+          "content": [
+            {
+              "type": "text",
+              "text": "ChatGPT web: use public HTTPS"
+            }
+          ]
+        },
+        {
+          "type": "widget",
+          "attrs": {
+            "kind": "custom",
+            "data": {
+              "componentId": "doc-steps",
+              "version": "1.0.0",
+              "props": {
+                "steps": [
+                  {
+                    "title": "Do you already have a public MCP URL?",
+                    "body": "If you have one, continue to registration. Otherwise open Settings → Remote MCP → Public endpoints on the ShowAI computer. Choose a temporary Cloudflare hostname for a trial, or a fixed hostname or Tailscale Funnel for a longer-lived endpoint."
+                  },
+                  {
+                    "title": "Can ChatGPT reach the endpoint?",
+                    "body": "Keep the computer online and awake with ShowAI running. Check the connection and copy the HTTPS URL ending in /mcp. The ChatGPT cloud cannot reach localhost, a home LAN or a tailnet-only Serve endpoint."
+                  },
+                  {
+                    "title": "Register and authorize in ChatGPT",
+                    "body": "In ChatGPT Plugins, choose + → Add custom MCP server → Server URL. Enter the URL, select OAuth and dynamic client registration (DCR), create the entry and connect. Match the connection number and scope in ShowAI, approve it and finish authorization in ChatGPT. If the option is managed by your workspace, ask its administrator."
+                  }
+                ]
+              },
+              "integrity": "sha256-0c4f6546ba7ab683adfaa028a3ad70cea166479204a4f1f462ef27eb314ff07b"
+            },
+            "id": "connect-chatgpt-steps"
+          }
+        },
+        {
+          "type": "heading",
+          "attrs": {
+            "id": "connect-grok",
+            "level": 2
+          },
+          "content": [
+            {
+              "type": "text",
+              "text": "Grok Bot: locate the device running the connector"
+            }
+          ]
+        },
+        {
+          "type": "paragraph",
+          "attrs": {
+            "id": "connect-device"
+          },
+          "content": [
+            {
+              "type": "text",
+              "text": "Ask whether the device running the Grok Bot connector shares a tailnet with ShowAI. Use the device that sends requests to decide. If both routes work, choose private or public access."
+            }
+          ]
+        },
+        {
+          "type": "widget",
+          "attrs": {
+            "kind": "custom",
+            "data": {
+              "componentId": "doc-compare",
+              "version": "1.0.0",
+              "props": {
+                "columns": [
+                  {
+                    "id": "app",
+                    "label": "In ShowAI",
+                    "tone": "brand"
+                  },
+                  {
+                    "id": "bot",
+                    "label": "In Grok Bot",
+                    "tone": "teal"
+                  }
+                ],
+                "rows": [
+                  {
+                    "label": "Same Tailscale network",
+                    "values": {
+                      "app": "Join both devices to the same tailnet and check access rules, MagicDNS and HTTPS. Enable Tailscale private Serve, choose device approval and copy the setup prompt.",
+                      "bot": "Send the setup prompt to the bot. In Add MCP server → Command / stdio, use its mcp-remote command. Check and approve the device in ShowAI. An HTTP-capable client can use the private HTTPS URL directly."
+                    }
+                  },
+                  {
+                    "label": "Public HTTPS",
+                    "values": {
+                      "app": "Enable a public endpoint, check it and copy its MCP URL. Public access uses OAuth.",
+                      "bot": "Enter the URL in an HTTP client with OAuth. For Command / stdio, use the command below on a device that can complete the OAuth callback. On a public-only route, resolve callback problems on that client."
+                    }
+                  }
+                ]
+              },
+              "integrity": "sha256-6450bf2fc82c6750eddbcc964d4133ab036484132eb122fee1599efa18c7a12c"
+            },
+            "id": "connect-grok-paths"
+          }
+        },
+        {
+          "type": "codeBlock",
+          "attrs": {
+            "id": "connect-grok-command",
+            "language": "sh"
+          },
+          "content": [
+            {
+              "type": "text",
+              "text": "npx -y mcp-remote@0.16.6 <PUBLIC_HTTPS_MCP_URL> --transport http-only"
+            }
+          ]
+        },
+        {
+          "type": "heading",
+          "attrs": {
+            "id": "connect-other",
+            "level": 2
+          },
+          "content": [
+            {
+              "type": "text",
+              "text": "Other agents: choose by location and transport"
+            }
+          ]
+        },
+        {
+          "type": "widget",
+          "attrs": {
+            "kind": "custom",
+            "data": {
+              "componentId": "doc-compare",
+              "version": "1.0.0",
+              "props": {
+                "columns": [
+                  {
+                    "id": "how",
+                    "label": "What to enter in the host",
+                    "tone": "brand"
+                  }
+                ],
+                "rows": [
+                  {
+                    "label": "Same computer, stdio",
+                    "values": {
+                      "how": "Copy the launch configuration from Settings → Plugins → Add MCP manually. Enter the command, arguments and environment separately."
+                    }
+                  },
+                  {
+                    "label": "Same trusted LAN",
+                    "values": {
+                      "how": "Enable LAN access in ShowAI and select Streamable HTTP in the client. Create an access key in the app and enter it in the client’s Bearer Token or header credential field."
+                    }
+                  },
+                  {
+                    "label": "Same tailnet or across networks",
+                    "values": {
+                      "how": "On the same tailnet use Serve with device approval. Across networks use reachable public HTTPS and OAuth. For a stdio-only client, use the bridge command in the setup prompt."
+                    }
+                  }
+                ]
+              },
+              "integrity": "sha256-6450bf2fc82c6750eddbcc964d4133ab036484132eb122fee1599efa18c7a12c"
+            },
+            "id": "connect-other-paths"
+          }
+        },
+        {
+          "type": "paragraph",
+          "attrs": {
+            "id": "connect-lan-stdio"
+          },
+          "content": [
+            {
+              "type": "text",
+              "text": "For a stdio-only client on a trusted HTTP LAN, mcp-remote accepts --allow-http and --header-file. Store the access key in a local header file readable only by you and pass its path in the arguments. Clients that require HTTPS need a reachable HTTPS endpoint."
+            }
+          ]
+        },
+        {
+          "type": "heading",
+          "attrs": {
+            "id": "connect-verify",
+            "level": 2
+          },
+          "content": [
+            {
+              "type": "text",
+              "text": "Verify the connection"
+            }
+          ]
+        },
+        {
+          "type": "paragraph",
+          "attrs": {
+            "id": "connect-probe"
+          },
+          "content": [
+            {
+              "type": "text",
+              "text": "In the same client, refresh tools and ask “Call projects_list and tell me only the number of visible projects.” An empty list is a successful response. A public catalog call verifies public access only. For sign-in, permission and reachability failures, check authorization, access rules and networking respectively."
+            }
+          ]
+        },
+        {
+          "type": "paragraph",
+          "attrs": {
+            "id": "connect-extra"
+          },
+          "content": [
+            {
+              "type": "text",
+              "text": "ChatGPT connection details",
+              "marks": [
+                {
+                  "type": "link",
+                  "attrs": {
+                    "href": "https://showai.renaissancemind.ai/doc/chatgpt"
+                  }
+                }
+              ]
+            },
+            {
+              "type": "text",
+              "text": " · "
+            },
+            {
+              "type": "text",
+              "text": "Common connection issues",
+              "marks": [
+                {
+                  "type": "link",
+                  "attrs": {
+                    "href": "https://showai.renaissancemind.ai/doc/agent-troubleshooting"
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    "layout": {},
+    "surfaceViews": {
+      "root": {
+        "initial": null,
+        "saved": [],
+        "readingOrder": [
+          "connect-hero",
+          "connect-status",
+          "connect-states",
+          "connect-chatgpt",
+          "connect-chatgpt-steps",
+          "connect-grok",
+          "connect-device",
+          "connect-grok-paths",
+          "connect-grok-command",
+          "connect-other",
+          "connect-other-paths",
+          "connect-lan-stdio",
+          "connect-verify",
+          "connect-probe",
+          "connect-extra"
+        ]
+      }
+    },
+    "comments": []
+  }
+}

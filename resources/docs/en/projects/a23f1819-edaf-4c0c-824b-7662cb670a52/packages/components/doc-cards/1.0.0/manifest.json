@@ -1,0 +1,288 @@
+{
+  "id": "doc-cards",
+  "version": "1.0.0",
+  "name": "document card",
+  "description": "Navigation or tab card: icon, title, description, and optional tags; the entire card is linkable. Tiles are grid cards and rows are compact list rows.",
+  "category": "other",
+  "entry": "index.tsx",
+  "reader": "readData",
+  "scenarios": [
+    "“Next” at the end of the page recommends 2–3 pages",
+    "Provide several entrance paths according to the reader's situation",
+    "List a set of options or resources side by side"
+  ],
+  "documentation": {
+    "version": 2,
+    "reuse": {
+      "kind": "domain",
+      "boundaries": [
+        "Used for navigation and side-by-side options; use doc-compare when you need item-by-item comparison capabilities.",
+        "The icon only accepts emoji or one or two characters. Images cannot be passed in."
+      ],
+      "owner": "ShowAI Document Station (doc kit)"
+    },
+    "usage": {
+      "purpose": "Let readers quickly choose their next step among several paths or pages.",
+      "structure": [
+        "Tile: icon block, title, description, upper right corner label; when there is href, the entire card is a link, and an arrow appears when hovering.",
+        "Row: One item per row, icon on the left, title and description in the middle, and arrow on the right.",
+        "Cards in the same row are of equal height; single column below 640px."
+      ],
+      "inputs": [
+        {
+          "path": "columns",
+          "meaning": "The number of columns is 2, 3 or 4; 4 columns will become 2 columns below 820px, and all columns will be single column below 640px.",
+          "omission": {
+            "behavior": "fallback",
+            "description": "tile: 2 columns when there are 4 cards, otherwise the smaller value of the number of cards and 3 is used; row: 2 columns when there are more than 3 items, otherwise 1 column.",
+            "computedFrom": [
+              "cards",
+              "variant"
+            ]
+          }
+        },
+        {
+          "path": "variant",
+          "meaning": "tile grid card or row compact list row.",
+          "omission": {
+            "behavior": "fallback",
+            "description": "Use tiles.",
+            "value": "tile"
+          }
+        },
+        {
+          "path": "cards",
+          "meaning": "Card list, 2–6 recommended."
+        },
+        {
+          "path": "cards[]",
+          "meaning": "A card."
+        },
+        {
+          "path": "cards[].icon",
+          "meaning": "Emoji icons placed in squares with light background.",
+          "omission": {
+            "behavior": "omit",
+            "description": "No icon is displayed."
+          }
+        },
+        {
+          "path": "cards[].title",
+          "meaning": "The card title is recommended to be no more than 12 Chinese characters."
+        },
+        {
+          "path": "cards[].body",
+          "meaning": "One or two sentences of explanation, no more than 50 Chinese characters recommended. Inline tags: **bold**,`代码`, [text] (link); links can be written ashttps://…or doc:slug#anchor. When the card itself has an href, the link in the description only displays text."
+        },
+        {
+          "path": "cards[].href",
+          "meaning": "Link to the entire card:https://…or doc:slug#anchor.",
+          "omission": {
+            "behavior": "omit",
+            "description": "Cards are not links and do not display arrows."
+          }
+        },
+        {
+          "path": "cards[].tag",
+          "meaning": "Short tags, such as \"recommended\" and \"new\", are recommended to be no more than 4 Chinese characters.",
+          "omission": {
+            "behavior": "omit",
+            "description": "Don't show labels."
+          }
+        },
+        {
+          "path": "cards[].tone",
+          "meaning": "Icon background color, label and hover border color: brand | teal | warm | violet | rose | slate.",
+          "omission": {
+            "behavior": "fallback",
+            "description": "Use brand.",
+            "value": "brand"
+          }
+        }
+      ],
+      "recipes": [
+        {
+          "title": "\"Next\" at the end of the page",
+          "steps": [
+            "Choose 2–3 most likely next pages.",
+            "Use variant row or 3 column tiles.",
+            "Explain what the writing reader can accomplish on that page."
+          ],
+          "exampleIndex": 1
+        }
+      ],
+      "interactions": [
+        {
+          "action": "Click or press Enter to open the card",
+          "effect": "Open the link; the document link opens within the site.",
+          "persistence": "none"
+        }
+      ],
+      "constraints": [
+        "Read-only display, page data will not be modified.",
+        "2–6 cards recommended; no more than 12 Chinese characters for the title and no more than 50 Chinese characters for the description."
+      ],
+      "editing": {
+        "data": [
+          "Add or delete cards, modify text and links."
+        ],
+        "implementation": [
+          "Extend the variant enumeration and release a new version when a new variant is added."
+        ]
+      }
+    },
+    "development": {
+      "entryPoints": [
+        {
+          "path": "index.tsx",
+          "purpose": "Components, column inference, md() and readData."
+        },
+        {
+          "path": "style.css",
+          "purpose": "Token, tile/row layouts and narrow screen rules."
+        }
+      ],
+      "architecture": [
+        "The number of grid columns is written to the CSS variable --cols; the tint is set via the tone-* classes --t/--ts.",
+        "Cards with href are rendered as <a>, internal links are downgraded to text, and nested links are avoided."
+      ],
+      "extensionPoints": [
+        "columnsFor() determines the default number of columns."
+      ],
+      "invariants": [
+        "The component does not call onChange.",
+        "Hover does not change height."
+      ],
+      "verification": [
+        "Check out the 2/3/4 column and row variants at 1000px, 390px width and dark theme.",
+        "The focus box is visible when tabbing into a card."
+      ]
+    }
+  },
+  "defaultData": {
+    "columns": 2,
+    "cards": [
+      {
+        "icon": "🖥️",
+        "title": "Only use the workbench",
+        "body": "Write pages, draw whiteboards, and export HTML to share in a local browser or desktop application.",
+        "href": "doc:install",
+        "tone": "brand"
+      },
+      {
+        "icon": "🤝",
+        "title": "Used with Agent",
+        "body": "After installing the plugin, let Codex or Claude Code create, modify, and inspect pages.",
+        "href": "doc:agent-hosts",
+        "tag": "recommend",
+        "tone": "violet"
+      },
+      {
+        "icon": "🧱",
+        "title": "Make components and templates",
+        "body": "Use React to write reusable components and refine useful page structures into templates.",
+        "href": "doc:component-dev",
+        "tone": "teal"
+      },
+      {
+        "icon": "👥",
+        "title": "Deploy to team",
+        "body": "Run the project server, multiple people can synchronize the same project, and assign permissions by project.",
+        "href": "doc:project-server",
+        "tone": "warm"
+      }
+    ]
+  },
+  "examples": [
+    {
+      "name": "Start with your situation (2×2 cards)",
+      "data": {
+        "columns": 2,
+        "cards": [
+          {
+            "icon": "🖥️",
+            "title": "Only use the workbench",
+            "body": "Write pages, draw whiteboards, and export HTML to share in a local browser or desktop application.",
+            "href": "doc:install",
+            "tone": "brand"
+          },
+          {
+            "icon": "🤝",
+            "title": "Used with Agent",
+            "body": "After installing the plugin, let Codex or Claude Code create, modify, and inspect pages.",
+            "href": "doc:agent-hosts",
+            "tag": "recommend",
+            "tone": "violet"
+          },
+          {
+            "icon": "🧱",
+            "title": "Make components and templates",
+            "body": "Use React to write reusable components and refine useful page structures into templates.",
+            "href": "doc:component-dev",
+            "tone": "teal"
+          },
+          {
+            "icon": "👥",
+            "title": "Deploy to team",
+            "body": "Run the project server, multiple people can synchronize the same project, and assign permissions by project.",
+            "href": "doc:project-server",
+            "tone": "warm"
+          }
+        ]
+      }
+    },
+    {
+      "name": "next(list row)",
+      "data": {
+        "variant": "row",
+        "cards": [
+          {
+            "icon": "🧩",
+            "title": "Pages & Boards",
+            "body": "When to use a Page laid out in reading order, and when to use a free-arranged Board.",
+            "href": "doc:page-board"
+          },
+          {
+            "icon": "📊",
+            "title": "Charts, Mind Maps & Diagrams",
+            "body": "Choose how to write charts, maps and flowcharts based on data shape.",
+            "href": "doc:visuals"
+          },
+          {
+            "icon": "📤",
+            "title": "Export & Share",
+            "body": "Export a single HTML or static site and interact with it offline.",
+            "href": "doc:export"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Three column chart family",
+      "data": {
+        "columns": 3,
+        "cards": [
+          {
+            "icon": "📈",
+            "title": "trend",
+            "body": "Line and area charts to see how indicators change over time.",
+            "tone": "brand"
+          },
+          {
+            "icon": "📊",
+            "title": "Compare",
+            "body": "Column and bar charts compare values ​​of different categories.",
+            "tone": "teal"
+          },
+          {
+            "icon": "🧭",
+            "title": "relation",
+            "body": "Maps, flow charts and boards organize structures and dependencies.",
+            "tag": "Editable",
+            "tone": "violet"
+          }
+        ]
+      }
+    }
+  ]
+}

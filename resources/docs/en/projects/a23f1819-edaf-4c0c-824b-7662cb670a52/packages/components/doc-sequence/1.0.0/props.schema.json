@@ -1,0 +1,90 @@
+{
+  "type": "object",
+  "properties": {
+    "actors": {
+      "type": "array",
+      "maxItems": 7,
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "label": {
+            "type": "string",
+            "minLength": 1
+          },
+          "sub": {
+            "type": "string"
+          },
+          "icon": {
+            "type": "string"
+          },
+          "tone": {
+            "type": "string",
+            "enum": [
+              "brand",
+              "teal",
+              "warm",
+              "violet",
+              "rose",
+              "slate"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "label"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "steps": {
+      "type": "array",
+      "maxItems": 30,
+      "items": {
+        "type": "object",
+        "properties": {
+          "from": {
+            "type": "string",
+            "minLength": 1
+          },
+          "to": {
+            "type": "string",
+            "minLength": 1
+          },
+          "label": {
+            "type": "string",
+            "minLength": 1
+          },
+          "detail": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "call",
+              "reply",
+              "note"
+            ]
+          }
+        },
+        "required": [
+          "from",
+          "to",
+          "label"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "title": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "actors",
+    "steps"
+  ],
+  "additionalProperties": false
+}

@@ -1,0 +1,291 @@
+{
+  "id": "doc-steps",
+  "version": "1.0.0",
+  "name": "Documentation steps",
+  "description": "Operation steps with a numbered vertical axis: Each step has instructions, reproducible code (can be switched by platform), prompts and completion results. Readers can mark completion step by step.",
+  "category": "flow",
+  "entry": "index.tsx",
+  "reader": "readData",
+  "scenarios": [
+    "Sequential operations such as installation, connection, and deployment",
+    "Steps to differentiate commands by platform (macOS/Windows/Linux) or host",
+    "Process description from creation to release"
+  ],
+  "documentation": {
+    "version": 2,
+    "reuse": {
+      "kind": "domain",
+      "boundaries": [
+        "Use for actions that need to be performed in order; use text lists for concept notes or unsequential points.",
+        "The code is only displayed and copied, not executed."
+      ],
+      "owner": "ShowAI Document Station (doc kit)"
+    },
+    "usage": {
+      "purpose": "Let readers complete an operation in order, knowing which step to take at any time and what to see after each step.",
+      "structure": [
+        "On the numbered vertical axis on the left, click the number to mark completion, and the vertical axis will be filled with completion; the completion progress is displayed at the top.",
+        "Each step: title, description, code panel (language tab or platform tab + copy button), prompt, checked result row."
+      ],
+      "inputs": [
+        {
+          "path": "steps",
+          "meaning": "It is recommended that each set of steps be performed in sequence, no more than 8 steps."
+        },
+        {
+          "path": "steps[]",
+          "meaning": "One step."
+        },
+        {
+          "path": "steps[].title",
+          "meaning": "Step title, written as an action, such as \"Start local workbench\". Inline tags are available."
+        },
+        {
+          "path": "steps[].body",
+          "meaning": "Description, segmented by line breaks. Inline tags: **bold**,`代码`, [text] (link); links can be written ashttps://…or doc:slug#anchor.",
+          "omission": {
+            "behavior": "omit",
+            "description": "Only the title is displayed."
+          }
+        },
+        {
+          "path": "steps[].code",
+          "meaning": "The command or code to be executed; lines starting with # or // appear in comment color.",
+          "omission": {
+            "behavior": "omit",
+            "description": "The code panel is not shown when there are no variants."
+          }
+        },
+        {
+          "path": "steps[].lang",
+          "meaning": "The language label in the upper left corner of the code panel.",
+          "omission": {
+            "behavior": "fallback",
+            "description": "Show shell.",
+            "value": "shell"
+          }
+        },
+        {
+          "path": "steps[].variants",
+          "meaning": "Code to switch by platform or host, replacing code when present. 2–4 recommended.",
+          "omission": {
+            "behavior": "omit",
+            "description": "Use code."
+          }
+        },
+        {
+          "path": "steps[].variants[]",
+          "meaning": "A tab page: tags and corresponding codes."
+        },
+        {
+          "path": "steps[].variants[].label",
+          "meaning": "Tab name, such as macOS, Windows, Codex."
+        },
+        {
+          "path": "steps[].variants[].code",
+          "meaning": "The code displayed on this tab."
+        },
+        {
+          "path": "steps[].note",
+          "meaning": "Add tips or precautions and weaken the display. Inline tags are available.",
+          "omission": {
+            "behavior": "omit",
+            "description": "No prompt is displayed."
+          }
+        },
+        {
+          "path": "steps[].result",
+          "meaning": "What the reader will see when you're done, shown as a result row with a check mark. Inline tags are available.",
+          "omission": {
+            "behavior": "omit",
+            "description": "Result rows are not displayed."
+          }
+        },
+        {
+          "path": "start",
+          "meaning": "The number of the first step; used to continue the numbering when splitting a process into multiple sections.",
+          "omission": {
+            "behavior": "fallback",
+            "description": "Numbering starts from 1.",
+            "value": 1
+          }
+        }
+      ],
+      "recipes": [
+        {
+          "title": "Write installation steps",
+          "steps": [
+            "Only do one thing at each step, and write the action in the title.",
+            "Put commands into code; use variants for different platforms.",
+            "Use result to write the results that readers should see to facilitate self-checking."
+          ],
+          "exampleIndex": 0
+        }
+      ],
+      "interactions": [
+        {
+          "action": "Click on the step number",
+          "effect": "Switch the completion status of the step, and the vertical axis and progress bar are updated; \"Reset\" clears everything.",
+          "persistence": "view"
+        },
+        {
+          "action": "Switch platform labels (direction keys can switch)",
+          "effect": "The code panel displays the commands for the corresponding platform.",
+          "persistence": "view"
+        },
+        {
+          "action": "Click to copy",
+          "effect": "Copy the current code and display \"Copied\"; when the environment does not allow copying, select the code and press ⌘C / Ctrl+C.",
+          "persistence": "none"
+        }
+      ],
+      "constraints": [
+        "The reading operation only changes the local view state and does not modify the page data.",
+        "It is recommended that each group should not exceed 8 steps; long codes should be scrolled horizontally and should not be broken."
+      ],
+      "editing": {
+        "data": [
+          "Add and delete steps, modify commands and results."
+        ],
+        "implementation": [
+          "Extend the schema and publish a new version when new step fields are added."
+        ]
+      }
+    },
+    "development": {
+      "entryPoints": [
+        {
+          "path": "index.tsx",
+          "purpose": "Components, CodePanel, copy logic, md() and readData."
+        },
+        {
+          "path": "style.css",
+          "purpose": "Tokens, vertical axis, code panel and narrow screen rules."
+        }
+      ],
+      "architecture": [
+        "The completion status is a local boolean array; the vertical axis segments are filled with scaleY of ::after.",
+        "To copy, use hidden textarea + execCommand('copy') first. If it fails, use Range to select the code and prompt (the Clipboard API is prohibited in the sandbox)."
+      ],
+      "extensionPoints": [
+        "isComment() determines the coloring of comment lines."
+      ],
+      "invariants": [
+        "The component does not call onChange.",
+        "The tab page uses role=tab / tabpanel, and the copy button has Chinese aria-label."
+      ],
+      "verification": [
+        "Check out the vertical axis, code panel and results row in 1000px, 390px width and dark theme.",
+        "Click the number to switch the completion status; after clicking copy, a \"Copied\" or selected prompt will be displayed."
+      ]
+    }
+  },
+  "defaultData": {
+    "steps": [
+      {
+        "title": "Prepare for Node.js",
+        "body": "Running from source requires Git, **Node.js 22.12 or higher**, and npm. Confirm the version first:",
+        "variants": [
+          {
+            "label": "macOS",
+            "code": "brew install node@22\nnode --version"
+          },
+          {
+            "label": "Windows",
+            "code": "winget install OpenJS.NodeJS.LTS\nnode --version"
+          },
+          {
+            "label": "Linux",
+            "code": "# 使用 nvm 安装\nnvm install 22\nnode --version"
+          }
+        ],
+        "result": "Terminal output `v22.12.0 `or higher."
+      },
+      {
+        "title": "Get the source code and build",
+        "code": "git clone https://github.com/Renaissance-Mind/ShowAI.git\ncd ShowAI\nnpm ci\nnpm run build:browser",
+        "lang": "sh"
+      },
+      {
+        "title": "Start local workbench",
+        "body": "The browser will automatically open after the service is started. **Keep the terminal running during use**.",
+        "code": "npm run browser",
+        "lang": "sh",
+        "note": "When the browser does not open automatically, copy the address displayed on the terminal; when finished, press `Ctrl+C `to stop the service.",
+        "result": "The workbench appears in the browser with a list of projects on the left."
+      },
+      {
+        "title": "New project and first page",
+        "body": "Click \"New Project\" and create a new Page in the project. Enter `/`to insert a chart, table or component, see [Page and Board](doc:page-board) for details.",
+        "result": "The save status at the top shows \"Saved\"."
+      }
+    ]
+  },
+  "examples": [
+    {
+      "name": "Install and start the local workbench",
+      "data": {
+        "steps": [
+          {
+            "title": "Prepare for Node.js",
+            "body": "Running from source requires Git, **Node.js 22.12 or higher**, and npm. Confirm the version first:",
+            "variants": [
+              {
+                "label": "macOS",
+                "code": "brew install node@22\nnode --version"
+              },
+              {
+                "label": "Windows",
+                "code": "winget install OpenJS.NodeJS.LTS\nnode --version"
+              },
+              {
+                "label": "Linux",
+                "code": "# 使用 nvm 安装\nnvm install 22\nnode --version"
+              }
+            ],
+            "result": "Terminal output `v22.12.0 `or higher."
+          },
+          {
+            "title": "Get the source code and build",
+            "code": "git clone https://github.com/Renaissance-Mind/ShowAI.git\ncd ShowAI\nnpm ci\nnpm run build:browser",
+            "lang": "sh"
+          },
+          {
+            "title": "Start local workbench",
+            "body": "The browser will automatically open after the service is started. **Keep the terminal running during use**.",
+            "code": "npm run browser",
+            "lang": "sh",
+            "note": "When the browser does not open automatically, copy the address displayed on the terminal; when finished, press `Ctrl+C `to stop the service.",
+            "result": "The workbench appears in the browser with a list of projects on the left."
+          },
+          {
+            "title": "New project and first page",
+            "body": "Click \"New Project\" and create a new Page in the project. Enter `/`to insert a chart, table or component, see [Page and Board](doc:page-board) for details.",
+            "result": "The save status at the top shows \"Saved\"."
+          }
+        ]
+      }
+    },
+    {
+      "name": "Install the plugin in Claude Code",
+      "data": {
+        "start": 1,
+        "steps": [
+          {
+            "title": "Add the plugin market and install it",
+            "body": "Execute in the ShowAI warehouse directory:",
+            "code": "claude plugin marketplace add ./\nclaude plugin install showai@renaissance-mind",
+            "lang": "sh"
+          },
+          {
+            "title": "Register runtime",
+            "body": "The standalone runtime built from source code needs to be registered once; the desktop version can view the configuration in \"Settings → Connect Agent\".",
+            "code": "npm run runtime:register",
+            "lang": "sh",
+            "result": "The plug-in can find the ShowAI runtime in the content library."
+          }
+        ]
+      }
+    }
+  ]
+}

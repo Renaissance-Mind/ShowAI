@@ -1,3 +1,4 @@
+import { sourceDigest, SOURCE_EXTENSIONS } from "./component-source-digest.mjs";
 import { componentActivationIssue } from "../contract/component-activation.mjs";
 import {
   validateComponentContract,
@@ -272,23 +273,6 @@ export default function Component({ data, onChange, readOnly }) {
   };
 }
 
-const SOURCE_EXTENSIONS = new Set([
-  ".html",
-  ".ts",
-  ".tsx",
-  ".js",
-  ".jsx",
-  ".mjs",
-  ".json",
-  ".css",
-  ".png",
-  ".jpg",
-  ".jpeg",
-  ".webp",
-  ".gif",
-  ".svg",
-  ".woff2",
-]);
 const TEXT_EXTENSIONS = new Set([
   ".html",
   ".ts",
@@ -1584,14 +1568,6 @@ async function packageFiles(
 }
 function digest(value: string | Buffer): string {
   return `sha256-${createHash("sha256").update(value).digest("hex")}`;
-}
-function sourceDigest(files: Map<string, Buffer>): string {
-  const hash = createHash("sha256");
-  for (const [name, content] of [...files.entries()].sort(([left], [right]) =>
-    left.localeCompare(right),
-  ))
-    hash.update(name).update("\0").update(content).update("\0");
-  return `sha256-${hash.digest("hex")}`;
 }
 function compiledIntegrity(
   component: Pick<

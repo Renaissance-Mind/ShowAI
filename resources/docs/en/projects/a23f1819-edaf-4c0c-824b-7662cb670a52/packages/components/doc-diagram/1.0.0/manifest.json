@@ -1,0 +1,589 @@
+{
+  "id": "doc-diagram",
+  "version": "1.0.0",
+  "name": "Document diagram",
+  "description": "Interactive concept map/topology map for documentation: Nodes are placed in a grid, connections automatically follow orthogonal paths with arrows and labels, and can be classified using grouping background colors; click on a node to highlight its connections and adjacent nodes, and display descriptions and document links below. Narrow screen changed to node list.",
+  "category": "flow",
+  "entry": "index.tsx",
+  "reader": "readData",
+  "scenarios": [
+    "Explain the relationships between product concepts (content libraries, projects, pages, components...)",
+    "Draw the system topology or data flow and let readers view the nodes one by one",
+    "\"Document Map\" on the document homepage"
+  ],
+  "documentation": {
+    "version": 2,
+    "reuse": {
+      "kind": "domain",
+      "boundaries": [
+        "Suitable for concept diagrams or topological diagrams with 3–16 nodes and 3–5 columns; node locations are given by the author on the grid, and automatic layout is not performed. The width of the node is calculated according to the width of the container (about 104–240px). If it cannot fit, it will be changed to a list as a whole.",
+        "Not a flowchart editor: readers can only view and click, not drag or modify.",
+        "Please use doc-sequence for interactions that require chronological order; use doc-layers for layered architecture."
+      ],
+      "owner": "ShowAI document component library (doc-*), used for pages in showai.renaissancemind.ai/doc"
+    },
+    "usage": {
+      "purpose": "Use a clickable diagram to explain the relationship between several concepts or system components. The explanatory text is placed in the detail of the node instead of being written repeatedly in the text.",
+      "structure": [
+        "Top: caption and operation tips.",
+        "Middle part: SVG grid diagram, with grouping background color at the bottom, connections and labels above, and nodes at the top.",
+        "Below: Description panel for the selected node (title, description, relationship list, \"Open document →\").",
+        "When the width is less than 640px (or there are too many columns to fit), it is changed to a list of node cards arranged in groups, and each card lists \"→ Connect to X (label)\"."
+      ],
+      "inputs": [
+        {
+          "path": "nodes",
+          "meaning": "Node list. Order does not affect position; the Tab key moves between nodes in row, then column, reading order. When empty, an empty status prompt is displayed."
+        },
+        {
+          "path": "nodes[].id",
+          "meaning": "The unique id of the node, used by edges and initial to refer to the node. Only the first node with duplicate IDs is retained."
+        },
+        {
+          "path": "nodes[].label",
+          "meaning": "Node title. On a page about 1000px wide, when there are 4 columns, up to 8 Chinese characters are displayed in a single line, and when there are 5 columns, about 5 Chinese characters are displayed; when it is longer, it is folded into two lines, and when it is longer, it is truncated at the end of the second line (the description panel and hover prompt display the full text)."
+        },
+        {
+          "path": "nodes[].sub",
+          "meaning": "The subtitle should be folded into two lines at most: about 16-18 Chinese characters when using 4 columns, and about 12 Chinese characters when using 5 columns. If it is longer, it will be truncated at the end of the second line.",
+          "omission": {
+            "behavior": "omit",
+            "description": "Nodes display only titles; nodes are shorter when all nodes have no subtitles."
+          }
+        },
+        {
+          "path": "nodes[].col",
+          "meaning": "Grid column number, integer. The coordinates are aligned by the minimum value of the group across all nodes, so starting from 0 or 1 is fine. Only one node can be placed in the same grid, and subsequent nodes will be ignored. No more than 5 columns is recommended.",
+          "units": "Grid (increasing to the right)"
+        },
+        {
+          "path": "nodes[].row",
+          "meaning": "Grid row number, integer, increasing downward.",
+          "units": "Grid (increasing downward)"
+        },
+        {
+          "path": "nodes[].tone",
+          "meaning": "Node color: brand | teal | warm | violet | rose | slate. Used for icon background color, filling when selected, and highlighting of related connections.",
+          "omission": {
+            "behavior": "fallback",
+            "description": "Use brand.",
+            "value": "brand"
+          }
+        },
+        {
+          "path": "nodes[].icon",
+          "meaning": "Icon: An emoji or 1–2 characters.",
+          "omission": {
+            "behavior": "omit",
+            "description": "The icon is not displayed and the title is left aligned."
+          }
+        },
+        {
+          "path": "nodes[].detail",
+          "meaning": "The text that appears in the description panel when the node is selected. Supports **bold**,`代码`, [Link](https://…) and [Link](doc:slug#anchor); line break segmentation.",
+          "omission": {
+            "behavior": "omit",
+            "description": "The description panel only displays the title, subtitle, and relationship list."
+          }
+        },
+        {
+          "path": "nodes[].href",
+          "meaning": "Related document links are displayed as \"Open Document →\". Can behttps://…or doc:slug#anchor.",
+          "omission": {
+            "behavior": "omit",
+            "description": "Document links are not displayed."
+          }
+        },
+        {
+          "path": "edges",
+          "meaning": "Connection list. Links that reference non-existent nodes or have the same beginning and end will be skipped (listed in skipped.edges of readData). Can be an empty array."
+        },
+        {
+          "path": "edges[].from",
+          "meaning": "Starting node id."
+        },
+        {
+          "path": "edges[].to",
+          "meaning": "The end node id, the arrow points here."
+        },
+        {
+          "path": "edges[].label",
+          "meaning": "Connection labels, displayed in small background labels on connections, suggest verbs of 2–4 Chinese characters (contain, insert, list). Labels between adjacent nodes in the same row will spread the column spacing and make all nodes narrow. It is best for such labels to be no more than 2–3 Chinese characters.",
+          "omission": {
+            "behavior": "omit",
+            "description": "Wires are not labeled."
+          }
+        },
+        {
+          "path": "edges[].dashed",
+          "meaning": "Whether to draw a dotted line to indicate optional, indirect or asynchronous relationships.",
+          "omission": {
+            "behavior": "fallback",
+            "description": "solid line.",
+            "value": false
+          }
+        },
+        {
+          "path": "edges[].both",
+          "meaning": "Whether it is bidirectional: draw arrows at both ends.",
+          "omission": {
+            "behavior": "fallback",
+            "description": "One-way, only the end point has an arrow.",
+            "value": false
+          }
+        },
+        {
+          "path": "groups",
+          "meaning": "The grouping background color is drawn below the nodes to frame similar nodes together. There should be no overlap between groups.",
+          "omission": {
+            "behavior": "omit",
+            "description": "No groups are drawn; narrow screen lists are not divided into sections."
+          }
+        },
+        {
+          "path": "groups[].label",
+          "meaning": "The group name is displayed in the upper left corner of the group. It is recommended that it should not exceed 8 Chinese characters."
+        },
+        {
+          "path": "groups[].from",
+          "meaning": "A corner [col, row] of the grouping rectangle, using the same grid coordinates as the node.",
+          "units": "grid"
+        },
+        {
+          "path": "groups[].to",
+          "meaning": "The diagonal [col, row] of the grouping rectangle, containing the cell.",
+          "units": "grid"
+        },
+        {
+          "path": "groups[].tone",
+          "meaning": "Grouped shades: brand | teal | warm | violet | rose | slate.",
+          "omission": {
+            "behavior": "fallback",
+            "description": "Use brand.",
+            "value": "brand"
+          }
+        },
+        {
+          "path": "initial",
+          "meaning": "The initial selected node id.",
+          "omission": {
+            "behavior": "omit",
+            "description": "If no node is initially selected, the panel will display a prompt; the same process will occur when the id does not exist."
+          }
+        },
+        {
+          "path": "caption",
+          "meaning": "A description above the figure supports inline markup.",
+          "omission": {
+            "behavior": "omit",
+            "description": "No instructions are displayed, only operation tips are displayed."
+          }
+        }
+      ],
+      "recipes": [
+        {
+          "title": "Draw a concept map",
+          "steps": [
+            "Start by arranging the concepts into a 3–4 column grid on paper, placing relevant ones in adjacent cells.",
+            "Write a label, a sub and 2-3 details for each node, and attach the href of the corresponding document.",
+            "Only use verbs (contain, insert, list) to label the relationships that really need to be stated.",
+            "Use groups to frame similar nodes, and use readData to check whether skipped is empty."
+          ],
+          "exampleIndex": 0
+        }
+      ],
+      "interactions": [
+        {
+          "action": "Click on the node, or Tab to focus on the node",
+          "effect": "Select the node: highlight its connections and adjacent nodes, fade the rest, and display a description below.",
+          "persistence": "view"
+        },
+        {
+          "action": "Arrow keys",
+          "effect": "Move to the closest node in that direction.",
+          "persistence": "view"
+        },
+        {
+          "action": "Esc or click on an empty space",
+          "effect": "Uncheck.",
+          "persistence": "view"
+        },
+        {
+          "action": "Click the relationship in the description panel",
+          "effect": "Jump to the node at the other end.",
+          "persistence": "view"
+        },
+        {
+          "action": "Narrow screen click node card",
+          "effect": "Expand or collapse the node's description.",
+          "persistence": "view"
+        }
+      ],
+      "constraints": [
+        "Reading operations do not modify page data.",
+        "Node text will not be reduced below 12px: the grid size will be recalculated when the container becomes narrower, and changed to a list when it cannot fit."
+      ],
+      "editing": {
+        "data": [
+          "When adding or deleting nodes, the references of edges and groups are checked synchronously."
+        ],
+        "implementation": [
+          "Create a new version when adding auto layout or curved wiring."
+        ]
+      }
+    },
+    "development": {
+      "entryPoints": [
+        {
+          "path": "index.tsx",
+          "purpose": "Data cleaning clean, grid layout and connection routing layout, SVG view, list view and readData."
+        },
+        {
+          "path": "style.css",
+          "purpose": "Tokens, light and dark themes, node/wire/group styles and narrow screen lists."
+        }
+      ],
+      "architecture": [
+        "clean() discards invalid or duplicate nodes, wires referencing unknown nodes, and aligns grid coordinates to 0.",
+        "layout() calculates the grid width based on the width of the container (measured by ResizeObserver); the connections are routed in three categories: rows, columns, or Z shapes. When the grid passing through has nodes, it will be routed through adjacent row/column gaps.",
+        "Multiple endpoints on the same edge are arranged according to the position of the other end; connections sharing the same gap are assigned different channels, and labels avoid each other.",
+        "The SVG is the same width as the container and does not require viewBox scaling, so the text is always 12–14px; the title and subtitle are each folded into two lines at most, and all nodes have the same height to maintain line alignment."
+      ],
+      "extensionPoints": [
+        "TONES defines available tones; pillW, gapX, gapY control labels and spacing."
+      ],
+      "invariants": [
+        "Only react is imported; inline markup is rendered as React elements, no HTML is injected.",
+        "Reading interaction only changes the local state and does not call onChange."
+      ],
+      "verification": [
+        "The example \"Core Concept Map\" should display 4 columns, 3 rows, and 3 groups at a width of 1000px. The node width is about 165-185px. The subtitle of \"Content Library\" is folded into two lines, and \"Directory → Component\" bypasses \"Template\" from the upper row gap.",
+        "Check labels don't overlap, list view shows connections in light, dark and 390px width.",
+        "skipped of readData is empty."
+      ]
+    }
+  },
+  "defaultData": {
+    "caption": "Agent reads and writes the content library through MCP, and the workbench displays the same file.",
+    "nodes": [
+      {
+        "id": "agent",
+        "label": "Agent",
+        "sub": "Codex / Claude Code",
+        "icon": "🤖",
+        "col": 0,
+        "row": 0,
+        "tone": "brand",
+        "detail": "Understand the requirements in the conversation and read and write pages through MCP tools."
+      },
+      {
+        "id": "mcp",
+        "label": "ShowAI MCP",
+        "sub": "stdio adapter",
+        "icon": "🔌",
+        "col": 1,
+        "row": 0,
+        "tone": "teal",
+        "detail": "Provides **page_read**, **page_save**, **page_present** and other tools."
+      },
+      {
+        "id": "lib",
+        "label": "Content Library",
+        "sub": "~/.showai",
+        "icon": "🗂️",
+        "col": 2,
+        "row": 0,
+        "tone": "violet",
+        "detail": "The page is just the JSON file here, with the full history.",
+        "href": "https://showai.renaissancemind.ai/doc/library"
+      },
+      {
+        "id": "wb",
+        "label": "Workbench",
+        "sub": "Desktop/Browser",
+        "icon": "🖥️",
+        "col": 2,
+        "row": 1,
+        "tone": "warm",
+        "detail": "Monitor the content library and automatically refresh the opened page after file changes."
+      }
+    ],
+    "edges": [
+      {
+        "from": "agent",
+        "to": "mcp",
+        "label": "Call tool"
+      },
+      {
+        "from": "mcp",
+        "to": "lib",
+        "label": "Read and write",
+        "both": true
+      },
+      {
+        "from": "lib",
+        "to": "wb",
+        "label": "File changes",
+        "dashed": true
+      }
+    ],
+    "initial": "mcp"
+  },
+  "examples": [
+    {
+      "name": "Core concept map: content library, project, Page, Board, components, templates, directory",
+      "data": {
+        "caption": "The core object in the content library. Click on a concept to see the definition and where it connects.",
+        "initial": "page",
+        "groups": [
+          {
+            "label": "Storage and organization",
+            "from": [
+              0,
+              0
+            ],
+            "to": [
+              2,
+              0
+            ],
+            "tone": "slate"
+          },
+          {
+            "label": "page",
+            "from": [
+              1,
+              1
+            ],
+            "to": [
+              2,
+              1
+            ],
+            "tone": "brand"
+          },
+          {
+            "label": "Reuse",
+            "from": [
+              1,
+              2
+            ],
+            "to": [
+              3,
+              2
+            ],
+            "tone": "violet"
+          }
+        ],
+        "nodes": [
+          {
+            "id": "library",
+            "label": "Content Library",
+            "sub": "Default ~/.showai, can be specified with --home",
+            "icon": "🗂️",
+            "col": 0,
+            "row": 0,
+            "tone": "slate",
+            "detail": "Directory that stores all projects, pages, component packages and historical versions. The default is `.showai `in the user's home directory. It can also be specified with **SHOWAI_HOME** or `--home `in the CLI. The desktop version, local browser version, and CLI share the same content library.",
+            "href": "https://showai.renaissancemind.ai/doc/library"
+          },
+          {
+            "id": "project",
+            "label": "project",
+            "sub": "a set of related pages",
+            "icon": "📁",
+            "col": 1,
+            "row": 0,
+            "tone": "slate",
+            "detail": "A container for a set of pages and project-level components, corresponding to `projects/<project-id>/`in the content library. When Agent works in the same code directory, it will find the same project according to this directory.",
+            "href": "https://showai.renaissancemind.ai/doc/library"
+          },
+          {
+            "id": "folder",
+            "label": "folder",
+            "sub": "levels within the project",
+            "icon": "🗃️",
+            "col": 2,
+            "row": 0,
+            "tone": "slate",
+            "detail": "It’s just the hierarchical information in `project.json `: the page file is still under `pages/`, and `parentId `points to the folder to which it belongs. Archive folders hide the pages within them together."
+          },
+          {
+            "id": "page",
+            "label": "Page",
+            "sub": "Arrange in reading order",
+            "icon": "📄",
+            "col": 1,
+            "row": 1,
+            "tone": "brand",
+            "detail": "Document flow arranged from top to bottom, suitable for instructions, reports and explanations. Blocks have **stable ids**, and the Agent can only change one of them. You can put Board in Page and vice versa.",
+            "href": "https://showai.renaissancemind.ai/doc/page-board"
+          },
+          {
+            "id": "board",
+            "label": "Board",
+            "sub": "free canvas",
+            "icon": "🧩",
+            "col": 2,
+            "row": 1,
+            "tone": "brand",
+            "detail": "A canvas that can be freely positioned, drawn and aligned, suitable for diagrams, Kanban boards and presentations. It can accommodate components just like Page, and can also be embedded in Page.",
+            "href": "https://showai.renaissancemind.ai/doc/page-board"
+          },
+          {
+            "id": "component",
+            "label": "components",
+            "sub": "Built-in / Custom",
+            "icon": "🧱",
+            "col": 1,
+            "row": 2,
+            "tone": "violet",
+            "detail": "An interactive block inserted into the page. Built-in components include charts, maps, and tables; custom components are React packages and the page references an exact version of them.",
+            "href": "https://showai.renaissancemind.ai/doc/components"
+          },
+          {
+            "id": "template",
+            "label": "template",
+            "sub": "README + Stage Guide",
+            "icon": "📐",
+            "col": 2,
+            "row": 2,
+            "tone": "violet",
+            "detail": "Reusable authoring method: README describing applicable scenarios, step-by-step guide, and optional component library. The Agent reads the guide in stages when applying the template.",
+            "href": "https://showai.renaissancemind.ai/doc/components"
+          },
+          {
+            "id": "catalog",
+            "label": "Table of contents",
+            "sub": "Built-in · Global · Project",
+            "icon": "📚",
+            "col": 3,
+            "row": 2,
+            "tone": "violet",
+            "detail": "The place where components and templates are found is divided into three levels: built-in, global and project according to their scope. Before inserting a component or applying a template, look up it and its version in the directory.",
+            "href": "https://showai.renaissancemind.ai/doc/components"
+          }
+        ],
+        "edges": [
+          {
+            "from": "library",
+            "to": "project",
+            "label": "Include"
+          },
+          {
+            "from": "project",
+            "to": "folder",
+            "label": "layered"
+          },
+          {
+            "from": "project",
+            "to": "page",
+            "label": "Include"
+          },
+          {
+            "from": "project",
+            "to": "board"
+          },
+          {
+            "from": "page",
+            "to": "board",
+            "label": "Nested",
+            "both": true
+          },
+          {
+            "from": "page",
+            "to": "component",
+            "label": "insert"
+          },
+          {
+            "from": "board",
+            "to": "component"
+          },
+          {
+            "from": "template",
+            "to": "component",
+            "label": "Comes with",
+            "dashed": true
+          },
+          {
+            "from": "catalog",
+            "to": "template",
+            "label": "list"
+          },
+          {
+            "from": "catalog",
+            "to": "component",
+            "label": "list"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Agent, MCP, content library and workbench",
+      "data": {
+        "caption": "Agent reads and writes the content library through MCP, and the workbench displays the same file.",
+        "nodes": [
+          {
+            "id": "agent",
+            "label": "Agent",
+            "sub": "Codex / Claude Code",
+            "icon": "🤖",
+            "col": 0,
+            "row": 0,
+            "tone": "brand",
+            "detail": "Understand the requirements in the conversation and read and write pages through MCP tools."
+          },
+          {
+            "id": "mcp",
+            "label": "ShowAI MCP",
+            "sub": "stdio adapter",
+            "icon": "🔌",
+            "col": 1,
+            "row": 0,
+            "tone": "teal",
+            "detail": "Provides **page_read**, **page_save**, **page_present** and other tools."
+          },
+          {
+            "id": "lib",
+            "label": "Content Library",
+            "sub": "~/.showai",
+            "icon": "🗂️",
+            "col": 2,
+            "row": 0,
+            "tone": "violet",
+            "detail": "The page is just the JSON file here, with the full history.",
+            "href": "https://showai.renaissancemind.ai/doc/library"
+          },
+          {
+            "id": "wb",
+            "label": "Workbench",
+            "sub": "Desktop/Browser",
+            "icon": "🖥️",
+            "col": 2,
+            "row": 1,
+            "tone": "warm",
+            "detail": "Monitor the content library and automatically refresh the opened page after file changes."
+          }
+        ],
+        "edges": [
+          {
+            "from": "agent",
+            "to": "mcp",
+            "label": "Call tool"
+          },
+          {
+            "from": "mcp",
+            "to": "lib",
+            "label": "Read and write",
+            "both": true
+          },
+          {
+            "from": "lib",
+            "to": "wb",
+            "label": "File changes",
+            "dashed": true
+          }
+        ],
+        "initial": "mcp"
+      }
+    }
+  ]
+}

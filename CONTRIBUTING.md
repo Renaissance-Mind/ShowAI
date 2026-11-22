@@ -73,7 +73,11 @@ Add tests that use a real temporary library and real component compilation rathe
 
 Markdown files are ignored by default. A new public `.md` file needs its exact path in the allowlist in `.gitignore`; otherwise Git silently leaves it out. Every English guide has a Simplified Chinese counterpart: `README.md` ↔ `docs/i18n/README.zh-CN.md`, `CONTRIBUTING.md` ↔ `docs/i18n/CONTRIBUTING.zh-CN.md`, `docs/TOPIC.md` ↔ `docs/i18n/TOPIC.zh-CN.md`. Change both together, list a new guide in both indexes (`docs/README.md` and `docs/i18n/index.zh-CN.md`), and keep the language switches and relative links valid.
 
-README, the quick start, the banners, the app's welcome copy and the homepage share one tagline, one-liner and sample prompt, defined in `scripts/release-entry.mjs`. Run `npm run release:check` after changing them. The app's built-in documentation in `resources/docs` is a copy of the pages published at showai.renaissancemind.ai/doc; change the website's documentation and run `npm run docs:sync -- --site <website>/site` instead of editing the copy.
+README, the quick start, the banners, the app's welcome copy and the homepage share one tagline, one-liner and sample prompt, defined in `scripts/release-entry.mjs`. Run `npm run release:check` after changing them.
+
+The App's official documentation lives in [resources/docs](resources/docs). In the desktop workbench, go to Settings → General → Change folder. Select [the Chinese library](resources/docs/zh-CN) or [the English library](resources/docs/en), then open the documentation project under Projects. Saving a page writes its native JSON directly to the checkout. You can also edit the page files in a text editor. Each project includes its folders and versioned component sources. To change a component, save a new component version and update its references on the relevant pages.
+
+For a new documentation link, register the page ID in `resources/docs/routes.json` and use that ID in both language projects. Run `npm run docs:build` to refresh the sidebar index, then `npm run docs:check` before committing. The App build reads the pages and their pinned components from this checkout.
 
 Check every documented command against the code that implements it, and say which version a statement describes: source, installed app or plugin, deployed service or published release. Keep internal plans, credentials, machine-specific paths, test logs and acceptance evidence out of public documentation.
 

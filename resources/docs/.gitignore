@@ -1,0 +1,12 @@
+/.docs-index-*.tmp
+/*/*
+!/*/sidebar.json
+!/*/projects/
+/*/projects/*/*
+!/*/projects/*/pages/
+!/*/projects/*/project.json
+!/*/projects/*/packages/
+/*/projects/*/packages/*
+!/*/projects/*/packages/components/
+/*/projects/*/packages/components/**/.*
+/*/projects/*/pages/*/

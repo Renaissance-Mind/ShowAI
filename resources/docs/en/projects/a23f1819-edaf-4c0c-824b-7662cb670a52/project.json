@@ -1,0 +1,90 @@
+{
+  "format": "showai-project",
+  "version": 1,
+  "id": "a23f1819-edaf-4c0c-824b-7662cb670a52",
+  "name": "ShowAI Documentation",
+  "icon": "📖",
+  "createdAt": "2026-10-08T17:53:57.637Z",
+  "updatedAt": "2026-10-15T06:42:11.659Z",
+  "pinned": false,
+  "archived": false,
+  "sortBy": "manual",
+  "manualOrder": [
+    "2e9af66b-0a83-58f6-b3f5-a480f0f6abab",
+    "0b49bb7a-052c-5fe7-a05f-f647bb862a91",
+    "5130253b-e1ae-5e03-bf87-ec58d245de28",
+    "c38eeda4-c709-5cae-bc63-2e4223ae0873",
+    "22aa57a1-9d74-5c5a-9c04-4fc999c8b9b4",
+    "79fa3b16-d74e-58cd-81a0-2c01bd8a9499",
+    "884a4104-344d-51e1-a1cd-c1f80f892d20",
+    "c68ed360-d4f3-50ae-9c0b-3592b669b21b"
+  ],
+  "folders": [
+    {
+      "id": "22aa57a1-9d74-5c5a-9c04-4fc999c8b9b4",
+      "name": "Using the Workbench",
+      "parentId": null,
+      "pinned": false,
+      "archived": false,
+      "createdAt": "2026-10-15T06:41:55.717Z",
+      "updatedAt": "2026-10-15T06:41:55.717Z",
+      "sortBy": "manual",
+      "manualOrder": [
+        "35f9cd9f-42bc-56f3-a792-3961178925bb",
+        "e30c72da-65cb-5628-8d35-370c8ac92363",
+        "6bd63230-60fc-561b-a445-2aea7c48e79e",
+        "038265ef-4dcc-5b17-9003-83c716c14876"
+      ]
+    },
+    {
+      "id": "79fa3b16-d74e-58cd-81a0-2c01bd8a9499",
+      "name": "Working with Agents",
+      "parentId": null,
+      "pinned": false,
+      "archived": false,
+      "createdAt": "2026-10-15T06:41:55.816Z",
+      "updatedAt": "2026-10-15T06:41:55.816Z",
+      "sortBy": "manual",
+      "manualOrder": [
+        "e8c001a7-4e9f-5515-a2e4-8ed6085ef46d",
+        "1c7a263c-bd9f-40ce-bc58-1870022f978b",
+        "963599de-ed81-58ea-be92-5b68937966f8",
+        "cf5d1ce9-369c-55de-923f-8da2ce92c74d",
+        "833d5f6c-651d-5abe-a8a4-542d6fe0be37",
+        "6e51cbfe-9394-571a-aa5a-5ff2fa96610e"
+      ]
+    },
+    {
+      "id": "884a4104-344d-51e1-a1cd-c1f80f892d20",
+      "name": "Saving, Sync & Collaboration",
+      "parentId": null,
+      "pinned": false,
+      "archived": false,
+      "createdAt": "2026-10-15T06:41:55.880Z",
+      "updatedAt": "2026-10-15T06:41:55.880Z",
+      "sortBy": "manual",
+      "manualOrder": [
+        "bd1ef961-f5d1-50a1-aded-0895dc63ebc7",
+        "c51ee747-5e00-5bda-8c27-7465ace0566a",
+        "56c95573-459b-54ae-9b0d-92c23b55fb88",
+        "c907d80d-f305-5558-bcbf-29ffd17d0f5d"
+      ]
+    },
+    {
+      "id": "c68ed360-d4f3-50ae-9c0b-3592b669b21b",
+      "name": "Developer Reference",
+      "parentId": null,
+      "pinned": false,
+      "archived": false,
+      "createdAt": "2026-10-08T19:36:57.312Z",
+      "updatedAt": "2026-10-08T19:36:57.312Z",
+      "sortBy": "manual",
+      "manualOrder": [
+        "428dd837-61c9-5984-b3a5-0f577b6db22a",
+        "d25297b7-5bfa-5283-ae6a-da5f8e524904",
+        "1b6dc3fc-a168-5ede-8cd2-fb3e22566de4",
+        "c207d0b8-8aa9-5290-95a5-2a6c4484456c"
+      ]
+    }
+  ]
+}

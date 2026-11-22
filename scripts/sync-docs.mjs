@@ -1,170 +1,21 @@
 #!/usr/bin/env node
-import { createHash } from "node:crypto";
 import {
+  existsSync,
+  lstatSync,
   mkdirSync,
   readdirSync,
   readFileSync,
   realpathSync,
   rmSync,
-  statSync,
   writeFileSync,
 } from "node:fs";
-import { dirname, join, relative, resolve } from "node:path";
-import { fileURLToPath, pathToFileURL } from "node:url";
+import { basename, dirname, join, relative, resolve, sep } from "node:path";
+import { isDeepStrictEqual } from "node:util";
+import { pathToFileURL } from "node:url";
 
-export const DOCS_ORIGIN = "https://showai.renaissancemind.ai";
-export const DOCS_LOCALES = { "zh-CN": "", en: ".en" };
-
-const sha256 = (text) => createHash("sha256").update(text).digest("hex");
-
-export function componentFile(key) {
-  const [id, version, integrity = ""] = key.split(":");
-  const digest = integrity.replace(/^sha256-/, "");
-  if (!id || !version || !/^[0-9a-f]{64}$/.test(digest))
-    throw new Error(`Unexpected component reference: ${key}`);
-  return `${id}@${version}-${digest.slice(0, 12)}.json`;
-}
-
-function localeDocs(locale, seed, catalog, site, files) {
-  const project = seed.projects?.[site.projectId];
-  if (!project)
-    throw new Error(
-      `The ${locale} seed has no documentation project ${site.projectId}.`,
-    );
-  const excluded = new Set(site.appExclude ?? []);
-  const pages = new Map();
-  for (const [key, record] of Object.entries(seed.pages ?? {})) {
-    const [projectId, pageId] = key.split("/");
-    if (
-      projectId !== site.projectId ||
-      excluded.has(pageId) ||
-      record.document?.archived
-    )
-      continue;
-    pages.set(pageId, record);
-  }
-  const missing = Object.values(site.pages).filter((id) => !pages.has(id));
-  if (missing.length)
-    throw new Error(
-      `The ${locale} seed is missing documentation pages: ${missing.join(", ")}`,
-    );
-  const folders = (project.folders ?? []).filter((folder) => !folder.archived);
-  const entryOrder = seed.sidebar?.entryOrder?.[site.projectId] ?? [];
-  const position = (order, id) => {
-    const index = order.indexOf(id);
-    return index < 0 ? Number.MAX_SAFE_INTEGER : index;
-  };
-  const children = (parentId) => {
-    const parent = parentId
-      ? folders.find((folder) => folder.id === parentId)
-      : project;
-    const order =
-      parent?.sortBy === "manual" && parent.manualOrder
-        ? parent.manualOrder
-        : entryOrder;
-    const items = [
-      ...folders
-        .filter((folder) => (folder.parentId ?? null) === parentId)
-        .map((folder) => ({
-          type: "folder",
-          id: folder.id,
-          title: folder.name,
-        })),
-      ...[...pages.values()]
-        .filter((record) => (record.document.parentId ?? null) === parentId)
-        .map((record) => ({
-          type: "page",
-          id: record.document.id,
-          title: record.document.title,
-        })),
-    ].sort(
-      (a, b) =>
-        position(order, a.id) - position(order, b.id) ||
-        position(entryOrder, a.id) - position(entryOrder, b.id) ||
-        a.title.localeCompare(b.title),
-    );
-    return items.flatMap((item) => {
-      if (item.type === "page") return [{ type: "page", id: item.id }];
-      const nested = children(item.id);
-      const folder = folders.find((entry) => entry.id === item.id);
-      return nested.length
-        ? [
-            {
-              type: "folder",
-              id: item.id,
-              name: folder.name,
-              ...(folder.icon ? { icon: folder.icon } : {}),
-              children: nested,
-            },
-          ]
-        : [];
-    });
-  };
-  const tree = children(null);
-  const placed = new Set();
-  const visit = (entries) =>
-    entries.forEach((entry) =>
-      entry.type === "page" ? placed.add(entry.id) : visit(entry.children),
-    );
-  visit(tree);
-  const orphaned = [...pages.keys()].filter((id) => !placed.has(id));
-  if (orphaned.length)
-    throw new Error(
-      `Documentation pages sit in archived or missing folders: ${orphaned.join(", ")}`,
-    );
-
-  const meta = {};
-  for (const [pageId, record] of pages) {
-    const components = (record.componentKeys ?? []).map((key) => {
-      const component = catalog.components?.[key];
-      if (!component)
-        throw new Error(
-          `The ${locale} catalog has no component ${key} used by ${record.document.title}.`,
-        );
-      const file = `${locale}/components/${componentFile(key)}`;
-      files.set(file, JSON.stringify(component));
-      return file;
-    });
-    const page = JSON.stringify(record.document);
-    const file = `${locale}/pages/${pageId}.json`;
-    files.set(file, page);
-    meta[pageId] = {
-      title: record.document.title,
-      icon: record.document.icon ?? "",
-      file,
-      sha256: sha256(page),
-      components,
-    };
-  }
-  return { name: project.name, icon: project.icon ?? "", tree, pages: meta };
-}
-
-export function buildDocs({ seeds, catalogs, site }) {
-  if (!site?.projectId || !site.pages || site.pages[""] === undefined)
-    throw new Error(
-      "docs-site.json needs a projectId and a page for the empty slug.",
-    );
-  const files = new Map();
-  const locales = {};
-  for (const locale of Object.keys(DOCS_LOCALES))
-    locales[locale] = localeDocs(
-      locale,
-      seeds[locale],
-      catalogs[locale],
-      site,
-      files,
-    );
-  const manifest = {
-    format: "showai-docs",
-    version: 1,
-    origin: DOCS_ORIGIN,
-    projectId: site.projectId,
-    slugs: site.pages,
-    locales,
-  };
-  files.set("manifest.json", JSON.stringify(manifest, null, 1) + "\n");
-  return files;
-}
+import { buildDocs, DOCS_LOCALES } from "./docs-index.mjs";
+import { docsRoot, readDocsProject } from "./docs-project.mjs";
+export { buildDocs, componentFile } from "./docs-index.mjs";
 
 export function readSite(siteDir) {
   const json = (path) => JSON.parse(readFileSync(join(siteDir, path), "utf8"));
@@ -189,7 +40,10 @@ function existingFiles(dir) {
     }
     for (const name of names) {
       const path = join(folder, name);
-      if (statSync(path).isDirectory()) walk(path);
+      const stat = lstatSync(path);
+      if (stat.isSymbolicLink())
+        throw new Error(`Unexpected symlink in the snapshot: ${path}`);
+      if (stat.isDirectory()) walk(path);
       else found.push(relative(dir, path).split("\\").join("/"));
     }
   };
@@ -217,7 +71,17 @@ export function compareDocs(files, dir) {
 }
 
 export function writeDocs(files, dir) {
-  rmSync(dir, { recursive: true, force: true });
+  const previous = existingFiles(dir);
+  for (const path of previous) {
+    if (
+      path !== "manifest.json" &&
+      !/^(en|zh-CN)\/(pages|components)\/[^/]+\.json$/.test(path)
+    )
+      throw new Error(
+        `The export directory contains a file outside the documentation snapshot: ${path}`,
+      );
+  }
+  for (const path of previous) if (!files.has(path)) rmSync(join(dir, path));
   for (const [path, content] of files) {
     mkdirSync(dirname(join(dir, path)), { recursive: true });
     writeFileSync(join(dir, path), content);
@@ -234,31 +98,54 @@ function main(argv) {
     throw new Error(
       "Usage: node scripts/sync-docs.mjs --site <ShowAI_Homepage/site> [--check] [--out DIR]",
     );
-  const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-  const out = resolve(option("--out") ?? join(root, "resources/docs"));
+  const destination = option("--out");
   const files = buildDocs(readSite(resolve(site)));
-  if (argv.includes("--check")) {
-    const differences = compareDocs(files, out);
-    if (differences.length) {
-      console.error(
-        `The App's built-in documentation differs from the website (${differences.length} files):`,
+  if (!destination) {
+    if (!argv.includes("--check"))
+      throw new Error(
+        "Edit the native projects in resources/docs. Use --check to compare the website snapshot or --out DIR to export a separate copy.",
       );
-      for (const line of differences.slice(0, 20)) console.error(`  ${line}`);
-      console.error(
-        `Run node scripts/sync-docs.mjs --site ${site} in the ShowAI checkout, commit resources/docs, and deploy against that commit.`,
+    const local = buildDocs(readDocsProject(docsRoot, false));
+    const paths = new Set([...local.keys(), ...files.keys()]);
+    const differences = [...paths].filter((path) => {
+      const left = local.get(path),
+        right = files.get(path);
+      return (
+        !left ||
+        !right ||
+        !isDeepStrictEqual(JSON.parse(left), JSON.parse(right))
       );
-      process.exitCode = 1;
-      return;
-    }
+    });
+    if (differences.length)
+      throw new Error(
+        `The website snapshot differs from the App documentation: ${differences.join(", ")}`,
+      );
     console.log(
       `Built-in documentation matches the website (${files.size} files).`,
     );
     return;
   }
-  writeDocs(files, out);
-  console.log(
-    `Wrote ${files.size} documentation files to ${relative(process.cwd(), out) || "."}.`,
-  );
+  function resolvedDestination(path) {
+    return existsSync(path)
+      ? realpathSync(path)
+      : join(resolvedDestination(dirname(path)), basename(path));
+  }
+  const out = resolvedDestination(resolve(destination));
+  const source = realpathSync(docsRoot);
+  if (
+    out === source ||
+    source.startsWith(out + sep) ||
+    out.startsWith(source + sep)
+  )
+    throw new Error(
+      "Choose an export directory outside the editable documentation project.",
+    );
+  if (argv.includes("--check")) {
+    const differences = compareDocs(files, out);
+    if (differences.length) throw new Error(differences.join("\n"));
+  } else {
+    writeDocs(files, out);
+  }
 }
 
 if (

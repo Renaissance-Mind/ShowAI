@@ -59,6 +59,8 @@
     "release:assets": "node scripts/release-entry.mjs assets",
     "release:mac": "node scripts/release-mac.mjs",
     "test:release": "node --test scripts/release-entry.test.mjs scripts/trim-embedded-git.test.mjs",
+    "docs:build": "node scripts/docs-project.mjs",
+    "docs:check": "node scripts/docs-project.mjs --check",
     "docs:sync": "node scripts/sync-docs.mjs",
     "test:sync-docs": "node --test scripts/sync-docs.test.mjs",
     "runtime:register": "node dist-runtime/scripts/cli.mjs runtime register --json",

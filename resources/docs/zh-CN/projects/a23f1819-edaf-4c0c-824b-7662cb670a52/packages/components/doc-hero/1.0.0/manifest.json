@@ -1,0 +1,271 @@
+{
+  "id": "doc-hero",
+  "version": "1.0.0",
+  "name": "文档页首",
+  "description": "文档页面的开头：眉题、标题、一两句导语、要点事实与行动按钮，右侧是按主题选择的抽象插图。",
+  "category": "text",
+  "entry": "index.tsx",
+  "reader": "readData",
+  "scenarios": [
+    "每个文档页面的第一个区块，说明这一页能帮读者完成什么",
+    "在页首给出前置条件、用时等关键事实和下一步入口"
+  ],
+  "documentation": {
+    "version": 2,
+    "reuse": {
+      "kind": "domain",
+      "boundaries": [
+        "只用于文档页面开头，每页一个；不用于正文中的小节标题。",
+        "插图是固定的六种抽象主题，不能传入图片；需要截图时在正文中使用图片组件。"
+      ],
+      "owner": "ShowAI 文档站（doc kit）"
+    },
+    "usage": {
+      "purpose": "让读者在第一屏知道这一页解决什么任务、需要什么前提、接下来去哪里。",
+      "structure": [
+        "左侧：眉题、标题（28px）、导语、行动按钮；右侧：220×150 抽象插图；下方：一行要点事实，以细线分隔。",
+        "640px 以下单列，插图缩小后放在标题上方。"
+      ],
+      "inputs": [
+        {
+          "path": "eyebrow",
+          "meaning": "标题上方的短标签，通常是所在栏目。",
+          "omission": {
+            "behavior": "omit",
+            "description": "不显示眉题。"
+          }
+        },
+        {
+          "path": "title",
+          "meaning": "页面标题，写成读者要完成的事。建议不超过 20 个汉字。"
+        },
+        {
+          "path": "lead",
+          "meaning": "一两句导语，建议不超过 80 个汉字。行内标记：**粗体**、`代码`、[文字](链接)；链接可写 https://… 或 doc:slug#anchor。"
+        },
+        {
+          "path": "facts",
+          "meaning": "要点事实，最多 4 组，例如需要、用时、适合谁。",
+          "omission": {
+            "behavior": "omit",
+            "description": "不显示事实行。"
+          }
+        },
+        {
+          "path": "facts[]",
+          "meaning": "一组事实：上方小字标签，下方数值。"
+        },
+        {
+          "path": "facts[].label",
+          "meaning": "事实标签，建议 2–4 个汉字。"
+        },
+        {
+          "path": "facts[].value",
+          "meaning": "事实内容，建议不超过 14 个汉字；可用行内标记。"
+        },
+        {
+          "path": "actions",
+          "meaning": "最多 3 个链接按钮。",
+          "omission": {
+            "behavior": "omit",
+            "description": "不显示按钮。"
+          }
+        },
+        {
+          "path": "actions[]",
+          "meaning": "一个链接按钮。"
+        },
+        {
+          "path": "actions[].label",
+          "meaning": "按钮文字，建议不超过 8 个汉字。"
+        },
+        {
+          "path": "actions[].href",
+          "meaning": "链接地址：https://… 或 doc:slug#anchor（转换为文档站地址，在站内打开）。"
+        },
+        {
+          "path": "actions[].primary",
+          "meaning": "为 true 时显示为实心主按钮；建议每个页首只设一个。",
+          "omission": {
+            "behavior": "fallback",
+            "description": "显示为描边次按钮。",
+            "value": false
+          }
+        },
+        {
+          "path": "art",
+          "meaning": "插图主题：start 叠放的页面、concepts 节点与连线、workbench 工作台窗口、agent 对话变成页面、collab 多端同步、dev 代码与组件；none 不显示插图，文字占满宽度。",
+          "omission": {
+            "behavior": "fallback",
+            "description": "使用 start 插图。",
+            "value": "start"
+          }
+        }
+      ],
+      "recipes": [
+        {
+          "title": "写一个页首",
+          "steps": [
+            "用一句话写清这一页让读者完成什么作为标题。",
+            "导语补充范围与结果，不重复标题。",
+            "facts 只放读者开始前需要知道的事实。",
+            "actions 指向最常见的下一步。"
+          ],
+          "exampleIndex": 0
+        }
+      ],
+      "interactions": [
+        {
+          "action": "点击行动按钮",
+          "effect": "打开链接；文档链接在站内打开。",
+          "persistence": "none"
+        }
+      ],
+      "constraints": [
+        "只读展示，不修改页面数据。",
+        "facts 超过 4 个、actions 超过 3 个时多余项不显示（schema 也会拒绝）。"
+      ],
+      "editing": {
+        "data": [
+          "修改文字、事实、按钮与插图主题。"
+        ],
+        "implementation": [
+          "新增插图主题需要在 ARTS 中加入绘制函数并扩展 schema 的 art 枚举，发布新版本。"
+        ]
+      }
+    },
+    "development": {
+      "entryPoints": [
+        {
+          "path": "index.tsx",
+          "purpose": "组件、六种插图、md() 行内标记与 readData。"
+        },
+        {
+          "path": "style.css",
+          "purpose": "令牌、布局、插图配色与窄屏规则。"
+        }
+      ],
+      "architecture": [
+        "插图是代码绘制的 SVG，颜色全部来自 CSS 令牌类（p/l/k/f-*/s-*/c-*），随亮暗主题切换。",
+        "md() 把行内标记转成 React 元素，不注入 HTML；doc: 链接转换成站点地址。"
+      ],
+      "extensionPoints": [
+        "ARTS 映射插图主题到绘制函数。"
+      ],
+      "invariants": [
+        "组件不调用 onChange。",
+        "链接是普通 <a href>，由宿主拦截打开。"
+      ],
+      "verification": [
+        "在 1000px、390px 宽度以及亮色、暗色主题下检查六种插图和事实行。",
+        "键盘 Tab 到按钮时可见焦点框。"
+      ]
+    }
+  },
+  "defaultData": {
+    "eyebrow": "快速上手",
+    "title": "十分钟做出第一份可分享的页面",
+    "lead": "启动本地工作台，新建项目和页面，用 `/` 插入图表与组件，最后导出一份**离线也能打开**的 HTML。",
+    "facts": [
+      {
+        "label": "需要",
+        "value": "Node.js 22.12+"
+      },
+      {
+        "label": "用时",
+        "value": "约 10 分钟"
+      },
+      {
+        "label": "内容库",
+        "value": "`~/.showai`"
+      }
+    ],
+    "actions": [
+      {
+        "label": "开始安装",
+        "href": "doc:install",
+        "primary": true
+      },
+      {
+        "label": "在 Agent 中使用",
+        "href": "doc:agent-hosts"
+      }
+    ],
+    "art": "start"
+  },
+  "examples": [
+    {
+      "name": "快速上手页首",
+      "data": {
+        "eyebrow": "快速上手",
+        "title": "十分钟做出第一份可分享的页面",
+        "lead": "启动本地工作台，新建项目和页面，用 `/` 插入图表与组件，最后导出一份**离线也能打开**的 HTML。",
+        "facts": [
+          {
+            "label": "需要",
+            "value": "Node.js 22.12+"
+          },
+          {
+            "label": "用时",
+            "value": "约 10 分钟"
+          },
+          {
+            "label": "内容库",
+            "value": "`~/.showai`"
+          }
+        ],
+        "actions": [
+          {
+            "label": "开始安装",
+            "href": "doc:install",
+            "primary": true
+          },
+          {
+            "label": "在 Agent 中使用",
+            "href": "doc:agent-hosts"
+          }
+        ],
+        "art": "start"
+      }
+    },
+    {
+      "name": "在 Agent 中使用页首",
+      "data": {
+        "eyebrow": "与 Agent 协作",
+        "title": "让 Agent 直接写出可编辑的页面",
+        "lead": "在 Codex 或 Claude Code 中安装 ShowAI 插件，Agent 通过 MCP 读写同一个内容库；你在工作台里看到的就是它刚保存的页面。",
+        "facts": [
+          {
+            "label": "支持",
+            "value": "Codex · Claude Code"
+          },
+          {
+            "label": "技能",
+            "value": "7 个"
+          }
+        ],
+        "actions": [
+          {
+            "label": "安装插件",
+            "href": "doc:agent-hosts#install",
+            "primary": true
+          },
+          {
+            "label": "了解技能",
+            "href": "doc:skills"
+          }
+        ],
+        "art": "agent"
+      }
+    },
+    {
+      "name": "无插图的参考页页首",
+      "data": {
+        "eyebrow": "开发参考",
+        "title": "CLI 与 MCP 参考",
+        "lead": "所有命令都读写同一个内容库，执行完即退出；工作台关闭时也能使用。",
+        "art": "none"
+      }
+    }
+  ]
+}

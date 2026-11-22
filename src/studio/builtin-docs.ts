@@ -1,3 +1,4 @@
+import { files } from "../../resources/docs/files";
 import manifest from "../../resources/docs/manifest.json";
 import type { CompiledComponent } from "../contract/types";
 import type { Locale } from "../i18n";
@@ -32,16 +33,12 @@ const docs = manifest as {
 export const WELCOME_DOC = "welcome";
 export const DOCS_HOME = docs.slugs[""];
 
-const files = import.meta.glob<string>("../../resources/docs/*/*/*.json", {
-  query: "?raw",
-  import: "default",
-});
 const components = new Map<string, Promise<CompiledComponent>>();
 
-function read(file: string) {
-  const load = files[`../../resources/docs/${file}`];
+function read<T>(file: string): Promise<T> {
+  const load = files[`./${file}`];
   if (!load) throw new Error(`The App is missing documentation file ${file}.`);
-  return load().then((text) => JSON.parse(text));
+  return load() as Promise<T>;
 }
 
 export function builtinDocs(locale: Locale): DocsLocale {
@@ -72,12 +69,14 @@ export async function loadBuiltinDoc(
   const page = builtinDocs(locale).pages[id];
   if (!page) throw new Error(`No documentation page ${id}.`);
   const [document, compiled] = await Promise.all([
-    read(page.file) as Promise<ShowDocument>,
+    read<{ document: ShowDocument }>(page.file).then(
+      (artifact) => artifact.document,
+    ),
     Promise.all(
       page.components.map((file) => {
         let component = components.get(file);
         if (!component) {
-          component = read(file);
+          component = read<CompiledComponent>(file);
           components.set(file, component);
           component.catch(() => components.delete(file));
         }

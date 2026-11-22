@@ -1,0 +1,900 @@
+{
+  "id": "doc-commands",
+  "version": "1.0.0",
+  "name": "文档命令参考",
+  "description": "可搜索的命令参考：按分组筛选，搜索命令、用途和参数并高亮匹配；展开一条命令查看说明、参数表和可复制的示例。",
+  "category": "other",
+  "entry": "index.tsx",
+  "reader": "readData",
+  "scenarios": [
+    "CLI 与 MCP 命令参考",
+    "列出键盘快捷键、脚本或配置命令",
+    "在长命令清单中按用途和参数查找"
+  ],
+  "documentation": {
+    "version": 2,
+    "reuse": {
+      "kind": "domain",
+      "boundaries": [
+        "用于 ShowAI 文档中的命令、快捷键或脚本清单：每项一行命令加一句用途，可展开说明、参数和示例。",
+        "适合 10–150 条；不用于需要排序或多列数值比较的数据表。",
+        "只读展示：搜索、筛选和展开只改变本地视图，不修改页面数据。"
+      ]
+    },
+    "usage": {
+      "purpose": "让读者按任务找到命令：输入关键词或参数名立刻缩小范围，展开后直接复制示例。",
+      "structure": [
+        "顶部搜索框：同时匹配命令、用途和参数（参数名与说明）；多个关键词用空格分开，需全部匹配；匹配文字高亮。Esc 清空，↓ 进入列表。",
+        "分组筛选：「全部」与每个分组，数字是当前搜索下的匹配数；再次点击已选分组回到「全部」。",
+        "列表按分组分节：每行是等宽字体的命令（程序名淡化、子命令加粗、占位符淡化）和一句用途；只因参数匹配的命令会列出匹配的参数。",
+        "展开一行显示 detail、参数表和带复制按钮的示例。没有 detail、flags、example 的命令不能展开。",
+        "没有匹配时显示空状态，可清除搜索或回到全部分组。"
+      ],
+      "inputs": [
+        {
+          "path": "groups",
+          "meaning": "分组，按显示顺序排列；建议 3–7 组。"
+        },
+        {
+          "path": "groups[].id",
+          "meaning": "分组标识，由 commands[].group 引用，唯一。"
+        },
+        {
+          "path": "groups[].label",
+          "meaning": "分组名称，显示在筛选按钮和分节标题上。"
+        },
+        {
+          "path": "commands",
+          "meaning": "命令，按显示顺序排列；同一分组的命令在该分组下按原顺序显示。最多 200 条，建议不超过 150 条。"
+        },
+        {
+          "path": "commands[].group",
+          "meaning": "所属分组的 id。不匹配任何分组的命令显示在最后的「其他」分组，readData 在 ungrouped 中列出。"
+        },
+        {
+          "path": "commands[].command",
+          "meaning": "命令行，原样以等宽字体显示。开头的 showai、./showai、npm、node 等程序名淡化；其后的第一个词是命令名并加粗，可以是 CLI 子命令或 MCP 工具名（如 page_read、showai_capabilities，可含 _ . -）；CLI 子命令后连续的小写单词（如 pages read）一并加粗，工具名之后不再加粗。以 - 开头的是参数，大写词（PAGE、PATH）视为占位符。"
+        },
+        {
+          "path": "commands[].summary",
+          "meaning": "一句话用途，显示在命令下方并参与搜索。纯文字。"
+        },
+        {
+          "path": "commands[].detail",
+          "meaning": "展开后的说明，支持 **粗体**、`代码`、[链接](href)；空行分段，以 \"- \" 开头的行成为列表。不参与搜索。",
+          "omission": {
+            "behavior": "omit",
+            "description": "展开后不显示说明。"
+          }
+        },
+        {
+          "path": "commands[].flags",
+          "meaning": "参数表，按顺序显示，参与搜索。",
+          "omission": {
+            "behavior": "omit",
+            "description": "不显示参数表。detail、flags、example 都省略时该行不能展开。"
+          }
+        },
+        {
+          "path": "commands[].flags[].flag",
+          "meaning": "参数写法，例如 --home PATH。同一命令内应唯一。"
+        },
+        {
+          "path": "commands[].flags[].meaning",
+          "meaning": "参数说明，支持行内标记。"
+        },
+        {
+          "path": "commands[].example",
+          "meaning": "可直接运行的示例，原样显示在带复制按钮的代码面板中；可以多行。",
+          "omission": {
+            "behavior": "omit",
+            "description": "不显示示例面板。"
+          }
+        },
+        {
+          "path": "placeholder",
+          "meaning": "搜索框的占位文字。",
+          "omission": {
+            "behavior": "fallback",
+            "description": "显示「搜索命令、参数或用途」。",
+            "value": "搜索命令、参数或用途"
+          }
+        }
+      ],
+      "recipes": [
+        {
+          "title": "整理一份 CLI 参考",
+          "steps": [
+            "按读者任务分 3–7 组（例如 运行与连接、项目与页面、展示与导出），不要按源码模块分。",
+            "command 写帮助输出中的形式（大写占位符、方括号表示可选）；summary 写读者用它做什么。",
+            "常用命令补 flags 和一条能直接运行的 example；冷门命令只写 summary。",
+            "用 readData 检查 ungrouped 为空，每组数量合理。"
+          ],
+          "exampleIndex": 0
+        }
+      ],
+      "interactions": [
+        {
+          "action": "在搜索框输入",
+          "effect": "过滤命令并高亮匹配；分组按钮上的数字随之更新。Esc 清空，↓ 移到第一条命令。",
+          "persistence": "view"
+        },
+        {
+          "action": "点击分组按钮",
+          "effect": "只显示该分组；再次点击回到全部。",
+          "persistence": "view"
+        },
+        {
+          "action": "点击命令行或按 Enter",
+          "effect": "展开或收起说明、参数和示例；↑ ↓ 在命令之间移动。",
+          "persistence": "view"
+        },
+        {
+          "action": "点击复制",
+          "effect": "复制示例；沙盒禁止复制时选中代码并提示按 ⌘C / Ctrl+C。",
+          "persistence": "none"
+        }
+      ],
+      "constraints": [
+        "阅读操作不修改页面数据。",
+        "搜索不区分大小写，按子串匹配命令、用途和参数；detail 与 example 不参与搜索。",
+        "列表没有内部滚动，高度随显示的命令增长；命令很多时依靠分组和搜索缩短列表。"
+      ],
+      "editing": {
+        "data": [
+          "增删分组时同步更新 commands[].group。",
+          "命令写法变化时同时更新 example。"
+        ],
+        "implementation": [
+          "要让 detail 参与搜索或支持命令别名，需要新版本。"
+        ]
+      },
+      "rules": [
+        {
+          "kind": "unique",
+          "path": "groups[].id"
+        },
+        {
+          "kind": "reference",
+          "path": "commands[].group",
+          "target": "groups[].id"
+        }
+      ]
+    },
+    "development": {
+      "entryPoints": [
+        {
+          "path": "index.tsx",
+          "purpose": "组件、搜索索引 prepare()、匹配与高亮 ranges() / marked()、命令着色 CommandLine、CodePanel、md() / mdBlock() 与 readData。"
+        },
+        {
+          "path": "style.css",
+          "purpose": "设计令牌（含深色）、搜索框、分组按钮、列表、展开详情、参数表、代码面板、空状态与窄屏规则。"
+        }
+      ],
+      "architecture": [
+        "prepare() 为每条命令预先计算小写的命令、用途和参数文本；每次输入只做子串比较，100 条以上也无需防抖。搜索词通过 useDeferredValue 延后过滤，输入保持流畅。",
+        "高亮在整条命令文字上计算匹配区间，再按词元切分渲染，因此跨越子命令与参数的关键词（如 \"pages read\"）也能完整高亮。",
+        "展开状态以命令下标为键保存在本地 Set 中，搜索和筛选不会重置。"
+      ],
+      "extensionPoints": [
+        "命令词元的分类规则在 CommandLine 中；空状态的建议在组件末尾。"
+      ],
+      "invariants": [
+        "组件不调用 onChange；所有交互只改变本地状态。",
+        "不使用 dangerouslySetInnerHTML；高亮与行内标记都生成 React 元素。"
+      ],
+      "verification": [
+        "示例 0：5 组 40 条；搜索 theme 只剩 pages read 并在行内列出匹配参数 --theme dark；搜索 \"pages read\" 高亮两个词。",
+        "搜索不存在的词显示空状态；在某个分组中搜索其他分组的命令时提供「在全部分组中查看」。",
+        "在 1000 px、390 px 与深色主题下检查搜索框、分组、展开的参数表与代码面板。"
+      ]
+    }
+  },
+  "defaultData": {
+    "groups": [
+      {
+        "id": "run",
+        "label": "运行与连接"
+      },
+      {
+        "id": "project",
+        "label": "项目与页面"
+      }
+    ],
+    "commands": [
+      {
+        "group": "run",
+        "command": "serve [--home PATH] [--port PORT] [--no-open]",
+        "summary": "在本机启动浏览器工作台。",
+        "detail": "服务**只监听** `127.0.0.1`，每次启动生成新的访问凭据。保持终端打开；按 Ctrl+C 停止服务，关闭浏览器标签页只关闭界面。",
+        "flags": [
+          {
+            "flag": "--home PATH",
+            "meaning": "使用指定的内容库目录；不指定时使用 `SHOWAI_HOME` 或默认的 `~/.showai`。"
+          },
+          {
+            "flag": "--port PORT",
+            "meaning": "固定端口；不指定时选择空闲端口。"
+          },
+          {
+            "flag": "--no-open",
+            "meaning": "只打印地址，不自动打开浏览器。"
+          }
+        ],
+        "example": "showai serve --home ~/ShowAI --port 5175 --no-open"
+      },
+      {
+        "group": "run",
+        "command": "mcp [--project PROJECT] [--templates ID[@VERSION],ID]",
+        "summary": "以 stdio 方式启动本地 MCP 服务，供 Codex、Claude Code 等 Agent 连接。",
+        "detail": "一个连接固定使用一个内容库。可以用 `--project` 绑定项目，用 `--templates` 预选模板。",
+        "flags": [
+          {
+            "flag": "--project PROJECT",
+            "meaning": "目标项目 ID；不指定时按当前目录所在的 Git 根目录确定项目。"
+          },
+          {
+            "flag": "--templates ID[@VERSION],ID",
+            "meaning": "预先选择的模板，可指定精确版本。"
+          },
+          {
+            "flag": "--presentation-directory PATH",
+            "meaning": "保存展示文件的目录。"
+          }
+        ],
+        "example": "showai mcp --project 4f1c…"
+      },
+      {
+        "group": "run",
+        "command": "mcp --public",
+        "summary": "启动只读的公开目录 MCP：浏览公开组件与模板，不需要个人项目。"
+      },
+      {
+        "group": "run",
+        "command": "mcp serve --state DIRECTORY --public-url HTTPS_ORIGIN",
+        "summary": "以 HTTP 方式运行远程 MCP 服务。",
+        "detail": "用于自托管远程 MCP。`--public-url` 必须是对外可访问的 HTTPS 地址。",
+        "flags": [
+          {
+            "flag": "--state DIRECTORY",
+            "meaning": "服务状态目录。"
+          },
+          {
+            "flag": "--public-url HTTPS_ORIGIN",
+            "meaning": "客户端访问这个服务的公开地址。"
+          },
+          {
+            "flag": "--sync-server SERVER_ORIGIN",
+            "meaning": "同步使用的项目服务器地址。"
+          },
+          {
+            "flag": "--port 8789",
+            "meaning": "监听端口，默认 8789。"
+          }
+        ]
+      },
+      {
+        "group": "run",
+        "command": "runtime info",
+        "summary": "查看当前 CLI 使用的运行环境与内容库。"
+      },
+      {
+        "group": "run",
+        "command": "runtime register",
+        "summary": "登记当前内容库的 `agent-runtime.json`，让 Agent 找到正确的内容库与执行路径。",
+        "detail": "移动发行包后重新运行一次，刷新配置里的执行路径。",
+        "flags": [
+          {
+            "flag": "--home PATH",
+            "meaning": "使用指定的内容库目录；不指定时使用 `SHOWAI_HOME` 或默认的 `~/.showai`。"
+          },
+          {
+            "flag": "--json",
+            "meaning": "输出机器可读的 JSON，Agent 调用时使用。"
+          }
+        ],
+        "example": "./showai runtime register --json"
+      }
+    ],
+    "placeholder": "搜索命令或参数"
+  },
+  "examples": [
+    {
+      "name": "ShowAI CLI 命令参考（5 组）",
+      "data": {
+        "groups": [
+          {
+            "id": "run",
+            "label": "运行与连接"
+          },
+          {
+            "id": "project",
+            "label": "项目与页面"
+          },
+          {
+            "id": "discover",
+            "label": "组件与模板"
+          },
+          {
+            "id": "deliver",
+            "label": "展示与导出"
+          },
+          {
+            "id": "library",
+            "label": "内容库"
+          }
+        ],
+        "commands": [
+          {
+            "group": "run",
+            "command": "serve [--home PATH] [--port PORT] [--no-open]",
+            "summary": "在本机启动浏览器工作台。",
+            "detail": "服务**只监听** `127.0.0.1`，每次启动生成新的访问凭据。保持终端打开；按 Ctrl+C 停止服务，关闭浏览器标签页只关闭界面。",
+            "flags": [
+              {
+                "flag": "--home PATH",
+                "meaning": "使用指定的内容库目录；不指定时使用 `SHOWAI_HOME` 或默认的 `~/.showai`。"
+              },
+              {
+                "flag": "--port PORT",
+                "meaning": "固定端口；不指定时选择空闲端口。"
+              },
+              {
+                "flag": "--no-open",
+                "meaning": "只打印地址，不自动打开浏览器。"
+              }
+            ],
+            "example": "showai serve --home ~/ShowAI --port 5175 --no-open"
+          },
+          {
+            "group": "run",
+            "command": "mcp [--project PROJECT] [--templates ID[@VERSION],ID]",
+            "summary": "以 stdio 方式启动本地 MCP 服务，供 Codex、Claude Code 等 Agent 连接。",
+            "detail": "一个连接固定使用一个内容库。可以用 `--project` 绑定项目，用 `--templates` 预选模板。",
+            "flags": [
+              {
+                "flag": "--project PROJECT",
+                "meaning": "目标项目 ID；不指定时按当前目录所在的 Git 根目录确定项目。"
+              },
+              {
+                "flag": "--templates ID[@VERSION],ID",
+                "meaning": "预先选择的模板，可指定精确版本。"
+              },
+              {
+                "flag": "--presentation-directory PATH",
+                "meaning": "保存展示文件的目录。"
+              }
+            ],
+            "example": "showai mcp --project 4f1c…"
+          },
+          {
+            "group": "run",
+            "command": "mcp --public",
+            "summary": "启动只读的公开目录 MCP：浏览公开组件与模板，不需要个人项目。"
+          },
+          {
+            "group": "run",
+            "command": "mcp serve --state DIRECTORY --public-url HTTPS_ORIGIN",
+            "summary": "以 HTTP 方式运行远程 MCP 服务。",
+            "detail": "用于自托管远程 MCP。`--public-url` 必须是对外可访问的 HTTPS 地址。",
+            "flags": [
+              {
+                "flag": "--state DIRECTORY",
+                "meaning": "服务状态目录。"
+              },
+              {
+                "flag": "--public-url HTTPS_ORIGIN",
+                "meaning": "客户端访问这个服务的公开地址。"
+              },
+              {
+                "flag": "--sync-server SERVER_ORIGIN",
+                "meaning": "同步使用的项目服务器地址。"
+              },
+              {
+                "flag": "--port 8789",
+                "meaning": "监听端口，默认 8789。"
+              }
+            ]
+          },
+          {
+            "group": "run",
+            "command": "runtime info",
+            "summary": "查看当前 CLI 使用的运行环境与内容库。"
+          },
+          {
+            "group": "run",
+            "command": "runtime register",
+            "summary": "登记当前内容库的 `agent-runtime.json`，让 Agent 找到正确的内容库与执行路径。",
+            "detail": "移动发行包后重新运行一次，刷新配置里的执行路径。",
+            "flags": [
+              {
+                "flag": "--home PATH",
+                "meaning": "使用指定的内容库目录；不指定时使用 `SHOWAI_HOME` 或默认的 `~/.showai`。"
+              },
+              {
+                "flag": "--json",
+                "meaning": "输出机器可读的 JSON，Agent 调用时使用。"
+              }
+            ],
+            "example": "./showai runtime register --json"
+          },
+          {
+            "group": "project",
+            "command": "projects list",
+            "summary": "列出内容库中的项目。",
+            "flags": [
+              {
+                "flag": "--home PATH",
+                "meaning": "使用指定的内容库目录；不指定时使用 `SHOWAI_HOME` 或默认的 `~/.showai`。"
+              },
+              {
+                "flag": "--json",
+                "meaning": "输出机器可读的 JSON，Agent 调用时使用。"
+              }
+            ],
+            "example": "showai projects list --json"
+          },
+          {
+            "group": "project",
+            "command": "projects create --name NAME",
+            "summary": "新建项目，返回项目 ID。",
+            "flags": [
+              {
+                "flag": "--name NAME",
+                "meaning": "项目名称。"
+              },
+              {
+                "flag": "--harness HOST --session SESSION_ID",
+                "meaning": "同时把项目绑定到某个 Agent 宿主的会话。"
+              },
+              {
+                "flag": "--home PATH",
+                "meaning": "使用指定的内容库目录；不指定时使用 `SHOWAI_HOME` 或默认的 `~/.showai`。"
+              },
+              {
+                "flag": "--json",
+                "meaning": "输出机器可读的 JSON，Agent 调用时使用。"
+              }
+            ],
+            "example": "showai projects create --name \"模型调研\" --json"
+          },
+          {
+            "group": "project",
+            "command": "projects current [--source-directory PROJECT_DIRECTORY]",
+            "summary": "查看某个源码目录对应的项目。",
+            "detail": "不传参数时，项目按当前目录所在的 Git 根目录确定。",
+            "flags": [
+              {
+                "flag": "--source-directory PROJECT_DIRECTORY",
+                "meaning": "按这个目录解析项目。"
+              },
+              {
+                "flag": "--project PROJECT",
+                "meaning": "目标项目 ID；不指定时按当前目录所在的 Git 根目录确定项目。"
+              }
+            ]
+          },
+          {
+            "group": "project",
+            "command": "projects bind PROJECT --harness HOST --session SESSION_ID",
+            "summary": "把已有项目绑定到 Agent 宿主的一个会话。"
+          },
+          {
+            "group": "project",
+            "command": "pages list --project PROJECT",
+            "summary": "列出项目中的页面。",
+            "flags": [
+              {
+                "flag": "--project PROJECT",
+                "meaning": "目标项目 ID；不指定时按当前目录所在的 Git 根目录确定项目。"
+              },
+              {
+                "flag": "--json",
+                "meaning": "输出机器可读的 JSON，Agent 调用时使用。"
+              }
+            ],
+            "example": "showai pages list --project 4f1c… --json"
+          },
+          {
+            "group": "project",
+            "command": "pages read PAGE --project PROJECT [--view structured|image|html]",
+            "summary": "读取一个页面：结构化数据、截图或可交互 HTML。",
+            "detail": "改内容时读 **structured**（默认）；检查样式和布局读 **image**；检查交互读 **html**。截图需要本机安装 Chrome、Edge 或 Chromium。",
+            "flags": [
+              {
+                "flag": "--view structured|image|html",
+                "meaning": "读取形式，默认 structured。"
+              },
+              {
+                "flag": "--theme dark",
+                "meaning": "以深色主题截图。"
+              },
+              {
+                "flag": "--width N --height N",
+                "meaning": "截图视口大小，高度最大 2160。"
+              },
+              {
+                "flag": "--out PATH",
+                "meaning": "图片或 HTML 的输出路径；文件已存在时需加 `--overwrite`。"
+              },
+              {
+                "flag": "--blocks ID,ID",
+                "meaning": "只读取指定节点（页面中的 `attrs.id`）。"
+              },
+              {
+                "flag": "--state OPTIONS.json",
+                "meaning": "HTML 读取时回放的交互步骤。"
+              }
+            ],
+            "example": "showai pages read PAGE --project PROJECT --view image --theme dark --width 1000 --height 900 --out ./preview.png --json"
+          },
+          {
+            "group": "project",
+            "command": "pages read PAGE --project PROJECT --format markdown [--detail full|outline]",
+            "summary": "以 Markdown 读取页面文字与组件数据。",
+            "detail": "`--detail outline` 先返回带稳定 ID 的大纲，再用 `--blocks` 读取需要的部分。",
+            "flags": [
+              {
+                "flag": "--detail full|outline",
+                "meaning": "完整内容或只看大纲。"
+              },
+              {
+                "flag": "--blocks ID,ID",
+                "meaning": "只读取指定节点。"
+              }
+            ],
+            "example": "showai pages read PAGE --project PROJECT --detail outline --json"
+          },
+          {
+            "group": "project",
+            "command": "boards read PAGE --project PROJECT [--board BOARD_NODE]",
+            "summary": "读取页面中的白板（Board）。",
+            "flags": [
+              {
+                "flag": "--board BOARD_NODE",
+                "meaning": "要读取的 Board 节点 ID。"
+              },
+              {
+                "flag": "--state OPTIONS.json",
+                "meaning": "读取选项。"
+              }
+            ]
+          },
+          {
+            "group": "project",
+            "command": "search --query TEXT [--project ID] [--kind page|component|template|project|source]",
+            "summary": "在内容库中搜索页面、组件、模板或项目。",
+            "flags": [
+              {
+                "flag": "--query TEXT",
+                "meaning": "搜索文字。"
+              },
+              {
+                "flag": "--kind …",
+                "meaning": "只搜索一种对象：page、component、template、project 或 source。"
+              }
+            ],
+            "example": "showai search --query 房贷 --kind page --json"
+          },
+          {
+            "group": "discover",
+            "command": "guide [TOPIC]",
+            "summary": "按主题查看创作、版本与交付的准确命令。",
+            "detail": "主题：workspace、reading、authoring、containers、document、catalog、component、templates、versions、recovery、sync、export、publish。",
+            "example": "showai guide component"
+          },
+          {
+            "group": "discover",
+            "command": "catalog list [--kind component|template] [--scope SCOPE]",
+            "summary": "列出可用的组件或模板：名称、说明与适用场景。",
+            "detail": "范围（scope）有 builtin、global、published 与 project。不指定范围时返回全部内置组件和所选项目的组件。",
+            "flags": [
+              {
+                "flag": "--kind component|template",
+                "meaning": "列出组件或模板。"
+              },
+              {
+                "flag": "--scope SCOPE",
+                "meaning": "builtin、global、published 或 project。"
+              },
+              {
+                "flag": "--query TEXT",
+                "meaning": "按文字筛选。"
+              },
+              {
+                "flag": "--limit N --cursor CURSOR",
+                "meaning": "分页。"
+              }
+            ],
+            "example": "showai catalog list --kind component --project PROJECT --json"
+          },
+          {
+            "group": "discover",
+            "command": "catalog describe ID [--kind component|template] [--view VIEW]",
+            "summary": "查看一个组件或模板的说明、参数、示例或源码。",
+            "detail": "常用视图：guide（使用约定）、schema（参数）、examples（完整示例）、source（源码）、parameters（逐项参数说明，可用 `--parameter-path` 选择字段）。",
+            "flags": [
+              {
+                "flag": "--view guide|schema|examples|source|parameters",
+                "meaning": "要查看的部分，默认是摘要。"
+              },
+              {
+                "flag": "--parameter-path PATH",
+                "meaning": "在 parameters 视图中只看某个字段或子树。"
+              }
+            ],
+            "example": "showai catalog describe doc-compare --kind component --view schema --json"
+          },
+          {
+            "group": "discover",
+            "command": "catalog import --project PROJECT --input DIRECTORY",
+            "summary": "把本地组件包导入项目。",
+            "detail": "组件包包含 `manifest.json`、`props.schema.json` 和 React 入口。同一 id 与版本导入后**不可更改**，修改实现时提高版本号。",
+            "flags": [
+              {
+                "flag": "--project PROJECT",
+                "meaning": "目标项目 ID；不指定时按当前目录所在的 Git 根目录确定项目。"
+              },
+              {
+                "flag": "--input DIRECTORY",
+                "meaning": "组件包文件夹。"
+              }
+            ],
+            "example": "showai catalog import --project PROJECT --input ./components/doc-compare --json"
+          },
+          {
+            "group": "discover",
+            "command": "public list [--kind component|template] [--query TEXT]",
+            "summary": "浏览公开目录中的组件和模板，不需要个人项目。"
+          },
+          {
+            "group": "discover",
+            "command": "public describe ID [--view guide|schema|examples|source]",
+            "summary": "查看公开组件或模板的说明、参数、示例或源码。"
+          },
+          {
+            "group": "discover",
+            "command": "template import DIRECTORY --project PROJECT",
+            "summary": "把模板文件夹导入项目。"
+          },
+          {
+            "group": "discover",
+            "command": "template export ID --project PROJECT --out NEW_DIRECTORY",
+            "summary": "把项目中的模板导出为文件夹。"
+          },
+          {
+            "group": "discover",
+            "command": "template context --project PROJECT [--templates ID[@VERSION],ID]",
+            "summary": "查看所选模板的创作上下文。"
+          },
+          {
+            "group": "discover",
+            "command": "template guide STAGE --project PROJECT",
+            "summary": "读取模板在某个阶段（例如规划、设计）的指南。"
+          },
+          {
+            "group": "deliver",
+            "command": "export --project PROJECT --page PAGE --format html|inline --out PATH",
+            "summary": "把整页或选中的块导出为独立 HTML。",
+            "detail": "默认把阅读器、内容和组件运行时都打包进去，离线可读。加 `--blocks` 只导出选中的块。",
+            "flags": [
+              {
+                "flag": "--format html|inline",
+                "meaning": "html 是完整页面；inline 是嵌入宿主对话的片段。"
+              },
+              {
+                "flag": "--blocks ID,ID",
+                "meaning": "只导出这些节点及必要的上级容器。"
+              },
+              {
+                "flag": "--out PATH",
+                "meaning": "输出文件；已存在时需加 `--overwrite`。"
+              }
+            ],
+            "example": "showai export --project PROJECT --page PAGE --format html --out ./report.html --json"
+          },
+          {
+            "group": "deliver",
+            "command": "export --project PROJECT --format site --out DIRECTORY",
+            "summary": "把整个项目导出为静态网站。",
+            "example": "showai export --project PROJECT --format site --out ./site --json"
+          },
+          {
+            "group": "deliver",
+            "command": "render --input INPUT_JSON --out PAGE.html",
+            "summary": "不经过项目，直接把一份页面 JSON 渲染成 HTML。",
+            "detail": "生成之前先校验源文件，并拒绝外链图片，所以渲染成功的页面是自包含的。",
+            "flags": [
+              {
+                "flag": "--overwrite",
+                "meaning": "覆盖已有文件。"
+              }
+            ]
+          },
+          {
+            "group": "deliver",
+            "command": "render --template TEMPLATE_ID --title TITLE --out PAGE.html",
+            "summary": "用模板生成一个独立页面。"
+          },
+          {
+            "group": "library",
+            "command": "library init",
+            "summary": "初始化版本化内容库。"
+          },
+          {
+            "group": "library",
+            "command": "library verify",
+            "summary": "校验内容库的完整性。"
+          },
+          {
+            "group": "library",
+            "command": "library stats",
+            "summary": "查看内容库的大小与对象统计。"
+          },
+          {
+            "group": "library",
+            "command": "library cleanup-plan [--older-than-days DAYS]",
+            "summary": "生成清理计划，列出可以回收的旧数据。",
+            "detail": "先生成计划、确认后再用 `library cleanup PLAN_ID` 执行。"
+          },
+          {
+            "group": "library",
+            "command": "library cleanup PLAN_ID",
+            "summary": "执行一份已确认的清理计划。"
+          },
+          {
+            "group": "library",
+            "command": "library archive --out ABSOLUTE_NEW_DIRECTORY",
+            "summary": "把内容库归档到一个新目录。",
+            "example": "showai library archive --out /Volumes/Backup/showai-2026-10 --json"
+          },
+          {
+            "group": "library",
+            "command": "library verify-archive ARCHIVE_DIRECTORY",
+            "summary": "校验一份归档。"
+          },
+          {
+            "group": "library",
+            "command": "library import --source OLD_PATH --home NEW_OR_SAME_PATH",
+            "summary": "从旧的内容库导入。",
+            "detail": "导入后用 `library activate IMPORT_ID` 启用。"
+          },
+          {
+            "group": "library",
+            "command": "library migrate --home PATH",
+            "summary": "就地准备、校验并启用迁移，保留原始文件。"
+          },
+          {
+            "group": "library",
+            "command": "workspace conflicts [--project ID]",
+            "summary": "列出外部修改造成的文件冲突。"
+          },
+          {
+            "group": "library",
+            "command": "workspace resolve CONFLICT_ID --resolution discard|import|merge",
+            "summary": "处理一个冲突：丢弃、导入或合并。",
+            "flags": [
+              {
+                "flag": "--resolution discard|import|merge",
+                "meaning": "处理方式；两份输入都会保留到你明确选择为止。"
+              }
+            ]
+          }
+        ],
+        "placeholder": "搜索命令、参数或用途，例如 export、--theme"
+      }
+    },
+    {
+      "name": "运行与项目命令（精简）",
+      "data": {
+        "groups": [
+          {
+            "id": "run",
+            "label": "运行与连接"
+          },
+          {
+            "id": "project",
+            "label": "项目与页面"
+          }
+        ],
+        "commands": [
+          {
+            "group": "run",
+            "command": "serve [--home PATH] [--port PORT] [--no-open]",
+            "summary": "在本机启动浏览器工作台。",
+            "detail": "服务**只监听** `127.0.0.1`，每次启动生成新的访问凭据。保持终端打开；按 Ctrl+C 停止服务，关闭浏览器标签页只关闭界面。",
+            "flags": [
+              {
+                "flag": "--home PATH",
+                "meaning": "使用指定的内容库目录；不指定时使用 `SHOWAI_HOME` 或默认的 `~/.showai`。"
+              },
+              {
+                "flag": "--port PORT",
+                "meaning": "固定端口；不指定时选择空闲端口。"
+              },
+              {
+                "flag": "--no-open",
+                "meaning": "只打印地址，不自动打开浏览器。"
+              }
+            ],
+            "example": "showai serve --home ~/ShowAI --port 5175 --no-open"
+          },
+          {
+            "group": "run",
+            "command": "mcp [--project PROJECT] [--templates ID[@VERSION],ID]",
+            "summary": "以 stdio 方式启动本地 MCP 服务，供 Codex、Claude Code 等 Agent 连接。",
+            "detail": "一个连接固定使用一个内容库。可以用 `--project` 绑定项目，用 `--templates` 预选模板。",
+            "flags": [
+              {
+                "flag": "--project PROJECT",
+                "meaning": "目标项目 ID；不指定时按当前目录所在的 Git 根目录确定项目。"
+              },
+              {
+                "flag": "--templates ID[@VERSION],ID",
+                "meaning": "预先选择的模板，可指定精确版本。"
+              },
+              {
+                "flag": "--presentation-directory PATH",
+                "meaning": "保存展示文件的目录。"
+              }
+            ],
+            "example": "showai mcp --project 4f1c…"
+          },
+          {
+            "group": "run",
+            "command": "mcp --public",
+            "summary": "启动只读的公开目录 MCP：浏览公开组件与模板，不需要个人项目。"
+          },
+          {
+            "group": "run",
+            "command": "mcp serve --state DIRECTORY --public-url HTTPS_ORIGIN",
+            "summary": "以 HTTP 方式运行远程 MCP 服务。",
+            "detail": "用于自托管远程 MCP。`--public-url` 必须是对外可访问的 HTTPS 地址。",
+            "flags": [
+              {
+                "flag": "--state DIRECTORY",
+                "meaning": "服务状态目录。"
+              },
+              {
+                "flag": "--public-url HTTPS_ORIGIN",
+                "meaning": "客户端访问这个服务的公开地址。"
+              },
+              {
+                "flag": "--sync-server SERVER_ORIGIN",
+                "meaning": "同步使用的项目服务器地址。"
+              },
+              {
+                "flag": "--port 8789",
+                "meaning": "监听端口，默认 8789。"
+              }
+            ]
+          },
+          {
+            "group": "run",
+            "command": "runtime info",
+            "summary": "查看当前 CLI 使用的运行环境与内容库。"
+          },
+          {
+            "group": "run",
+            "command": "runtime register",
+            "summary": "登记当前内容库的 `agent-runtime.json`，让 Agent 找到正确的内容库与执行路径。",
+            "detail": "移动发行包后重新运行一次，刷新配置里的执行路径。",
+            "flags": [
+              {
+                "flag": "--home PATH",
+                "meaning": "使用指定的内容库目录；不指定时使用 `SHOWAI_HOME` 或默认的 `~/.showai`。"
+              },
+              {
+                "flag": "--json",
+                "meaning": "输出机器可读的 JSON，Agent 调用时使用。"
+              }
+            ],
+            "example": "./showai runtime register --json"
+          }
+        ],
+        "placeholder": "搜索命令或参数"
+      }
+    }
+  ]
+}

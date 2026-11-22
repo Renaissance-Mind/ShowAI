@@ -2494,7 +2494,7 @@ export class SyncManager {
       (item) => !item.paused && (!projectIds || projectIds.has(item.projectId)),
     );
     const library = new GitLibrary(this.home);
-    const global = await library.head();
+    const global = selected.length ? await library.head() : null;
     let tokens: Promise<Map<string, string | null>> | undefined;
     const resourceToken = async (projectId: string) => {
       const path = `projects/${projectId}`;

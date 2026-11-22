@@ -23,3 +23,7 @@ export function walk(
   visit: (node: JSONContent, context: WalkContext) => unknown,
   options: WalkOptions,
 ): void;
+export function walkComponentReferences(
+  root: JSONContent,
+  visit: (data: unknown, node: JSONContent) => void,
+): void;

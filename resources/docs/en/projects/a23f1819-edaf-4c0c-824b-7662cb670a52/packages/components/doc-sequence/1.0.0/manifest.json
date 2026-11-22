@@ -1,0 +1,388 @@
+{
+  "id": "doc-sequence",
+  "version": "1.0.0",
+  "name": "Document sequence diagram",
+  "description": "Step-by-step playback sequence diagram for documentation: participant lifeline, call (solid line), return (dashed line) and remarks; previous step / next step / play / restart, unreached steps fade out, and the description of the current step is displayed below the diagram. Narrow screen changed to vertical step list.",
+  "category": "flow",
+  "entry": "index.tsx",
+  "reader": "readData",
+  "scenarios": [
+    "Explain the round trip of an operation between Agent, MCP, content library and workbench",
+    "Explain the process of synchronization, publishing, exporting, etc. involving multiple parties",
+    "The tutorial explains step by step what components a request passes through."
+  ],
+  "documentation": {
+    "version": 2,
+    "reuse": {
+      "kind": "domain",
+      "boundaries": [
+        "Suitable for interactions with 2–6 participants and 3–14 steps; longer processes are broken into several diagrams.",
+        "Only the communication of messages in time sequence is expressed, and branches and loops are not expressed.",
+        "Please use doc-diagram for static relationships; please use doc-steps for operation steps."
+      ],
+      "owner": "ShowAI document component library (doc-*), used for pages in showai.renaissancemind.ai/doc"
+    },
+    "usage": {
+      "purpose": "Let readers see step by step how an operation goes back and forth between several participants. The explanation of each step is placed in detail.",
+      "structure": [
+        "Top: title and \"n/Nth step\".",
+        "Middle part: participant cards and lifelines, one line for each step: calls are solid arrows, returns are dotted arrows, notes are boxes crossing the lifeline; call yourself and draw a loop.",
+        "Below: Control buttons and description of the current step.",
+        "When the width is less than 640px, it is changed to a vertical step list, and \"initiator → receiver\" is displayed for each step."
+      ],
+      "inputs": [
+        {
+          "path": "actors",
+          "meaning": "Participants, arranged from left to right, equally divided in width. 2–6 are recommended; when empty, an empty status prompt is displayed."
+        },
+        {
+          "path": "actors[].id",
+          "meaning": "The actor's unique id, which steps is referenced by."
+        },
+        {
+          "path": "actors[].label",
+          "meaning": "It is recommended that the participant name should not exceed 8 characters; it will be truncated if it cannot fit."
+        },
+        {
+          "path": "actors[].sub",
+          "meaning": "Subtitles, such as implementation or location; truncated if there are many participants.",
+          "omission": {
+            "behavior": "omit",
+            "description": "Participant cards show only names; cards are shorter when all have no subtitles."
+          }
+        },
+        {
+          "path": "actors[].icon",
+          "meaning": "Icon: An emoji.",
+          "omission": {
+            "behavior": "omit",
+            "description": "No icon is displayed."
+          }
+        },
+        {
+          "path": "actors[].tone",
+          "meaning": "Participant colors: brand | teal | warm | violet | rose | slate. Participants involved in the current step are highlighted with it.",
+          "omission": {
+            "behavior": "fallback",
+            "description": "Use brand.",
+            "value": "brand"
+          }
+        },
+        {
+          "path": "steps",
+          "meaning": "Chronological steps. Steps that reference non-existent actors are skipped (listed in skipped in readData). When empty, an empty status prompt is displayed. No more than 14 steps is recommended."
+        },
+        {
+          "path": "steps[].from",
+          "meaning": "Initiator participant id."
+        },
+        {
+          "path": "steps[].to",
+          "meaning": "Receiver participant id; when it is the same as from, a self-calling loop is drawn."
+        },
+        {
+          "path": "steps[].label",
+          "meaning": "The short label above the arrow is recommended to be no more than 10 Chinese characters; if it exceeds the limit, it will be truncated and the full text will be displayed below."
+        },
+        {
+          "path": "steps[].detail",
+          "meaning": "A description of the current step is shown below the figure. Supports **bold**,`代码`, [Link](https://…) and [Link](doc:slug#anchor); line break segmentation.",
+          "omission": {
+            "behavior": "omit",
+            "description": "Show only step labels with Initiator → Receiver."
+          }
+        },
+        {
+          "path": "steps[].kind",
+          "meaning": "call: call, solid arrow; reply: return, dotted open arrow; note: note box, spanning the lifeline between from and to.",
+          "omission": {
+            "behavior": "fallback",
+            "description": "call。",
+            "value": "call"
+          }
+        },
+        {
+          "path": "title",
+          "meaning": "The title of the figure is displayed in the upper left corner.",
+          "omission": {
+            "behavior": "omit",
+            "description": "No title is displayed."
+          }
+        }
+      ],
+      "recipes": [
+        {
+          "title": "Draw a round trip to Agent editing",
+          "steps": [
+            "List the participants, arranged by message flow from left to right.",
+            "Write a verb phrase as label for each step, and write the parameters and reasons into detail.",
+            "Use reply to return and note to comment.",
+            "Use readData to check that skipped is empty."
+          ],
+          "exampleIndex": 0
+        }
+      ],
+      "interactions": [
+        {
+          "action": "Previous/next step, or press the left and right arrow keys on the picture",
+          "effect": "Moves the current step; subsequent steps fade.",
+          "persistence": "view"
+        },
+        {
+          "action": "play/pause",
+          "effect": "Advance one step every 1.6 seconds, stopping at the last step.",
+          "persistence": "view"
+        },
+        {
+          "action": "Start over",
+          "effect": "Go back to step one and stop playing.",
+          "persistence": "view"
+        },
+        {
+          "action": "Click an arrow or a step in a list",
+          "effect": "Skip to this step.",
+          "persistence": "view"
+        }
+      ],
+      "constraints": [
+        "Reading operations do not modify page data.",
+        "When the system turns on \"Reduce Motion Effect\", the transition animation is turned off; playback only starts after the reader clicks."
+      ],
+      "editing": {
+        "data": [
+          "When adding or deleting participants, check the reference of steps synchronously."
+        ],
+        "implementation": [
+          "Create new versions when branches, loop boxes or activation bars are needed."
+        ]
+      }
+    },
+    "development": {
+      "entryPoints": [
+        {
+          "path": "index.tsx",
+          "purpose": "Timing layout, playback state, wide/narrow view and readData."
+        },
+        {
+          "path": "style.css",
+          "purpose": "Tokens, light and dark themes, and step status styles."
+        }
+      ],
+      "architecture": [
+        "Participants equal the width of the container (as measured by the ResizeObserver), and the SVG is the same width as the container, without scaling the text.",
+        "The current step cur is the only view state; playback is advanced with setInterval."
+      ],
+      "extensionPoints": [
+        "ROW, NOTE_ROW, SELF_ROW control the row height; PLAY_MS controls the playback interval."
+      ],
+      "invariants": [
+        "Only react is imported; inline markup is rendered as React elements.",
+        "Reading interactions only change local state."
+      ],
+      "verification": [
+        "The example \"A round trip for Agent to modify the content of a page\" should show 5 participants and 10 steps. Step 5 is a self-call loopback and step 8 is a comment.",
+        "Check that the label does not overlap the arrow or card in light, dark and 390px width."
+      ]
+    }
+  },
+  "defaultData": {
+    "title": "Export a website",
+    "actors": [
+      {
+        "id": "user",
+        "label": "user",
+        "icon": "🙋",
+        "tone": "slate"
+      },
+      {
+        "id": "wb",
+        "label": "Workbench",
+        "icon": "🖥️",
+        "tone": "brand"
+      },
+      {
+        "id": "exp",
+        "label": "exporter",
+        "icon": "📦",
+        "tone": "teal"
+      }
+    ],
+    "steps": [
+      {
+        "from": "user",
+        "to": "wb",
+        "label": "Choose export as website",
+        "detail": "Select the export format in the project menu."
+      },
+      {
+        "from": "wb",
+        "to": "exp",
+        "label": "Collection of pages and components",
+        "detail": "Only collect component versions actually used by the page."
+      },
+      {
+        "from": "exp",
+        "to": "user",
+        "label": "Static website directory",
+        "kind": "reply",
+        "detail": "Directories can be deployed directly to any static hosting."
+      }
+    ]
+  },
+  "examples": [
+    {
+      "name": "Round trip for Agent to modify the content of a page",
+      "data": {
+        "title": "Round trip for Agent to modify the content of a page",
+        "actors": [
+          {
+            "id": "user",
+            "label": "user",
+            "icon": "🙋",
+            "tone": "slate"
+          },
+          {
+            "id": "agent",
+            "label": "Agent",
+            "sub": "Codex / Claude Code",
+            "icon": "🤖",
+            "tone": "brand"
+          },
+          {
+            "id": "mcp",
+            "label": "ShowAI MCP",
+            "sub": "stdio adapter",
+            "icon": "🔌",
+            "tone": "teal"
+          },
+          {
+            "id": "lib",
+            "label": "Content Library",
+            "sub": "~/.showai",
+            "icon": "🗂️",
+            "tone": "violet"
+          },
+          {
+            "id": "wb",
+            "label": "Workbench",
+            "sub": "Desktop/Browser",
+            "icon": "🖥️",
+            "tone": "warm"
+          }
+        ],
+        "steps": [
+          {
+            "from": "user",
+            "to": "agent",
+            "label": "Change the pricing page to three levels",
+            "detail": "Users use natural language to propose modifications in Agent without knowing the page ID."
+          },
+          {
+            "from": "agent",
+            "to": "mcp",
+            "label": "Find page",
+            "detail": "Agent calls **pages_list** or **library_search** to find the page to be changed by title and item."
+          },
+          {
+            "from": "mcp",
+            "to": "lib",
+            "label": "read page",
+            "detail": "**page_read** returns the complete page source and its **hash**, and then saves with this baseline."
+          },
+          {
+            "from": "lib",
+            "to": "agent",
+            "label": "Page source + hash",
+            "kind": "reply",
+            "detail": "The content is a structured block tree, each block has a stable ID, and the agent can only change a few of them."
+          },
+          {
+            "from": "agent",
+            "to": "agent",
+            "label": "Modify block",
+            "detail": "Agent changes the content locally and uses **page_diff** to preview the changes if necessary."
+          },
+          {
+            "from": "agent",
+            "to": "mcp",
+            "label": "Save (with base hash)",
+            "detail": "**page_save** brings the hash when reading. If someone changes the same page during this period, the save will be rejected and the differences will be given instead of overwriting other people's changes."
+          },
+          {
+            "from": "mcp",
+            "to": "lib",
+            "label": "Write new revision",
+            "detail": "The content library writes a new page file and retains a snapshot, allowing you to go back to a previous revision."
+          },
+          {
+            "from": "lib",
+            "to": "wb",
+            "label": "File changes",
+            "kind": "note",
+            "detail": "The workbench monitors the content library, and open pages will be refreshed automatically."
+          },
+          {
+            "from": "agent",
+            "to": "mcp",
+            "label": "display page",
+            "detail": "**page_present** allows users to see the saved page directly in the workbench or Agent host."
+          },
+          {
+            "from": "wb",
+            "to": "user",
+            "label": "see new page",
+            "kind": "reply",
+            "detail": "What the user sees is the saved version, and they can continue to edit manually or let the Agent make changes."
+          }
+        ]
+      }
+    },
+    {
+      "name": "Export a website",
+      "data": {
+        "title": "Export a website",
+        "actors": [
+          {
+            "id": "user",
+            "label": "user",
+            "icon": "🙋",
+            "tone": "slate"
+          },
+          {
+            "id": "wb",
+            "label": "Workbench",
+            "icon": "🖥️",
+            "tone": "brand"
+          },
+          {
+            "id": "exp",
+            "label": "exporter",
+            "icon": "📦",
+            "tone": "teal"
+          }
+        ],
+        "steps": [
+          {
+            "from": "user",
+            "to": "wb",
+            "label": "Choose export as website",
+            "detail": "Select the export format in the project menu."
+          },
+          {
+            "from": "wb",
+            "to": "exp",
+            "label": "Collection of pages and components",
+            "detail": "Only collect component versions actually used by the page."
+          },
+          {
+            "from": "exp",
+            "to": "user",
+            "label": "Static website directory",
+            "kind": "reply",
+            "detail": "Directories can be deployed directly to any static hosting."
+          }
+        ]
+      }
+    }
+  ]
+}

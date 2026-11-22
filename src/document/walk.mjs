@@ -45,3 +45,23 @@ export function walk(root, visit, options) {
     -1,
   );
 }
+
+export function walkComponentReferences(root, visit) {
+  walk(
+    root,
+    (node) => {
+      if (
+        (node.type === "widget" || node.type === "inlineWidget") &&
+        node.attrs?.kind === "custom"
+      )
+        visit(node.attrs.data, node);
+      if (
+        node.type === "surface" &&
+        node.attrs?.kind === "page" &&
+        node.attrs.outline?.renderer
+      )
+        visit(node.attrs.outline.renderer, node);
+    },
+    { scope: "content" },
+  );
+}
