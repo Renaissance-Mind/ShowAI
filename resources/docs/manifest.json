@@ -154,7 +154,7 @@
      "title": "导出与分享",
      "icon": "📤",
      "file": "zh-CN/projects/a23f1819-edaf-4c0c-824b-7662cb670a52/pages/038265ef-4dcc-5b17-9003-83c716c14876.json",
-     "sha256": "a852782d9a37ebd1e7d83a79fee544fffbce1f709e78074c002880b7c3ee0d58",
+     "sha256": "1a14daa1c9f0972ffad25feb06f1c026b90e700ef362c5ffe2aac894896dc197",
      "components": [
       "zh-CN/projects/a23f1819-edaf-4c0c-824b-7662cb670a52/packages/components/doc-hero/1.0.0/compiled.json",
       "zh-CN/projects/a23f1819-edaf-4c0c-824b-7662cb670a52/packages/components/doc-compare/1.0.0/compiled.json",
@@ -169,7 +169,7 @@
      "title": "快速上手",
      "icon": "🚀",
      "file": "zh-CN/projects/a23f1819-edaf-4c0c-824b-7662cb670a52/pages/0b49bb7a-052c-5fe7-a05f-f647bb862a91.json",
-     "sha256": "f344d447b52cfd8d030be460c450a583974d47cb0683bf5e3e94e7719ae5f264",
+     "sha256": "527c853b7cf1dae4806b1effab01ee658d38d9e17d32c8148c628e93a00d5de4",
      "components": [
       "zh-CN/projects/a23f1819-edaf-4c0c-824b-7662cb670a52/packages/components/doc-hero/1.0.0/compiled.json",
       "zh-CN/projects/a23f1819-edaf-4c0c-824b-7662cb670a52/packages/components/doc-steps/1.0.0/compiled.json",
@@ -194,7 +194,7 @@
      "title": "通用插件连接向导",
      "icon": "🤝",
      "file": "zh-CN/projects/a23f1819-edaf-4c0c-824b-7662cb670a52/pages/1c7a263c-bd9f-40ce-bc58-1870022f978b.json",
-     "sha256": "7a73e561b7338b5f61b76ccf065b6e5a0ecbcce0f1cd10bbda8f17e4ca4ddf55",
+     "sha256": "900931c87d1deb701795c6019e5a9e5c7c35dabbe1eefe77b8ef9d3d9f157a0c",
      "components": [
       "zh-CN/projects/a23f1819-edaf-4c0c-824b-7662cb670a52/packages/components/doc-hero/1.0.0/compiled.json",
       "zh-CN/projects/a23f1819-edaf-4c0c-824b-7662cb670a52/packages/components/doc-compare/1.0.0/compiled.json",
@@ -205,7 +205,7 @@
      "title": "ShowAI 文档",
      "icon": "📚",
      "file": "zh-CN/projects/a23f1819-edaf-4c0c-824b-7662cb670a52/pages/2e9af66b-0a83-58f6-b3f5-a480f0f6abab.json",
-     "sha256": "30f49d1600498310b77c67ff1011c0b687a5bb891f0e45b32eafd1a07ee80907",
+     "sha256": "6461d3cb94beb823842891559c7751f6f4e211b51714e00aacfa8835df491f51",
      "components": [
       "zh-CN/projects/a23f1819-edaf-4c0c-824b-7662cb670a52/packages/components/doc-hero/1.0.0/compiled.json",
       "zh-CN/projects/a23f1819-edaf-4c0c-824b-7662cb670a52/packages/components/doc-cards/1.0.0/compiled.json",
@@ -217,7 +217,7 @@
      "title": "安装与运行",
      "icon": "💻",
      "file": "zh-CN/projects/a23f1819-edaf-4c0c-824b-7662cb670a52/pages/35f9cd9f-42bc-56f3-a792-3961178925bb.json",
-     "sha256": "7429544add82ca7b328125d7f093bd1580e1f54026f19059c22ef1aa57f8bc42",
+     "sha256": "17cb15db929cce1935548c4ad46e580d20b9ee263dbf794fda991bdcfc4284b8",
      "components": [
       "zh-CN/projects/a23f1819-edaf-4c0c-824b-7662cb670a52/packages/components/doc-hero/1.0.0/compiled.json",
       "zh-CN/projects/a23f1819-edaf-4c0c-824b-7662cb670a52/packages/components/doc-steps/1.0.0/compiled.json",
@@ -230,7 +230,7 @@
      "title": "架构",
      "icon": "🏗️",
      "file": "zh-CN/projects/a23f1819-edaf-4c0c-824b-7662cb670a52/pages/428dd837-61c9-5984-b3a5-0f577b6db22a.json",
-     "sha256": "644c00b51f1ed8faa04376157d37c77dfd0a96d3bd2ee0df40865a85d3c0b91f",
+     "sha256": "a2aac08a6f57d6344b04f46eeaa4d7eafe7073fe573d5f7cae8856f5c45a9437",
      "components": [
       "zh-CN/projects/a23f1819-edaf-4c0c-824b-7662cb670a52/packages/components/doc-hero/1.0.0/compiled.json",
       "zh-CN/projects/a23f1819-edaf-4c0c-824b-7662cb670a52/packages/components/doc-diagram/1.0.0/compiled.json",
@@ -257,7 +257,7 @@
      "title": "ShowAI Cloud",
      "icon": "☁️",
      "file": "zh-CN/projects/a23f1819-edaf-4c0c-824b-7662cb670a52/pages/56c95573-459b-54ae-9b0d-92c23b55fb88.json",
-     "sha256": "eaa59149bf32f816f1e8e5c941e93c641d2c8655b0070a3047ded4cfd209d70c",
+     "sha256": "c003397350ae96d831f8f54a4502dc6957aae5cbb59c37987d61b6a64f3733d6",
      "components": [
       "zh-CN/projects/a23f1819-edaf-4c0c-824b-7662cb670a52/packages/components/doc-hero/1.0.0/compiled.json",
       "zh-CN/projects/a23f1819-edaf-4c0c-824b-7662cb670a52/packages/components/doc-steps/1.0.0/compiled.json",
@@ -282,7 +282,7 @@
      "title": "技能与工作流程",
      "icon": "🧠",
      "file": "zh-CN/projects/a23f1819-edaf-4c0c-824b-7662cb670a52/pages/6e51cbfe-9394-571a-aa5a-5ff2fa96610e.json",
-     "sha256": "53705511bc8c466cfa4223a1d92a57d16549d009bda7edcd1301032787f93b28",
+     "sha256": "3b5b77d6b82d0606018f49e24a8fee7cafe2aca24daddf2a7c58b5fb70359bfe",
      "components": [
       "zh-CN/projects/a23f1819-edaf-4c0c-824b-7662cb670a52/packages/components/doc-hero/1.0.0/compiled.json",
       "zh-CN/projects/a23f1819-edaf-4c0c-824b-7662cb670a52/packages/components/doc-compare/1.0.0/compiled.json",
@@ -293,7 +293,7 @@
      "title": "内置 Agent",
      "icon": "🤖",
      "file": "zh-CN/projects/a23f1819-edaf-4c0c-824b-7662cb670a52/pages/833d5f6c-651d-5abe-a8a4-542d6fe0be37.json",
-     "sha256": "6fe811cd6af7b91ae92deec0fb4f3c39a5149274864c5dd12313d4429db4f4a1",
+     "sha256": "31520dcc08d7c8bd5ea37e75b88dcba1e2ad88c384975a376bb53a59df0d6d5c",
      "components": [
       "zh-CN/projects/a23f1819-edaf-4c0c-824b-7662cb670a52/packages/components/doc-hero/1.0.0/compiled.json",
       "zh-CN/projects/a23f1819-edaf-4c0c-824b-7662cb670a52/packages/components/doc-steps/1.0.0/compiled.json",
@@ -306,7 +306,7 @@
      "title": "连接 Agent 时的常见问题",
      "icon": "🔍",
      "file": "zh-CN/projects/a23f1819-edaf-4c0c-824b-7662cb670a52/pages/963599de-ed81-58ea-be92-5b68937966f8.json",
-     "sha256": "ac83f53e5b52269f01f279368f7c4c2bdcfd92daec88d8d709d4e48f40fb43c9",
+     "sha256": "5a581c71bb0e3fc9b61bf5d3f91acb0b8ee300737f9f8fd3b4d343ad321f24b1",
      "components": [
       "zh-CN/projects/a23f1819-edaf-4c0c-824b-7662cb670a52/packages/components/doc-hero/1.0.0/compiled.json",
       "zh-CN/projects/a23f1819-edaf-4c0c-824b-7662cb670a52/packages/components/doc-steps/1.0.0/compiled.json",
@@ -317,7 +317,7 @@
      "title": "内容库与版本",
      "icon": "🗂️",
      "file": "zh-CN/projects/a23f1819-edaf-4c0c-824b-7662cb670a52/pages/bd1ef961-f5d1-50a1-aded-0895dc63ebc7.json",
-     "sha256": "f25929365fb5b90195c00e700d2f560b9b3fecd247f9bf457b81d691d0f8ce40",
+     "sha256": "43481584e60a22919786068411645025da902a129015943c68b1b6f1a712ead3",
      "components": [
       "zh-CN/projects/a23f1819-edaf-4c0c-824b-7662cb670a52/packages/components/doc-hero/1.0.0/compiled.json",
       "zh-CN/projects/a23f1819-edaf-4c0c-824b-7662cb670a52/packages/components/doc-tree/1.0.0/compiled.json",
@@ -331,7 +331,7 @@
      "title": "CLI 与 MCP 参考",
      "icon": "⌨️",
      "file": "zh-CN/projects/a23f1819-edaf-4c0c-824b-7662cb670a52/pages/c207d0b8-8aa9-5290-95a5-2a6c4484456c.json",
-     "sha256": "e4dd1b4a732dd963065237e13df0e1a78d3b76ac4ac27d1154cdab6d270ead08",
+     "sha256": "7da8a5223e290c5c13da1b8ddb93c9025fd687d8888f756c9f05755be63516c6",
      "components": [
       "zh-CN/projects/a23f1819-edaf-4c0c-824b-7662cb670a52/packages/components/doc-hero/1.0.0/compiled.json",
       "zh-CN/projects/a23f1819-edaf-4c0c-824b-7662cb670a52/packages/components/doc-commands/1.0.0/compiled.json",
@@ -356,7 +356,7 @@
      "title": "项目服务器与团队协作",
      "icon": "👥",
      "file": "zh-CN/projects/a23f1819-edaf-4c0c-824b-7662cb670a52/pages/c51ee747-5e00-5bda-8c27-7465ace0566a.json",
-     "sha256": "9c56f9e95be1541eec0634d6066e784acf3607166294de4125345d9eff1a70f2",
+     "sha256": "8d326a7400edd08ab0cfa39d7b745a3755505c459b014c3fc89082378f464a7d",
      "components": [
       "zh-CN/projects/a23f1819-edaf-4c0c-824b-7662cb670a52/packages/components/doc-hero/1.0.0/compiled.json",
       "zh-CN/projects/a23f1819-edaf-4c0c-824b-7662cb670a52/packages/components/doc-diagram/1.0.0/compiled.json",
@@ -383,7 +383,7 @@
      "title": "在 ChatGPT 中连接 ShowAI",
      "icon": "💬",
      "file": "zh-CN/projects/a23f1819-edaf-4c0c-824b-7662cb670a52/pages/cf5d1ce9-369c-55de-923f-8da2ce92c74d.json",
-     "sha256": "0826e010f104231951757cb1b181d7d21bde7662c6d15a1a2e4fd99dfeecd86e",
+     "sha256": "2c079fc980cbd3fda8461b37a3789cdf6033230f1639d52d3fe4d676c76ee972",
      "components": [
       "zh-CN/projects/a23f1819-edaf-4c0c-824b-7662cb670a52/packages/components/doc-hero/1.0.0/compiled.json",
       "zh-CN/projects/a23f1819-edaf-4c0c-824b-7662cb670a52/packages/components/doc-compare/1.0.0/compiled.json",
@@ -394,7 +394,7 @@
      "title": "页面文件格式",
      "icon": "📄",
      "file": "zh-CN/projects/a23f1819-edaf-4c0c-824b-7662cb670a52/pages/d25297b7-5bfa-5283-ae6a-da5f8e524904.json",
-     "sha256": "48b473d3fafc873e3269e99184439684e0413af26b62b1f4376ae05dbb6af56f",
+     "sha256": "b0d85dee37348e8d820d2e2310325c1358cc4df0496a083626376c54443d9e15",
      "components": [
       "zh-CN/projects/a23f1819-edaf-4c0c-824b-7662cb670a52/packages/components/doc-hero/1.0.0/compiled.json",
       "zh-CN/projects/a23f1819-edaf-4c0c-824b-7662cb670a52/packages/components/doc-tree/1.0.0/compiled.json",
@@ -419,7 +419,7 @@
      "title": "在 Agent 中使用",
      "icon": "🤝",
      "file": "zh-CN/projects/a23f1819-edaf-4c0c-824b-7662cb670a52/pages/e8c001a7-4e9f-5515-a2e4-8ed6085ef46d.json",
-     "sha256": "f741805f4a7a7bcb7144c7f2d9751407164b3df461ff090f0b6ded34b0d7765c",
+     "sha256": "ccbb7afe98d674347fc53fe411610083480dd102acd34af2aed0a013bb57467b",
      "components": [
       "zh-CN/projects/a23f1819-edaf-4c0c-824b-7662cb670a52/packages/components/doc-hero/1.0.0/compiled.json",
       "zh-CN/projects/a23f1819-edaf-4c0c-824b-7662cb670a52/packages/components/doc-compare/1.0.0/compiled.json",
@@ -555,7 +555,7 @@
      "title": "Export & Share",
      "icon": "📤",
      "file": "en/projects/a23f1819-edaf-4c0c-824b-7662cb670a52/pages/038265ef-4dcc-5b17-9003-83c716c14876.json",
-     "sha256": "c676e392d4650cfcdfa16b65d8acf7e3fd8c9fe055b7c58faad5f019a43fa353",
+     "sha256": "fdf54743d9de9f31efb9e7ef20961a98c00171ccc4f6da8e8e86ac4dfed25172",
      "components": [
       "en/projects/a23f1819-edaf-4c0c-824b-7662cb670a52/packages/components/doc-hero/1.0.0/compiled.json",
       "en/projects/a23f1819-edaf-4c0c-824b-7662cb670a52/packages/components/doc-compare/1.0.0/compiled.json",
@@ -570,7 +570,7 @@
      "title": "Quick Start",
      "icon": "🚀",
      "file": "en/projects/a23f1819-edaf-4c0c-824b-7662cb670a52/pages/0b49bb7a-052c-5fe7-a05f-f647bb862a91.json",
-     "sha256": "d91f963ee1ca4dab77ddfb89ab7f9d0691a69800ec0b1ccf7cc0b1c504b999e8",
+     "sha256": "4c091a6fb0b9c38b9e32cc1c3e66b2dc47a3e9d26f9270d228e9bc5a5e70cc11",
      "components": [
       "en/projects/a23f1819-edaf-4c0c-824b-7662cb670a52/packages/components/doc-hero/1.0.0/compiled.json",
       "en/projects/a23f1819-edaf-4c0c-824b-7662cb670a52/packages/components/doc-steps/1.0.0/compiled.json",
@@ -595,7 +595,7 @@
      "title": "Universal plugin connection guide",
      "icon": "🤝",
      "file": "en/projects/a23f1819-edaf-4c0c-824b-7662cb670a52/pages/1c7a263c-bd9f-40ce-bc58-1870022f978b.json",
-     "sha256": "87a64e597514b15aad67663fe7729b4768e1bd6d66ed715e3eccb7f0669d3c9b",
+     "sha256": "410d78be873066e119fa8ecdbfff2973648ed63e3fda530acfbf42cbd7f56be2",
      "components": [
       "en/projects/a23f1819-edaf-4c0c-824b-7662cb670a52/packages/components/doc-hero/1.0.0/compiled.json",
       "en/projects/a23f1819-edaf-4c0c-824b-7662cb670a52/packages/components/doc-compare/1.0.0/compiled.json",
@@ -606,7 +606,7 @@
      "title": "ShowAI Documentation",
      "icon": "📚",
      "file": "en/projects/a23f1819-edaf-4c0c-824b-7662cb670a52/pages/2e9af66b-0a83-58f6-b3f5-a480f0f6abab.json",
-     "sha256": "464768aff5ac707a1f8abf91bdc81178e1b0e6aa9b594530a4fa797ad1dfe8f1",
+     "sha256": "ac2ea6778d7c8200add3f86404b8065ee9916f9d4dfaf7321bca8d2cee608e6e",
      "components": [
       "en/projects/a23f1819-edaf-4c0c-824b-7662cb670a52/packages/components/doc-hero/1.0.0/compiled.json",
       "en/projects/a23f1819-edaf-4c0c-824b-7662cb670a52/packages/components/doc-cards/1.0.0/compiled.json",
@@ -618,7 +618,7 @@
      "title": "Installation & Setup",
      "icon": "💻",
      "file": "en/projects/a23f1819-edaf-4c0c-824b-7662cb670a52/pages/35f9cd9f-42bc-56f3-a792-3961178925bb.json",
-     "sha256": "0d724e2e1ad17642892f612c71d0307b3e991f22a64be55371aa6933c0c9dd32",
+     "sha256": "4a612fde24fc0fd68bc0cd3acdf3f7582784564d7009a18436b55e0f3ec4aaf0",
      "components": [
       "en/projects/a23f1819-edaf-4c0c-824b-7662cb670a52/packages/components/doc-hero/1.0.0/compiled.json",
       "en/projects/a23f1819-edaf-4c0c-824b-7662cb670a52/packages/components/doc-steps/1.0.0/compiled.json",
@@ -631,7 +631,7 @@
      "title": "Architecture",
      "icon": "🏗️",
      "file": "en/projects/a23f1819-edaf-4c0c-824b-7662cb670a52/pages/428dd837-61c9-5984-b3a5-0f577b6db22a.json",
-     "sha256": "dc96284ddc9eac99227e0ee9f294192656786410d7a9bdb6d4cd5b02f52f4cc2",
+     "sha256": "d01de8a0b21123556985955c12f96e1d72f6045319369dadc39547e3e088a129",
      "components": [
       "en/projects/a23f1819-edaf-4c0c-824b-7662cb670a52/packages/components/doc-hero/1.0.0/compiled.json",
       "en/projects/a23f1819-edaf-4c0c-824b-7662cb670a52/packages/components/doc-diagram/1.0.0/compiled.json",
@@ -658,7 +658,7 @@
      "title": "ShowAI Cloud",
      "icon": "☁️",
      "file": "en/projects/a23f1819-edaf-4c0c-824b-7662cb670a52/pages/56c95573-459b-54ae-9b0d-92c23b55fb88.json",
-     "sha256": "69a15b53fc283bc4b098f76d244e9ec9c138a4bb262e94f652bb1324088b9493",
+     "sha256": "8d0017b21cbe3d702c9e79c51fdcb954caff44991db6d7bf06f54b6c6049bc2b",
      "components": [
       "en/projects/a23f1819-edaf-4c0c-824b-7662cb670a52/packages/components/doc-hero/1.0.0/compiled.json",
       "en/projects/a23f1819-edaf-4c0c-824b-7662cb670a52/packages/components/doc-steps/1.0.0/compiled.json",
@@ -683,7 +683,7 @@
      "title": "Skills & Workflows",
      "icon": "🧠",
      "file": "en/projects/a23f1819-edaf-4c0c-824b-7662cb670a52/pages/6e51cbfe-9394-571a-aa5a-5ff2fa96610e.json",
-     "sha256": "52e9ec75e984b0449a2dfb8bced98fbb1dd1dd3534fc62fadb5ddbaf60aa9456",
+     "sha256": "42ee3956d781a95888000e31177658e7ae970c72e444f80a89259f74802a7cce",
      "components": [
       "en/projects/a23f1819-edaf-4c0c-824b-7662cb670a52/packages/components/doc-hero/1.0.0/compiled.json",
       "en/projects/a23f1819-edaf-4c0c-824b-7662cb670a52/packages/components/doc-compare/1.0.0/compiled.json",
@@ -694,7 +694,7 @@
      "title": "Built-in Agent",
      "icon": "🤖",
      "file": "en/projects/a23f1819-edaf-4c0c-824b-7662cb670a52/pages/833d5f6c-651d-5abe-a8a4-542d6fe0be37.json",
-     "sha256": "344df9063c52bed204a21ac33a2f4d0ff1e70fbbb673c2477bdf7e4ab7491207",
+     "sha256": "b0c22cea4d82671536b3c77fcb5637cb498df8b6b0ba8a190e48777ebad3902d",
      "components": [
       "en/projects/a23f1819-edaf-4c0c-824b-7662cb670a52/packages/components/doc-hero/1.0.0/compiled.json",
       "en/projects/a23f1819-edaf-4c0c-824b-7662cb670a52/packages/components/doc-steps/1.0.0/compiled.json",
@@ -707,7 +707,7 @@
      "title": "Connecting an agent: common problems",
      "icon": "🔍",
      "file": "en/projects/a23f1819-edaf-4c0c-824b-7662cb670a52/pages/963599de-ed81-58ea-be92-5b68937966f8.json",
-     "sha256": "330e127a3ef70fa1c68e68ae0c4f2817f0cde096c26f0b9e963f0b637d84f90e",
+     "sha256": "28f2f5bf651294194e323d5b06e3a7c4eaa69339be84b11718564213b1f01e95",
      "components": [
       "en/projects/a23f1819-edaf-4c0c-824b-7662cb670a52/packages/components/doc-hero/1.0.0/compiled.json",
       "en/projects/a23f1819-edaf-4c0c-824b-7662cb670a52/packages/components/doc-steps/1.0.0/compiled.json",
@@ -718,7 +718,7 @@
      "title": "Content Library & Versions",
      "icon": "🗂️",
      "file": "en/projects/a23f1819-edaf-4c0c-824b-7662cb670a52/pages/bd1ef961-f5d1-50a1-aded-0895dc63ebc7.json",
-     "sha256": "372b6bf0937209837c64bb7a6d9afe128ffdf6037d70341b7ea4ff885fd5bfac",
+     "sha256": "8d32ce5941bca525c93d807804fd5fb955096c0b3ef7f919ae769ef4b70e4d2d",
      "components": [
       "en/projects/a23f1819-edaf-4c0c-824b-7662cb670a52/packages/components/doc-hero/1.0.0/compiled.json",
       "en/projects/a23f1819-edaf-4c0c-824b-7662cb670a52/packages/components/doc-tree/1.0.0/compiled.json",
@@ -732,7 +732,7 @@
      "title": "CLI & MCP Reference",
      "icon": "⌨️",
      "file": "en/projects/a23f1819-edaf-4c0c-824b-7662cb670a52/pages/c207d0b8-8aa9-5290-95a5-2a6c4484456c.json",
-     "sha256": "13f152b2a3c8beb0d474a23a404dd4ae3a71fddf975e52b049bfff5f2cfe2384",
+     "sha256": "c1504947f858103e8a1e7d533313d9e5b10fdcd1c28ee0a080a53805d12dc7c0",
      "components": [
       "en/projects/a23f1819-edaf-4c0c-824b-7662cb670a52/packages/components/doc-hero/1.0.0/compiled.json",
       "en/projects/a23f1819-edaf-4c0c-824b-7662cb670a52/packages/components/doc-commands/1.0.0/compiled.json",
@@ -757,7 +757,7 @@
      "title": "Project Server & Team Collaboration",
      "icon": "👥",
      "file": "en/projects/a23f1819-edaf-4c0c-824b-7662cb670a52/pages/c51ee747-5e00-5bda-8c27-7465ace0566a.json",
-     "sha256": "121d00e47b3d2289fb32dbce4247b04d794d2f4ecf1177c686b01c2b0ac74e11",
+     "sha256": "f54cc45f3f278d8f86d2e3d1f244fe3dc2de9dbb02d893dc58ed5aaaba27d4f4",
      "components": [
       "en/projects/a23f1819-edaf-4c0c-824b-7662cb670a52/packages/components/doc-hero/1.0.0/compiled.json",
       "en/projects/a23f1819-edaf-4c0c-824b-7662cb670a52/packages/components/doc-diagram/1.0.0/compiled.json",
@@ -784,7 +784,7 @@
      "title": "Connect ChatGPT to ShowAI",
      "icon": "💬",
      "file": "en/projects/a23f1819-edaf-4c0c-824b-7662cb670a52/pages/cf5d1ce9-369c-55de-923f-8da2ce92c74d.json",
-     "sha256": "b44d6def8c1816f208ec783182e0c127760ba860d6e4ee1a11d4fa8f11605aba",
+     "sha256": "f4e246ec2557f8f2b186c984ecb7574823bc1e05a581f2e163d190dce3c42976",
      "components": [
       "en/projects/a23f1819-edaf-4c0c-824b-7662cb670a52/packages/components/doc-hero/1.0.0/compiled.json",
       "en/projects/a23f1819-edaf-4c0c-824b-7662cb670a52/packages/components/doc-compare/1.0.0/compiled.json",
@@ -795,7 +795,7 @@
      "title": "Page File Format",
      "icon": "📄",
      "file": "en/projects/a23f1819-edaf-4c0c-824b-7662cb670a52/pages/d25297b7-5bfa-5283-ae6a-da5f8e524904.json",
-     "sha256": "e503a2dad2534ae7a4918f6c600bdc8e43d9167be76f3b51841f6945aeba86bb",
+     "sha256": "ee7bd599c9d38df738c72a55c8c8bf30f6bc2c1b33102cc1a785e5719ff19a62",
      "components": [
       "en/projects/a23f1819-edaf-4c0c-824b-7662cb670a52/packages/components/doc-hero/1.0.0/compiled.json",
       "en/projects/a23f1819-edaf-4c0c-824b-7662cb670a52/packages/components/doc-tree/1.0.0/compiled.json",
@@ -820,7 +820,7 @@
      "title": "Use with an Agent",
      "icon": "🤝",
      "file": "en/projects/a23f1819-edaf-4c0c-824b-7662cb670a52/pages/e8c001a7-4e9f-5515-a2e4-8ed6085ef46d.json",
-     "sha256": "61a3c2596e7b6ce32ed69926d155f05bc61151629aa2914e894ebb9cccd757f7",
+     "sha256": "896c55808f9aa2545a8cb698fdb33872ed601e0ef339724e68e158eadcff1fc8",
      "components": [
       "en/projects/a23f1819-edaf-4c0c-824b-7662cb670a52/packages/components/doc-hero/1.0.0/compiled.json",
       "en/projects/a23f1819-edaf-4c0c-824b-7662cb670a52/packages/components/doc-compare/1.0.0/compiled.json",

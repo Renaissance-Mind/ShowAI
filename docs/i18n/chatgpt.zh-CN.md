@@ -48,7 +48,7 @@ ChatGPT 网页从云端发起请求，需要公网地址。其他设备上运行
 
 ## 连接 ChatGPT
 
-尚未添加 MCP 时，可先从源码生成通用包或从「设置 → Agent 插件」准备插件取得六个 Skills，安装后请 Agent 带你手动连接。已有 ChatGPT 连接时，下文的 Personal 导出可引用它。
+下载[通用插件 ZIP](https://raw.githubusercontent.com/Renaissance-Mind/ShowAI/main/downloads/showai-universal.zip)即可安装六个 Skills。源码用户也可以运行 `npm run package:plugin -- --out showai-universal.zip` 生成同一安装包。随后在宿主配置 MCP。已有 ChatGPT 连接时，下文的 Personal 导出可以关联该连接。
 
 公网连接通过检查后选择「ChatGPT」，按三步填写：
 

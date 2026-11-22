@@ -10,7 +10,7 @@
     "favorite": false,
     "archived": false,
     "createdAt": "2026-10-15T20:03:21.422Z",
-    "updatedAt": "2026-11-22T12:10:30.688Z",
+    "updatedAt": "2026-11-22T13:48:07.183Z",
     "content": {
       "type": "surface",
       "attrs": {
@@ -39,7 +39,7 @@
                   },
                   {
                     "label": "Download the universal plugin ZIP",
-                    "href": "https://showai.renaissancemind.ai/downloads/showai-universal.zip"
+                    "href": "https://raw.githubusercontent.com/Renaissance-Mind/ShowAI/main/downloads/showai-universal.zip"
                   }
                 ]
               },

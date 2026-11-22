@@ -1,5 +1,7 @@
 # Portable ink
 
+**Language:** English | [简体中文](i18n/portable-ink.zh-CN.md) · [Documentation](README.md)
+
 New shared pen/marker input is a `drawing` node with `attrs.ink.format = showai-ink-v2`; existing `showai-ink-v1` nodes retain their original interpretation. Browser, Electron (including the Windows build), and iOS use the same page model and causal ink operations. Input processing and geometry share C++ sources compiled as an iOS library and WebAssembly. Build provenance records the source digest and compiler configuration. Platform renderers consume this geometry; textures and screenshots are disposable caches.
 
 ## Input and geometry

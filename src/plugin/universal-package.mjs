@@ -138,10 +138,21 @@ export async function universalPluginFiles(
   const metadata = JSON.parse(
     await readFile(join(source, "plugin.json"), "utf8"),
   );
-  const description =
-    connection || appId
-      ? "Use ShowAI with the included MCP connection. The Skills guide connection recovery and page creation."
-      : "Use ShowAI with an MCP connection configured in your agent. The included Skills guide first-time setup.";
+  const instructions = appId
+    ? {
+        en: "This Personal plugin refers to your registered ChatGPT MCP connection. Select and authorize that connection in ChatGPT.",
+        zh: "这个 Personal 插件引用你已经登记的 ChatGPT MCP 连接。请在 ChatGPT 选择该连接并完成授权。",
+      }
+    : connection
+      ? {
+          en: "This package includes an MCP connection configuration. Enable it in the host and verify access with projects_list.",
+          zh: "本包附带 MCP 连接配置。请在宿主中启用该连接，通过 projects_list 核对访问范围。",
+        }
+      : {
+          en: "This package supplies the six Skills. Select an existing ShowAI MCP connection in your host, or ask “Help me connect ShowAI” to set one up.",
+          zh: "本包提供六个 Skills。请在宿主中选择已有的 ShowAI MCP 连接。首次连接时，可以对 Agent 说「帮我连接 ShowAI」。",
+        };
+  const description = instructions.en;
   const manifest = {
     $schema: metadata.$schema,
     name,
@@ -285,9 +296,9 @@ export async function universalPluginFiles(
       [
         `# ${displayName}`,
         "",
-        "Install this package in a compatible plugin host, or load its six skills/ folders in an Agent Skills client. Use the bundled or already configured ShowAI MCP connection. Ask “Help me connect ShowAI” when setup or reconnection is needed.",
+        "Install the plugin in a compatible host, or load the six folders under `skills/` in an Agent Skills client. " + instructions.en,
         "",
-        "在支持插件包的宿主导入本包；支持 Agent Skills 的客户端可加载 skills/ 下的六个技能目录。优先使用随包提供或已经配置的 ShowAI MCP。需要设置或恢复连接时，对 Agent 说「帮我连接 ShowAI」。",
+        "在支持插件的宿主中导入本包，或在支持 Agent Skills 的客户端加载 `skills/` 下的六个目录。" + instructions.zh,
         "",
         ...(setupUrl
           ? [

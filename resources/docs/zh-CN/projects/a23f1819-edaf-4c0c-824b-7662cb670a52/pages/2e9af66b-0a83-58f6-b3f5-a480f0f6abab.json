@@ -10,7 +10,7 @@
     "favorite": false,
     "archived": false,
     "createdAt": "2026-10-15T06:42:10.579Z",
-    "updatedAt": "2026-11-21T18:49:39.933Z",
+    "updatedAt": "2026-11-22T13:53:23.329Z",
     "content": {
       "type": "surface",
       "attrs": {
@@ -166,7 +166,7 @@
                     "icon": "🗂️",
                     "title": "可以归档",
                     "tone": "teal",
-                    "body": "每个界面保存为你自己的页面，带完整版本历史；你修改过的地方，Agent 下次会接着做，也可以导出交给别人。"
+                    "body": "想保留的界面可以保存为自己的页面。你和 Agent 可以接着编辑，也可以导出副本分享。"
                   },
                   {
                     "icon": "🌱",
@@ -237,7 +237,7 @@
                   },
                   {
                     "title": "让 Agent 做第一个界面",
-                    "body": "在新对话中粘贴示例提示词：\n“用 ShowAI 帮我做一个房贷计算器：房价、首付比例、利率和贷款年限可以调整，显示月供和总利息。”"
+                    "body": "在新对话中粘贴示例提示词：\n“用 ShowAI 做一个房贷计算器。让我调整房价、首付比例、利率和期限，显示月供和总利息，并保存为 ShowAI 页面。”"
                   }
                 ]
               },
@@ -337,7 +337,7 @@
                     "row": 2,
                     "tone": "teal",
                     "icon": "🤖",
-                    "detail": "Claude Code 与 Codex 从 App 的「设置 → 插件」一键安装插件；App 里也有内置 Agent。其他 Agent 的状态见「在 Agent 中使用」。",
+                    "detail": "Claude Code 与 Codex 从 App 的「设置 → Agent 插件」一键安装插件；App 里也有内置 Agent。其他 Agent 的状态见「在 Agent 中使用」。",
                     "href": "https://showai.renaissancemind.ai/doc/agent-hosts"
                   },
                   {
@@ -358,7 +358,7 @@
                     "row": 1,
                     "tone": "slate",
                     "icon": "🗂️",
-                    "detail": "项目、页面、组件和模板都保存在本机内容库中，带完整版本历史。冲突时双方内容都会保留，供你比较合并。",
+                    "detail": "正式内容保存在本机内容库。并发修改时，可比较保留的草稿与当前页面，再保存合并结果。",
                     "href": "https://showai.renaissancemind.ai/doc/library"
                   },
                   {
@@ -463,9 +463,9 @@
                   {
                     "icon": "💬",
                     "title": "网页版 ChatGPT",
-                    "tag": "邀请制",
+                    "tag": "远程 MCP",
                     "tone": "teal",
-                    "body": "连接自己的桌面内容库或团队托管服务，在 ChatGPT 中授权和验证。",
+                    "body": "通过公网 HTTPS 和 OAuth 连接你自己的桌面 App，或使用管理员提供的 MCP 服务。",
                     "href": "https://showai.renaissancemind.ai/doc/chatgpt"
                   },
                   {
@@ -859,7 +859,7 @@
               "content": [
                 {
                   "type": "text",
-                  "text": "Claude Code、Codex 和内置 Agent 已正式支持，Claude Code 与 Codex 在 App「设置 → 插件」中一键安装插件。DeepSeek Harness 和 Kimi 处于预览阶段，网页版 ChatGPT 为邀请制，其他 MCP 客户端可以手动配置（实验）。详见 "
+                  "text": "Codex、Claude Code、Antigravity 和内置 Agent 已获支持。DeepSeek Harness、Kimi Work、Cursor、Qoder、WorkBuddy、Kimi Code 和 TRAE IDE 可按宿主准备插件。网页版 ChatGPT 使用公网 HTTPS 与 OAuth。详见"
                 },
                 {
                   "type": "text",
@@ -935,7 +935,7 @@
               "content": [
                 {
                   "type": "text",
-                  "text": "能，前提是它们指向同一个内容库。从 App 安装的插件使用 App 当前的内容库；切换内容库或移动 App 后，在「设置 → 插件」点「更新并启用」。内容库在「设置 → 通用 → 内容库」中选择。"
+                  "text": "能，前提是它们指向同一个内容库。从 App 安装的插件使用 App 当前的内容库；切换内容库或移动 App 后，在「设置 → Agent 插件」点「更新并启用」。内容库在「设置 → 通用 → 内容库」中选择。"
                 }
               ],
               "attrs": {

@@ -10,7 +10,7 @@
     "favorite": false,
     "archived": false,
     "createdAt": "2026-10-08T19:30:30.196Z",
-    "updatedAt": "2026-10-22T12:40:29.959Z",
+    "updatedAt": "2026-11-22T13:53:23.329Z",
     "content": {
       "type": "surface",
       "attrs": {
@@ -358,7 +358,7 @@
                 "steps": [
                   {
                     "title": "打开插件面板",
-                    "body": "首次启动时，欢迎页会显示插件面板；之后随时可以在「设置 → 插件」中找到。"
+                    "body": "首次启动时，欢迎页会显示插件面板；之后随时可以在「设置 → Agent 插件」中找到。"
                   },
                   {
                     "title": "安装插件",
@@ -385,7 +385,7 @@
           "content": [
             {
               "type": "text",
-              "text": "要确认连接，「设置 → 插件」会给出测试提示词「用 ShowAI 列出我的项目」。在新对话中发送它；Agent 连上 ShowAI 后，该 Agent 旁的状态会从「等待第一次调用」变为「已收到第一次调用」。"
+              "text": "在 Agent 新对话中发送「用 ShowAI 列出我的项目」。在「设置 → MCP → 调用记录」核对客户端、工具和结果；在「设置 → Agent 插件」检查宿主是否启用。"
             }
           ],
           "attrs": {
@@ -470,7 +470,7 @@
               "content": [
                 {
                   "type": "text",
-                  "text": "用 ShowAI 帮我做一个房贷计算器：房价、首付比例、利率和贷款年限可以调整，显示月供和总利息。"
+                  "text": "用 ShowAI 做一个房贷计算器。让我调整房价、首付比例、利率和期限，显示月供和总利息，并保存为 ShowAI 页面。"
                 }
               ],
               "attrs": {
@@ -484,7 +484,7 @@
           "content": [
             {
               "type": "text",
-              "text": "Agent 会直接在对话里显示这个计算器，你可以马上调整数值试用。这一步只是展示，还没有保存。"
+              "text": "这个提示词明确要求保存页面。保存成功后，从宿主返回的卡片或链接打开计算器，也可以在 ShowAI 的「最近」中找到它。"
             }
           ],
           "attrs": {
@@ -499,7 +499,7 @@
           "content": [
             {
               "type": "text",
-              "text": "想留下来继续改，接着说："
+              "text": "如果一开始只让 Agent 在聊天里画图，想保留这次试用的结果时，可以接着说："
             }
           ]
         },
@@ -519,7 +519,7 @@
               "content": [
                 {
                   "type": "text",
-                  "text": "存到 ShowAI。"
+                  "text": "把刚才的计算器保存为 ShowAI 页面。"
                 }
               ]
             }
@@ -533,7 +533,7 @@
           "content": [
             {
               "type": "text",
-              "text": "Agent 会用同一份数据把它保存为 ShowAI 中的一个页面并展示出来：支持内嵌显示的 Agent 直接在对话里显示，其他 Agent 给出可以打开的 HTML 文件。在 App 中，它出现在「最近」里。一开始就想保存，也可以在请求里直接说“……并保存到 ShowAI”。"
+              "text": "Agent 会确认目标项目并保存当前数据。之后你和 Agent 可以接着编辑同一页。"
             }
           ]
         },
@@ -1176,15 +1176,15 @@
                     "title": "内置 Agent",
                     "tag": "正式",
                     "tone": "brand",
-                    "body": "打开「设置 → Agent」，添加使用 API Key 的模型来源（也可以使用本机 Codex 或 Claude Code 的登录，或 ShowAI Cloud）。然后点顶栏的 AI 按钮，或选中文字、打开内容块菜单，选择「让 AI 处理」。",
+                    "body": "打开「设置 → 内置 Agent」，添加使用 API Key 的模型来源（也可以使用本机 Codex 或 Claude Code 的登录，或 ShowAI Cloud）。然后点顶栏的 AI 按钮，或选中文字、打开内容块菜单，选择「让 AI 处理」。",
                     "href": "https://showai.renaissancemind.ai/doc/built-in-agent"
                   },
                   {
                     "icon": "🔌",
                     "title": "其他 Agent",
-                    "tag": "预览 · 邀请制 · 实验",
+                    "tag": "宿主插件与远程 MCP",
                     "tone": "teal",
-                    "body": "DeepSeek Harness 与 Kimi 处于预览阶段，网页版 ChatGPT 采用邀请制，Gemini CLI、OpenCode 等其他 MCP 客户端可以手动配置。",
+                    "body": "DeepSeek Harness、Kimi Work、Kimi Code 和 TRAE IDE 有专用接入方式。网页版 ChatGPT 通过公网 HTTPS 和 OAuth 连接你的桌面 App 或管理员提供的服务。Gemini CLI、OpenCode 可手动配置本机 MCP。",
                     "href": "https://showai.renaissancemind.ai/doc/agent-hosts"
                   },
                   {

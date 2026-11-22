@@ -10,7 +10,7 @@
     "favorite": false,
     "archived": false,
     "createdAt": "2026-10-15T06:42:07.909Z",
-    "updatedAt": "2026-11-21T18:49:39.599Z",
+    "updatedAt": "2026-11-22T13:48:07.183Z",
     "content": {
       "type": "surface",
       "attrs": {
@@ -104,8 +104,8 @@
                   {
                     "label": "show-visual",
                     "values": {
-                      "task": "Preview 1–5 components in chat. For a known component ID, read its guide directly.",
-                      "host": "Selection and data formats are shared. The host determines how a visual is displayed."
+                      "task": "Show one to five original, interactive HTML visuals in chat.",
+                      "host": "Look up the catalog when a specific existing component is requested. The host determines delivery."
                     }
                   },
                   {
@@ -164,7 +164,33 @@
           "content": [
             {
               "type": "text",
-              "text": "“Let me try this chart” uses show-visual. With a known connection, choose a component, read its guide and display it. A known ID skips catalog discovery. Asking to keep the chart prompts the agent to confirm a project and save the same data."
+              "text": "“Let me try this chart” uses "
+            },
+            {
+              "type": "text",
+              "text": "show-visual",
+              "marks": [
+                {
+                  "type": "code"
+                }
+              ]
+            },
+            {
+              "type": "text",
+              "text": ". The agent authors HTML and displays it in chat with "
+            },
+            {
+              "type": "text",
+              "text": "show_component({html})",
+              "marks": [
+                {
+                  "type": "code"
+                }
+              ]
+            },
+            {
+              "type": "text",
+              "text": ". It looks up the catalog when you request a specific existing component. To continue editing, name a project and ask the agent to save the result as a page."
             }
           ]
         },

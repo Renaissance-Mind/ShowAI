@@ -23,6 +23,8 @@ ShowAI keeps itself up to date: it checks the latest release in the background, 
 
 ## 2. Connect your agent
 
+The menus below follow `main`. In the [public 0.13.0 build](https://github.com/Renaissance-Mind/ShowAI/blob/v0.13.0/plugins/showai/README.md#deepseek-harness), open the **External Agent plugins** section in Settings to copy the local launch configuration. For DeepSeek Harness, choose **Prepare plugin** there and finish installing the bundle in Harness. The current source build installs it from **Settings → Agent plugins**.
+
 1. In ShowAI, open the plugin panel: the welcome screen shows it on first launch, and it is always available under **Settings → Agent plugins**.
 2. ShowAI checks for Claude Code and Codex. Click **Install plugin** next to the agent you use and wait for **Installed and enabled**.
 3. Reload the agent: restart the Claude Code session, or refresh plugins or restart Codex. A conversation that was already open keeps its old tool list, so start a new one.
@@ -35,9 +37,9 @@ The app supplies both the plugin and the runtime it talks to, so you need neithe
 
 Paste this into a new conversation:
 
-> Use ShowAI to build a mortgage calculator: price, down payment, rate and term are adjustable; show the monthly payment and total interest.
+> Use ShowAI to build a mortgage calculator with adjustable price, down payment, rate and term. Show the monthly payment and total interest, and save it as a ShowAI page.
 
-The agent saves the interface as a page in ShowAI and presents it: inline in agents that can display it, otherwise as an HTML file you can open. In the app it appears under **Recent**.
+The sample asks the agent to save the calculator. Open its page card or link, or find the saved page under **Recent** in ShowAI. For a temporary visualization, ask to see it in chat. Ask the agent to save it to your project when you want to keep it.
 
 Two more to try:
 
@@ -53,7 +55,7 @@ Two more to try:
 | **Installed, disabled**                             | Click **Update and enable**.                                                                                                                                     |
 | ShowAI is enabled from another source               | Disable that plugin in the agent, then click **Check again** and install the app version.                                                                        |
 | The agent answers in text and never mentions ShowAI | The conversation started before the plugin loaded. Restart the agent and open a new conversation; asking explicitly with "Use ShowAI to …" helps.                |
-| The agent reports that it cannot connect to ShowAI  | Open **Settings → Agent plugins**. If **Registered runtime** shows a problem, click **Repair registration**; if the agent shows a failed connection or another library, click **Repair and reconnect** or **Update and enable**. Then restart the agent. |
+| The agent reports that it cannot connect to ShowAI  | Open **Settings → MCP** to inspect and repair the local runtime. For a host connected to another library, open **Settings → Agent plugins** and choose **Repair and reconnect** or **Update and enable**. Then restart the agent. |
 | A page was saved but you can't find it in the app   | The app and the plugin are using different content libraries. Compare **Settings → General → Content library** with **Plugin library** for that agent in **Settings → Agent plugins**. |
 
 Still stuck? [Open an issue](https://github.com/Renaissance-Mind/ShowAI/issues) with your agent and its version, the ShowAI version from **Settings → About & feedback**, and what the agent said.
@@ -85,7 +87,7 @@ Choose **Export page** in the page's menu, or ask the agent. Standalone HTML ope
 
 **Built-in agent.** Open **Settings → Built-in Agent**, add a model source with an API key (or use your local Codex or Claude Code sign-in, or ShowAI Cloud), then click the **AI** button in the top bar, or select text or open a block menu and choose **Ask AI**. See [Built-in agent](agent-host.md).
 
-**Other agents.** DeepSeek Harness and Kimi are in preview, ChatGPT on the web is invite only, and other MCP clients can be configured manually. See [Supported agents](../README.md#-supported-agents).
+**Other agents.** DeepSeek Harness, Kimi Work, Kimi Code and TRAE IDE have host-specific setup instructions. ChatGPT on the web connects over public HTTPS with OAuth. Use your desktop endpoint or an address provided by your administrator. See [Supported agents](../README.md#-supported-agents) and the [ChatGPT guide](chatgpt.md).
 
 **On your own.** The workbench works without any agent: choose **New project**, add a **Page** for ordered reading or a **Board** for a spatial workspace, and type `/` to insert components. See [Page and Board](page-surface.md).
 

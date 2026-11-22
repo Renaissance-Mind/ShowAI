@@ -10,7 +10,7 @@
     "favorite": false,
     "archived": false,
     "createdAt": "2026-10-15T06:42:08.471Z",
-    "updatedAt": "2026-11-22T12:10:25.234Z",
+    "updatedAt": "2026-11-22T14:15:26.480Z",
     "content": {
       "type": "surface",
       "attrs": {
@@ -39,7 +39,7 @@
                   },
                   {
                     "label": "Download the universal plugin ZIP",
-                    "href": "https://showai.renaissancemind.ai/downloads/showai-universal.zip"
+                    "href": "https://raw.githubusercontent.com/Renaissance-Mind/ShowAI/main/downloads/showai-universal.zip"
                   }
                 ]
               },
@@ -124,7 +124,7 @@
           "content": [
             {
               "type": "text",
-              "text": "Install and open ShowAI on the same computer as the agent. Select the library, then install one host plugin. All five packages include their MCP launch configuration. Settings → MCP shows the runtime, provides the launch configuration and lists calls with their client and tool."
+              "text": "Open ShowAI on the computer that runs the agent and select your library. Use Settings → Agent plugins to install or prepare the package for your host. Settings → MCP shows the local runtime, launch configuration and call history."
             }
           ]
         },
@@ -139,7 +139,7 @@
                 "steps": [
                   {
                     "title": "Codex · Claude Code · Antigravity",
-                    "body": "In ShowAI Settings → Plugins, find your host and choose Install plugin. Its command-line tool must be available first."
+                    "body": "In ShowAI Settings → Agent plugins, find your host and choose Install plugin. Its command-line tool must be available first."
                   },
                   {
                     "title": "DeepSeek Harness",
@@ -147,7 +147,19 @@
                   },
                   {
                     "title": "Kimi Work",
-                    "body": "Register the [Kimi Work plugin](https://github.com/Renaissance-Mind/ShowAI/tree/main/plugins-kimi/showai) in the local plugin manager, then install and enable it under Plugins → Personal → ShowAI. Its bundled MCP launcher defaults to ~/.showai. For a different registered library, set SHOWAI_HOME in this configuration."
+                    "body": "Choose Settings → Agent plugins → Kimi Work to prepare a directory. Register it in Kimi Work, then install ShowAI from Plugins → Personal."
+                  },
+                  {
+                    "title": "Cursor Agents · Cursor IDE · TRAE IDE",
+                    "body": "Select the host under Settings → Agent plugins. Cursor Agents uses a local plugin directory. In Cursor IDE or TRAE IDE, install the VSIX from Extensions and configure local MCP as prompted."
+                  },
+                  {
+                    "title": "Kimi Code · Qoder · WorkBuddy",
+                    "body": "Prepare the package on the same settings page. In Kimi Code, install the custom plugin directory in Plugins. In Qoder, import the ZIP from Extensions. In WorkBuddy, add the local marketplace and install the plugin."
+                  },
+                  {
+                    "title": "Gemini CLI · OpenCode",
+                    "body": "Copy the MCP configuration from the host row, add it to the client configuration and start a new conversation."
                   }
                 ]
               },
@@ -206,13 +218,13 @@
                     "label": "Codex",
                     "values": {
                       "show": "Native MCP Apps view in chat.",
-                      "save": "Open the original-page card in the workbench on the right, optionally at a specific component."
+                      "save": "Click the page card to open or navigate its editable side tab. A card can target the page or one of its components."
                     }
                   },
                   {
                     "label": "Claude Code",
                     "values": {
-                      "show": "The agent passes a compact HTML fragment to the session’s HTML display tool.",
+                      "show": "A session with an HTML display tool can show an interactive preview in chat. A terminal-only session returns an HTML file or an accessible link.",
                       "save": "Preview a new page and return the original link after edits. Full offline HTML is also available."
                     }
                   },
@@ -226,7 +238,7 @@
                   {
                     "label": "DeepSeek Harness",
                     "values": {
-                      "show": "Interact with temporary components and saved Pages in the tool result or at the end of the turn.",
+                      "show": "The graphical Harness client displays interactive previews in tool results and at the end of the turn. The terminal client returns a page link or an HTML file.",
                       "save": "Choose Edit in sidebar to edit the original Page alongside chat and add a Page or selection reference to the current draft. Choose ShowAI in the left navigation for the global workbench."
                     }
                   },
@@ -235,6 +247,41 @@
                     "values": {
                       "show": "The offline HTML opens in the current Widget workspace.",
                       "save": "Reuse the Widget for updated previews and follow the original page link to edit."
+                    }
+                  },
+                  {
+                    "label": "Cursor Agents",
+                    "values": {
+                      "show": "Native MCP Apps views and saved-page cards.",
+                      "save": "Click the card to get the live editor link and open the original in Cursor Browser."
+                    }
+                  },
+                  {
+                    "label": "Cursor IDE · TRAE IDE",
+                    "values": {
+                      "show": "Use the preview or page link provided by the host connection.",
+                      "save": "Run ShowAI: Open Workbench in the extension or open a .showai-ref in an editor tab."
+                    }
+                  },
+                  {
+                    "label": "Qoder",
+                    "values": {
+                      "show": "Interactive MCP Apps and saved-page cards.",
+                      "save": "A card navigates an existing side editor in the current task. Ask the agent to open the page on the right for a new tab. More → ShowAI opens the global workbench."
+                    }
+                  },
+                  {
+                    "label": "WorkBuddy",
+                    "values": {
+                      "show": "Interactive MCP Apps and saved-page cards.",
+                      "save": "Use the live editor link in the WorkBuddy browser when available."
+                    }
+                  },
+                  {
+                    "label": "Kimi Code",
+                    "values": {
+                      "show": "Desktop opens HTML in its file preview. The CLI returns a file path.",
+                      "save": "Desktop can open the live editor in its right-hand browser. The CLI returns the same page link."
                     }
                   },
                   {
@@ -284,7 +331,36 @@
           "content": [
             {
               "type": "text",
-              "text": "Export the ZIP from desktop Settings → Plugins → Export universal plugin, or download it from this page. Import it in a compatible plugin host, or load its six Skill directories in an Agent Skills client. Then add MCP in that host."
+              "text": "Download the "
+            },
+            {
+              "type": "text",
+              "text": "universal plugin ZIP",
+              "marks": [
+                {
+                  "type": "link",
+                  "attrs": {
+                    "href": "https://raw.githubusercontent.com/Renaissance-Mind/ShowAI/main/downloads/showai-universal.zip"
+                  }
+                }
+              ]
+            },
+            {
+              "type": "text",
+              "text": " or run "
+            },
+            {
+              "type": "text",
+              "text": "npm run package:plugin -- --out showai-universal.zip",
+              "marks": [
+                {
+                  "type": "code"
+                }
+              ]
+            },
+            {
+              "type": "text",
+              "text": " in the checkout. Install its six Skills, then configure or select an MCP connection in your host. A ChatGPT Personal export can reference an existing registered connection."
             }
           ]
         },

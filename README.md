@@ -13,7 +13,7 @@
 **The evolving interface between humans and agents.** Your agent's answers become interfaces — interactive, archived, and evolving as you use them.
 
 - **Interactive** — agents answer with charts, calculators and diagrams you can adjust, compare and explore.
-- **Archived** — every interface is saved as your own page in local versioned files; the agent continues from your edits, and you can export it for others.
+- **Archived** — ask your agent to save a result as a ShowAI page. Reopen the page, edit it together or export a copy.
 - **Evolving** — when an expression is missing, the agent builds a new component; pages that work become templates, so each round starts from a better place.
 
 https://github.com/user-attachments/assets/ecdccdec-1def-45a9-811f-121a7d07b906
@@ -22,25 +22,27 @@ https://github.com/user-attachments/assets/ecdccdec-1def-45a9-811f-121a7d07b906
 
 ## 🚀 Get started in 3 steps
 
+This README describes `main`. For the exact menus and plugin setup in a downloaded build, follow the Quick start link in the [release notes for that version](https://github.com/Renaissance-Mind/ShowAI/releases).
+
 ShowAI works inside the agent you already use: the plugin lets your agent build interfaces, and the ShowAI app keeps, opens and edits them.
 
 You need a Mac with Apple silicon (macOS 13 or later), and Claude Code or Codex signed in. No agent yet? Use the built-in agent with a model API key. On Windows or Linux, run the [browser edition](#build-from-source).
 
 1. **Download ShowAI** — get the [latest release](https://github.com/Renaissance-Mind/ShowAI/releases/latest), open the DMG and drag ShowAI into Applications. Current builds are not yet notarized by Apple; if macOS blocks the first launch, see [first launch](docs/quick-start.md#1-install-showai).
-2. **Connect your agent** — open ShowAI and install the plugin for Claude Code or Codex from the welcome screen (or **Settings → Plugins**), then restart the agent.
+2. **Connect your agent** — open ShowAI and install the plugin for Claude Code or Codex from the welcome screen (or **Settings → Agent plugins**), then restart the agent.
 3. **Ask for an interface** — paste the sample prompt into a new conversation:
 
-   > Use ShowAI to build a mortgage calculator: price, down payment, rate and term are adjustable; show the monthly payment and total interest.
+   > Use ShowAI to build a mortgage calculator with adjustable price, down payment, rate and term. Show the monthly payment and total interest, and save it as a ShowAI page.
 
-The agent saves the interface in ShowAI and shows it in the conversation (or as an HTML file in agents that can't display it); in the app it appears under **Recent**. Edit it there, or ask the agent to continue from your changes. Not working? See [If the agent can't find ShowAI](docs/quick-start.md#if-the-agent-cant-find-showai).
+A chat visualization is a temporary preview. The sample explicitly requests a saved page. Once saved, open it under **Recent** in ShowAI or use the page card or link your agent returns. [Troubleshoot the connection](docs/quick-start.md#if-the-agent-cant-find-showai).
 
 ## 🤖 Supported agents
 
 | Agent                                     | Status       | How to connect                                                                                                                         |
 | ----------------------------------------- | ------------ | -------------------------------------------------------------------------------------------------------------------------------------- |
-| Claude Code                               | Supported    | ShowAI → **Settings → Plugins** → Install plugin                                                                                       |
-| Codex                                     | Supported    | ShowAI → **Settings → Plugins** → Install plugin                                                                                       |
-| Antigravity                               | Supported    | ShowAI → **Settings → Plugins** → Install plugin                                                                                       |
+| Claude Code                               | Supported    | ShowAI → **Settings → Agent plugins** → Install plugin                                                                                       |
+| Codex                                     | Supported    | ShowAI → **Settings → Agent plugins** → Install plugin                                                                                       |
+| Antigravity                               | Supported    | ShowAI → **Settings → Agent plugins** → Install plugin                                                                                       |
 | Built-in agent                            | Supported    | Inside ShowAI, using your local Codex or Claude Code sign-in, a model API key or Cloud                                                 |
 | DeepSeek Harness                          | Preview      | Quit DeepSeek Harness, then choose **Settings → Agent plugins → Install plugin** in ShowAI ([steps](plugins/showai/README.md#deepseek-harness)) |
 | Kimi Work                                 | Preview      | Prepare the plugin directory in **Settings → Agent plugins**, then [install it in Kimi Work](plugins/showai-kimi/README.md)                                              |
@@ -67,7 +69,7 @@ When installing ShowAI from this repository, use the row for your current Agent 
 | Qoder                             | [plugins/showai/](plugins/showai/) → `--host qoder`                  | Generate a ZIP and import it in **Extensions → Plugins → Add plugin**. [Qoder setup](plugins/showai/README.md#cursor-qoder-and-workbuddy)                         |
 | WorkBuddy                         | [plugins/showai/](plugins/showai/) → `--host workbuddy`              | Generate a local marketplace package, or add ShowAI in **Connectors → Custom connectors**. [WorkBuddy setup](plugins/showai/README.md#cursor-qoder-and-workbuddy) |
 | ChatGPT on the web                | [plugins/showai/](plugins/showai/) → `--chatgpt-app`                 | [Register a remote MCP connection](docs/chatgpt.md#connect-chatgpt) and attach it to a universal package if needed.                                               |
-| TRAE and other compatible clients | [plugins/showai/](plugins/showai/)                                   | [Generate the universal package](plugins/showai/README.md#universal-plugin-and-manual-mcp-setup) with a known connection, or use the included setup guide.        |
+| Other compatible clients | [plugins/showai/](plugins/showai/)                                   | [Generate the universal package](plugins/showai/README.md#universal-plugin-and-manual-mcp-setup) with a known connection, or use the included setup guide.        |
 
 ## 💡 See what it makes
 
@@ -101,7 +103,7 @@ As agents take on more work, the bottleneck moves from what agents can do to whe
 
 **Archived**
 
-- **Living Archive**: Output lands as versioned files in a local project bound to your source directory, with editor undo, retained drafts and conflict protection, ready to be continued, reused or broken into new material.
+- **Living Archive**: Saved pages belong to a local project. ShowAI stores their current content in SQLite and protects edits with undo, drafts and conflict recovery.
 - **Local-first, share when you want**: Fully usable with no account. Connect a self-hosted server for collaboration, or export an offline, interactive HTML file.
 
 **Evolving**

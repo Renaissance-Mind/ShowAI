@@ -10,7 +10,7 @@
     "favorite": false,
     "archived": false,
     "createdAt": "2026-10-08T19:30:30.196Z",
-    "updatedAt": "2026-10-22T12:40:29.959Z",
+    "updatedAt": "2026-11-22T13:53:23.329Z",
     "content": {
       "type": "surface",
       "attrs": {
@@ -358,7 +358,7 @@
                 "steps": [
                   {
                     "title": "Open the plugin panel",
-                    "body": "The welcome screen shows the plugin panel on first launch; after that, find it under Settings → Plugins at any time."
+                    "body": "The welcome screen shows the plugin panel on first launch; after that, find it under Settings → Agent plugins at any time."
                   },
                   {
                     "title": "Install plugin",
@@ -385,7 +385,7 @@
           "content": [
             {
               "type": "text",
-              "text": "To confirm the connection, Settings → Plugins shows a test prompt, “Use ShowAI to list my projects”. Send it in a new conversation; when the agent reaches ShowAI, the status next to that agent changes from “Waiting for the first call” to “First call received”."
+              "text": "Start a new agent chat and ask “Use ShowAI to list my projects.” In Settings → MCP → Call history, check the client, tool and result. Settings → Agent plugins shows whether the host plugin is enabled."
             }
           ],
           "attrs": {
@@ -470,7 +470,7 @@
               "content": [
                 {
                   "type": "text",
-                  "text": "Use ShowAI to build a mortgage calculator: price, down payment, rate and term are adjustable; show the monthly payment and total interest."
+                  "text": "Use ShowAI to build a mortgage calculator with adjustable price, down payment, rate and term. Show the monthly payment and total interest, and save it as a ShowAI page."
                 }
               ],
               "attrs": {
@@ -484,7 +484,7 @@
           "content": [
             {
               "type": "text",
-              "text": "The Agent shows the calculator right in the conversation, and you can adjust the numbers to try it out. At this point it is only shown, not saved."
+              "text": "This prompt asks for a saved page. After the save succeeds, open the calculator from its card or link, or find it under Recent in ShowAI."
             }
           ],
           "attrs": {
@@ -499,7 +499,7 @@
           "content": [
             {
               "type": "text",
-              "text": "To keep it and continue editing, follow up with:"
+              "text": "If you started with a temporary chat preview and want to keep what you tried, ask:"
             }
           ]
         },
@@ -519,7 +519,7 @@
               "content": [
                 {
                   "type": "text",
-                  "text": "Save it to ShowAI."
+                  "text": "Save that calculator as a ShowAI page."
                 }
               ]
             }
@@ -533,7 +533,7 @@
           "content": [
             {
               "type": "text",
-              "text": "The Agent saves the same data as a page in ShowAI and shows it: Agents that support inline display show it right in the conversation, and others give you an HTML file to open. In the App, it appears under Recent. If you want it saved from the start, add “…and save it to ShowAI” to your request."
+              "text": "The agent confirms the destination project and saves the current data. You can both continue editing that page."
             }
           ]
         },
@@ -1176,15 +1176,15 @@
                     "title": "Built-in Agent",
                     "tag": "Supported",
                     "tone": "brand",
-                    "body": "Open Settings → Agent and add a model source with an API key (or use your local Codex or Claude Code sign-in, or ShowAI Cloud). Then click the AI button in the top bar, or select text or open a block menu and choose Ask AI.",
+                    "body": "Open Settings → Built-in Agent and add a model source with an API key (or use your local Codex or Claude Code sign-in, or ShowAI Cloud). Then click the AI button in the top bar, or select text or open a block menu and choose Ask AI.",
                     "href": "https://showai.renaissancemind.ai/doc/built-in-agent"
                   },
                   {
                     "icon": "🔌",
                     "title": "Other agents",
-                    "tag": "Preview · Invite only · Experimental",
+                    "tag": "Host plugins and remote MCP",
                     "tone": "teal",
-                    "body": "DeepSeek Harness and Kimi are in preview, ChatGPT on the web is invite only, and Gemini CLI, OpenCode and other MCP clients can be configured manually.",
+                    "body": "DeepSeek Harness, Kimi Work, Kimi Code and TRAE IDE have host-specific setups. ChatGPT web uses public HTTPS and OAuth to reach your desktop or an administrator’s service. Gemini CLI and OpenCode can use a local MCP configuration.",
                     "href": "https://showai.renaissancemind.ai/doc/agent-hosts"
                   },
                   {

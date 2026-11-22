@@ -10,7 +10,7 @@
     "favorite": false,
     "archived": false,
     "createdAt": "2026-10-21T17:41:46.507Z",
-    "updatedAt": "2026-11-21T18:49:39.813Z",
+    "updatedAt": "2026-11-22T13:53:23.329Z",
     "content": {
       "type": "surface",
       "attrs": {
@@ -34,11 +34,11 @@
                 "facts": [
                   {
                     "label": "Plugin panel",
-                    "value": "Settings → Plugins"
+                    "value": "Settings → Agent plugins"
                   },
                   {
                     "label": "ShowAI version",
-                    "value": "Settings → About"
+                    "value": "Settings → About & feedback"
                   },
                   {
                     "label": "Content Library",
@@ -114,7 +114,7 @@
                   },
                   {
                     "title": "The plugin shows “Installed and enabled”",
-                    "body": "Open Settings → Plugins and find the agent you use. If it shows a different status, see “In the plugin panel” below."
+                    "body": "Open Settings → Agent plugins and find the agent you use. If it shows a different status, see “In the plugin panel” below."
                   },
                   {
                     "title": "Reload the agent and start a new conversation",
@@ -122,13 +122,13 @@
                   },
                   {
                     "title": "Start with “Use ShowAI to …”",
-                    "body": "Paste the sample prompt into a new conversation so the agent knows to use ShowAI:\n“Use ShowAI to build a mortgage calculator: price, down payment, rate and term are adjustable; show the monthly payment and total interest.”",
+                    "body": "Paste the sample prompt into a new conversation so the agent knows to use ShowAI:\n“Use ShowAI to build a mortgage calculator with adjustable price, down payment, rate and term. Show the monthly payment and total interest, and save it as a ShowAI page.”",
                     "result": "The agent saves the interface as a page and presents it; in the app it appears under Recent."
                   },
                   {
-                    "title": "Confirm the call in Settings → Plugins",
+                    "title": "Confirm the call in Settings → Agent plugins",
                     "body": "For each agent, the panel shows whether it has called ShowAI yet, and offers a shorter test prompt, “Use ShowAI to list my projects”.",
-                    "result": "The status changes from “Waiting for the first call” to “First call received”. If it stays at “Waiting for the first call”, the agent hasn't loaded the plugin yet; go back a step and restart the agent."
+                    "result": "Start a new agent chat and ask “Use ShowAI to list my projects.” In Settings → MCP → Call history, check the client, tool and result. Settings → Agent plugins shows whether the host plugin is enabled."
                   }
                 ]
               },
@@ -357,7 +357,7 @@
                       "content": [
                         {
                           "type": "text",
-                          "text": "Settings → Plugins asks you to install the plugin in the desktop app"
+                          "text": "Settings → Agent plugins asks you to install the plugin in the desktop app"
                         }
                       ],
                       "attrs": {
@@ -1025,7 +1025,7 @@
                       "content": [
                         {
                           "type": "text",
-                          "text": "In Settings → Plugins, click Update and enable, then restart the agent."
+                          "text": "In Settings → Agent plugins, click Update and enable, then restart the agent."
                         }
                       ],
                       "attrs": {
@@ -1102,7 +1102,7 @@
                       "content": [
                         {
                           "type": "text",
-                          "text": "Update the app, open it once, and click Update and enable in Settings → Plugins; when running from source, rebuild and run "
+                          "text": "Update the app, open it once, and click Update and enable in Settings → Agent plugins; when running from source, rebuild and run "
                         },
                         {
                           "type": "text",
@@ -1260,7 +1260,7 @@
                       "content": [
                         {
                           "type": "text",
-                          "text": "Update the App, click Update and enable in Settings → Plugins, then start a new conversation. Agents without inline display give an image; to interact with it, ask the Agent to save it as a page."
+                          "text": "Update the host plugin in Settings → Agent plugins and start a new chat. Text hosts can return a file or link. Ask to save a page for editing."
                         }
                       ]
                     }
@@ -1408,7 +1408,7 @@
                       "content": [
                         {
                           "type": "text",
-                          "text": "Compare Settings → General → Content library with the library shown in Settings → Plugins. If you switched libraries, click Update and enable and restart the agent."
+                          "text": "Compare Settings → General → Content library with the library shown in Settings → Agent plugins. If you switched libraries, click Update and enable and restart the agent."
                         }
                       ],
                       "attrs": {
@@ -1731,7 +1731,7 @@
                     },
                     {
                       "type": "text",
-                      "text": ": the version number in Settings → About."
+                      "text": ": the version number in Settings → About & feedback."
                     }
                   ],
                   "attrs": {
@@ -1789,7 +1789,7 @@
                     },
                     {
                       "type": "text",
-                      "text": ": the text shown next to your agent in Settings → Plugins."
+                      "text": ": the text shown next to your agent in Settings → Agent plugins."
                     }
                   ],
                   "attrs": {

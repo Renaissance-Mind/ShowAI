@@ -10,7 +10,7 @@
     "favorite": false,
     "archived": false,
     "createdAt": "2026-10-15T06:42:08.471Z",
-    "updatedAt": "2026-11-22T12:10:25.234Z",
+    "updatedAt": "2026-11-22T14:15:26.479Z",
     "content": {
       "type": "surface",
       "attrs": {
@@ -39,7 +39,7 @@
                   },
                   {
                     "label": "下载通用插件 ZIP",
-                    "href": "https://showai.renaissancemind.ai/downloads/showai-universal.zip"
+                    "href": "https://raw.githubusercontent.com/Renaissance-Mind/ShowAI/main/downloads/showai-universal.zip"
                   }
                 ]
               },
@@ -124,7 +124,7 @@
           "content": [
             {
               "type": "text",
-              "text": "先在同一台电脑上安装并打开 ShowAI，选好内容库，再安装宿主插件。下列五种包均自带 MCP 启动配置，只需安装一份插件。在「设置 → MCP」可以查看运行时、复制启动配置，并按客户端和工具核对实际调用。"
+              "text": "在运行 Agent 的电脑上打开 ShowAI，选择内容库。在「设置 → Agent 插件」安装或准备与你的宿主对应的包。「设置 → MCP」提供本机运行时、启动配置和调用记录。"
             }
           ]
         },
@@ -139,7 +139,7 @@
                 "steps": [
                   {
                     "title": "Codex · Claude Code · Antigravity",
-                    "body": "在 ShowAI「设置 → 插件」找到对应宿主，点「安装插件」。请先让该宿主的命令行工具可用。"
+                    "body": "在 ShowAI「设置 → Agent 插件」找到对应宿主，点「安装插件」。请先让该宿主的命令行工具可用。"
                   },
                   {
                     "title": "DeepSeek Harness",
@@ -147,7 +147,19 @@
                   },
                   {
                     "title": "Kimi Work",
-                    "body": "在 Kimi 的本地插件管理器登记 [Kimi Work 专用包](https://github.com/Renaissance-Mind/ShowAI/tree/main/plugins-kimi/showai)，再到 Plugins → Personal → ShowAI 安装并启用。包内的 MCP 启动器默认使用 ~/.showai。使用其他已登记的内容库时，在这份配置的环境中指定 SHOWAI_HOME。"
+                    "body": "在「设置 → Agent 插件 → Kimi Work」准备插件目录，在 Kimi Work 中登记该目录，再从 Plugins → Personal 安装 ShowAI。"
+                  },
+                  {
+                    "title": "Cursor Agents · Cursor IDE · TRAE IDE",
+                    "body": "在「设置 → Agent 插件」选对应宿主。Cursor Agents 使用本地插件目录；Cursor IDE、TRAE IDE 从扩展菜单安装 VSIX，并按提示配置本机 MCP。"
+                  },
+                  {
+                    "title": "Kimi Code · Qoder · WorkBuddy",
+                    "body": "在同一设置页准备安装包。Kimi Code 在 Plugins 中安装自定义插件目录，Qoder 从扩展菜单导入 ZIP，WorkBuddy 添加本地插件市场再安装。"
+                  },
+                  {
+                    "title": "Gemini CLI · OpenCode",
+                    "body": "在对应宿主行复制 MCP 配置，加入该客户端的配置文件后开启新对话。"
                   }
                 ]
               },
@@ -206,13 +218,13 @@
                     "label": "Codex",
                     "values": {
                       "show": "聊天中的原生 MCP Apps 视图。",
-                      "save": "原页卡片可在聊天右侧打开工作台并定位到组件。"
+                      "save": "点击原页卡片可打开或定位右侧编辑标签页。卡片可以指向整页或指定组件。"
                     }
                   },
                   {
                     "label": "Claude Code",
                     "values": {
-                      "show": "Agent 将紧凑 HTML 片段交给会话提供的 HTML 展示工具。",
+                      "show": "会话提供 HTML 展示工具时可在聊天里操作预览。纯终端会话提供 HTML 文件或可访问的链接。",
                       "save": "新页可预览，续改后给出原页链接；完整离线 HTML 可单独交付。"
                     }
                   },
@@ -226,7 +238,7 @@
                   {
                     "label": "DeepSeek Harness",
                     "values": {
-                      "show": "临时组件和已保存页面都可在工具结果和回合末尾交互预览。",
+                      "show": "Harness 图形客户端可在工具结果和回合末尾显示交互预览。终端客户端返回页面链接或 HTML 文件。",
                       "save": "点「在侧栏编辑」打开原页，边聊边改，并把页面或选区引用放入当前对话草稿。左侧导航的 ShowAI 打开全局工作台。"
                     }
                   },
@@ -235,6 +247,41 @@
                     "values": {
                       "show": "离线 HTML 放进当前 Widget 的工作区后显示。",
                       "save": "可复用同一 Widget 显示更新，通过原页链接继续编辑。"
+                    }
+                  },
+                  {
+                    "label": "Cursor Agents",
+                    "values": {
+                      "show": "原生 MCP Apps 与原页卡片。",
+                      "save": "点击卡片取得实时编辑链接，在 Cursor Browser 中打开原页。"
+                    }
+                  },
+                  {
+                    "label": "Cursor IDE · TRAE IDE",
+                    "values": {
+                      "show": "通过宿主插件或 MCP 连接提供的预览与原页入口。",
+                      "save": "从扩展运行 ShowAI: Open Workbench，或打开 .showai-ref 进入 IDE 编辑标签页。"
+                    }
+                  },
+                  {
+                    "label": "Qoder",
+                    "values": {
+                      "show": "交互式 MCP Apps 和原页卡片。",
+                      "save": "点击卡片可定位当前任务中已打开的侧栏编辑器。要新开右侧标签页，告诉 Agent 打开原页。「更多 → ShowAI」进入全局工作台。"
+                    }
+                  },
+                  {
+                    "label": "WorkBuddy",
+                    "values": {
+                      "show": "交互式 MCP Apps 和原页卡片。",
+                      "save": "宿主提供浏览器时可用实时编辑链接打开原页。"
+                    }
+                  },
+                  {
+                    "label": "Kimi Code",
+                    "values": {
+                      "show": "桌面版可在文件预览中打开 HTML。CLI 返回文件路径。",
+                      "save": "桌面版可在右侧浏览器打开实时编辑链接；CLI 返回同一页的链接。"
                     }
                   },
                   {
@@ -284,7 +331,36 @@
           "content": [
             {
               "type": "text",
-              "text": "在桌面「设置 → 插件 → 导出通用插件」取得 ZIP，或从本页下载。支持插件包的宿主可直接导入，使用 Agent Skills 目录的客户端可加载其中六份 Skills。随后在当前宿主添加 MCP。"
+              "text": "从本页下载"
+            },
+            {
+              "type": "text",
+              "text": "通用插件 ZIP",
+              "marks": [
+                {
+                  "type": "link",
+                  "attrs": {
+                    "href": "https://raw.githubusercontent.com/Renaissance-Mind/ShowAI/main/downloads/showai-universal.zip"
+                  }
+                }
+              ]
+            },
+            {
+              "type": "text",
+              "text": "，或在主仓库运行 "
+            },
+            {
+              "type": "text",
+              "text": "npm run package:plugin -- --out showai-universal.zip",
+              "marks": [
+                {
+                  "type": "code"
+                }
+              ]
+            },
+            {
+              "type": "text",
+              "text": "。安装六个 Skills 后，在宿主里配置或选择已有的 MCP 连接。ChatGPT 的 Personal 导出可以关联已经注册的连接。"
             }
           ]
         },

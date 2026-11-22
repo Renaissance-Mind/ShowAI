@@ -10,7 +10,7 @@
     "favorite": false,
     "archived": false,
     "createdAt": "2026-10-15T06:42:09.851Z",
-    "updatedAt": "2026-10-21T17:41:47.159Z",
+    "updatedAt": "2026-11-22T13:48:07.183Z",
     "content": {
       "type": "surface",
       "attrs": {
@@ -112,7 +112,7 @@
                   },
                   {
                     "title": "连接你的 Agent",
-                    "body": "在欢迎页或「设置 → 插件」中，为 Claude Code 或 Codex 点「安装插件」，然后重启 Agent，新开一个对话。完整步骤见 [快速上手](doc:quick-start)。"
+                    "body": "在欢迎页或「设置 → Agent 插件」中，为 Claude Code 或 Codex 点「安装插件」，然后重启 Agent，新开一个对话。完整步骤见 [快速上手](doc:quick-start)。"
                   }
                 ]
               },
@@ -294,7 +294,7 @@
                     "group": "Agent",
                     "label": "安装 Claude Code / Codex 插件",
                     "values": {
-                      "desktop": "「设置 → 插件」一键安装",
+                      "desktop": "「设置 → Agent 插件」一键安装",
                       "package": "从源码仓库安装",
                       "source": "从源码仓库安装"
                     }
@@ -894,7 +894,7 @@
                     "badge": "内容库",
                     "open": true,
                     "summary": "默认位置 `~/.showai`。",
-                    "detail": "可以在「设置 → 通用 → 内容库」中「选择内容库」，也可以用 `--home` 或环境变量 `SHOWAI_HOME` 固定一次启动的位置。",
+                    "detail": "可以在「设置 → 通用 → 内容库」中「更换目录」，也可以用 `--home` 或环境变量 `SHOWAI_HOME` 固定一次启动的位置。",
                     "children": [
                       {
                         "name": "library.json",
@@ -1334,7 +1334,7 @@
                 "steps": [
                   {
                     "title": "App：换成新版本",
-                    "body": "从[最新发行版](https://github.com/Renaissance-Mind/ShowAI/releases/latest)下载新的 DMG，把 ShowAI 拖进「应用程序」替换旧版本。然后在「设置 → 插件」中点「更新并启用」，让插件换成新版 App 附带的版本，再重启 Agent。内容库不在 App 里，不受影响。"
+                    "body": "从[最新发行版](https://github.com/Renaissance-Mind/ShowAI/releases/latest)下载新的 DMG，把 ShowAI 拖进「应用程序」替换旧版本。然后在「设置 → Agent 插件」中点「更新并启用」，让插件换成新版 App 附带的版本，再重启 Agent。内容库不在 App 里，不受影响。"
                   },
                   {
                     "title": "源码：拉取并重新构建",

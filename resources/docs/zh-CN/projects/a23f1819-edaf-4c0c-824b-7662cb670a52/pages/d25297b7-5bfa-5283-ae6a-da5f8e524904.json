@@ -10,7 +10,7 @@
     "favorite": false,
     "archived": false,
     "createdAt": "2026-10-08T19:30:38.316Z",
-    "updatedAt": "2026-10-15T06:42:06.310Z",
+    "updatedAt": "2026-11-22T13:48:07.183Z",
     "content": {
       "type": "surface",
       "attrs": {
@@ -2659,7 +2659,7 @@
           "content": [
             {
               "type": "text",
-              "text": "绘图节点只能放在 Board 里。位置和显示尺寸保存在 "
+              "text": "绘图属于 Board，"
             },
             {
               "type": "text",
@@ -2672,11 +2672,11 @@
             },
             {
               "type": "text",
-              "text": "，"
+              "text": " 记录位置和显示尺寸。新钢笔与荧光笔将分段中心曲线、半径和仿射变换写入 "
             },
             {
               "type": "text",
-              "text": "points",
+              "text": "attrs.ink",
               "marks": [
                 {
                   "type": "code"
@@ -2685,7 +2685,33 @@
             },
             {
               "type": "text",
-              "text": " 是相对自身外框的本地坐标。移动绘图保持点不变，缩放会改变外框。"
+              "text": "，格式为 "
+            },
+            {
+              "type": "text",
+              "text": "showai-ink-v2",
+              "marks": [
+                {
+                  "type": "code"
+                }
+              ]
+            },
+            {
+              "type": "text",
+              "text": "。现有 "
+            },
+            {
+              "type": "text",
+              "text": "showai-ink-v1",
+              "marks": [
+                {
+                  "type": "code"
+                }
+              ]
+            },
+            {
+              "type": "text",
+              "text": " 笔迹仍按原采样与遮罩解释。下例是使用局部点列的箭头。"
             }
           ],
           "attrs": {
@@ -2865,6 +2891,10 @@
                   "content": [
                     {
                       "type": "text",
+                      "text": "形状和旧式点列绘图的 "
+                    },
+                    {
+                      "type": "text",
                       "text": "strokeWidth",
                       "marks": [
                         {
@@ -2874,7 +2904,7 @@
                     },
                     {
                       "type": "text",
-                      "text": " 为 0.5–40；"
+                      "text": " 为 0.5–40，"
                     },
                     {
                       "type": "text",
@@ -2887,7 +2917,23 @@
                     },
                     {
                       "type": "text",
-                      "text": " 为 2–20,000 个点。"
+                      "text": " 含 2–20,000 个局部点。新墨迹的容量按曲线几何和采样预算校验。详见"
+                    },
+                    {
+                      "type": "text",
+                      "text": "可移植墨迹",
+                      "marks": [
+                        {
+                          "type": "link",
+                          "attrs": {
+                            "href": "https://github.com/Renaissance-Mind/ShowAI/blob/main/docs/i18n/portable-ink.zh-CN.md"
+                          }
+                        }
+                      ]
+                    },
+                    {
+                      "type": "text",
+                      "text": "。"
                     }
                   ],
                   "attrs": {

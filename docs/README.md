@@ -14,6 +14,7 @@ Guides describe the current source. The released app, the plugin and hosted serv
 | [Use in Claude Code and Codex](codex.md)       | Install the plugin from the app, projects and pages |
 | [Built-in agent](agent-host.md)                | Local/API, Cloud and paired Mac execution           |
 | [Page and Board](page-surface.md)              | Nested containers, drawing, reading and shortcuts   |
+| [Portable ink](portable-ink.md) | Shared pen and marker format, editing and compatibility |
 | [Local browser edition](local-browser.md)      | Run from source on macOS, Linux and Windows         |
 | [ChatGPT on the web (local MCP)](chatgpt.md) | Desktop tunnels, pairing, permissions and updates            |
 
@@ -22,7 +23,7 @@ Guides describe the current source. The released app, the plugin and hosted serv
 | Guide                                            | Contents                                                |
 | ------------------------------------------------ | ------------------------------------------------------- |
 | [Components and templates](catalog-lifecycle.md) | Scopes, immutable versions, composition and publication |
-| [Skills and workflows](skills.md)                | Six Skills and task routing                             |
+| [Skills and workflows](skills.md)                | Six Skills, chat previews and saved pages                             |
 | [Template folders](template-bundles.md)          | Metadata, guides and component libraries                |
 | [Component parameters](component-parameters.md)  | Generated references, omission and relation checks      |
 | [G2 data charts](g2-components.md)               | 43 charts, datasets and field mapping                   |

@@ -10,7 +10,7 @@
     "favorite": false,
     "archived": false,
     "createdAt": "2026-10-15T06:42:08.178Z",
-    "updatedAt": "2026-10-21T17:41:45.952Z",
+    "updatedAt": "2026-11-22T13:48:07.183Z",
     "content": {
       "type": "surface",
       "attrs": {
@@ -399,7 +399,7 @@
           "content": [
             {
               "type": "text",
-              "text": "Select \"Execution Mode\" in \"Settings → Agent\". Both methods read and write pages by only connecting to the MCP of the current project, the difference is who calls the model. The settings only affect new conversations, existing conversations remain the same way they were created."
+              "text": "Select \"Execution Mode\" in \"Settings → Built-in Agent\". Both methods read and write pages by only connecting to the MCP of the current project, the difference is who calls the model. The settings only affect new conversations, existing conversations remain the same way they were created."
             }
           ],
           "attrs": {
@@ -1701,7 +1701,7 @@
                   "content": [
                     {
                       "type": "text",
-                      "text": "The built-in agent's private copy of the plugin keeps the 8 skills but drops the launch configuration that connects to the whole library, so it can only work on the current project."
+                      "text": "The built-in agent's private copy of the plugin keeps the six Skills but drops the launch configuration that connects to the whole library, so it can only work on the current project."
                     }
                   ],
                   "attrs": {
@@ -2066,7 +2066,7 @@
           "content": [
             {
               "type": "text",
-              "text": "The SDK required for \"Providing LLM API\" is not installed with the application. Click \"One-click Install Codex SDK\" in \"Settings → Agent → Built-in Execution Capabilities\", and later use \"Check and install new version\" to update."
+              "text": "The SDK required for \"Providing LLM API\" is not installed with the application. Click \"One-click Install Codex SDK\" in \"Settings → Built-in Agent → Built-in Execution Capabilities\", and later use \"Check and install new version\" to update."
             }
           ],
           "attrs": {
@@ -2173,7 +2173,7 @@
                   {
                     "icon": "🧠",
                     "title": "Skills & Workflows",
-                    "body": "The built-in agent follows the same 8 skills.",
+                    "body": "The built-in agent follows the same six Skills.",
                     "href": "https://showai.renaissancemind.ai/doc/skills"
                   },
                   {

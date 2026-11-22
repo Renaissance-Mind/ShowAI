@@ -10,7 +10,7 @@
     "favorite": false,
     "archived": false,
     "createdAt": "2026-10-08T19:30:37.418Z",
-    "updatedAt": "2026-10-15T06:42:06.462Z",
+    "updatedAt": "2026-11-22T13:48:07.183Z",
     "content": {
       "type": "surface",
       "attrs": {
@@ -512,11 +512,11 @@
           "content": [
             {
               "type": "text",
-              "text": "The default content library is in the user's home directory"
+              "text": "A normal library lives at "
             },
             {
               "type": "text",
-              "text": ".showai",
+              "text": "~/.showai",
               "marks": [
                 {
                   "type": "code"
@@ -525,11 +525,11 @@
             },
             {
               "type": "text",
-              "text": ". The current format is "
+              "text": " by default. The transactional database "
             },
             {
               "type": "text",
-              "text": "history/content.sqlite ",
+              "text": "history/content.sqlite",
               "marks": [
                 {
                   "type": "code"
@@ -538,7 +538,7 @@
             },
             {
               "type": "text",
-              "text": "as an authoritative source,"
+              "text": " holds current content. "
             },
             {
               "type": "text",
@@ -551,7 +551,7 @@
             },
             {
               "type": "text",
-              "text": "Below is the JSON projection for humans and tools to read,"
+              "text": " provides readable JSON. "
             },
             {
               "type": "text",
@@ -564,7 +564,20 @@
             },
             {
               "type": "text",
-              "text": "Below is the rebuildable cache and operation record."
+              "text": " also contains editor drafts, draft assets, conflicts and transaction recovery data. Rebuildable reading caches live under "
+            },
+            {
+              "type": "text",
+              "text": "local/reading-cache/",
+              "marks": [
+                {
+                  "type": "code"
+                }
+              ]
+            },
+            {
+              "type": "text",
+              "text": ". Use Settings → Storage → Full backup to preserve recovery material."
             }
           ],
           "attrs": {
@@ -580,7 +593,7 @@
           "content": [
             {
               "type": "text",
-              "text": ".showai/\n  library.json                 # 内容库格式与存储类型\n  history/content.sqlite       # 当前内容（权威）\n  workspace/projects/<项目 id>/\n    project.json               # 项目元数据、文件夹层级\n    pages/<页面 id>.json     # 页面源文件（格式版本 3）\n    packages/components/<组件 id>/<版本>/\n  local/                       # 回执、事务、缓存（可重建）"
+              "text": ".showai/\n  library.json\n  history/content.sqlite             # Current content\n  workspace/projects/<project ID>/\n    project.json                     # Project and folders\n    pages/<page ID>.json             # Readable page\n    packages/components/             # Project components\n  local/editor-drafts/               # Unfinished edits\n  local/draft-assets/                # Draft attachments\n  local/conflicts/                   # Conflict material\n  local/transactions/                # Transaction recovery\n  local/reading-cache/               # Rebuildable reader cache"
             }
           ]
         },

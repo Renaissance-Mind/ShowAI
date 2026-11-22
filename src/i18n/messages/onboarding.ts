@@ -35,7 +35,7 @@ export default defineMessages("onboarding", {
     "prompts.copied": "已复制",
     "prompts.mortgage": "做一个房贷计算器",
     "prompts.mortgagePrompt":
-      "用 ShowAI 帮我做一个房贷计算器：房价、首付比例、利率和贷款年限可以调整，显示月供和总利息。",
+      "用 ShowAI 做一个房贷计算器。让我调整房价、首付比例、利率和期限，显示月供和总利息，并保存为 ShowAI 页面。",
     "prompts.foldable": "比较两台折叠屏",
     "prompts.foldablePrompt":
       "用 ShowAI 比较两台折叠屏手机：按便携、续航、影像和价格列出差异，并让我调整各项权重。",
@@ -122,7 +122,7 @@ export default defineMessages("onboarding", {
     "prompts.copied": "Copied",
     "prompts.mortgage": "Build a mortgage calculator",
     "prompts.mortgagePrompt":
-      "Use ShowAI to build a mortgage calculator: price, down payment, rate and term are adjustable; show the monthly payment and total interest.",
+      "Use ShowAI to build a mortgage calculator with adjustable price, down payment, rate and term. Show the monthly payment and total interest, and save it as a ShowAI page.",
     "prompts.foldable": "Compare two foldable phones",
     "prompts.foldablePrompt":
       "Use ShowAI to compare two foldable phones on portability, battery, camera and price, and let me adjust the weights.",

@@ -17,7 +17,7 @@ The page model, component compiler, authoring service, revision checks, export r
 
 ## Local use
 
-Find the actual runtime under **Settings → Agent plugins** (**Registered runtime** and the launch configuration) or in the selected library's `agent-runtime.json`. `showai` below abbreviates that executable and its arguments. Inspect `runtime info --json` and `guide integration --json`.
+Find the actual runtime under **Settings → MCP** (**Local runtime** and **Local launch configuration**) or in the selected library's `agent-runtime.json`. `showai` below abbreviates that executable and its arguments. Inspect `runtime info --json` and `guide integration --json`.
 
 ```sh
 showai public list --kind component --view compact --json
@@ -75,7 +75,7 @@ For a chat visual, use show-visual and call `show_component({html})` with the HT
 
 The built-in Agent requests a component index when authoring a page or when the user asks to use existing components. Conversation HTML needs only the display tool. The embedded text view can link the file returned by a local preview.
 
-Public tools are `showai_capabilities`, `public_catalog_list`, `public_catalog_describe`, `render_document`, `show_component` and `presentation_source`. The last tool retrieves editable public render input in text chunks when a host cannot download the HTTP URL; it does not expose private project exports. The catalog includes built-in components and editable starter templates. All public rendering inputs come from the caller; anonymous operations do not read the user's content library.
+On hosted HTTP, the tools available without an account are `showai_capabilities`, `public_catalog_list`, `public_catalog_describe`, `render_document`, `show_component` and `presentation_source`. The last tool retrieves editable public render input in text chunks when a host cannot download the HTTP URL; it does not expose private project exports. The catalog includes built-in components and editable starter templates. All public rendering inputs come from the caller; anonymous operations do not read the user's content library.
 
 Private tools retain the existing authoring names, add an explicit `projectId`, and use OAuth. `projects_list` queries current server membership on every call. Selected-project grants remain restricted to their original IDs; account grants include later projects. `project_create` requires account authorization and the separate `projects.create` scope; it creates and synchronizes the project, returns its server ID, and accepts an operationId UUID for retrying the same request. `page_present` supplies the same reader as public rendering. Local path-based import, whole-site publication and local recovery tools stay local; remote component customization uses `component_save` with source. Remote exports use service-owned temporary paths and return downloadable artifacts instead of server filesystem paths.
 
@@ -107,7 +107,7 @@ MCP Apps resources use `text/html;profile=mcp-app` and `_meta.ui.resourceUri`, w
 
 The same skill source supports local and remote connections. For a remote package:
 
-Generate an unbound universal package with `npm run package:plugin -- --out NEW_DIRECTORY`, or export the ZIP from desktop Settings → Agent plugins. Install the six Skills in the host and configure its MCP connection manually. The optional ChatGPT Personal export can reference a connection the user has already registered. A supplied `--mcp-url` is a manual setup hint in the README. See [Set up an agent](https://showai.renaissancemind.ai/doc/agent-hosts).
+Download the [universal plugin ZIP](https://raw.githubusercontent.com/Renaissance-Mind/ShowAI/main/downloads/showai-universal.zip) or build it from the checkout with `npm run package:plugin -- --out showai-universal.zip`. Install the six Skills in the host and configure its MCP connection manually. The optional ChatGPT Personal export can reference a connection the user has already registered. A supplied `--mcp-url` is a manual setup hint in the README. See [Set up an agent](https://showai.renaissancemind.ai/doc/agent-hosts).
 
 ## Saved-page presentation contract
 

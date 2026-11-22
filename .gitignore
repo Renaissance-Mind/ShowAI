@@ -76,6 +76,7 @@ plugins/showai/scripts/cli.mjs
 !/docs/page-surface.md
 !/docs/project-sync.md
 !/docs/portable-ink.md
+!/docs/i18n/portable-ink.zh-CN.md
 !/docs/quick-start.md
 !/docs/server-operations.md
 !/docs/skills.md

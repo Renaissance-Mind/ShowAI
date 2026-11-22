@@ -10,7 +10,7 @@
     "favorite": false,
     "archived": false,
     "createdAt": "2026-10-15T06:42:05.786Z",
-    "updatedAt": "2026-10-22T18:35:06.207Z",
+    "updatedAt": "2026-11-22T14:00:23.396Z",
     "content": {
       "type": "surface",
       "attrs": {
@@ -28,17 +28,17 @@
               "componentId": "doc-hero",
               "version": "1.0.0",
               "props": {
-                "eyebrow": "可搜索的完整清单",
-                "title": "每条命令、每个工具",
-                "lead": "Agent 处理页面用 MCP 工具；脚本、服务启动、诊断和管理用 CLI。两者调用同一套服务，读写同一个内容库。",
+                "eyebrow": "CLI 与 MCP",
+                "title": "查命令、工具和用法",
+                "lead": "脚本通过 CLI 调用，Agent 通过 MCP 连接。展开索引查看当前构建登记的命令和各连接模式公布的工具，再按任务查下面的用法示例。",
                 "facts": [
                   {
-                    "label": "CLI 命令",
-                    "value": "83 条"
+                    "label": "CLI 命令族",
+                    "value": "20"
                   },
                   {
-                    "label": "MCP 工具",
-                    "value": "47 个"
+                    "label": "本机内容库工具",
+                    "value": "47"
                   },
                   {
                     "label": "输出",
@@ -125,20 +125,7 @@
           "content": [
             {
               "type": "text",
-              "text": "桌面 App 的 "
-            },
-            {
-              "type": "text",
-              "text": "设置 → Agent → 本地连接",
-              "marks": [
-                {
-                  "type": "bold"
-                }
-              ]
-            },
-            {
-              "type": "text",
-              "text": " 会给出本机可执行文件、CLI 路径和环境变量，直接复制即可。"
+              "text": "打开桌面 App 的「设置 → MCP → 本机启动配置」，复制本机可执行文件、参数和环境变量。"
             }
           ],
           "attrs": {
@@ -583,12 +570,35 @@
           "content": [
             {
               "type": "text",
-              "text": "搜索命令、说明或参数，或按分组筛选。展开一条命令查看参数和示例。"
+              "text": "索引来自当前 CLI 声明，包含别名。下面的示例按任务分组，可搜索命令、参数和示例输入。"
             }
           ],
           "attrs": {
             "id": "node-c9b76796"
           }
+        },
+        {
+          "type": "toggle",
+          "attrs": {
+            "id": "cli-command-index",
+            "open": false,
+            "title": "按命令查看 CLI 注册表"
+          },
+          "content": [
+            {
+              "type": "codeBlock",
+              "attrs": {
+                "id": "cli-command-index-text",
+                "language": "text"
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "boards read\n\ncatalog describe\ncatalog fork\ncatalog import\ncatalog list\ncatalog merge\ncatalog promote\ncatalog remove\ncatalog save\n\ndatasets apply\ndatasets create\ndatasets delete\ndatasets link\ndatasets list\ndatasets read\ndatasets transform\n\nexport\n\nguide\n\nimport\n\nimporters list\nimporters remove\nimporters save\n\nlibrary activate\nlibrary archive\nlibrary cleanup\nlibrary cleanup-plan\nlibrary compact\nlibrary import\nlibrary imports\nlibrary init\nlibrary migrate\nlibrary policy\nlibrary rebuild-index\nlibrary stats\nlibrary verify\nlibrary verify-archive\n\nmcp\nmcp serve\n\npages apply\npages create\npages delete\npages deleted\npages diff\npages duplicate\npages list\npages pin\npages read\npages restore\npages save\npages unpin\n\nprojects bind\nprojects create\nprojects current\nprojects list\n\npublic describe\npublic list\n\npublish list\npublish prepare\npublish register\npublish verify\n\nrender\n\nruntime info\nruntime register\n\nsearch\n\nserve\n\nsync account\nsync attach\nsync conflict\nsync connect\nsync dashboard\nsync default\nsync detach\nsync disconnect\nsync join\nsync projects\nsync resolve\nsync retained\nsync run\nsync status\nsync subscribe\n\ntemplate apply\ntemplate context\ntemplate export\ntemplate import\ntemplate instantiate\ntemplate save\n\nworkspace conflict\nworkspace conflicts\nworkspace merge\nworkspace recover-package\nworkspace resolve"
+                }
+              ]
+            }
+          ]
         },
         {
           "type": "widget",
@@ -638,6 +648,14 @@
                   {
                     "id": "sync",
                     "label": "同步"
+                  },
+                  {
+                    "id": "datasets",
+                    "label": "共享数据"
+                  },
+                  {
+                    "id": "import",
+                    "label": "导入与导入器"
                   }
                 ],
                 "commands": [
@@ -696,7 +714,7 @@
                     "group": "start",
                     "command": "mcp --public",
                     "summary": "启动只含公开资源的 MCP",
-                    "detail": "不读取任何项目数据，只提供公开目录、guide 和 render_document。不接受 --project 或 --templates。"
+                    "detail": "公开 stdio 模式提供能力查询、公开目录、独立渲染和聊天可视化。使用本页的公开工具索引或该连接的 tools/list 查看当前名单。"
                   },
                   {
                     "group": "start",
@@ -1227,27 +1245,6 @@
                   },
                   {
                     "group": "template",
-                    "command": "template guide STAGE",
-                    "summary": "读取某一阶段的指南",
-                    "detail": "阶段：intent、evidence、understanding、design、authoring、review。返回系统指南加所选模板的同阶段指南。",
-                    "flags": [
-                      {
-                        "flag": "--templates ID",
-                        "meaning": "所选模板"
-                      },
-                      {
-                        "flag": "--input CONTEXT.json",
-                        "meaning": "沿用 template context 的结果"
-                      },
-                      {
-                        "flag": "--file NAME --id TEMPLATE",
-                        "meaning": "读取指南文件夹中的某个子文件"
-                      }
-                    ],
-                    "example": "showai template guide design --project P --templates my-template --json"
-                  },
-                  {
-                    "group": "template",
                     "command": "template apply ID",
                     "summary": "用模板创建页面，或插入现有页面",
                     "detail": "单独使用时新建资源并保持模板的容器类型；加 --page 时把模板根节点作为模块插入，所有 ID 与视图引用一起重映射。",
@@ -1569,6 +1566,91 @@
                     "group": "sync",
                     "command": "sync disconnect --connection ID",
                     "summary": "移除一个服务器连接"
+                  },
+                  {
+                    "group": "pages",
+                    "command": "pages deleted",
+                    "summary": "列出可恢复的已归档项目、文件夹和页面。"
+                  },
+                  {
+                    "group": "pages",
+                    "command": "pages delete PAGE",
+                    "summary": "归档页面。"
+                  },
+                  {
+                    "group": "pages",
+                    "command": "pages restore PAGE",
+                    "summary": "恢复已归档页面。"
+                  },
+                  {
+                    "group": "pages",
+                    "command": "pages duplicate PAGE",
+                    "summary": "复制页面到同一项目。"
+                  },
+                  {
+                    "group": "pages",
+                    "command": "pages pin PAGE",
+                    "summary": "置顶页面。使用 pages unpin 取消。"
+                  },
+                  {
+                    "group": "datasets",
+                    "command": "datasets list",
+                    "summary": "列出项目的共享数据。"
+                  },
+                  {
+                    "group": "datasets",
+                    "command": "datasets read DATASET",
+                    "summary": "读取数据、状态和关联页面。"
+                  },
+                  {
+                    "group": "datasets",
+                    "command": "datasets create --project PROJECT --name NAME --input FILE",
+                    "summary": "从 JSON 输入创建共享数据。"
+                  },
+                  {
+                    "group": "datasets",
+                    "command": "datasets apply DATASET --project PROJECT --input FILE --base-hash HASH",
+                    "summary": "基于当前 hash 应用数据修改。"
+                  },
+                  {
+                    "group": "datasets",
+                    "command": "datasets link DATASET --project PROJECT --file PATH",
+                    "summary": "将数据链接到本地文件、网址或嵌入副本。"
+                  },
+                  {
+                    "group": "datasets",
+                    "command": "datasets transform --project PROJECT --inputs INPUTS.json --script transform.js",
+                    "summary": "从输入数据生成派生数据；可先用 --dry-run 检查。"
+                  },
+                  {
+                    "group": "datasets",
+                    "command": "datasets delete DATASET --project PROJECT --base-hash HASH",
+                    "summary": "按当前 hash 删除共享数据。"
+                  },
+                  {
+                    "group": "import",
+                    "command": "import PATH --project PROJECT --dry-run",
+                    "summary": "预览文件、目录或 ZIP 的导入计划。确认后去掉 --dry-run 执行。"
+                  },
+                  {
+                    "group": "import",
+                    "command": "importers list",
+                    "summary": "查看可用的导入器。"
+                  },
+                  {
+                    "group": "import",
+                    "command": "importers save DIRECTORY",
+                    "summary": "登记目录内包含 importer.json 和 importer.js 的导入器。"
+                  },
+                  {
+                    "group": "import",
+                    "command": "importers remove ID",
+                    "summary": "从所选范围移除导入器。"
+                  },
+                  {
+                    "group": "catalog",
+                    "command": "catalog remove ID --kind component",
+                    "summary": "移除所选目录范围内的组件。"
                   }
                 ],
                 "placeholder": "搜索命令或参数，例如 export、--blocks、冲突"
@@ -2756,11 +2838,11 @@
           "content": [
             {
               "type": "text",
-              "text": "参数名以工具的输入 schema 为准。修改页面的工具都需要读取时得到的 "
+              "text": "工具名取自实际运行时的协议清单。标准连接按模式列出，HTTP 工具的执行权限取决于授权范围。部分宿主另行提供原页卡片或工作台工具，以当前连接的 "
             },
             {
               "type": "text",
-              "text": "baseHash",
+              "text": "tools/list",
               "marks": [
                 {
                   "type": "code"
@@ -2769,25 +2851,35 @@
             },
             {
               "type": "text",
-              "text": " 与 "
-            },
-            {
-              "type": "text",
-              "text": "baseRevision",
-              "marks": [
-                {
-                  "type": "code"
-                }
-              ]
-            },
-            {
-              "type": "text",
-              "text": "。每个工具都拒绝 schema 之外的参数；带 action 的工具按 action 选择操作，只接受该操作自己的字段。"
+              "text": " 和输入 schema 为准。"
             }
           ],
           "attrs": {
             "id": "node-aaceaf1c"
           }
+        },
+        {
+          "type": "toggle",
+          "attrs": {
+            "id": "mcp-tool-index",
+            "open": false,
+            "title": "按连接模式查看 MCP 工具"
+          },
+          "content": [
+            {
+              "type": "codeBlock",
+              "attrs": {
+                "id": "mcp-tool-index-text",
+                "language": "text"
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "本机内容库 · stdio (47)\nboard_read  catalog_describe  catalog_list  catalog_merge_preview\ncatalog_references  catalog_version  component_save  dataset_delete\ndataset_read  dataset_write  draft_read  draft_remove  draft_write\nlibrary_search  organization_read  organization_update  page_apply\npage_create  page_diff  page_export  page_merge_preview  page_merge_save\npage_present  page_read  page_save  pages_list  project_context\nproject_create  project_resolve  project_sync  project_sync_status\nprojects_list  public_catalog_describe  public_catalog_list  publication_list\npublication_prepare  render_document  show_component  show_component_close\nshow_component_read  show_component_update  showai_capabilities\ntemplate_apply  template_context  template_save  workspace_conflict\nworkspace_resolve\n\n固定项目 · stdio (44)\nboard_read  catalog_describe  catalog_list  catalog_merge_preview\ncatalog_references  catalog_version  component_save  dataset_delete\ndataset_read  dataset_write  draft_read  draft_remove  draft_write\nlibrary_search  organization_read  organization_update  page_apply\npage_create  page_diff  page_export  page_merge_preview  page_merge_save\npage_present  page_read  page_save  pages_list  project_context  project_sync\nproject_sync_status  public_catalog_describe  public_catalog_list\npublication_list  publication_prepare  render_document  show_component\nshow_component_close  show_component_read  show_component_update\nshowai_capabilities  template_apply  template_context  template_save\nworkspace_conflict  workspace_resolve\n\n公开资源 · stdio (8)\npublic_catalog_describe  public_catalog_list  render_document  show_component\nshow_component_close  show_component_read  show_component_update\nshowai_capabilities\n\n托管 HTTP · 工具发现 (39)\nboard_read  catalog_describe  catalog_list  catalog_merge_preview\ncatalog_references  catalog_version  component_save  dataset_delete\ndataset_read  dataset_write  draft_read  draft_remove  draft_write\nlibrary_search  organization_read  organization_update  page_apply\npage_create  page_diff  page_export  page_merge_preview  page_merge_save\npage_present  page_read  page_save  pages_list  presentation_source\nproject_context  project_create  projects_list  public_catalog_describe\npublic_catalog_list  publication_list  render_document  show_component\nshowai_capabilities  template_apply  template_context  template_save"
+                }
+              ]
+            }
+          ]
         },
         {
           "type": "widget",
@@ -2871,26 +2963,6 @@
                       {
                         "flag": "name",
                         "meaning": "项目名称"
-                      }
-                    ]
-                  },
-                  {
-                    "group": "connect",
-                    "command": "guide",
-                    "summary": "读取一个主题指南",
-                    "detail": "不带 topic 时列出主题。",
-                    "flags": [
-                      {
-                        "flag": "topic",
-                        "meaning": "主题"
-                      },
-                      {
-                        "flag": "stage",
-                        "meaning": "presentation 的阶段"
-                      },
-                      {
-                        "flag": "knownHash",
-                        "meaning": "跳过已读内容"
                       }
                     ]
                   },
@@ -3104,18 +3176,8 @@
                   {
                     "group": "pages",
                     "command": "page_present",
-                    "summary": "展示已保存的页面或选定区块",
-                    "detail": "返回完整 HTML、源码和宿主可显示的预览。不保存、不同步；输出位置由运行时决定。",
-                    "flags": [
-                      {
-                        "flag": "pageId",
-                        "meaning": "页面"
-                      },
-                      {
-                        "flag": "blockIds",
-                        "meaning": "只展示选定区块"
-                      }
-                    ]
+                    "summary": "在聊天里阅读已保存的整页或指定内容块。",
+                    "detail": "提供 pageId，可用 blockIds 选择内容块。支持原页卡片的宿主另用 card_present 交付可编辑原页。"
                   },
                   {
                     "group": "pages",
@@ -3352,40 +3414,8 @@
                   {
                     "group": "template",
                     "command": "template_context",
-                    "summary": "读取系统基线、所选模板 README 与组件索引",
-                    "flags": [
-                      {
-                        "flag": "templates",
-                        "meaning": "精确模板引用；[] 表示只用系统基线"
-                      },
-                      {
-                        "flag": "knownHash / knownSystemHash",
-                        "meaning": "跳过已读内容"
-                      },
-                      {
-                        "flag": "componentOffset / componentLimit",
-                        "meaning": "组件索引分页"
-                      }
-                    ]
-                  },
-                  {
-                    "group": "template",
-                    "command": "template_guide",
-                    "summary": "读取一个阶段的指南",
-                    "flags": [
-                      {
-                        "flag": "stage",
-                        "meaning": "intent | evidence | understanding | design | authoring | review"
-                      },
-                      {
-                        "flag": "templates",
-                        "meaning": "所选模板"
-                      },
-                      {
-                        "flag": "templateId / file",
-                        "meaning": "读取指南文件夹中的子文件"
-                      }
-                    ]
+                    "summary": "读取当前任务选择的完整模板。",
+                    "detail": "按精确引用返回 README、各篇指南和组件索引。templates: [] 记录系统流程引用。"
                   },
                   {
                     "group": "template",
@@ -3589,20 +3619,20 @@
                   {
                     "group": "public",
                     "command": "show_component",
-                    "summary": "在对话中展示 1–5 个组件，不保存",
-                    "detail": "kind 与 data 的写法和 page_apply 的 component.insert 相同，之后可以原样存进页面。",
+                    "summary": "在聊天里展示 1–5 个原创 HTML 可视化。",
+                    "detail": "默认传入 html。明确要求已有目录组件时可用 kind/data 或 blocks。临时展示保存在预览缓存或交付文件中；需要归档时再保存为项目页面。",
                     "flags": [
                       {
-                        "flag": "kind / data",
-                        "meaning": "一个组件"
+                        "flag": "html",
+                        "meaning": "单个 HTML 片段或有序数组。"
                       },
                       {
-                        "flag": "blocks",
-                        "meaning": "多个组件，按顺序展示"
+                        "flag": "delivery",
+                        "meaning": "按宿主能力选择展示方式。"
                       },
                       {
-                        "flag": "componentSources",
-                        "meaning": "未保存的组件包"
+                        "flag": "live",
+                        "meaning": "在支持回调的宿主中保持可更新的组件视图。"
                       }
                     ]
                   },
@@ -3616,7 +3646,7 @@
                     "group": "public",
                     "command": "presentation_source",
                     "summary": "取回 render_document 结果的可编辑源码（仅 HTTP 服务）",
-                    "detail": "执行环境无法下载结果网址时使用，按 offset 分段读取。",
+                    "detail": "托管 HTTP 的工具。使用交付回执中的来源标识分块取回可编辑的渲染输入。",
                     "flags": [
                       {
                         "flag": "artifactId",
@@ -3627,6 +3657,24 @@
                         "meaning": "分段"
                       }
                     ]
+                  },
+                  {
+                    "group": "public",
+                    "command": "show_component_read",
+                    "summary": "读取当前实时视图；source 可取回可移植内容。",
+                    "detail": "适用于提供实时视图工具的本机 stdio 连接。"
+                  },
+                  {
+                    "group": "public",
+                    "command": "show_component_update",
+                    "summary": "使用 viewId、baseRevision 和操作更新实时视图。",
+                    "detail": "适用于提供实时视图工具的本机 stdio 连接。"
+                  },
+                  {
+                    "group": "public",
+                    "command": "show_component_close",
+                    "summary": "释放指定 viewId 的临时实时视图。",
+                    "detail": "适用于提供实时视图工具的本机 stdio 连接。"
                   }
                 ],
                 "placeholder": "搜索工具，例如 page_read、合并、模板"
@@ -4060,6 +4108,7 @@
           "node-d3b77754",
           "node-d4b778e7",
           "node-c9b76796",
+          "cli-command-index",
           "node-cab76929",
           "node-a7ceaa63",
           "node-a6cea8d0",
@@ -4067,6 +4116,7 @@
           "node-a8ceabf6",
           "node-abceb0af",
           "node-aaceaf1c",
+          "mcp-tool-index",
           "node-adceb3d5",
           "node-acceb242",
           "node-afceb6fb",

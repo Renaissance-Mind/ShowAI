@@ -8,9 +8,183 @@ ShowAI's Node.js CLI and optional MCP server operate on the same project files a
 
 The local plugin with its stdio MCP launcher resolves the installed software from `agent-runtime.json` in the selected content directory, then verifies it with `runtime info --json`. Desktop startup records its bundled launch; standalone runtime users run `runtime register --json`.
 
-In the examples below, `showai` means the **verified external command prefix**, for example `node /absolute/path/to/dist-runtime/scripts/cli.mjs`. Do not assume a global npm command exists. Standalone use requires Node.js 22.12+. The desktop application's **Settings → Agent plugins** panel provides its bundled executable, CLI path and environment for use without a separate Node installation.
+In the examples below, `showai` means the **verified external command prefix**, for example `node /absolute/path/to/dist-runtime/scripts/cli.mjs`. Do not assume a global npm command exists. Standalone use requires Node.js 22.12+. Open **Settings → MCP → Local launch configuration** in the desktop App to copy the bundled executable, CLI path and environment.
 
 For independent public rendering, HTTP MCP, OAuth and host-specific display, see [cross-host Agent integration](agent-integration.md). These capabilities share the same content model and authoring service; synchronization does not depend on inline display.
+
+## Runtime command and tool index
+
+The CLI index lists registered command and action names, including aliases. The MCP index shows what a default connection advertises through `tools/list`. A hosted HTTP tool can still require OAuth and project access to execute. Host adapters can add tools such as `card_present` when that connection supports page cards.
+
+<!-- showai:runtime-index:start -->
+<details>
+<summary>Browse the CLI command registry</summary>
+
+```text
+boards read
+
+catalog describe
+catalog fork
+catalog import
+catalog list
+catalog merge
+catalog promote
+catalog remove
+catalog save
+
+datasets apply
+datasets create
+datasets delete
+datasets link
+datasets list
+datasets read
+datasets transform
+
+export
+
+guide
+
+import
+
+importers list
+importers remove
+importers save
+
+library activate
+library archive
+library cleanup
+library cleanup-plan
+library compact
+library import
+library imports
+library init
+library migrate
+library policy
+library rebuild-index
+library stats
+library verify
+library verify-archive
+
+mcp
+mcp serve
+
+pages apply
+pages create
+pages delete
+pages deleted
+pages diff
+pages duplicate
+pages list
+pages pin
+pages read
+pages restore
+pages save
+pages unpin
+
+projects bind
+projects create
+projects current
+projects list
+
+public describe
+public list
+
+publish list
+publish prepare
+publish register
+publish verify
+
+render
+
+runtime info
+runtime register
+
+search
+
+serve
+
+sync account
+sync attach
+sync conflict
+sync connect
+sync dashboard
+sync default
+sync detach
+sync disconnect
+sync join
+sync projects
+sync resolve
+sync retained
+sync run
+sync status
+sync subscribe
+
+template apply
+template context
+template export
+template import
+template instantiate
+template save
+
+workspace conflict
+workspace conflicts
+workspace merge
+workspace recover-package
+workspace resolve
+```
+
+</details>
+
+<details>
+<summary>Browse MCP tools by connection mode</summary>
+
+```text
+Local library · stdio (47)
+board_read  catalog_describe  catalog_list  catalog_merge_preview
+catalog_references  catalog_version  component_save  dataset_delete
+dataset_read  dataset_write  draft_read  draft_remove  draft_write
+library_search  organization_read  organization_update  page_apply
+page_create  page_diff  page_export  page_merge_preview  page_merge_save
+page_present  page_read  page_save  pages_list  project_context
+project_create  project_resolve  project_sync  project_sync_status
+projects_list  public_catalog_describe  public_catalog_list  publication_list
+publication_prepare  render_document  show_component  show_component_close
+show_component_read  show_component_update  showai_capabilities
+template_apply  template_context  template_save  workspace_conflict
+workspace_resolve
+
+Bound project · stdio (44)
+board_read  catalog_describe  catalog_list  catalog_merge_preview
+catalog_references  catalog_version  component_save  dataset_delete
+dataset_read  dataset_write  draft_read  draft_remove  draft_write
+library_search  organization_read  organization_update  page_apply
+page_create  page_diff  page_export  page_merge_preview  page_merge_save
+page_present  page_read  page_save  pages_list  project_context  project_sync
+project_sync_status  public_catalog_describe  public_catalog_list
+publication_list  publication_prepare  render_document  show_component
+show_component_close  show_component_read  show_component_update
+showai_capabilities  template_apply  template_context  template_save
+workspace_conflict  workspace_resolve
+
+Public resources · stdio (8)
+public_catalog_describe  public_catalog_list  render_document  show_component
+show_component_close  show_component_read  show_component_update
+showai_capabilities
+
+Hosted HTTP · tool discovery (39)
+board_read  catalog_describe  catalog_list  catalog_merge_preview
+catalog_references  catalog_version  component_save  dataset_delete
+dataset_read  dataset_write  draft_read  draft_remove  draft_write
+library_search  organization_read  organization_update  page_apply
+page_create  page_diff  page_export  page_merge_preview  page_merge_save
+page_present  page_read  page_save  pages_list  presentation_source
+project_context  project_create  projects_list  public_catalog_describe
+public_catalog_list  publication_list  render_document  show_component
+showai_capabilities  template_apply  template_context  template_save
+```
+
+</details>
+<!-- showai:runtime-index:end -->
 
 ## Choose a usage path
 

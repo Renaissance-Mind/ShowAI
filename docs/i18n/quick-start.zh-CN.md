@@ -23,6 +23,8 @@ ShowAI 会自动更新：它在后台检查最新发行版，下载新版本，�
 
 ## 2. 连接你的 Agent
 
+以下菜单按 `main` 说明。在[公开发行的 0.13.0](https://github.com/Renaissance-Mind/ShowAI/blob/v0.13.0/plugins/showai/README.zh-CN.md#deepseek-harness) 中，打开设置里的「外部 Agent 插件」栏目即可复制本机启动配置。该发行版接入 DeepSeek Harness 时，先点「准备插件」，再去 Harness 完成安装。当前源码构建可在「设置 → Agent 插件」直接安装。
+
 1. 在 ShowAI 中打开插件面板：首次启动时欢迎页会显示它，之后随时可以在「设置 → Agent 插件」中找到。
 2. ShowAI 会检测 Claude Code 与 Codex。在你使用的 Agent 旁点「安装插件」，等待显示「已安装并启用」。
 3. 重新加载 Agent：Claude Code 重启会话；Codex 刷新插件或重启 Codex。已经打开的对话仍使用旧的工具列表，请新开一个对话。
@@ -35,9 +37,9 @@ ShowAI 会自动更新：它在后台检查最新发行版，下载新版本，�
 
 在新对话中粘贴：
 
-> 用 ShowAI 帮我做一个房贷计算器：房价、首付比例、利率和贷款年限可以调整，显示月供和总利息。
+> 用 ShowAI 做一个房贷计算器。让我调整房价、首付比例、利率和期限，显示月供和总利息，并保存为 ShowAI 页面。
 
-Agent 会把界面保存为 ShowAI 中的一个页面并展示出来：支持内嵌显示的 Agent 直接在对话里显示，其他 Agent 给出可以打开的 HTML 文件。在 App 中，它出现在「最近」里。
+示例明确要求保存计算器。保存后，从宿主返回的页面卡片、链接或 ShowAI 的「最近」打开原页。只想试一试时，可以先让 Agent 在聊天里展示，想保留时再指定项目并要求保存。
 
 再试两个：
 
@@ -53,7 +55,7 @@ Agent 会把界面保存为 ShowAI 中的一个页面并展示出来：支持内
 | 显示「已安装，尚未启用」            | 点「更新并启用」。                                                                                                       |
 | 提示已启用其他来源的 ShowAI 插件    | 先在 Agent 中停用原插件，再点「重新检测」并安装 App 版本。                                                               |
 | Agent 只用文字回答，没有提到 ShowAI | 对话在插件加载前就已开始。重启 Agent 并新开对话；提示词以“用 ShowAI……”开头会更明确。                                     |
-| Agent 报告无法连接 ShowAI           | 打开「设置 → Agent 插件」。「当前登记的运行时」显示问题时点「修复登记」；Agent 显示连接失败或连接了另一个内容库时点「修复并重新连接」或「更新并启用」。然后重启 Agent。 |
+| Agent 报告无法连接 ShowAI           | 在「设置 → MCP」检查并修复本机运行时。如果宿主连接了另一个内容库，到「设置 → Agent 插件」点「修复并重新连接」或「更新并启用」。然后重启 Agent。 |
 | 页面已保存，但在 App 中找不到       | App 与插件使用了不同的内容库。对照「设置 → 通用 → 内容库」与「设置 → Agent 插件」中该 Agent 的「插件连接的内容库」。              |
 
 仍未解决时，请[提交 Issue](https://github.com/Renaissance-Mind/ShowAI/issues)，写明 Agent 及其版本、「设置 → 关于与反馈」中的 ShowAI 版本，以及 Agent 的回复。
@@ -85,7 +87,7 @@ Agent 修改前会先读取当前页面，包括你的修改。你和 Agent 同�
 
 **内置 Agent。** 打开「设置 → 内置 Agent」，添加使用 API Key 的模型来源（也可以使用本机 Codex 或 Claude Code 的登录，或 ShowAI Cloud），然后点顶栏的 AI 按钮，或选中文字、打开内容块菜单，选择「让 AI 处理」。详见[内置 Agent](agent-host.zh-CN.md)。
 
-**其他 Agent。** DeepSeek Harness 与 Kimi 处于预览阶段，网页版 ChatGPT 采用邀请制，其他 MCP 客户端可以手动配置。详见[支持的 Agent](README.zh-CN.md#-支持的-agent)。
+**其他 Agent。** DeepSeek Harness、Kimi Work、Kimi Code 和 TRAE IDE 各有专用安装步骤。网页版 ChatGPT 通过公网 HTTPS 和 OAuth 连接自己的桌面 App，也可以使用管理员提供的托管地址。详见[支持的 Agent](README.zh-CN.md#-支持的-agent)和 [ChatGPT 接入指南](chatgpt.zh-CN.md)。
 
 **单独使用。** 工作台不连接 Agent 也能使用：点「新建项目」，添加按阅读顺序排版的 **Page** 或可以自由摆放内容的 **Board**，输入 `/` 插入组件。详见 [Page 与 Board](page-surface.zh-CN.md)。
 

@@ -14,7 +14,7 @@ Open **Settings → Remote MCP** in the desktop App. Choose the network, start t
 | Public access → Cloudflare fixed domain | Internet clients using your own hostname | Your Cloudflare tunnel and OAuth |
 | Public access → Tailscale Funnel | Internet clients outside the tailnet | Public HTTPS through Funnel and OAuth |
 
-ChatGPT web connects from its cloud service and needs a public address. A client running on your other device can use its local network or tailnet directly.
+ChatGPT web connects from its cloud service and needs a public HTTPS endpoint with OAuth. A client running on your other device can use its local network or tailnet directly.
 
 New connections default to full access to all current and future projects, including remote project creation. Use **Access rules** to restrict the connection to specified projects and assign read-only or full access. Explicit access rules are preserved until changed. Older configurations without an access mode use the new full-library default. When expanding permissions, OAuth clients authorize again and local network clients create and enter a new access key; existing keys do not gain broader access.
 
@@ -48,7 +48,7 @@ Select **Copy setup prompt** and send it to your agent. For a manual connection,
 
 ## Connect ChatGPT
 
-To get the six Skills before connecting, choose **Settings → Agent plugins** or generate a universal package (`npm run package:plugin`). Add MCP separately in the host and ask the Agent to help you connect. If you already registered a ChatGPT connection, the optional Personal export below can reference it.
+Download the [universal plugin ZIP](https://raw.githubusercontent.com/Renaissance-Mind/ShowAI/main/downloads/showai-universal.zip) to install the six Skills. From a checkout, `npm run package:plugin -- --out showai-universal.zip` produces the same package. Configure MCP in the host. If you already registered a ChatGPT connection, the optional Personal export below can reference it.
 
 Choose **ChatGPT** after a public connection passes its check. The guide has three steps:
 

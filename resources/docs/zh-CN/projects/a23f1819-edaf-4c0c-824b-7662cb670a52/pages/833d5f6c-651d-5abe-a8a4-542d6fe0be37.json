@@ -10,7 +10,7 @@
     "favorite": false,
     "archived": false,
     "createdAt": "2026-10-15T06:42:08.178Z",
-    "updatedAt": "2026-10-21T17:41:45.952Z",
+    "updatedAt": "2026-11-22T13:48:07.183Z",
     "content": {
       "type": "surface",
       "attrs": {
@@ -399,7 +399,7 @@
           "content": [
             {
               "type": "text",
-              "text": "在 「设置 → Agent」 中选择 「执行方式」。两种方式都通过只连接当前项目的 MCP 读写页面，区别在于由谁调用模型。设置只影响新对话，已有对话保持创建时的方式。"
+              "text": "在 「设置 → 内置 Agent」 中选择 「执行方式」。两种方式都通过只连接当前项目的 MCP 读写页面，区别在于由谁调用模型。设置只影响新对话，已有对话保持创建时的方式。"
             }
           ],
           "attrs": {
@@ -1701,7 +1701,7 @@
                   "content": [
                     {
                       "type": "text",
-                      "text": "内置 Agent 的私有插件副本保留 8 个技能，但去掉了连接整个内容库的启动配置，所以它只能操作当前项目。"
+                      "text": "内置 Agent 的私有插件副本保留 六个技能，但去掉了连接整个内容库的启动配置，所以它只能操作当前项目。"
                     }
                   ],
                   "attrs": {
@@ -2066,7 +2066,7 @@
           "content": [
             {
               "type": "text",
-              "text": "「提供 LLM API」 需要的 SDK 不随应用安装。在 「设置 → Agent → 内置执行能力」 点 「一键安装 Codex SDK」，以后用 「检查并安装新版」 更新。"
+              "text": "「提供 LLM API」 需要的 SDK 不随应用安装。在 「设置 → 内置 Agent → 内置执行能力」 点 「一键安装 Codex SDK」，以后用 「检查并安装新版」 更新。"
             }
           ],
           "attrs": {
@@ -2173,7 +2173,7 @@
                   {
                     "icon": "🧠",
                     "title": "技能与工作流程",
-                    "body": "内置 Agent 同样遵循这 8 个技能。",
+                    "body": "内置 Agent 同样遵循这 六个技能。",
                     "href": "https://showai.renaissancemind.ai/doc/skills"
                   },
                   {

@@ -10,7 +10,7 @@
     "favorite": false,
     "archived": false,
     "createdAt": "2026-10-15T06:42:05.786Z",
-    "updatedAt": "2026-10-22T18:35:06.207Z",
+    "updatedAt": "2026-11-22T14:00:23.396Z",
     "content": {
       "type": "surface",
       "attrs": {
@@ -28,16 +28,16 @@
               "componentId": "doc-hero",
               "version": "1.0.0",
               "props": {
-                "eyebrow": "Searchable complete list",
-                "title": "Commands and tools",
-                "lead": "Agents work on pages through MCP tools. Scripts, server startup, diagnostics, and administration use the CLI. Both call the same services and access the same content library.",
+                "eyebrow": "CLI and MCP",
+                "title": "Find a command, tool or example",
+                "lead": "Scripts use the CLI and agents connect over MCP. Expand the indexes for the commands in this build and the tools advertised by each connection mode. Search the examples for an operation.",
                 "facts": [
                   {
-                    "label": "CLI commands",
-                    "value": "83 items"
+                    "label": "CLI command groups",
+                    "value": "20"
                   },
                   {
-                    "label": "MCP tools",
+                    "label": "Local library tools",
                     "value": "47"
                   },
                   {
@@ -125,20 +125,7 @@
           "content": [
             {
               "type": "text",
-              "text": "Desktop App "
-            },
-            {
-              "type": "text",
-              "text": "Settings → Agent → Local Area Connection ",
-              "marks": [
-                {
-                  "type": "bold"
-                }
-              ]
-            },
-            {
-              "type": "text",
-              "text": "The local executable file, CLI path and environment variables will be given, just copy them directly."
+              "text": "Open Settings → MCP → Local launch configuration in the desktop App and copy the executable, arguments and environment for this computer."
             }
           ],
           "attrs": {
@@ -583,12 +570,35 @@
           "content": [
             {
               "type": "text",
-              "text": "Search for commands, descriptions, or parameters, or filter by group. Expand a command to see parameters and examples."
+              "text": "The index comes from the current CLI declarations and includes aliases. The examples below are grouped by task and can be searched by command or parameter."
             }
           ],
           "attrs": {
             "id": "node-c9b76796"
           }
+        },
+        {
+          "type": "toggle",
+          "attrs": {
+            "id": "cli-command-index",
+            "open": false,
+            "title": "Browse the CLI command registry"
+          },
+          "content": [
+            {
+              "type": "codeBlock",
+              "attrs": {
+                "id": "cli-command-index-text",
+                "language": "text"
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "boards read\n\ncatalog describe\ncatalog fork\ncatalog import\ncatalog list\ncatalog merge\ncatalog promote\ncatalog remove\ncatalog save\n\ndatasets apply\ndatasets create\ndatasets delete\ndatasets link\ndatasets list\ndatasets read\ndatasets transform\n\nexport\n\nguide\n\nimport\n\nimporters list\nimporters remove\nimporters save\n\nlibrary activate\nlibrary archive\nlibrary cleanup\nlibrary cleanup-plan\nlibrary compact\nlibrary import\nlibrary imports\nlibrary init\nlibrary migrate\nlibrary policy\nlibrary rebuild-index\nlibrary stats\nlibrary verify\nlibrary verify-archive\n\nmcp\nmcp serve\n\npages apply\npages create\npages delete\npages deleted\npages diff\npages duplicate\npages list\npages pin\npages read\npages restore\npages save\npages unpin\n\nprojects bind\nprojects create\nprojects current\nprojects list\n\npublic describe\npublic list\n\npublish list\npublish prepare\npublish register\npublish verify\n\nrender\n\nruntime info\nruntime register\n\nsearch\n\nserve\n\nsync account\nsync attach\nsync conflict\nsync connect\nsync dashboard\nsync default\nsync detach\nsync disconnect\nsync join\nsync projects\nsync resolve\nsync retained\nsync run\nsync status\nsync subscribe\n\ntemplate apply\ntemplate context\ntemplate export\ntemplate import\ntemplate instantiate\ntemplate save\n\nworkspace conflict\nworkspace conflicts\nworkspace merge\nworkspace recover-package\nworkspace resolve"
+                }
+              ]
+            }
+          ]
         },
         {
           "type": "widget",
@@ -638,6 +648,14 @@
                   {
                     "id": "sync",
                     "label": "synchronous"
+                  },
+                  {
+                    "id": "datasets",
+                    "label": "Shared datasets"
+                  },
+                  {
+                    "id": "import",
+                    "label": "Import and importers"
                   }
                 ],
                 "commands": [
@@ -696,7 +714,7 @@
                     "group": "start",
                     "command": "mcp --public",
                     "summary": "Launch an MCP with only public resources",
-                    "detail": "Does not read any project data, only provides the public directory, guide and render_document. Does not accept --project or --templates."
+                    "detail": "Public stdio exposes capabilities, public catalogs, standalone rendering and chat visuals. Use the public tool index on this page or tools/list on that connection for the current names."
                   },
                   {
                     "group": "start",
@@ -1227,27 +1245,6 @@
                   },
                   {
                     "group": "template",
-                    "command": "template guide STAGE",
-                    "summary": "Read the guide for a certain stage",
-                    "detail": "Stages: intent, evidence, understanding, design, authoring, review. Returns the system guide plus the guide for the selected template at the same stage.",
-                    "flags": [
-                      {
-                        "flag": "--templates ID",
-                        "meaning": "selected template"
-                      },
-                      {
-                        "flag": "--input CONTEXT.json",
-                        "meaning": "Inherit the result of template context"
-                      },
-                      {
-                        "flag": "--file NAME --id TEMPLATE",
-                        "meaning": "Read a subfile in the guide folder"
-                      }
-                    ],
-                    "example": "showai template guide design --project P --templates my-template --json"
-                  },
-                  {
-                    "group": "template",
                     "command": "template apply ID",
                     "summary": "Create pages from templates, or insert existing pages",
                     "detail": "When used alone, new resources are created and the container type of the template is maintained; when --page is added, the template root node is inserted as a module, and all IDs are remapped together with the view reference.",
@@ -1569,6 +1566,91 @@
                     "group": "sync",
                     "command": "sync disconnect --connection ID",
                     "summary": "Remove a server connection"
+                  },
+                  {
+                    "group": "pages",
+                    "command": "pages deleted",
+                    "summary": "List archived projects, folders and pages that can be restored."
+                  },
+                  {
+                    "group": "pages",
+                    "command": "pages delete PAGE",
+                    "summary": "Archive a page."
+                  },
+                  {
+                    "group": "pages",
+                    "command": "pages restore PAGE",
+                    "summary": "Restore an archived page."
+                  },
+                  {
+                    "group": "pages",
+                    "command": "pages duplicate PAGE",
+                    "summary": "Duplicate a page in the project."
+                  },
+                  {
+                    "group": "pages",
+                    "command": "pages pin PAGE",
+                    "summary": "Pin a page. Use pages unpin to unpin it."
+                  },
+                  {
+                    "group": "datasets",
+                    "command": "datasets list",
+                    "summary": "List shared datasets in the project."
+                  },
+                  {
+                    "group": "datasets",
+                    "command": "datasets read DATASET",
+                    "summary": "Read data, status and linked pages."
+                  },
+                  {
+                    "group": "datasets",
+                    "command": "datasets create --project PROJECT --name NAME --input FILE",
+                    "summary": "Create a shared dataset from JSON input."
+                  },
+                  {
+                    "group": "datasets",
+                    "command": "datasets apply DATASET --project PROJECT --input FILE --base-hash HASH",
+                    "summary": "Apply dataset changes against the current hash."
+                  },
+                  {
+                    "group": "datasets",
+                    "command": "datasets link DATASET --project PROJECT --file PATH",
+                    "summary": "Link data to a local file, a URL or an embedded copy."
+                  },
+                  {
+                    "group": "datasets",
+                    "command": "datasets transform --project PROJECT --inputs INPUTS.json --script transform.js",
+                    "summary": "Derive a dataset from its inputs. Preview it with --dry-run."
+                  },
+                  {
+                    "group": "datasets",
+                    "command": "datasets delete DATASET --project PROJECT --base-hash HASH",
+                    "summary": "Delete a shared dataset against its current hash."
+                  },
+                  {
+                    "group": "import",
+                    "command": "import PATH --project PROJECT --dry-run",
+                    "summary": "Preview the import plan for a file, directory or ZIP. Omit --dry-run to carry it out."
+                  },
+                  {
+                    "group": "import",
+                    "command": "importers list",
+                    "summary": "List available importers."
+                  },
+                  {
+                    "group": "import",
+                    "command": "importers save DIRECTORY",
+                    "summary": "Register an importer from a directory containing importer.json and importer.js."
+                  },
+                  {
+                    "group": "import",
+                    "command": "importers remove ID",
+                    "summary": "Remove an importer from the selected scope."
+                  },
+                  {
+                    "group": "catalog",
+                    "command": "catalog remove ID --kind component",
+                    "summary": "Remove a component from the selected catalog scope."
                   }
                 ],
                 "placeholder": "Search commands or flags: export, --blocks, conflicts"
@@ -2756,11 +2838,11 @@
           "content": [
             {
               "type": "text",
-              "text": "The parameter name is based on the tool's input schema. Tools that modify the page need to be obtained when reading "
+              "text": "Names come from the runtime protocol listings. The index groups standard connections by mode. Executing an HTTP tool can require authorization. Some host adapters also provide page cards or workbench tools. Consult "
             },
             {
               "type": "text",
-              "text": "baseHash ",
+              "text": "tools/list",
               "marks": [
                 {
                   "type": "code"
@@ -2769,25 +2851,35 @@
             },
             {
               "type": "text",
-              "text": "and "
-            },
-            {
-              "type": "text",
-              "text": "baseRevision",
-              "marks": [
-                {
-                  "type": "code"
-                }
-              ]
-            },
-            {
-              "type": "text",
-              "text": ". Every tool rejects arguments outside its schema; tools with an action field select the operation by action and accept only that operation's own fields."
+              "text": " and the input schema on the active connection."
             }
           ],
           "attrs": {
             "id": "node-aaceaf1c"
           }
+        },
+        {
+          "type": "toggle",
+          "attrs": {
+            "id": "mcp-tool-index",
+            "open": false,
+            "title": "Browse MCP tools by connection mode"
+          },
+          "content": [
+            {
+              "type": "codeBlock",
+              "attrs": {
+                "id": "mcp-tool-index-text",
+                "language": "text"
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Local library · stdio (47)\nboard_read  catalog_describe  catalog_list  catalog_merge_preview\ncatalog_references  catalog_version  component_save  dataset_delete\ndataset_read  dataset_write  draft_read  draft_remove  draft_write\nlibrary_search  organization_read  organization_update  page_apply\npage_create  page_diff  page_export  page_merge_preview  page_merge_save\npage_present  page_read  page_save  pages_list  project_context\nproject_create  project_resolve  project_sync  project_sync_status\nprojects_list  public_catalog_describe  public_catalog_list  publication_list\npublication_prepare  render_document  show_component  show_component_close\nshow_component_read  show_component_update  showai_capabilities\ntemplate_apply  template_context  template_save  workspace_conflict\nworkspace_resolve\n\nBound project · stdio (44)\nboard_read  catalog_describe  catalog_list  catalog_merge_preview\ncatalog_references  catalog_version  component_save  dataset_delete\ndataset_read  dataset_write  draft_read  draft_remove  draft_write\nlibrary_search  organization_read  organization_update  page_apply\npage_create  page_diff  page_export  page_merge_preview  page_merge_save\npage_present  page_read  page_save  pages_list  project_context  project_sync\nproject_sync_status  public_catalog_describe  public_catalog_list\npublication_list  publication_prepare  render_document  show_component\nshow_component_close  show_component_read  show_component_update\nshowai_capabilities  template_apply  template_context  template_save\nworkspace_conflict  workspace_resolve\n\nPublic resources · stdio (8)\npublic_catalog_describe  public_catalog_list  render_document  show_component\nshow_component_close  show_component_read  show_component_update\nshowai_capabilities\n\nHosted HTTP · tool discovery (39)\nboard_read  catalog_describe  catalog_list  catalog_merge_preview\ncatalog_references  catalog_version  component_save  dataset_delete\ndataset_read  dataset_write  draft_read  draft_remove  draft_write\nlibrary_search  organization_read  organization_update  page_apply\npage_create  page_diff  page_export  page_merge_preview  page_merge_save\npage_present  page_read  page_save  pages_list  presentation_source\nproject_context  project_create  projects_list  public_catalog_describe\npublic_catalog_list  publication_list  render_document  show_component\nshowai_capabilities  template_apply  template_context  template_save"
+                }
+              ]
+            }
+          ]
         },
         {
           "type": "widget",
@@ -2871,26 +2963,6 @@
                       {
                         "flag": "name",
                         "meaning": "Project name"
-                      }
-                    ]
-                  },
-                  {
-                    "group": "connect",
-                    "command": "guide",
-                    "summary": "Read a topic guide",
-                    "detail": "Lists topics without topic.",
-                    "flags": [
-                      {
-                        "flag": "topic",
-                        "meaning": "theme"
-                      },
-                      {
-                        "flag": "stage",
-                        "meaning": "stage of presentation"
-                      },
-                      {
-                        "flag": "knownHash",
-                        "meaning": "Skip what has been read"
                       }
                     ]
                   },
@@ -3104,18 +3176,8 @@
                   {
                     "group": "pages",
                     "command": "page_present",
-                    "summary": "Show saved pages or selected blocks",
-                    "detail": "Returns full HTML, source code, and host-displayable preview. Not saved, not synchronized; output location is determined at runtime.",
-                    "flags": [
-                      {
-                        "flag": "pageId",
-                        "meaning": "page"
-                      },
-                      {
-                        "flag": "blockIds",
-                        "meaning": "Show only selected blocks"
-                      }
-                    ]
+                    "summary": "Present a saved page or selected blocks for reading.",
+                    "detail": "Supply pageId and optionally blockIds. Hosts offering original-page cards use card_present for delivery of the editable original."
                   },
                   {
                     "group": "pages",
@@ -3352,40 +3414,8 @@
                   {
                     "group": "template",
                     "command": "template_context",
-                    "summary": "Read system baseline, selected template README and component index",
-                    "flags": [
-                      {
-                        "flag": "templates",
-                        "meaning": "Exact template reference; [] means only use the system baseline"
-                      },
-                      {
-                        "flag": "knownHash / knownSystemHash",
-                        "meaning": "Skip what has been read"
-                      },
-                      {
-                        "flag": "componentOffset / componentLimit",
-                        "meaning": "Component index pagination"
-                      }
-                    ]
-                  },
-                  {
-                    "group": "template",
-                    "command": "template_guide",
-                    "summary": "Read a stage guide",
-                    "flags": [
-                      {
-                        "flag": "stage",
-                        "meaning": "intent | evidence | understanding | design | authoring | review"
-                      },
-                      {
-                        "flag": "templates",
-                        "meaning": "selected template"
-                      },
-                      {
-                        "flag": "templateId / file",
-                        "meaning": "Read subfiles in guide folder"
-                      }
-                    ]
+                    "summary": "Read the complete templates selected for a task.",
+                    "detail": "Returns the README, guides and component index for each exact reference. templates: [] records the system workflow reference."
                   },
                   {
                     "group": "template",
@@ -3589,20 +3619,20 @@
                   {
                     "group": "public",
                     "command": "show_component",
-                    "summary": "Show 1–5 components in the conversation without saving",
-                    "detail": "kind and data are written as in page_apply's component.insert, so the same component can later be saved in a page.",
+                    "summary": "Show one to five original HTML visuals in chat.",
+                    "detail": "Pass html for an original visual. Use kind/data or blocks for a requested catalog component. A temporary preview can live in the preview cache or delivery file. Save a project page when the user wants to keep it.",
                     "flags": [
                       {
-                        "flag": "kind / data",
-                        "meaning": "One component"
+                        "flag": "html",
+                        "meaning": "One HTML fragment or an ordered array."
                       },
                       {
-                        "flag": "blocks",
-                        "meaning": "Several components, shown in order"
+                        "flag": "delivery",
+                        "meaning": "Select a delivery supported by the host."
                       },
                       {
-                        "flag": "componentSources",
-                        "meaning": "Unsaved component packages"
+                        "flag": "live",
+                        "meaning": "Keep an updatable component view in a host with callbacks."
                       }
                     ]
                   },
@@ -3616,7 +3646,7 @@
                     "group": "public",
                     "command": "presentation_source",
                     "summary": "Retrieve the editable source code of render_document results (HTTP service only)",
-                    "detail": "Used when the execution environment cannot download the result URL, read segmented by offset.",
+                    "detail": "A hosted HTTP tool. Use the source identifier from the delivery receipt to retrieve editable rendering input in chunks.",
                     "flags": [
                       {
                         "flag": "artifactId",
@@ -3627,6 +3657,24 @@
                         "meaning": "segmentation"
                       }
                     ]
+                  },
+                  {
+                    "group": "public",
+                    "command": "show_component_read",
+                    "summary": "Read a live view. Request source to retrieve portable content.",
+                    "detail": "Available on local stdio connections that expose live-view tools."
+                  },
+                  {
+                    "group": "public",
+                    "command": "show_component_update",
+                    "summary": "Apply operations to a live view using its viewId and baseRevision.",
+                    "detail": "Available on local stdio connections that expose live-view tools."
+                  },
+                  {
+                    "group": "public",
+                    "command": "show_component_close",
+                    "summary": "Release the temporary live view identified by viewId.",
+                    "detail": "Available on local stdio connections that expose live-view tools."
                   }
                 ],
                 "placeholder": "Search tools such as page_read, merge, template"
@@ -4060,6 +4108,7 @@
           "node-d3b77754",
           "node-d4b778e7",
           "node-c9b76796",
+          "cli-command-index",
           "node-cab76929",
           "node-a7ceaa63",
           "node-a6cea8d0",
@@ -4067,6 +4116,7 @@
           "node-a8ceabf6",
           "node-abceb0af",
           "node-aaceaf1c",
+          "mcp-tool-index",
           "node-adceb3d5",
           "node-acceb242",
           "node-afceb6fb",

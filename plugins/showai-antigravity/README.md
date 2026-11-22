@@ -143,9 +143,9 @@ Follow the distribution’s bound host adapter for display. The shared workflows
 
 ## Universal plugin and manual MCP setup
 
-The five host-specific packages install six Skills and the local MCP launch configuration together. Run the Agent and ShowAI on the same computer and use the host's installer. ShowAI installs and enables the DeepSeek bundle through the Harness CLI; Kimi Work installs its registered local plugin.
+Local host packages connect an agent to ShowAI on the same computer. Choose your host in **Settings → Agent plugins** and follow its directory, extension or marketplace install flow. ShowAI installs the DeepSeek bundle with the Harness CLI. Kimi Work registers the prepared local plugin in its own plugin manager.
 
-For another client, use **Settings → Agent plugins** in ShowAI or generate the universal directory from source:
+Download the [universal plugin ZIP](https://raw.githubusercontent.com/Renaissance-Mind/ShowAI/main/downloads/showai-universal.zip) for a client with its own MCP connection, or generate a package from source:
 
 ```sh
 npm run package:plugin -- --out NEW_DIRECTORY
@@ -153,6 +153,6 @@ npm run package:plugin -- --out NEW_DIRECTORY
 
 The universal package contains six Skills and an offline [connection guide](skills/use-showai/references/connect-mcp.md). For a known connection, pass `--mcp local` to use a registered local ShowAI runtime or `--mcp <MCP_URL>` for a remote server. Set `--runtime-config <absolute path>` to select a local runtime or `--mcp-auth oauth` to declare remote OAuth. The existing `--mcp-url` argument is a setup hint, and `--chatgpt-app` references a registered ChatGPT connection. When a task needs MCP and the tools are unavailable, the guide helps the user configure the connection for their host.
 
-ChatGPT web uses a public HTTPS endpoint and OAuth. A Grok Bot connector on the same tailnet can use Tailscale Serve and device approval, or choose public HTTPS. Other clients can use a local stdio command or a reachable HTTP endpoint. Check the connection in the client with a read-only call. See [Agent setup](https://showai.renaissancemind.ai/doc/agent-hosts).
+ChatGPT web uses a public HTTPS endpoint and OAuth. A Grok Bot connector on the same tailnet can use Tailscale Serve and device approval, or choose public HTTPS. Other clients can use a local stdio command or a reachable HTTP endpoint. Check the connection in the client with a read-only call. See [connection guide](skills/use-showai/references/connect-mcp.md).
 
 Collaborative canvas work, optional spatial references, and iPad/Mac pairing are described in [collaborate-canvas](skills/collaborate-canvas/SKILL.md).

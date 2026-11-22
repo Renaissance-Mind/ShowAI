@@ -53,7 +53,7 @@ v3 用可递归嵌套的原生 Page 与 Board 保存内容。Page 按阅读顺�
 
 ## 绘画与正文
 
-绘画节点为 `drawing`，attrs 包含 id/name/tool/color/strokeWidth/extent/points。工具支持 pen、rectangle、ellipse、arrow；颜色为六位十六进制，线宽 0.5–40，点数 2–20,000。布局记录显示位置和尺寸，移动不重写局部点位。绘画属于 Board；在 Page 中使用时放入 Board 模块。
+Board 中每个绘图对象都是一个 `drawing` 节点。新写入的钢笔与荧光笔笔迹使用 `attrs.ink.format = "showai-ink-v2"`，保存中心曲线、半径和仿射变换。已有 v1 笔迹沿用自己的采样点和遮罩。形状和旧式点列绘图使用 `extent` 和局部 `points`。布局决定绘图在 Board 中的位置与显示尺寸。在 Page 中插入 Board 即可放置绘图。几何、编辑操作和兼容规则见[可移植墨迹](portable-ink.zh-CN.md)。
 
 普通树节点使用 `{type,attrs?,content?}`，文本使用 `{type:"text",text,marks?}`。空段落用 `content:[]`；空文本节点无效。
 

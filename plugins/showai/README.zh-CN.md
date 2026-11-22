@@ -87,9 +87,11 @@ page_present 返回完整离线 HTML/source 与聊天预览。预览容纳时使
 
 ## 通用插件与手动连接
 
-五个专用包面向同一台电脑上的 Agent 和 ShowAI，一次安装六个 Skills 与本机 MCP 启动配置。DeepSeek Harness 通过宿主 CLI 安装并启用本机插件包，Kimi Work 在宿主里注册并安装本地插件。
+[下载通用插件 ZIP](https://raw.githubusercontent.com/Renaissance-Mind/ShowAI/main/downloads/showai-universal.zip)。该包提供六个 Skills，在宿主中配置或选用已有的 MCP 连接即可使用。
 
-在其他客户端使用时，可在桌面「设置 → Agent 插件」安装，也可从源码生成通用目录：
+本机插件连接同一台电脑上的 Agent 和 ShowAI。在「设置 → Agent 插件」选择宿主，按该宿主的目录、扩展或插件市场流程安装。DeepSeek Harness 通过宿主 CLI 安装并启用本机插件包，Kimi Work 在宿主里注册并安装本地插件。
+
+需要目录形式时，在源码检出中运行：
 
 ```sh
 npm run package:plugin -- --out NEW_DIRECTORY
@@ -97,7 +99,7 @@ npm run package:plugin -- --out NEW_DIRECTORY
 
 通用包提供六个 Skills 和离线[连接向导](skills/use-showai/references/connect-mcp.md)。有已知连接时，附上 `--mcp local`（使用已登记的本机 ShowAI 运行时）或 `--mcp <MCP地址>`。本机版可用 `--runtime-config <绝对路径>` 绑定指定运行时。远程版可用 `--mcp-auth oauth` 声明 OAuth。旧命令中的 `--mcp-url` 只把地址写入 README 供手动填写，`--chatgpt-app` 引用已注册的 ChatGPT 连接。任务需要 MCP、工具不可用时，接入向导按宿主和实际环境补齐配置。
 
-ChatGPT 网页通过公网 HTTPS 和 OAuth 连接。Grok Bot 可选同一 tailnet 的私网设备授权或公网 HTTPS。其他客户端按运行位置选择本机 stdio、局域网或远程 HTTP。在客户端实际发起只读调用核验，见[在 Agent 中使用](https://showai.renaissancemind.ai/doc/agent-hosts)。
+ChatGPT 网页通过公网 HTTPS 和 OAuth 连接。Grok Bot 可选同一 tailnet 的私网设备授权或公网 HTTPS。其他客户端按运行位置选择本机 stdio、局域网或远程 HTTP。在客户端实际发起只读调用核验，见[连接向导](skills/use-showai/references/connect-mcp.md)。
 
 ### Cursor、Qoder 和 WorkBuddy
 

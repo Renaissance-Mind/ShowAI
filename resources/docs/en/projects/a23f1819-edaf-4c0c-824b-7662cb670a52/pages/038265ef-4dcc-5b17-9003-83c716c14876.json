@@ -10,7 +10,7 @@
     "favorite": false,
     "archived": false,
     "createdAt": "2026-10-15T06:42:08.787Z",
-    "updatedAt": "2026-10-15T06:42:08.787Z",
+    "updatedAt": "2026-11-22T14:00:23.396Z",
     "content": {
       "type": "surface",
       "attrs": {
@@ -617,7 +617,7 @@
                 "steps": [
                   {
                     "title": "Open the project and click \"Export Website\" at the top",
-                    "body": "button above the list on the project page. There are two methods in the menu: **Offline website · Packaged component**, the component is packaged with the website, and does not depend on other URLs after deployment. In most cases, choose it; **Online website · Reference publishing component**, the custom component is loaded from the published fixed version URL, and readers need to be connected to the Internet."
+                    "body": "Choose Offline site to bundle every component. Online site links verified releases with matching versions and fingerprints, and bundles the remaining components with their pages."
                   },
                   {
                     "title": "Choose an output directory",
@@ -882,7 +882,20 @@
           "content": [
             {
               "type": "text",
-              "text": "When writing pages with Agent, you usually don't need to export them yourself. Called after Agent saves the page "
+              "text": "After saving, a host with page cards can open the editable original with "
+            },
+            {
+              "type": "text",
+              "text": "card_present",
+              "marks": [
+                {
+                  "type": "code"
+                }
+              ]
+            },
+            {
+              "type": "text",
+              "text": ". Use "
             },
             {
               "type": "text",
@@ -895,7 +908,7 @@
             },
             {
               "type": "text",
-              "text": ", displays the entire page or a selected portion, depending on the conversation host's capabilities, and gives the location of the full HTML. When a conversation fragment exceeds 1 MB, the Agent selects blocks that can be independently understood and displays them, while retaining links to the full page."
+              "text": " when the user asks to read a page or selection in the conversation. Other hosts return their supported preview, file or link."
             }
           ],
           "attrs": {
@@ -1005,7 +1018,7 @@
                     "flags": [
                       {
                         "flag": "--components remote",
-                        "meaning": "Networked sites: Components refer to published versions"
+                        "meaning": "Strict remote CLI export requires a verified release for every custom component. The workbench Online site option bundles the remaining components."
                       }
                     ],
                     "detail": "Website export does not support `--blocks `, nor does it support CDN readers."

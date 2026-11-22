@@ -55,7 +55,7 @@ Legacy v1 ordinary documents adapt to Page; v2 and legacy floating content retai
 
 ## Board drawings
 
-A drawing is `{type:'drawing',attrs:{id,name,tool,color,strokeWidth,extent,points}}`. Tool is pen, rectangle, ellipse or arrow; color is six-digit hex; strokeWidth is 0.5–40; extent is [width,height]; points is 2–20000 local {x,y} values. Drawings belong to Boards and have no children. Layout stores their position and displayed dimensions. Moving a drawing preserves its local points; resizing changes its frame. Keep drawings inside a Board module when placing them into a Page.
+A Board stores each drawing in a `drawing` node. New pen and highlighter strokes use `attrs.ink.format = "showai-ink-v2"`. The ink holds its center curves, radius and affine transform. Previously saved v1 ink retains its own sample and mask representation. Shapes and legacy point drawings use `extent` and local `points`. Layout positions and resizes the drawing in its Board. To place a drawing on a Page, insert a Board inside the Page. See [Portable ink](portable-ink.md) for the geometry, editing operations and compatibility rules.
 
 ## Text and document blocks
 
@@ -291,7 +291,7 @@ The standalone renderer also accepts `--inline`. Its output is an HTML fragment 
 
 ## Validation and limits
 
-Page structure allows 16 MiB of UTF-8 JSON, excluding binary bodies of complete canonical base64 data URLs. Each decoded resource allows 64 MiB; distinct complete resource URLs total at most 128 MiB per page. Artifact JSON and final standalone HTML each allow 256 MiB, including encoded resources, bundled components and the reader. The compressed conversation fragment has a separate 1,000,000-byte host budget. Current values are exposed in `showai_capabilities.capacities`; see [capacity rules](../plugins/showai/skills/show-document/references/capacity.md) for component, transport and synchronization boundaries.
+Page structure allows 16 MiB of UTF-8 JSON, excluding binary bodies of complete canonical base64 data URLs. Each decoded resource allows 64 MiB; distinct complete resource URLs total at most 128 MiB per page. Artifact JSON and final standalone HTML each allow 256 MiB, including encoded resources, bundled components and the reader. The compressed conversation fragment has a separate 1,000,000-byte host budget. Current values are exposed in `showai_capabilities.capacities`; see [capacity rules](../plugins/showai/skills/use-showai/references/capacity.md) for component, transport and synchronization boundaries.
 
 The 12,000-node and 48-level JSON nesting constraints still apply. Built-in widgets also have the semantic limits described above. Invalid trees, unsupported node types, malformed marks, unsafe URLs, nonfinite numbers, and prototype-pollution keys are rejected before creating the editor. Unknown widget kinds preserve **plain JSON** data.
 

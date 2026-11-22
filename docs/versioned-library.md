@@ -6,6 +6,8 @@ ShowAI stores current project content in transactional SQLite, alongside a reada
 
 ## Storage contract
 
+A normal content library keeps editor drafts, draft assets, conflicts and transaction recovery data under `local/`. Its reading and generated caches can be rebuilt. Use **Settings → Storage → Full backup** to include the recovery material. The official documentation projects are file-backed authoring libraries in the checkout. Editing them writes their page JSON directly. See [Contributing](../CONTRIBUTING.md#documentation).
+
 The SQLite database at `history/content.sqlite` is authoritative. The directory name remains compatible with existing libraries. A save atomically updates compressed content objects, current file references, resource concurrency tokens and the current operation receipt. It then materializes readable workspace files through a durable recovery journal. Content objects superseded by new saves are reclaimed when current content and retained legacy archives no longer reference them.
 
 Pages store metadata and stable content nodes separately. Data URL bytes are addressed by digest under `assets/`; their JSON envelope records exact locations and MIME types. Reading and export assemble the complete document. Components, templates, editable source files and compiled packages preserve the precise dependency identities referenced by current pages.

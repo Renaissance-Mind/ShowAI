@@ -10,7 +10,7 @@
     "favorite": false,
     "archived": false,
     "createdAt": "2026-10-15T06:42:07.909Z",
-    "updatedAt": "2026-11-21T18:49:39.599Z",
+    "updatedAt": "2026-11-22T13:48:07.183Z",
     "content": {
       "type": "surface",
       "attrs": {
@@ -104,8 +104,8 @@
                   {
                     "label": "show-visual",
                     "values": {
-                      "task": "在聊天里看 1–5 个组件；已知组件 ID 可直接读取指南。",
-                      "host": "选型与数据格式共享；实际显示方式取决于宿主。"
+                      "task": "在聊天里用原创 HTML 展示 1–5 个可交互的图。",
+                      "host": "需要复用指定组件时才查询目录；展示方式由宿主决定。"
                     }
                   },
                   {
@@ -164,7 +164,33 @@
           "content": [
             {
               "type": "text",
-              "text": "「让我试试这个图」走 show-visual。已有连接时，选图、读 guide、展示即可；已知组件 ID 时省去查目录。说「把刚才的图存下来」时，Agent 才核对项目并保存同一份组件数据。"
+              "text": "「让我试试这个图」使用 "
+            },
+            {
+              "type": "text",
+              "text": "show-visual",
+              "marks": [
+                {
+                  "type": "code"
+                }
+              ]
+            },
+            {
+              "type": "text",
+              "text": "。Agent 根据问题编写 HTML，通过 "
+            },
+            {
+              "type": "text",
+              "text": "show_component({html})",
+              "marks": [
+                {
+                  "type": "code"
+                }
+              ]
+            },
+            {
+              "type": "text",
+              "text": " 在聊天中展示。指定已有组件时才查目录。要继续编辑，告诉 Agent 保存到哪个项目并让它保存为页面。"
             }
           ]
         },

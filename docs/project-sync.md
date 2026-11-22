@@ -6,11 +6,9 @@ ShowAI Server shares current project content by **administrator, editor and view
 
 ## Connect and manage projects
 
-**Settings → Account & sync** contains:
+Open **Settings → Projects** for project status, upload, sync account selection, visibility on this device and disconnect. The default save location applies to subsequently created projects.
 
-- **Project sync:** per-project status/account, upload to a server, switch sync account, visibility on this device and disconnect; default save location affects subsequently created projects.
-- **Server accounts:** login, server projects, account/device management and member invitations.
-- **Account linking:** connect trusted accounts on multiple servers.
+Open **Settings → Account & sync** to sign in to a server, manage devices and member invitations, browse server projects and link trusted accounts across servers.
 
 Disconnecting retains local content. Removing a member blocks later server access; downloaded copies remain on their device. The **Show on this device** switch changes local navigation/recents while retaining content and membership.
 

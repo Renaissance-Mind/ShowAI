@@ -13,13 +13,13 @@ export const ENTRY_COPY = {
     tagline: "The evolving interface between humans and agents.",
     oneLiner: "Your agent's answers become interfaces — interactive, archived, and evolving as you use them.",
     usage: "ShowAI works inside the agent you already use: the plugin lets your agent build interfaces, and the ShowAI app keeps, opens and edits them.",
-    prompt: "Use ShowAI to build a mortgage calculator: price, down payment, rate and term are adjustable; show the monthly payment and total interest.",
+    prompt: "Use ShowAI to build a mortgage calculator with adjustable price, down payment, rate and term. Show the monthly payment and total interest, and save it as a ShowAI page.",
   },
   zh: {
     tagline: "可进化的人机交互界面",
     oneLiner: "Agent 的回答不再只是一段文字，而是一个可以交互、可以归档、在使用中不断进化的界面。",
     usage: "ShowAI 在你已经在用的 Agent 里工作：装上插件后，Agent 就能把回答做成界面；ShowAI App 负责保存、打开和继续编辑这些界面。",
-    prompt: "用 ShowAI 帮我做一个房贷计算器：房价、首付比例、利率和贷款年限可以调整，显示月供和总利息。",
+    prompt: "用 ShowAI 做一个房贷计算器。让我调整房价、首付比例、利率和期限，显示月供和总利息，并保存为 ShowAI 页面。",
   },
 };
 
@@ -145,8 +145,8 @@ export function checkLocalEntries(root, { homepage } = {}) {
   expect("docs/i18n/showai-banner.zh-CN.svg", [zh.tagline]);
   expect("docs/quick-start.md", [en.usage, en.prompt, LATEST]);
   expect("docs/i18n/quick-start.zh-CN.md", [zh.usage, zh.prompt, LATEST]);
-  expect("docs/chatgpt.md", ["Invite only"]);
-  expect("docs/i18n/chatgpt.zh-CN.md", ["邀请制"]);
+  expect("docs/chatgpt.md", ["public HTTPS", "OAuth"]);
+  expect("docs/i18n/chatgpt.zh-CN.md", ["公网", "OAuth"]);
   for (const path of ["docs/README.md", "docs/i18n/index.zh-CN.md", "plugins/showai/README.md", "plugins/showai/README.zh-CN.md"]) {
     const pin = read(path).match(VERSION_PIN);
     if (pin) errors.push(`${path}: hard-coded version “${pin[0]}”; versions belong in release notes`);

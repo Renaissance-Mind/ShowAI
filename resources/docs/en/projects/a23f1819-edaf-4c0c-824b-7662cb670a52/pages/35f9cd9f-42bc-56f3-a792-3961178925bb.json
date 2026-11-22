@@ -10,7 +10,7 @@
     "favorite": false,
     "archived": false,
     "createdAt": "2026-10-15T06:42:09.851Z",
-    "updatedAt": "2026-10-21T17:41:47.159Z",
+    "updatedAt": "2026-11-22T13:48:07.183Z",
     "content": {
       "type": "surface",
       "attrs": {
@@ -112,7 +112,7 @@
                   },
                   {
                     "title": "Connect your agent",
-                    "body": "On the welcome screen or in Settings → Plugins, click Install plugin for Claude Code or Codex, then restart the agent and start a new conversation. For the full steps, see [Quick Start](doc:quick-start)."
+                    "body": "On the welcome screen or in Settings → Agent plugins, click Install plugin for Claude Code or Codex, then restart the agent and start a new conversation. For the full steps, see [Quick Start](doc:quick-start)."
                   }
                 ]
               },
@@ -294,7 +294,7 @@
                     "group": "Agent",
                     "label": "Install the Claude Code / Codex plugin",
                     "values": {
-                      "desktop": "One click in Settings → Plugins",
+                      "desktop": "One click in Settings → Agent plugins",
                       "package": "Install from a source checkout",
                       "source": "从源码仓库安装"
                     }
@@ -894,7 +894,7 @@
                     "badge": "Content Library",
                     "open": true,
                     "summary": "Default location `~/.showai `.",
-                    "detail": "You can \"Select Content Library\" in \"Settings → General → Content Library\", or you can use `--home `or the environment variable `SHOWAI_HOME `to fix the location of a startup.",
+                    "detail": "You can \"Change folder\" in \"Settings → General → Content Library\", or you can use `--home `or the environment variable `SHOWAI_HOME `to fix the location of a startup.",
                     "children": [
                       {
                         "name": "library.json",
@@ -1334,7 +1334,7 @@
                 "steps": [
                   {
                     "title": "App: switch to the new version",
-                    "body": "Download the new DMG from the [latest release](https://github.com/Renaissance-Mind/ShowAI/releases/latest) and drag ShowAI into Applications to replace the old version. Then click Update and enable in Settings → Plugins so the plugin switches to the version bundled with the new app, and restart the agent. Your content library is not inside the app, so it is unaffected."
+                    "body": "Download the new DMG from the [latest release](https://github.com/Renaissance-Mind/ShowAI/releases/latest) and drag ShowAI into Applications to replace the old version. Then click Update and enable in Settings → Agent plugins so the plugin switches to the version bundled with the new app, and restart the agent. Your content library is not inside the app, so it is unaffected."
                   },
                   {
                     "title": "Source code: pull and rebuild",

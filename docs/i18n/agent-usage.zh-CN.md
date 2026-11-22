@@ -4,9 +4,183 @@
 
 Agent 的文档操作使用 MCP，见 [Agent 接入](agent-integration.zh-CN.md)。本页面向脚本、服务配置、诊断与运维。CLI 每条命令完成后退出，可在桌面窗口关闭时运行；它与工作台使用同一内容库和保存保护。
 
+## 当前 CLI 命令与 MCP 工具索引
+
+CLI 索引列出已登记的命令、子命令和别名。MCP 索引按默认连接的 `tools/list` 分组。HTTP 列出的工具可能需要 OAuth 和项目权限才能执行。支持原页卡片的宿主还可以提供 `card_present` 等适配工具。
+
+<!-- showai:runtime-index:start -->
+<details>
+<summary>按命令查看 CLI 注册表</summary>
+
+```text
+boards read
+
+catalog describe
+catalog fork
+catalog import
+catalog list
+catalog merge
+catalog promote
+catalog remove
+catalog save
+
+datasets apply
+datasets create
+datasets delete
+datasets link
+datasets list
+datasets read
+datasets transform
+
+export
+
+guide
+
+import
+
+importers list
+importers remove
+importers save
+
+library activate
+library archive
+library cleanup
+library cleanup-plan
+library compact
+library import
+library imports
+library init
+library migrate
+library policy
+library rebuild-index
+library stats
+library verify
+library verify-archive
+
+mcp
+mcp serve
+
+pages apply
+pages create
+pages delete
+pages deleted
+pages diff
+pages duplicate
+pages list
+pages pin
+pages read
+pages restore
+pages save
+pages unpin
+
+projects bind
+projects create
+projects current
+projects list
+
+public describe
+public list
+
+publish list
+publish prepare
+publish register
+publish verify
+
+render
+
+runtime info
+runtime register
+
+search
+
+serve
+
+sync account
+sync attach
+sync conflict
+sync connect
+sync dashboard
+sync default
+sync detach
+sync disconnect
+sync join
+sync projects
+sync resolve
+sync retained
+sync run
+sync status
+sync subscribe
+
+template apply
+template context
+template export
+template import
+template instantiate
+template save
+
+workspace conflict
+workspace conflicts
+workspace merge
+workspace recover-package
+workspace resolve
+```
+
+</details>
+
+<details>
+<summary>按连接模式查看 MCP 工具</summary>
+
+```text
+本机内容库 · stdio (47)
+board_read  catalog_describe  catalog_list  catalog_merge_preview
+catalog_references  catalog_version  component_save  dataset_delete
+dataset_read  dataset_write  draft_read  draft_remove  draft_write
+library_search  organization_read  organization_update  page_apply
+page_create  page_diff  page_export  page_merge_preview  page_merge_save
+page_present  page_read  page_save  pages_list  project_context
+project_create  project_resolve  project_sync  project_sync_status
+projects_list  public_catalog_describe  public_catalog_list  publication_list
+publication_prepare  render_document  show_component  show_component_close
+show_component_read  show_component_update  showai_capabilities
+template_apply  template_context  template_save  workspace_conflict
+workspace_resolve
+
+固定项目 · stdio (44)
+board_read  catalog_describe  catalog_list  catalog_merge_preview
+catalog_references  catalog_version  component_save  dataset_delete
+dataset_read  dataset_write  draft_read  draft_remove  draft_write
+library_search  organization_read  organization_update  page_apply
+page_create  page_diff  page_export  page_merge_preview  page_merge_save
+page_present  page_read  page_save  pages_list  project_context  project_sync
+project_sync_status  public_catalog_describe  public_catalog_list
+publication_list  publication_prepare  render_document  show_component
+show_component_close  show_component_read  show_component_update
+showai_capabilities  template_apply  template_context  template_save
+workspace_conflict  workspace_resolve
+
+公开资源 · stdio (8)
+public_catalog_describe  public_catalog_list  render_document  show_component
+show_component_close  show_component_read  show_component_update
+showai_capabilities
+
+托管 HTTP · 工具发现 (39)
+board_read  catalog_describe  catalog_list  catalog_merge_preview
+catalog_references  catalog_version  component_save  dataset_delete
+dataset_read  dataset_write  draft_read  draft_remove  draft_write
+library_search  organization_read  organization_update  page_apply
+page_create  page_diff  page_export  page_merge_preview  page_merge_save
+page_present  page_read  page_save  pages_list  presentation_source
+project_context  project_create  projects_list  public_catalog_describe
+public_catalog_list  publication_list  render_document  show_component
+showai_capabilities  template_apply  template_context  template_save
+```
+
+</details>
+<!-- showai:runtime-index:end -->
+
 ## 使用正确的运行时
 
-下面的 `showai` 代表经过核实的命令前缀，例如 `node /absolute/path/ShowAI/dist-runtime/scripts/cli.mjs`，不假设已安装全局 npm 命令。本机独立运行需要 Node.js 22.12+；桌面设置提供可使用内置 Electron 执行的完整配置。
+下面的 `showai` 代表经过核实的命令前缀，例如 `node /absolute/path/ShowAI/dist-runtime/scripts/cli.mjs`，不假设已安装全局 npm 命令。本机独立运行需要 Node.js 22.12+；桌面 App 的「设置 → MCP → 本机启动配置」提供内置可执行文件、CLI 路径和环境变量。
 
 本机插件通过所选内容库的 `agent-runtime.json` 发现软件，并调用 `runtime info --json` 核对能力。桌面启动会登记运行时；独立包可运行 `runtime register --json`。`--home /absolute/library` 或 `SHOWAI_HOME` 指定内容库，默认 `~/.showai`。
 

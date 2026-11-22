@@ -7,7 +7,7 @@ The ShowAI plugin provides six Skills. The runtime owns storage, native containe
 | Skill                                                                      | Task                                                                                | Result                                                             |
 | -------------------------------------------------------------------------- | ----------------------------------------------------------------------------------- | ------------------------------------------------------------------ |
 | [use-showai](../plugins/showai/skills/use-showai/SKILL.md)                 | Entry point: route the request; connect, find, read and manage content              | Connection, content identities, managed content and the next Skill |
-| [show-visual](../plugins/showai/skills/show-visual/SKILL.md)               | Show a visualization in the conversation                                            | One to five components displayed, nothing saved                    |
+| [show-visual](../plugins/showai/skills/show-visual/SKILL.md)               | Show a visualization in the conversation                                            | One to five interactive HTML previews in chat                    |
 | [show-document](../plugins/showai/skills/show-document/SKILL.md)           | Create or revise a work: report, explanation page, whiteboard diagram or small site | Work records, a saved editable Page and delivery                   |
 | [create-template](../plugins/showai/skills/create-template/SKILL.md)       | Create or extract a template for one kind of content                                | Template folder, guides and applied example                        |
 | [create-component](../plugins/showai/skills/create-component/SKILL.md)     | Add a missing expression capability                                                 | Versioned React component, contract and real instance              |
@@ -15,7 +15,7 @@ The ShowAI plugin provides six Skills. The runtime owns storage, native containe
 
 ## Start from the request
 
-`use-showai` is the single entry point. It routes each request by the result the user wants: creating or revising a work goes to `show-document`; seeing components in the conversation without saving goes to `show-visual`; finding, reading and managing existing content stays in `use-showai` and its references; components, templates and collaborative canvases go to their own Skills. `use-showai` also holds the shared rules for connection, project ownership, the content model and saving. Users need not invoke each Skill manually.
+For a visual in chat, start with `show-visual`. The agent authors one to five HTML visuals and displays them with `show_component({html})`. If the user asks for an existing ShowAI component, the agent reads its catalog entry. To keep a visual, name the destination project and ask the agent to save it as a page. For connections, library management and saved work, `use-showai` leads to the appropriate workflow.
 
 Answer simple questions directly and perform focused edits at their natural scope. For a work to create or revise, the agent reads `show-document` once at the start. It contains the whole presentation workflow, how to carry out each stage with ShowAI, the work records, template use, authoring and delivery. Existing records are reused.
 

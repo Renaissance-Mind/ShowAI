@@ -7,7 +7,7 @@ ShowAI 插件提供六个 Skill，覆盖总入口与内容管理、对话展示�
 | Skill                                                                         | 何时使用                                               | 产物                                         |
 | ----------------------------------------------------------------------------- | ------------------------------------------------------ | -------------------------------------------- |
 | [use-showai](../../plugins/showai/skills/use-showai/SKILL.md)                 | 总入口：按用户要的结果分流；连接、查找、阅读与管理内容 | 连接与项目身份、整理结果和下一步使用的 Skill |
-| [show-visual](../../plugins/showai/skills/show-visual/SKILL.md)               | 在对话中直接展示可视化                                 | 展示 1–5 个组件，不保存                      |
+| [show-visual](../../plugins/showai/skills/show-visual/SKILL.md)               | 在对话中直接展示可视化                                 | 在聊天中展示 1–5 个交互式 HTML 预览                      |
 | [show-document](../../plugins/showai/skills/show-document/SKILL.md)           | 创作或修改作品：报告、讲解页面、白板图示与小型网站     | 工作记录、可继续编辑的 Page 与实际交付       |
 | [create-template](../../plugins/showai/skills/create-template/SKILL.md)       | 为某一类内容建立或提炼模板                             | 模板文件夹、指南与应用验证                   |
 | [create-component](../../plugins/showai/skills/create-component/SKILL.md)     | 既有数据调整和组合无法满足表达需求                     | 精确版本的组件、契约与真实页面实例           |
@@ -15,7 +15,7 @@ ShowAI 插件提供六个 Skill，覆盖总入口与内容管理、对话展示�
 
 ## 从用户任务开始
 
-use-showai 是唯一的入口，按用户要的结果分流：创作或修改作品进入 show-document；只在对话里看组件、不保存，进入 show-visual；查找、阅读和管理已有内容留在 use-showai 及其参考文档；组件、模板和画布协作各有对应的 Skill。连接与项目归属、内容模型和保存规则也写在 use-showai 中。用户无需手动逐个调用 Skill。
+在聊天里看图时直接使用 `show-visual`。Agent 根据问题编写一至五个 HTML 可视化，用 `show_component({html})` 展示。用户指定已有 ShowAI 组件时，Agent 再查该组件的目录说明。要留下某张图，指定项目并要求保存为页面。连接、内容库管理和正式作品由 `use-showai` 引导进入相应工作流。
 
 简单问题直接回答；普通修改完成对应局部工作。创作或修改作品时，Agent 在开头一次读完 show-document：它包含完整的制作流程、每个环节怎样用 ShowAI 完成、工作记录、模板使用、制作与交付。已有记录直接沿用，不需要每个环节都重新确认。
 

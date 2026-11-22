@@ -10,7 +10,7 @@
     "favorite": false,
     "archived": false,
     "createdAt": "2026-10-15T06:42:10.579Z",
-    "updatedAt": "2026-11-21T18:49:39.933Z",
+    "updatedAt": "2026-11-22T13:53:23.329Z",
     "content": {
       "type": "surface",
       "attrs": {
@@ -166,7 +166,7 @@
                     "icon": "🗂️",
                     "title": "Archived",
                     "tone": "teal",
-                    "body": "Every interface is saved as your own page with full history; the agent continues from your edits, and you can export it for others."
+                    "body": "Ask the agent to save a result as a ShowAI page. Reopen it, edit it together or export a copy."
                   },
                   {
                     "icon": "🌱",
@@ -237,7 +237,7 @@
                   },
                   {
                     "title": "Ask for an interface",
-                    "body": "Paste the sample prompt into a new conversation:\n“Use ShowAI to build a mortgage calculator: price, down payment, rate and term are adjustable; show the monthly payment and total interest.”"
+                    "body": "Paste the sample prompt into a new conversation:\n“Use ShowAI to build a mortgage calculator with adjustable price, down payment, rate and term. Show the monthly payment and total interest, and save it as a ShowAI page.”"
                   }
                 ]
               },
@@ -337,7 +337,7 @@
                     "row": 2,
                     "tone": "teal",
                     "icon": "🤖",
-                    "detail": "Claude Code and Codex install the plugin in one click from Settings → Plugins in the app; the app also has a built-in agent. For the status of other agents, see “Use with an Agent”.",
+                    "detail": "Claude Code and Codex install the plugin in one click from Settings → Agent plugins in the app; the app also has a built-in agent. For the status of other agents, see “Use with an Agent”.",
                     "href": "https://showai.renaissancemind.ai/doc/agent-hosts"
                   },
                   {
@@ -358,7 +358,7 @@
                     "row": 1,
                     "tone": "slate",
                     "icon": "🗂️",
-                    "detail": "Projects, pages, components and templates are stored in the local content library with full version history. In a conflict, both versions are kept for you to compare and merge.",
+                    "detail": "The local library holds saved content. When edits conflict, compare the retained draft with the current page and save the merged result.",
                     "href": "https://showai.renaissancemind.ai/doc/library"
                   },
                   {
@@ -463,9 +463,9 @@
                   {
                     "icon": "💬",
                     "title": "ChatGPT on the web",
-                    "tag": "Invite only",
+                    "tag": "Remote MCP",
                     "tone": "teal",
-                    "body": "Connect your desktop library or team-hosted service, then authorize and verify it in ChatGPT.",
+                    "body": "Connect your desktop over public HTTPS and OAuth, or use your administrator’s MCP service.",
                     "href": "https://showai.renaissancemind.ai/doc/chatgpt"
                   },
                   {
@@ -859,7 +859,7 @@
               "content": [
                 {
                   "type": "text",
-                  "text": "Claude Code, Codex and the built-in agent are supported; Claude Code and Codex install the plugin in one click from Settings → Plugins in the app. DeepSeek Harness and Kimi are in preview, ChatGPT on the web is invite only, and other MCP clients can be configured manually (experimental). See "
+                  "text": "Codex, Claude Code, Antigravity and the built-in agent are supported. DeepSeek Harness, Kimi Work, Cursor, Qoder, WorkBuddy, Kimi Code and TRAE IDE have host-specific setups. ChatGPT web uses public HTTPS and OAuth. See "
                 },
                 {
                   "type": "text",
@@ -875,7 +875,7 @@
                 },
                 {
                   "type": "text",
-                  "text": ". "
+                  "text": "."
                 }
               ],
               "attrs": {
@@ -935,7 +935,7 @@
               "content": [
                 {
                   "type": "text",
-                  "text": "Yes, as long as they point to the same content library. A plugin installed from the app uses the app's current library; after switching libraries or moving the app, click Update and enable in Settings → Plugins. Choose the library in Settings → General → Content library."
+                  "text": "Yes, as long as they point to the same content library. A plugin installed from the app uses the app's current library; after switching libraries or moving the app, click Update and enable in Settings → Agent plugins. Choose the library in Settings → General → Content library."
                 }
               ],
               "attrs": {

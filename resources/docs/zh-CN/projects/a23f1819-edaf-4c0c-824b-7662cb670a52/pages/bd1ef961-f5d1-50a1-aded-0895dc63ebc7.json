@@ -10,7 +10,7 @@
     "favorite": false,
     "archived": false,
     "createdAt": "2026-10-15T06:42:07.645Z",
-    "updatedAt": "2026-11-22T11:49:11.721Z",
+    "updatedAt": "2026-11-22T14:00:23.396Z",
     "content": {
       "type": "surface",
       "attrs": {
@@ -128,7 +128,7 @@
                   "content": [
                     {
                       "type": "text",
-                      "text": "换一个位置：「设置 → 通用 → 内容库 → 选择内容库」。"
+                      "text": "换一个位置：「设置 → 通用 → 内容库 → 更换目录」。"
                     }
                   ],
                   "attrs": {
@@ -229,7 +229,7 @@
           "content": [
             {
               "type": "text",
-              "text": "点开下面的目录看每一部分的作用。只有 "
+              "text": "下图展示普通 SQLite 内容库。"
             },
             {
               "type": "text",
@@ -242,7 +242,49 @@
             },
             {
               "type": "text",
-              "text": " 是权威数据，其余要么由它生成，要么只属于这台设备。"
+              "text": " 保存当前项目内容，"
+            },
+            {
+              "type": "text",
+              "text": "workspace/",
+              "marks": [
+                {
+                  "type": "code"
+                }
+              ]
+            },
+            {
+              "type": "text",
+              "text": " 提供可读文件，"
+            },
+            {
+              "type": "text",
+              "text": "local/",
+              "marks": [
+                {
+                  "type": "code"
+                }
+              ]
+            },
+            {
+              "type": "text",
+              "text": " 还存有本机草稿与恢复材料。主仓库的"
+            },
+            {
+              "type": "text",
+              "text": "官方文档原稿",
+              "marks": [
+                {
+                  "type": "link",
+                  "attrs": {
+                    "href": "https://github.com/Renaissance-Mind/ShowAI/tree/main/resources/docs/zh-CN"
+                  }
+                }
+              ]
+            },
+            {
+              "type": "text",
+              "text": "采用文件型内容库。用「设置 → 通用 → 更换目录」打开它，编辑会写回 Git 中对应的页面 JSON。"
             }
           ],
           "attrs": {
@@ -1128,6 +1170,66 @@
           }
         },
         {
+          "type": "paragraph",
+          "attrs": {
+            "id": "library-backup-local-data"
+          },
+          "content": [
+            {
+              "type": "text",
+              "text": "local/editor-drafts/",
+              "marks": [
+                {
+                  "type": "code"
+                }
+              ]
+            },
+            {
+              "type": "text",
+              "text": " 和 "
+            },
+            {
+              "type": "text",
+              "text": "local/draft-assets/",
+              "marks": [
+                {
+                  "type": "code"
+                }
+              ]
+            },
+            {
+              "type": "text",
+              "text": " 保存未完成的编辑与附件，"
+            },
+            {
+              "type": "text",
+              "text": "local/conflicts/",
+              "marks": [
+                {
+                  "type": "code"
+                }
+              ]
+            },
+            {
+              "type": "text",
+              "text": " 与 "
+            },
+            {
+              "type": "text",
+              "text": "local/transactions/",
+              "marks": [
+                {
+                  "type": "code"
+                }
+              ]
+            },
+            {
+              "type": "text",
+              "text": " 保存冲突和恢复材料。阅读缓存可以重建。用完整备份同时保留这些本机材料和已保存的项目。"
+            }
+          ]
+        },
+        {
           "type": "widget",
           "attrs": {
             "kind": "custom",
@@ -1161,7 +1263,7 @@
                   },
                   {
                     "title": "需要时恢复",
-                    "body": "先核验归档，再把它复制到新位置，用「设置 → 通用 → 内容库 → 选择内容库」或 `--home` 指向这份副本。",
+                    "body": "先核验归档，再把它复制到新位置，用「设置 → 通用 → 内容库 → 更换目录」或 `--home` 指向这份副本。",
                     "code": "showai library verify-archive /Volumes/Backup/showai-2026-10-15 --json",
                     "result": "核验通过时返回 `verified: true`、内容库 ID 和文件数。"
                   }
@@ -1537,6 +1639,7 @@
           "node-e1010951",
           "node-e00107be",
           "node-df01062b",
+          "library-backup-local-data",
           "node-de010498",
           "node-e5010f9d",
           "node-e4010e0a",

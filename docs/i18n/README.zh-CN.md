@@ -13,7 +13,7 @@
 **可进化的人机交互界面。** Agent 的回答不再只是一段文字，而是一个可以交互、可以归档、在使用中不断进化的界面。
 
 - **可以交互**：Agent 用图表、计算器、流程图等组件回答，你可以调参数、做对比、展开细节，在操作中理解。
-- **可以归档**：每个界面保存为你自己的页面，存在本地的版本化文件里；你修改过的地方，Agent 下次会接着做，也可以导出交给别人。
+- **可以归档**：让 Agent 把结果保存为 ShowAI 页面。你可以随时打开原页，和 Agent 接着改，也可以导出一份交给别人。
 - **在使用中进化**：缺少合适的表达时，Agent 会写出新组件；好用的页面可以沉淀为模板，下一次从更好的起点开始。
 
 https://github.com/user-attachments/assets/375d6ff3-fe3e-47c2-b6a4-d69df1b86b20
@@ -21,6 +21,8 @@ https://github.com/user-attachments/assets/375d6ff3-fe3e-47c2-b6a4-d69df1b86b20
 <sub>在你的 Agent 里提问，得到一个能用、能一起改、能分享的界面。更多示例见 [showai.renaissancemind.ai](https://showai.renaissancemind.ai/)。</sub>
 
 ## 🚀 三步开始
+
+本文按 `main` 的实现说明操作。使用已下载的安装包时，可从[对应版本的发行说明](https://github.com/Renaissance-Mind/ShowAI/releases)打开随该版本提供的入门指南。
 
 ShowAI 在你已经在用的 Agent 里工作：装上插件后，Agent 就能把回答做成界面；ShowAI App 负责保存、打开和继续编辑这些界面。
 
@@ -30,9 +32,9 @@ ShowAI 在你已经在用的 Agent 里工作：装上插件后，Agent 就能把
 2. **连接你的 Agent** — 打开 ShowAI，在欢迎页（或「设置 → Agent 插件」）为 Claude Code 或 Codex 安装插件，然后重启 Agent。
 3. **让 Agent 做第一个界面** — 在新对话中粘贴示例提示词：
 
-   > 用 ShowAI 帮我做一个房贷计算器：房价、首付比例、利率和贷款年限可以调整，显示月供和总利息。
+   > 用 ShowAI 做一个房贷计算器。让我调整房价、首付比例、利率和期限，显示月供和总利息，并保存为 ShowAI 页面。
 
-Agent 会把界面保存到 ShowAI 并在对话中展示（不能内嵌显示的 Agent 会给出 HTML 文件）；在 App 中，它出现在「最近」里。你可以直接修改，或让 Agent 在你的修改上继续。遇到问题，见 [Agent 找不到 ShowAI 时](quick-start.zh-CN.md#agent-找不到-showai-时)。
+聊天里的可视化可以临时展示。上面的提示词明确要求保存页面，保存后就能从 ShowAI 的「最近」或宿主返回的页面卡片、链接打开原页，继续编辑。[排查连接问题](quick-start.zh-CN.md#agent-找不到-showai-时)。
 
 ## 🤖 支持的 Agent
 
@@ -46,7 +48,8 @@ Agent 会把界面保存到 ShowAI 并在对话中展示（不能内嵌显示的
 | Kimi Work                                  | 预览     | 在「设置 → Agent 插件」准备插件目录，再[在 Kimi Work 中安装](../../plugins/showai-kimi/README.md)                                      |
 | Cursor、Qoder、WorkBuddy                   | 预览     | 在「设置 → Agent 插件」准备对应的安装包，再[在宿主中安装](../../plugins/showai/README.zh-CN.md#cursorqoder-和-workbuddy)                      |
 | 网页版 ChatGPT                             | 自行部署 | 在桌面 App 开启远程连接，使用自己的 Cloudflare 或 Tailscale 接入本机项目（[指南](chatgpt.zh-CN.md)）                           |
-| Kimi Code CLI、Gemini CLI、OpenCode | 实验     | 从「设置 → Agent 插件」复制该宿主的本地 MCP 配置（[Agent 接入](agent-integration.zh-CN.md)）                                                                 |
+| Kimi Code、TRAE IDE | 预览 | 在「设置 → Agent 插件」准备对应安装包。[Kimi Code 与 TRAE 接入](../../plugins/showai/README.zh-CN.md#kimi-code-和-trae) |
+| Gemini CLI、OpenCode | 实验 | 从「设置 → Agent 插件」复制该宿主的本地 MCP 配置。[Agent 接入](agent-integration.zh-CN.md) |
 
 ### 按 Agent 宿主选择插件目录
 
@@ -66,7 +69,7 @@ Agent 会把界面保存到 ShowAI 并在对话中展示（不能内嵌显示的
 | Qoder                 | [plugins/showai/](../../plugins/showai/) → `--host qoder`                 | 生成 ZIP，在「扩展 → 插件 → 添加插件」中导入。[Qoder 接入](../../plugins/showai/README.zh-CN.md#cursorqoder-和-workbuddy)                                 |
 | WorkBuddy             | [plugins/showai/](../../plugins/showai/) → `--host workbuddy`             | 生成本地插件市场包，或在「连接器 → 自定义连接器」添加 ShowAI。[WorkBuddy 接入](../../plugins/showai/README.zh-CN.md#cursorqoder-和-workbuddy)             |
 | 网页版 ChatGPT        | [plugins/showai/](../../plugins/showai/) → `--chatgpt-app`                | [注册远程 MCP 连接](chatgpt.zh-CN.md#连接-chatgpt)，需要时将通用包关联到这个连接。                                                                        |
-| TRAE 和其他兼容客户端 | [plugins/showai/](../../plugins/showai/)                                  | [生成通用包](../../plugins/showai/README.zh-CN.md#通用插件与手动连接)，按已知连接附上配置，或使用包内接入向导。                                           |
+| 其他兼容客户端 | [plugins/showai/](../../plugins/showai/)                                  | [生成通用包](../../plugins/showai/README.zh-CN.md#通用插件与手动连接)，按已知连接附上配置，或使用包内接入向导。                                           |
 
 ## 💡 看看做出来的样子
 
@@ -100,7 +103,7 @@ Agent 能做的事越来越多，瓶颈正在从 Agent 能做什么，转向人�
 
 **可以归档**
 
-- **Living Archive**：产出默认就是本地项目里的版本化文件，与源码目录自动绑定，支持编辑撤销、草稿保留和冲突保护，随时可以续改、复用或拆成新素材。
+- **Living Archive**：保存的页面归入本机项目。ShowAI 用 SQLite 管理当前内容，通过编辑撤销、草稿和冲突恢复保护修改。
 - **Local-first, share when you want**：不开账号也能完整使用，需要时接自建服务器多人协作，或导出一个离线可交互的 HTML。
 
 **在使用中进化**

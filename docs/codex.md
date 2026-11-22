@@ -20,7 +20,7 @@ The plugin connects to the app's current content library. Click **Update and ena
 
 Installing the plugin, reloading the agent and a conversation picking up the new tools are separate steps; a conversation that was already open keeps its old tool list. In a new conversation, ask for an interface:
 
-> Use ShowAI to build a mortgage calculator: price, down payment, rate and term are adjustable; show the monthly payment and total interest.
+> Use ShowAI to build a mortgage calculator with adjustable price, down payment, rate and term. Show the monthly payment and total interest, and save it as a ShowAI page.
 
 The agent should use ShowAI tools, save the page and present it. **Settings → MCP → Call history** shows its tool calls and their results. If it answers in plain text, see [If the agent can't find ShowAI](quick-start.md#if-the-agent-cant-find-showai).
 
