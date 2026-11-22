@@ -990,6 +990,24 @@ for await (const line of createInterface({ input: process.stdin })) {
       });
       expect((afterCollapse._meta as any).showaiWorkbenchData.status).toBe("queued");
 
+      // 6. Legacy sidecar state without viewportVerified:true must NOT block auto-opening a collapsed side pane
+      await writeFile(
+        join(home, "local", "antigravity-workbench-state.json"),
+        JSON.stringify({
+          openClients: 2,
+          visibleClients: 1,
+          updatedAt: Date.now(),
+        }) + "\n",
+        "utf8",
+      );
+      const withLegacySidecar = await client.callTool({
+        name: "workbench_open_destination",
+        arguments: { projectId, pageId, destination: "workbench" },
+      });
+      expect((withLegacySidecar._meta as any).showaiWorkbenchData.status).toBe("queued");
+      expect(fvHtml).toContain("trackVisibility: true");
+      expect(html).toContain("trackVisibility: true");
+
       abort.abort();
       await reader.cancel().catch(() => {});
     } finally {

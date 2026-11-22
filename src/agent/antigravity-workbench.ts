@@ -79,18 +79,14 @@ export async function readAntigravityWorkbenchOpen(home: string) {
   try {
     const raw = await readFile(join(home, "local", STATE_FILE), "utf8");
     const parsed = JSON.parse(raw) as {
-      openClients?: unknown;
       visibleClients?: unknown;
+      viewportVerified?: unknown;
       updatedAt?: unknown;
     };
-    const visibleCount =
-      typeof parsed?.visibleClients === "number"
-        ? parsed.visibleClients
-        : typeof parsed?.openClients === "number"
-          ? parsed.openClients
-          : 0;
     return (
-      visibleCount > 0 &&
+      parsed?.viewportVerified === true &&
+      typeof parsed?.visibleClients === "number" &&
+      parsed.visibleClients > 0 &&
       typeof parsed?.updatedAt === "number" &&
       Date.now() - parsed.updatedAt <= ACTIVE_STATE_MAX_AGE_MS
     );
@@ -461,6 +457,7 @@ html, body { margin: 0; width: 100%; height: 100%; overflow: hidden; background:
 </style></head><body>
 <div id="showai-status" role="status"><span id="showai-msg"></span></div>
 <iframe id="showai-frame" title="ShowAI"></iframe>
+<div id="showai-vis-probe" aria-hidden="true" style="position:fixed;left:25%;top:25%;width:50%;height:50%;pointer-events:none;z-index:2147483647"></div>
 <script>
 (() => {
   const translations = ${JSON.stringify(messages.catalogs)};
@@ -468,9 +465,11 @@ html, body { margin: 0; width: 100%; height: 100%; overflow: hidden; background:
   const statusEl = document.getElementById("showai-status");
   const msgEl = document.getElementById("showai-msg");
   const frame = document.getElementById("showai-frame");
+  const visProbe = document.getElementById("showai-vis-probe");
   let locale = navigator.language.startsWith("zh") ? "zh-CN" : "en";
   let initialized = false, contextSupported = false, hostTheme = "", toolPrefix = "";
   let fileInput = null, readingFile = false, mountedPage = null, frameOrigin = "", revealTimer = 0;
+  let hostViewportVisible = typeof IntersectionObserver !== "function";
   let sequence = 0;
   const pending = new Map();
   const t = key => translations[locale][key];
@@ -488,8 +487,38 @@ html, body { margin: 0; width: 100%; height: 100%; overflow: hidden; background:
     if (!frameOrigin || !frame.contentWindow) return;
     const visible = typeof overrideVisible === "boolean"
       ? overrideVisible
-      : document.visibilityState === "visible" && window.innerWidth > 40 && window.innerHeight > 40;
+      : hostViewportVisible &&
+        document.visibilityState === "visible" &&
+        window.innerWidth > 40 &&
+        window.innerHeight > 40;
     frame.contentWindow.postMessage({ type: "showai:ag-host-visibility", visible }, frameOrigin);
+  }
+
+  if (typeof IntersectionObserver === "function" && visProbe) {
+    const onIntersect = entries => {
+      const e = entries[entries.length - 1];
+      if (!e) return;
+      const next =
+        e.isIntersecting &&
+        e.intersectionRect.width > 20 &&
+        e.intersectionRect.height > 20 &&
+        (typeof e.isVisible !== "boolean" || e.isVisible);
+      if (next !== hostViewportVisible) {
+        hostViewportVisible = next;
+        sendHostVisibility();
+      }
+    };
+    let io;
+    try {
+      io = new IntersectionObserver(onIntersect, {
+        threshold: [0, 0.05, 0.5],
+        trackVisibility: true,
+        delay: 120,
+      });
+    } catch {
+      io = new IntersectionObserver(onIntersect, { threshold: [0, 0.05, 0.5] });
+    }
+    io.observe(visProbe);
   }
 
   function request(method, params) {

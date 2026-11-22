@@ -325,8 +325,11 @@
       ? window.crypto.randomUUID()
       : Math.random().toString(36).slice(2) + Date.now().toString(36));
 
+  let viewportVisible = typeof window.IntersectionObserver !== "function";
+
   function isWorkbenchVisible() {
     return (
+      viewportVisible &&
       document.visibilityState === "visible" &&
       window.innerWidth > 40 &&
       window.innerHeight > 40
@@ -349,6 +352,46 @@
     } catch {
       // Non-fatal if sidecar is restarting.
     }
+  }
+
+  if (typeof window.IntersectionObserver === "function") {
+    const attachProbe = () => {
+      const root = document.body || document.documentElement;
+      if (!root) return;
+      const probe = document.createElement("div");
+      probe.setAttribute("aria-hidden", "true");
+      probe.style.cssText =
+        "position:fixed;left:25%;top:25%;width:50%;height:50%;pointer-events:none;z-index:2147483647";
+      root.appendChild(probe);
+      const onIntersect = (entries) => {
+        const e = entries[entries.length - 1];
+        if (!e) return;
+        const next =
+          e.isIntersecting &&
+          e.intersectionRect.width > 20 &&
+          e.intersectionRect.height > 20 &&
+          (typeof e.isVisible !== "boolean" || e.isVisible);
+        if (next !== viewportVisible) {
+          viewportVisible = next;
+          reportVisibility();
+        }
+      };
+      let io;
+      try {
+        io = new window.IntersectionObserver(onIntersect, {
+          threshold: [0, 0.05, 0.5],
+          trackVisibility: true,
+          delay: 120,
+        });
+      } catch {
+        io = new window.IntersectionObserver(onIntersect, {
+          threshold: [0, 0.05, 0.5],
+        });
+      }
+      io.observe(probe);
+    };
+    if (document.body) attachProbe();
+    else document.addEventListener("DOMContentLoaded", attachProbe, { once: true });
   }
 
   if (typeof window.EventSource === "function") {

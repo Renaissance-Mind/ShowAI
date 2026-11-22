@@ -890,7 +890,10 @@ export async function startBrowserServer(options: BrowserServerOptions) {
     document.documentElement.style.colorScheme = initialTheme;
     document.documentElement.dataset.theme = initialTheme;
   }
-  let seq = 0, notifiedReady = false, parentVisible = true;
+  let seq = 0,
+    notifiedReady = false,
+    parentVisible = window.parent === window,
+    viewportVisible = typeof IntersectionObserver !== "function";
   const pending = new Map();
   const wantsPage = params.has("page");
   function checkReady() {
@@ -910,6 +913,43 @@ export async function startBrowserServer(options: BrowserServerOptions) {
   });
   mo.observe(document.documentElement, { childList: true, subtree: true });
   let syncVisibility = () => {};
+  if (typeof IntersectionObserver === "function") {
+    const attachProbe = () => {
+      const root = document.body || document.documentElement;
+      if (!root) return;
+      const probe = document.createElement("div");
+      probe.setAttribute("aria-hidden", "true");
+      probe.style.cssText =
+        "position:fixed;left:25%;top:25%;width:50%;height:50%;pointer-events:none;z-index:2147483647";
+      root.appendChild(probe);
+      const onIntersect = (entries) => {
+        const e = entries[entries.length - 1];
+        if (!e) return;
+        const next =
+          e.isIntersecting &&
+          e.intersectionRect.width > 20 &&
+          e.intersectionRect.height > 20 &&
+          (typeof e.isVisible !== "boolean" || e.isVisible);
+        if (next !== viewportVisible) {
+          viewportVisible = next;
+          syncVisibility();
+        }
+      };
+      let io;
+      try {
+        io = new IntersectionObserver(onIntersect, {
+          threshold: [0, 0.05, 0.5],
+          trackVisibility: true,
+          delay: 120,
+        });
+      } catch {
+        io = new IntersectionObserver(onIntersect, { threshold: [0, 0.05, 0.5] });
+      }
+      io.observe(probe);
+    };
+    if (document.body) attachProbe();
+    else document.addEventListener("DOMContentLoaded", attachProbe, { once: true });
+  }
   const initialProject = params.get("project") || "";
   const initialPage = params.get("page") || "";
   const localToken = window.__SHOWAI_LOCAL__?.token || "";
@@ -919,6 +959,7 @@ export async function startBrowserServer(options: BrowserServerOptions) {
       : Math.random().toString(36).slice(2) + Date.now().toString(36);
     const isVisible = () =>
       parentVisible &&
+      viewportVisible &&
       document.visibilityState === "visible" &&
       window.innerWidth > 40 &&
       window.innerHeight > 40;

@@ -484,6 +484,7 @@ function createNavigationCoordinator(env = process.env) {
         JSON.stringify({
           openClients: clients.size,
           visibleClients: countVisibleClients(),
+          viewportVerified: true,
           updatedAt: Date.now(),
         }) + "\n",
         "utf8",
