@@ -7,7 +7,7 @@ Desktop app icons are taken from the vendors' distributed applications:
 Codex from the ChatGPT macOS app; Kimi Work, Cursor, Qoder, WorkBuddy,
 DeepSeek Harness and Antigravity from their respective macOS app bundles.
 
-Claude Code: https://code.claude.com/docs/en/overview (product favicon)
+Claude Code: https://www.anthropic.com/press-kit (ClaudeIcon-Square.png)
 Gemini CLI: https://geminicli.com/icon.png
 Kimi Code CLI: https://github.com/MoonshotAI/kimi-cli/blob/main/web/public/logo.png
 OpenCode: https://opencode.ai/brand/files/opencode-logo-light.svg
