@@ -42,7 +42,7 @@ Agent 会把界面保存到 ShowAI 并在对话中展示（不能内嵌显示的
 | Codex                                      | 正式     | ShowAI「设置 → 外部 Agent 插件」→ 安装插件                                                                                                |
 | Antigravity                                | 正式     | ShowAI「设置 → 外部 Agent 插件」→ 安装插件                                                                                                |
 | 内置 Agent                                 | 正式     | 在 ShowAI 中使用本机 Codex 或 Claude Code 的登录、模型 API Key 或 Cloud                                                        |
-| DeepSeek Harness                           | 预览     | ShowAI「设置 → 外部 Agent 插件」→ 准备插件，再在 DeepSeek Harness 中添加（[步骤](../../plugins/showai/README.zh-CN.md#deepseek-harness)） |
+| DeepSeek Harness                           | 预览     | 完全退出 DeepSeek Harness，在 ShowAI「设置 → 外部 Agent 插件」点「安装插件」（[步骤](../../plugins/showai/README.zh-CN.md#deepseek-harness)） |
 | Kimi Work                                  | 预览     | 在 Kimi Work 中添加 ShowAI 的 MCP 服务和 [Kimi 插件](../../plugins/showai-kimi/README.md)                                      |
 | Cursor、Qoder、WorkBuddy                   | 预览     | 为所用宿主生成并安装插件（[桌面宿主接入](../../plugins/showai/README.zh-CN.md#cursorqoder-和-workbuddy)）                      |
 | 网页版 ChatGPT                             | 自行部署 | 在桌面 App 开启远程连接，使用自己的 Cloudflare 或 Tailscale 接入本机项目（[指南](chatgpt.zh-CN.md)）                           |
@@ -57,7 +57,7 @@ Agent 会把界面保存到 ShowAI 并在对话中展示（不能内嵌显示的
 | Codex                 | [plugins/showai-codex/](../../plugins/showai-codex/)                      | 在源码目录运行 `npm run plugin:install`。[源码安装说明](codex.zh-CN.md#从源码安装)                                                                        |
 | Claude Code           | [plugins/showai-claude/](../../plugins/showai-claude/)                    | 将本仓库添加为 Claude Code 插件市场，安装 `showai@renaissance-mind`。[源码安装说明](codex.zh-CN.md#从源码安装)                                            |
 | Antigravity           | [plugins/showai-antigravity/](../../plugins/showai-antigravity/)          | 在源码目录运行 `npm run plugin:antigravity`。[源码安装说明](../../plugins/showai/README.zh-CN.md#从源码安装)                                              |
-| DeepSeek Harness      | [plugins/showai-deepseek/](../../plugins/showai-deepseek/)（bundle 源码） | 运行 `npm run plugin:dsh`，然后在 DeepSeek Harness 中添加命令返回的已准备目录。[准备并启用 bundle](../../plugins/showai/README.zh-CN.md#deepseek-harness) |
+| DeepSeek Harness      | [plugins/showai-deepseek/](../../plugins/showai-deepseek/)（bundle 源码） | ShowAI 通过 Harness CLI 安装。源码方式可用 `npm run plugin:dsh` 准备插件包。[准备并启用 bundle](../../plugins/showai/README.zh-CN.md#deepseek-harness) |
 | Kimi Work             | [plugins/showai-kimi/](../../plugins/showai-kimi/)                        | 在 Kimi Work 中指定这个子目录，注册后安装。[Kimi Work 安装说明](../../plugins/showai-kimi/README.md#安装与更新)                                           |
 | Cursor                | [plugins/showai/](../../plugins/showai/) → `--host cursor`                | 生成本地 Cursor 插件并重载窗口。[Cursor 接入](../../plugins/showai/README.zh-CN.md#cursorqoder-和-workbuddy)                                              |
 | Qoder                 | [plugins/showai/](../../plugins/showai/) → `--host qoder`                 | 生成 ZIP，在「扩展 → 插件 → 添加插件」中导入。[Qoder 接入](../../plugins/showai/README.zh-CN.md#cursorqoder-和-workbuddy)                                 |

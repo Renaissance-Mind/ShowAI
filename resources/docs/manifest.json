@@ -154,7 +154,7 @@
      "title": "在 Agent 中使用",
      "icon": "🤝",
      "file": "zh-CN/pages/e8c001a7-4e9f-5515-a2e4-8ed6085ef46d.json",
-     "sha256": "3f5906da5e084d3ce733db9dea1d6593449df23ee4a87ec2bc879a118d1beb79",
+     "sha256": "ea744ba3c1c832a076d86b5f40d7f9733aa0c4c07689506a2292c5d6e37c4f91",
      "components": [
       "zh-CN/components/doc-hero@1.0.0-7c2bbe84b003.json",
       "zh-CN/components/doc-compare@1.0.0-3a5b6ff02c26.json",
@@ -555,7 +555,7 @@
      "title": "Use with an Agent",
      "icon": "🤝",
      "file": "en/pages/e8c001a7-4e9f-5515-a2e4-8ed6085ef46d.json",
-     "sha256": "3d2683c64e796bb9a0f3d019465143df11e719e945a370c8b5b971066545b719",
+     "sha256": "7d1ce8bcac5d4a9c972843c0e1357506d989320552fdbede2b7c606eee7cec27",
      "components": [
       "en/components/doc-hero@1.0.0-6aa1b6a2a0e9.json",
       "en/components/doc-compare@1.0.0-6450bf2fc82c.json",

@@ -3,7 +3,7 @@
   "profile": "kimi",
   "declaredHostDisplay": "fragment-file",
   "commonVersion": "0.31.0",
-  "commonSha256": "d21f19713cd457948488fd5916a0c790e9215f74e90269ad37830289c44e31e5",
+  "commonSha256": "0048b4a33692ce005c87525e297a4d492405feba56e22a21201a7911e459edc6",
   "commonFiles": {
     "collaborate-canvas/SKILL.md": "551ec4bde35476fd307aa0be78cde9949e9cf7efee1cfd89e4cd797be5bd895d",
     "create-component/references/component-authoring.md": "3debe9a4e5ca925c9336b9c296abd55c65bffdd38a1a7027bc99baaab7c4e037",
@@ -22,7 +22,7 @@
     "use-showai/references/authoring.md": "e2f011a83d4d6729fafd822734e7fb43611eac619a3f7c4d218d19d59d106dba",
     "use-showai/references/board-authoring.md": "9a3ae7f60fb5391480fce4c3633fe5ebd6f6ee262256aea5b66d7072c0aa6d7a",
     "use-showai/references/capacity.md": "b52501b5b14a81c02d060d2ff8e6af06b5235f90e2c9854a4d89529630b19883",
-    "use-showai/references/connect-mcp.md": "313466db484402f687162e5566312188d9f1e9fad3cbe17d1fb7a8ca0a3bc044",
+    "use-showai/references/connect-mcp.md": "9e895a7af320eb5b6bc6ce588b9565178a526e0e75cc6ddb6654a527ad64f069",
     "use-showai/references/editing.md": "157da687374663ed3c3f37df55f339a8513155c868c3e71a003d472ddbdbf30f",
     "use-showai/references/extension-points.md": "fcfcc4b3d58bd8d65ffa7a60a6acffb92c33e629184f1b7bbb1a40a638304332",
     "use-showai/references/formats/authoring.json": "a557893ba1c20ec596ed5e541d36b524040e832f3e4599fb33c2652f3c881d67",

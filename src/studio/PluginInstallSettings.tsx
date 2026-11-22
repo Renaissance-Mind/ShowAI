@@ -44,6 +44,8 @@ function DshSteps({ steps }: { steps: DshPendingSteps }) {
   const notify = useNotify();
   const items = [
     steps.profileMissing && t("dshOpenOnce"),
+    steps.automatic === "quit" && t("dshQuit"),
+    steps.automatic === "manual" && t("dshManual"),
     steps.otherSource && `${t("dshRemoveOther")} ${steps.otherSource}`,
     ...steps.legacyBundles.map((name) => `${t("dshRemoveLegacy")} ${name}`),
     steps.manualMcpRow && `${t("dshRemoveRow")} ${steps.manualMcpRow}`,
@@ -631,7 +633,7 @@ function hostStatus(
   if (!host.installed)
     return {
       text: t(
-        host.host === "deepseek" && host.installedPath ? "dshStaged" : "ready",
+        host.host === "deepseek" ? (host.installedPath ? "dshStaged" : "dshReady") : "ready",
       ),
       tone: "muted",
     };
@@ -707,6 +709,9 @@ export default function PluginInstallSettings({ home }: { home: string }) {
   const [batch, setBatch] = useState<PluginBatchResult | null>(null);
   const [manualHost, setManualHost] = useState<PluginHost | null>(null);
   const [dshHost, setDshHost] = useState<PluginHost | null>(null);
+  useEffect(() => {
+    if (receipt?.dsh) setDshHost("deepseek");
+  }, [receipt]);
   const [showUndetected, setShowUndetected] = useState(false);
   const installed = hosts.filter(
     (host) =>
@@ -764,7 +769,7 @@ export default function PluginInstallSettings({ home }: { home: string }) {
           ? host.dsh
           : undefined;
     const hostErr = resolveHostError(host);
-    const canManual = !host.executable && host.host !== "deepseek";
+    const canManual = !host.executable || dsh?.automatic === "manual";
     const actionKey = pluginActionLabel(host, home);
     return (
       <div

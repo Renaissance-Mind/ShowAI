@@ -7,6 +7,7 @@ import {
   realpath,
   rm,
   stat,
+  symlink,
   writeFile,
 } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -180,6 +181,12 @@ test("reports Harness profile steps without editing the profile", async () => {
     "- insert:\n    - id: mcp-showai\n      name: '@deepseek-ai/dsh-mcp-client'\n";
   await writeFile(join(profile, "package.json"), manifest);
   await writeFile(join(profile, "cordis.patch.yml"), patch);
+  expect(await inspectDshProfile({ target, home })).toMatchObject({
+    registered: true, installed: false, enabled: false,
+  });
+  await mkdir(join(profile, "node_modules/@showai"), { recursive: true });
+  await symlink(target, join(profile, "node_modules/@showai/dsh-showai"),
+    process.platform === "win32" ? "junction" : "dir");
   expect(
     await inspectDshProfile({ target, home, skillNames: ["use-showai"] }),
   ).toMatchObject({

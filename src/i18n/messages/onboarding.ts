@@ -20,7 +20,7 @@ export default defineMessages("onboarding", {
     "connect.disabled": "已安装，尚未启用",
     "connect.otherSource": "已启用其他来源的 ShowAI 插件",
     "connect.failed": "无法读取插件状态",
-    "connect.dshStaged": "插件文件已准备，需在 DeepSeek Harness 中完成安装",
+    "connect.dshStaged": "插件包已准备，等待安装",
     "connect.noHost": "没有找到 Claude Code 或 Codex。",
     "connect.hostGuide": "安装 Claude Code 或 Codex 的说明",
     "connect.useBuiltin": "改用内置 Agent",
@@ -119,8 +119,7 @@ export default defineMessages("onboarding", {
     "connect.disabled": "Installed, disabled",
     "connect.otherSource": "ShowAI is enabled from another source",
     "connect.failed": "Couldn't read the plugin status",
-    "connect.dshStaged":
-      "Plugin files prepared; finish installing in DeepSeek Harness",
+    "connect.dshStaged": "Plugin prepared, installation pending",
     "connect.noHost": "Claude Code or Codex wasn't found.",
     "connect.hostGuide": "How to install Claude Code or Codex",
     "connect.useBuiltin": "Use the built-in Agent instead",

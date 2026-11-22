@@ -27,15 +27,11 @@ export function pluginActionLabel(
   host: PluginInstallation,
   home?: string | null,
 ) {
-  return host.host === "deepseek"
-    ? host.installedPath
-      ? ("dshUpdate" as const)
-      : ("dshPrepare" as const)
-    : host.installed
-      ? host.enabled && host.current && !pluginLibraryMismatch(host, home)
-        ? ("reinstall" as const)
-        : ("update" as const)
-      : ("install" as const);
+  return host.installed
+    ? host.enabled && host.current && !pluginLibraryMismatch(host, home)
+      ? ("reinstall" as const)
+      : ("update" as const)
+    : ("install" as const);
 }
 
 export function pluginUpToDate(host: PluginInstallation, home?: string | null) {
@@ -248,19 +244,21 @@ export function usePluginHosts(home: string | null) {
         );
         if (!mounted.current) return false;
         setReceipt(result);
-        setInstalledAt((previous) => ({ ...previous, [host]: Date.now() }));
+        if (!result.dsh)
+          setInstalledAt((previous) => ({ ...previous, [host]: Date.now() }));
         publishHosts(
           await desktop.invoke<PluginInstallation[]>("plugins:status"),
         );
-        return true;
+        return !result.dsh;
       } catch (reason) {
+        if (host === "deepseek" && mounted.current) await refreshHost(host);
         if (mounted.current) fail(reason, host);
         return false;
       } finally {
         if (mounted.current) setBusy(null);
       }
     },
-    [fail, publishHosts],
+    [fail, publishHosts, refreshHost],
   );
   const repairRuntime = useCallback(async () => {
     setBusy("runtime");
@@ -303,9 +301,14 @@ export function usePluginHosts(home: string | null) {
       try {
         for (const host of targets) {
           try {
-            await desktop.invoke<PluginInstallReceipt>("plugins:install", {
+            const installed = await desktop.invoke<PluginInstallReceipt>("plugins:install", {
               host,
             });
+            if (installed.dsh) {
+              if (mounted.current) setReceipt(installed);
+              result.failed.push({ host, message: translator(messages)("dshStagedDone") });
+              continue;
+            }
             result.updated.push(host);
             if (mounted.current)
               setInstalledAt((previous) => ({

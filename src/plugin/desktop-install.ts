@@ -39,12 +39,14 @@ import {
   publishPluginDirectory,
 } from "./host-package.mjs";
 import {
+  DSH_BUNDLE,
   DSH_BUNDLE_FILES,
   DSH_LOGOS,
   inspectDshProfile,
   stageDshBundle,
   type DshProfileState,
 } from "./dsh-stage.mjs";
+import { dshDesktopRunning, dshPackageLauncher } from "./dsh-cli";
 
 export type PluginHost = "codex" | "claude" | "antigravity" | "deepseek";
 export interface DshPendingSteps {
@@ -57,6 +59,7 @@ export interface DshPendingSteps {
   skillRoot: string;
   add: boolean;
   enable: boolean;
+  automatic?: "quit" | "manual";
 }
 export interface PluginInstallation {
   host: PluginHost;
@@ -205,12 +208,29 @@ async function exists(path: string, mode = constants.F_OK) {
   );
 }
 
+async function saveInstallJson(path: string, value: unknown) {
+  const temporary = `${path}.${randomUUID()}.tmp`;
+  try {
+    await writeFile(temporary, JSON.stringify(value, null, 2) + "\n");
+    await rename(temporary, path);
+  } finally {
+    await rm(temporary, { force: true });
+  }
+}
+
 async function dshApplication() {
   if (process.platform === "darwin")
     for (const root of ["/Applications", join(homedir(), "Applications")]) {
       const path = join(root, "DeepSeek Harness.app");
       if (await exists(path)) return path;
     }
+  if (process.platform === "win32") {
+    for (const root of [process.env.LOCALAPPDATA && join(process.env.LOCALAPPDATA, "Programs"), process.env.ProgramFiles]) {
+      if (!root) continue;
+      const path = join(root, "DeepSeek Harness", "DeepSeek Harness.exe");
+      if (await exists(path)) return path;
+    }
+  }
   const cli = await findExecutable("dsh");
   if (cli) return cli;
   const home = process.env.DSH_HOME || join(homedir(), ".dsh");
@@ -219,7 +239,13 @@ async function dshApplication() {
     : null;
 }
 
-function dshSteps(path: string, state: DshProfileState): DshPendingSteps {
+function dshNeedsCleanup(state: DshProfileState) {
+  return Boolean(state.otherSource || state.manualMcpRow ||
+    state.legacyBundles.length || state.shadowingSkills.length);
+}
+
+function dshSteps(path: string, state: DshProfileState): DshPendingSteps | undefined {
+  if (state.enabled && !dshNeedsCleanup(state)) return;
   return {
     bundlePath: path,
     profileMissing: !state.profileFound,
@@ -320,9 +346,7 @@ export class DesktopPluginInstaller {
     else delete paths[host];
     await mkdir(this.options.root, { recursive: true });
     const target = join(this.options.root, "host-paths.json");
-    const temporary = `${target}.${randomUUID()}.tmp`;
-    await writeFile(temporary, JSON.stringify(paths, null, 2) + "\n");
-    await rename(temporary, target);
+    await saveInstallJson(target, paths);
     return this.status();
   }
 
@@ -371,9 +395,11 @@ export class DesktopPluginInstaller {
     );
   }
 
-  private async command(executable: string, args: string[], timeout = 120000) {
-    const result = await execute(executable, ["plugin", ...args], {
-      env: this.commandEnv(executable),
+  private async command(launcher: string | RuntimeLaunch, args: string[], timeout = 120000) {
+    const { command: executable, args: prefix, env } = typeof launcher === "string"
+      ? { command: launcher, args: [], env: {} } : launcher;
+    const result = await execute(executable, [...prefix, "plugin", ...args], {
+      env: { ...this.commandEnv(executable), ...env },
       cwd: this.options.root,
       timeout,
     }).catch((error) => {
@@ -447,7 +473,7 @@ export class DesktopPluginInstaller {
       join(target, "package.json"),
     );
     const receipt = staged
-      ? await optionalJson<{ version?: string; source?: string }>(
+      ? await optionalJson<{ version?: string; source?: string; home?: string }>(
           join(this.options.root, "deepseek-install.json"),
         )
       : undefined;
@@ -468,6 +494,7 @@ export class DesktopPluginInstaller {
           : undefined,
       expected: source,
       installedPath: staged ? target : undefined,
+      boundHome: state.installed ? receipt?.home : undefined,
       otherSources: state.otherSource ? [state.otherSource] : [],
       dsh: dshSteps(target, state),
     };
@@ -745,14 +772,14 @@ export class DesktopPluginInstaller {
     this.pending = true;
     try {
       return host === "deepseek"
-        ? await this.stageDsh()
+        ? await this.installDsh()
         : await this.installHost(host);
     } finally {
       this.pending = false;
     }
   }
 
-  private async stageDsh(): Promise<PluginInstallReceipt> {
+  private async installDsh(): Promise<PluginInstallReceipt> {
     const executable = await this.hostExecutable("deepseek");
     if (!executable)
       throw new PluginInstallError(
@@ -770,7 +797,29 @@ export class DesktopPluginInstaller {
       runtime: runtime.cli,
       home: runtime.home,
     });
-    const after = await this.inspectDsh(executable);
+    const skillNames = await readdir(join(this.options.pluginRoot(), "skills"));
+    const inspect = () => inspectDshProfile({ target: staged.path, skillNames });
+    let state = await inspect();
+    let pending = dshSteps(staged.path, state);
+    if (pending && state.profileFound && !dshNeedsCleanup(state)) {
+      const launcher = await dshPackageLauncher(executable);
+      const running = launcher && await dshDesktopRunning(state.profile);
+      if (!launcher || running === undefined) pending.automatic = "manual";
+      else if (running) pending.automatic = "quit";
+      else {
+        // DSH auto-enables newly added bundles and preserves disabled dependencies.
+        // Re-add only our own disabled or broken registration on an explicit install.
+        if (state.registered)
+          await this.command(launcher, ["--profile", "desktop", "remove", DSH_BUNDLE]);
+        await this.command(launcher, ["--profile", "desktop", "add", `link:${staged.path}`]);
+        state = await inspect();
+        pending = dshSteps(staged.path, state);
+        if (!state.installed || !state.enabled)
+          throw new PluginInstallError("PLUGIN_NOT_CONFIRMED", "DeepSeek Harness did not link and enable the staged ShowAI bundle.", { host: "deepseek" });
+      }
+    }
+    if (await this.expectedVersion("deepseek") !== source)
+      throw new PluginInstallError("PLUGIN_BUNDLE_CHANGED", "The DeepSeek bundle or its runtime binding changed during installation. Retry with the current files.");
     const receipt = {
       host: "deepseek" as const,
       version: staged.version,
@@ -778,16 +827,11 @@ export class DesktopPluginInstaller {
       verifiedFiles: staged.verifiedFiles,
       treeSha256: staged.treeSha256,
       home: staged.home,
-      dsh: after.dsh,
+      ...(pending ? { dsh: pending } : {}),
     };
-    await writeFile(
-      join(this.options.root, "deepseek-install.json"),
-      JSON.stringify(
-        { ...receipt, source, verifiedAt: new Date().toISOString() },
-        null,
-        2,
-      ) + "\n",
-    );
+    await saveInstallJson(join(this.options.root, "deepseek-install.json"), {
+      ...receipt, source, verifiedAt: new Date().toISOString(),
+    });
     return receipt;
   }
 

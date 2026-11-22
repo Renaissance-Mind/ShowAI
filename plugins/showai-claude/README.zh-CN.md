@@ -42,13 +42,11 @@ npm run plugin:antigravity -- --port <端口> --json
 
 ### DeepSeek Harness
 
-DeepSeek Harness 由自己安装插件，因此 ShowAI 准备一个完整 bundle（[dsh-showai](https://github.com/Renaissance-Mind/ShowAI/blob/main/plugins/showai-deepseek/README.md)），包含绑定当前运行时和内容库的 MCP 工具、上述 Skill、对话内预览、会话右侧的编辑标签和左侧导航的全局工作台。App 中打开「设置 → 外部 Agent 插件 → DeepSeek Harness → 准备插件」。源码方式在已登记运行时后执行：
+首次使用时先打开一次 DeepSeek Harness，再完全退出。在 ShowAI 中选择「设置 → 外部 Agent 插件 → DeepSeek Harness → 安装插件」。ShowAI 调用 Harness 自带的包管理器安装并启用[本机插件包](https://github.com/Renaissance-Mind/ShowAI/blob/main/plugins/showai-deepseek/README.md)，随后核验实际链接。打开 Harness 即可使用六个 Skills、本机 MCP 工具、对话预览、会话侧栏和全局工作台。
 
-```sh
-npm run plugin:dsh
-```
+切换内容库或更新 ShowAI 后，点「更新并启用」并重新打开 Harness。源码开发时，`npm run plugin:dsh` 仍可单独准备插件包。Harness 退出后，用命令输出的目录执行 `dsh plugin --profile desktop add "link:/插件包的绝对路径"`，也可在 Harness 的「插件 → 添加插件」选择该目录并点「立即启用」。
 
-然后在 DeepSeek Harness 中执行一次：「插件 → 添加插件」，粘贴显示的 bundle 路径，选择「立即启用」并重启 Harness。更新 ShowAI（App 或源码）、切换内容库或登记的运行时变化后，再准备一次：它会重写同一目录，重启 Harness 即可加载，无需重新添加。安装器会列出需要先清理的旧手动配置（`$DSH_HOME` 未设置时为 `~/.dsh`）：
+设置页会列出可能需要清理的旧注册。Harness 的默认配置目录为 `~/.dsh`。
 
 - 旧版 `@showai/dsh-showai-preview` bundle：在 Harness「插件」中打开它并卸载；
 - `$DSH_HOME/profiles/desktop/cordis.patch.yml` 中手写的 `mcp-showai` 配置：删除整段；
@@ -89,7 +87,7 @@ page_present 返回完整离线 HTML/source 与聊天预览。预览容纳时使
 
 ## 通用插件与手动连接
 
-五个专用包面向同一台电脑上的 Agent 和 ShowAI，一次安装六个 Skills 与本机 MCP 启动配置。DeepSeek Harness 启用 App 准备的插件包，Kimi Work 在宿主里注册并安装本地插件。
+五个专用包面向同一台电脑上的 Agent 和 ShowAI，一次安装六个 Skills 与本机 MCP 启动配置。DeepSeek Harness 通过宿主 CLI 安装并启用本机插件包，Kimi Work 在宿主里注册并安装本地插件。
 
 在其他客户端使用时，可在桌面「设置 → 外部 Agent 插件」安装，也可从源码生成通用目录：
 

@@ -208,6 +208,7 @@ export async function inspectDshProfile({
     home,
     profile,
     profileFound: text !== undefined,
+    registered: false,
     installed: false,
     enabled: false,
     otherSource: undefined,
@@ -223,16 +224,24 @@ export async function inspectDshProfile({
   const dependencies = {
     ...manifest.dependencies,
     ...manifest.devDependencies,
+    ...manifest.optionalDependencies,
   };
   const bundles = manifest.dsh?.profile?.bundles ?? [];
   const linked = await linkTarget(dependencies[DSH_BUNDLE], profile);
   const own = target
     ? await realpath(target).catch(() => resolve(target))
     : undefined;
-  state.installed =
+  state.registered =
     dependencies[DSH_BUNDLE] !== undefined && (!own || linked === own);
-  if (dependencies[DSH_BUNDLE] !== undefined && !state.installed)
+  const installedPath = await realpath(join(profile, "node_modules", DSH_BUNDLE)).catch(error => {
+    if (error.code === "ENOENT") return undefined;
+    throw error;
+  });
+  state.installed = state.registered && !!installedPath && (!own || installedPath === own);
+  if (dependencies[DSH_BUNDLE] !== undefined && !state.registered)
     state.otherSource = linked ?? dependencies[DSH_BUNDLE];
+  else if (own && installedPath && installedPath !== own)
+    state.otherSource = installedPath;
   state.enabled = state.installed && bundles.includes(DSH_BUNDLE);
   state.legacyBundles = DSH_LEGACY_BUNDLES.filter(
     (name) => dependencies[name] !== undefined || bundles.includes(name),

@@ -30,6 +30,7 @@ export interface DshProfileState {
   home: string;
   profile: string;
   profileFound: boolean;
+  registered: boolean;
   installed: boolean;
   enabled: boolean;
   otherSource?: string;

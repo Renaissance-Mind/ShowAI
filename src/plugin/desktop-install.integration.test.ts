@@ -5,12 +5,15 @@ import {
   mkdtemp,
   readFile,
   readdir,
+  realpath,
   rm,
   writeFile,
 } from "node:fs/promises";
 import { join, resolve, sep } from "node:path";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
+import { chromium } from "playwright-core";
+import { startBrowserServer } from "../browser/server";
 import type { Tool } from "@modelcontextprotocol/sdk/types.js";
 import { execFile, spawn } from "node:child_process";
 import { createInterface } from "node:readline";
@@ -138,10 +141,11 @@ describe.skipIf(!output || !config)(
       await registerRuntime(home, cli);
       bundle = join(root, "app-resources/agent-plugin");
       await cp(resolve("plugins/showai"), bundle, { recursive: true });
+      await cp(resolve("plugins/showai-deepseek"), join(root, "app-resources/dsh-plugin"), { recursive: true });
       installer = new DesktopPluginInstaller({
         root: join(root, "profile/external-plugins"),
         pluginRoot: () => bundle,
-        dshBundleRoot: () => resolve("plugins/showai-deepseek"),
+        dshBundleRoot: () => join(root, "app-resources/dsh-plugin"),
         runtime: () => ({ home, cli }),
         channel: "packaged",
       });
@@ -465,22 +469,23 @@ describe.skipIf(!output || !config)(
         code: "PLUGIN_DEVELOPMENT_BUILD",
       });
     });
-    test("deepseek stages a bundle whose MCP row starts without Node on PATH", async () => {
+    test("one click installs and enables the linked DeepSeek bundle whose MCP row starts without Node on PATH", async () => {
       const profile = join(root, "dsh/profiles/desktop");
+      const pending = await installer.install("deepseek");
+      expect(pending.dsh).toMatchObject({ profileMissing: true, add: true });
       await mkdir(profile, { recursive: true });
       await writeFile(
         join(profile, "package.json"),
-        JSON.stringify({ dsh: { profile: { bundles: [] } } }),
+        JSON.stringify({ name: "dsh-profile-desktop", private: true, dependencies: {},
+          dsh: { profile: { bundles: ["@deepseek-ai/dsh-base", "@deepseek-ai/dsh-web-app"] } } }),
       );
       const first = await installer.install("deepseek");
-      expect(first.dsh).toMatchObject({ add: true, profileMissing: false });
-      await writeFile(
-        join(profile, "package.json"),
-        JSON.stringify({
-          dependencies: { "@showai/dsh-showai": `link:${first.installedPath}` },
-          dsh: { profile: { bundles: ["@showai/dsh-showai"] } },
-        }),
-      );
+      expect(first.dsh).toBeUndefined();
+      const manifest = JSON.parse(await readFile(join(profile, "package.json"), "utf8"));
+      expect(manifest.dsh.profile.bundles).toEqual([
+        "@deepseek-ai/dsh-base", "@deepseek-ai/dsh-web-app", "@showai/dsh-showai",
+      ]);
+      expect(await realpath(join(profile, "node_modules/@showai/dsh-showai"))).toBe(await realpath(first.installedPath));
       const dshState = async () =>
         (await installer.status()).find((item) => item.host === "deepseek")!;
       const status = await dshState();
@@ -491,6 +496,11 @@ describe.skipIf(!output || !config)(
         installedPath: first.installedPath,
         current: true,
       });
+      manifest.dsh.profile.bundles = manifest.dsh.profile.bundles.filter((name: string) => name !== "@showai/dsh-showai");
+      await writeFile(join(profile, "package.json"), JSON.stringify(manifest));
+      expect(await dshState()).toMatchObject({ installed: true, enabled: false });
+      expect((await installer.install("deepseek")).dsh).toBeUndefined();
+      expect(await dshState()).toMatchObject({ installed: true, enabled: true });
       const probe = join(bundle, "skills/update-probe.txt");
       await writeFile(probe, "newer bundle\n");
       try {
@@ -546,6 +556,46 @@ describe.skipIf(!output || !config)(
         );
       } finally {
         await client.close();
+      }
+    }, 120000);
+    test("the DeepSeek settings button completes a real desktop-profile installation", async () => {
+      const previous = process.env.DSH_HOME;
+      process.env.DSH_HOME = join(root, "DSH settings acceptance");
+      const profile = join(process.env.DSH_HOME, "profiles/desktop");
+      const browser = await chromium.launch({ headless: true });
+      let server: Awaited<ReturnType<typeof startBrowserServer>> | undefined;
+      try {
+        await mkdir(profile, { recursive: true });
+        await writeFile(join(profile, "package.json"), JSON.stringify({
+          name: "dsh-profile-desktop", private: true, dependencies: {},
+          dsh: { profile: { bundles: ["@deepseek-ai/dsh-base", "@deepseek-ai/dsh-web-app"] } },
+        }));
+        server = await startBrowserServer({
+          home, webRoot: resolve("dist-runtime/web"), cliEntry: resolve("dist-runtime/scripts/cli.mjs"),
+          settingsPath: join(root, "settings-ui/settings.json"), registerAgentRuntime: false,
+        });
+        const tab = await browser.newPage({ locale: "zh-CN", viewport: { width: 1280, height: 900 } });
+        await tab.goto(server.url);
+        await tab.getByRole("button", { name: /^(设置|Settings)$/ }).click();
+        await tab.getByRole("button", { name: /外部 Agent 插件|External Agent plugins/i }).click();
+        const row = tab.locator('.plugin-host[data-host="deepseek"]');
+        const installButton = row.getByRole("button", { name: /^(安装插件|Install plugin)$/i });
+        await installButton.waitFor();
+        await row.screenshot({ path: join(output!, "deepseek-settings-before.png") });
+        await installButton.click();
+        await row.getByRole("button", { name: /^(重新安装|Reinstall)$/i }).waitFor();
+        expect(await tab.getByRole("dialog").count()).toBe(0);
+        const installed = JSON.parse(await readFile(join(profile, "package.json"), "utf8"));
+        expect(installed.dsh.profile.bundles).toEqual(["@deepseek-ai/dsh-base", "@deepseek-ai/dsh-web-app", "@showai/dsh-showai"]);
+        expect(await realpath(join(profile, "node_modules/@showai/dsh-showai"))).toBe(
+          await realpath(join(root, "settings-ui/external-plugins/deepseek/showai")),
+        );
+        await tab.screenshot({ path: join(output!, "deepseek-settings-installed.png") });
+      } finally {
+        await browser.close();
+        await server?.close();
+        if (previous === undefined) delete process.env.DSH_HOME;
+        else process.env.DSH_HOME = previous;
       }
     }, 120000);
     test("a Codex-only instruction update only invalidates Codex", async () => {

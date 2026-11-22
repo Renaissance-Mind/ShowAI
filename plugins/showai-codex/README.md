@@ -42,13 +42,11 @@ npm run plugin:antigravity -- --port <port> --json
 
 ### DeepSeek Harness
 
-DeepSeek Harness installs plugins itself, so ShowAI prepares one complete bundle ([dsh-showai](https://github.com/Renaissance-Mind/ShowAI/blob/main/plugins/showai-deepseek/README.md)): the MCP tools bound to this runtime and library, these Skills, inline previews, a session sidebar editor and a global workbench. In the App, open **Settings → External Agent plugins → DeepSeek Harness → Prepare plugin**. From source, with a registered runtime:
+Open DeepSeek Harness once to initialize its desktop profile, then quit the application completely. In ShowAI choose **Settings → External Agent plugins → DeepSeek Harness → Install plugin**. ShowAI uses the Harness package manager to install and enable the local [bundle](https://github.com/Renaissance-Mind/ShowAI/blob/main/plugins/showai-deepseek/README.md) and verifies its link. Open Harness to use the six Skills, local MCP tools, inline previews, session sidebar and global workbench.
 
-```sh
-npm run plugin:dsh
-```
+After switching libraries or updating ShowAI, choose **Update and enable** and reopen Harness. For source development, `npm run plugin:dsh` prepares the bundle. With Harness closed, run `dsh plugin --profile desktop add "link:/absolute/path/to/the/bundle"` using the printed directory. Harness also accepts that directory through **Plugins → Add plugin → Enable now**.
 
-Then, once, in DeepSeek Harness: **Plugins → Add plugin**, paste the bundle path shown, choose **Enable now** and restart Harness. After updating ShowAI (App or source checkout), switching libraries, or changing the registered runtime, prepare again: this restages the same directory, and a Harness restart loads it without adding the plugin again. The installer lists earlier hand-made setups to remove first; `$DSH_HOME` is `~/.dsh` unless set:
+The settings page identifies earlier registrations that may need cleanup. The default Harness home is `~/.dsh`:
 
 - an older `@showai/dsh-showai-preview` bundle: Harness **Plugins** → that bundle → **Uninstall**;
 - a hand-written `mcp-showai` entry in `$DSH_HOME/profiles/desktop/cordis.patch.yml`: delete that whole entry;
@@ -93,7 +91,7 @@ Edit workflows in `plugins/showai/skills` and host delivery contracts in `plugin
 | Codex            | `plugins/showai-codex`                | Native MCP Apps views with a file-based fallback           |
 | Claude Code      | `plugins/showai-claude`               | Host HTML display tool                                     |
 | Antigravity      | `plugins/showai-antigravity`          | Native MCP Apps views, page cards, and side-pane workbench |
-| DeepSeek Harness | Prepared bundle directory             | Inline preview, editable session sidebar, global workbench |
+| DeepSeek Harness | Local bundle installed by the Harness CLI             | Inline preview, editable session sidebar, global workbench |
 | Kimi Work        | `plugins/showai-kimi`                 | Offline Widget workspace and display action                |
 | Qoder            | Generated local plugin                | Chat MCP Apps, global and task workbenches                 |
 | Cursor           | Generated local plugin                | Chat MCP Apps; saved pages edited through MCP or ShowAI    |
@@ -137,7 +135,7 @@ Follow the distribution’s bound host adapter for display. The shared workflows
 
 ## Universal plugin and manual MCP setup
 
-The five host-specific packages install six Skills and the local MCP launch configuration together. Run the Agent and ShowAI on the same computer and use the host's installer. DeepSeek Harness enables the bundle prepared by ShowAI; Kimi Work installs its registered local plugin.
+The five host-specific packages install six Skills and the local MCP launch configuration together. Run the Agent and ShowAI on the same computer and use the host's installer. ShowAI installs and enables the DeepSeek bundle through the Harness CLI; Kimi Work installs its registered local plugin.
 
 For another client, use **Settings → External Agent plugins** in ShowAI or generate the universal directory from source:
 
