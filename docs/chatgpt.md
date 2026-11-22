@@ -64,4 +64,8 @@ Pages save directly in the local ShowAI library with normal version and conflict
 
 Quitting the App closes its listener and connector. Enabled connections restore on the next App launch and retry transient failures. Choosing Disconnect disables restoration. Fixed hostnames retain full-library grants across normal restarts; changed temporary addresses require an updated client address or a newly exported plugin and renewed authorization. Refresh the client's MCP tools after an App update changes capabilities. If a save was interrupted, read the Page after reconnecting before retrying. Preview links expire after one hour; the saved Page remains the source.
 
+### Edit original pages in ChatGPT Work
+
+The desktop remote connection provides original-Page cards and the ShowAI conversation panel and global workbench on Work clients that expose these extensions. Open a saved card to edit its Page or Board. The global workbench lists the projects approved for this connection. Edits use the original Page and its current revision. A read-only grant opens the same Page in reading mode. Classic ChatGPT can display the inline MCP Apps when available. It uses the available links for additional navigation. [OpenAI extension support](https://github.com/openai/mcp-extensions/blob/main/docs/spec.md#platform-support)
+
 Provider references: [Cloudflare setup](https://developers.cloudflare.com/tunnel/get-started/), [Tailscale Serve](https://tailscale.com/docs/features/tailscale-serve), [Tailscale Funnel](https://tailscale.com/docs/features/tailscale-funnel). Separately administered cloud gateways are covered in [MCP deployment](cloud-mcp-deployment.md).

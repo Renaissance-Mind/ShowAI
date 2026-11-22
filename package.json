@@ -54,6 +54,7 @@
     "plugin:dsh": "node scripts/install-dsh-plugin.mjs",
     "package:runtime": "node scripts/package-runtime.mjs",
     "package:plugin": "node scripts/package-plugin.mjs",
+    "package:cursor": "node scripts/package-cursor-workbench.mjs",
     "release:notes": "node scripts/release-entry.mjs notes",
     "release:check": "node scripts/release-entry.mjs check",
     "release:assets": "node scripts/release-entry.mjs assets",

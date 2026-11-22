@@ -213,6 +213,7 @@ async function install(identity) {
       SHOWAI_HOME: binding.home,
       SHOWAI_RUNTIME_CONFIG: record,
       SHOWAI_HOST_DISPLAY: "model-html",
+      SHOWAI_LINKED_WORKBENCH: "1",
     },
   };
   await writeJson(join(plugin, ".mcp.json"), { mcpServers: { showai: server } });

@@ -64,4 +64,8 @@ Agent 工作流使用完整的 ShowAI Skill，通过「安装完整 Skills（可
 
 退出 App 会关闭监听和连接器；已启用的连接会在下次启动时自动恢复，网络暂时不可用时定期重试。主动点击「断开连接」会取消自动恢复。固定域名的完整内容库授权在正常重启后保留；临时地址变化后需要更新客户端地址或重新导出插件，并重新授权。App 更新改变工具能力后，刷新客户端的 MCP 工具。保存中断时，重连后先读取 Page 再决定是否重试。预览链接一小时后过期，正式 Page 持续保存。
 
+### 在 ChatGPT Work 编辑原页
+
+使用桌面远程连接时，支持插件扩展的 Work 客户端可打开原页卡片、对话里的 ShowAI 面板和全局工作台。在原页卡片中打开 Page 或 Board 后可继续编辑；全局工作台会列出本次连接已授权的项目。修改保存到同一页面并沿用版本检查。只读授权只能查看。经典 ChatGPT 按会话能力显示 MCP App，可通过可用链接打开额外内容。[OpenAI 扩展支持情况](https://github.com/openai/mcp-extensions/blob/main/docs/spec.md#platform-support)
+
 提供方参考：[Cloudflare 配置](https://developers.cloudflare.com/tunnel/get-started/)、[Tailscale Serve](https://tailscale.com/docs/features/tailscale-serve)、[Tailscale Funnel](https://tailscale.com/docs/features/tailscale-funnel)。独立管理的云网关见 [MCP 部署](cloud-mcp-deployment.zh-CN.md)。

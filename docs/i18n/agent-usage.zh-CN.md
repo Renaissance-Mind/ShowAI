@@ -102,7 +102,7 @@ showai template apply TEMPLATE_ID --project PROJECT --version VERSION --title "�
 
 ## 导出与发布准备
 
-新建或修改页面并保存成功后，按当前宿主适配交付。在提供 `card_present` 的 Codex 连接中，临时组件用 `show_component` 在聊天里展示，本轮创建、续改的页面默认用一组原页卡片交付。用户明确要求在对话中阅读正文或片段时，使用 `page_present`。其余连接按各自的宿主交付约定执行。
+临时可视化使用 `show_component`。当前连接提供 `card_present` 时，本轮新建或续改成功的页面用一组原页卡片交付。按宿主适配呈现卡片和打开编辑器。用户明确要求在对话中阅读正文或片段时，使用 `page_present`。没有卡片工具时，给出所在项目，并使用可用的阅读视图、文件或原页链接交付。
 
 ```sh
 showai export --project PROJECT --page PAGE --format html --components bundled --out ./report.html --json

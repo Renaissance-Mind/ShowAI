@@ -41,7 +41,7 @@ const sync = (
 export const connectionCommands: CommandDeclaration[] = [
   {
     command: "serve",
-    options: { port: text, "no-open": flag, "dsh-origin": hiddenText },
+    options: { port: text, "no-open": flag, "dsh-origin": hiddenText, "linked-workbench": hiddenText },
     help: ["serve [--home PATH] [--port PORT] [--no-open]"],
     async run(args) {
       requireCount(args, 1);
@@ -50,6 +50,7 @@ export const connectionCommands: CommandDeclaration[] = [
         home: option(args, "home"),
         port: option(args, "port"),
         dshOrigin: option(args, "dsh-origin"),
+        linkedWorkbench: option(args, "linked-workbench"),
         open: !args.options["no-open"],
         json: !!args.options.json,
       });
@@ -100,8 +101,10 @@ export const connectionCommands: CommandDeclaration[] = [
         : undefined;
       if (!option(args, "project")) {
         const { startLibraryMcp } = await import("../mcp-library");
-        const profile = process.env.SHOWAI_CODEX_WORKBENCH_PROFILE;
         const home = service.store.root;
+        const cursor = process.env.SHOWAI_CURSOR_IDE_WORKBENCH === "1";
+        const profile = cursor ? join(home, "local", "cursor-workbench")
+          : process.env.SHOWAI_CODEX_WORKBENCH_PROFILE;
         const qoderProfile = process.env.SHOWAI_QODER_WORKBENCH === "1"
           ? join(home, "local", "qoder-workbench")
           : undefined;
@@ -113,7 +116,7 @@ export const connectionCommands: CommandDeclaration[] = [
               }),
               service,
               presentationDirectory,
-              profile ? "codex" : "qoder",
+              cursor ? "cursor" : profile ? "codex" : "qoder",
             )
           : process.env.SHOWAI_ANTIGRAVITY_WORKBENCH === "1"
             ? (await import("../antigravity-workbench")).antigravityWorkbenchConnection(
@@ -125,7 +128,13 @@ export const connectionCommands: CommandDeclaration[] = [
                     key,
                   }),
               )
-            : undefined;
+            : process.env.SHOWAI_LINKED_WORKBENCH === "1"
+              ? (await import("../linked-workbench")).linkedWorkbenchConnection(
+                  service,
+                  async () => (await loadBrowser()).startLinkedWorkbenchBrowser(home),
+                  presentationDirectory,
+                )
+              : undefined;
         await startLibraryMcp({ root: home, presentationDirectory, ...workbench });
       } else {
         const { startMcp } = await import("../mcp");

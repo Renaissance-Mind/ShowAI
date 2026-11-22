@@ -105,7 +105,8 @@ ChatGPT 网页通过公网 HTTPS 和 OAuth 连接。Grok Bot 可选同一 tailne
 
 | 宿主      | 生成安装包                                                                      | 安装                                                                                                                         |
 | --------- | ------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
-| Cursor    | `npm run package:plugin -- --host cursor --mcp local --out showai-cursor`       | 把生成的目录放到 `~/.cursor/plugins/local/`，重载 Cursor 窗口，在新的本机对话使用插件。                                      |
+| Cursor Agents | `npm run package:plugin -- --host cursor --mcp local --out showai-cursor`       | 把生成的目录放到 `~/.cursor/plugins/local/`，重载窗口，并新建本机对话。 |
+| Cursor IDE | `npm run package:cursor -- --out showai-workbench.vsix` | 在「扩展」中选择「从 VSIX 安装」。扩展已包含 Cursor Agent 插件。 |
 | Qoder     | `npm run package:plugin -- --host qoder --mcp local --out showai-qoder.zip`     | 在 Qoder 桌面版打开「扩展 → 插件 → 添加插件 → 导入插件」，选择 ZIP。                                                         |
 | WorkBuddy | `npm run package:plugin -- --host workbuddy --mcp local --out showai-workbuddy` | 将生成的目录注册为 WorkBuddy 本地插件市场。也可以从 ShowAI 复制本机 MCP 配置，在「连接器 → 自定义连接器 → 添加 MCP」中填写。 |
 
@@ -121,11 +122,18 @@ CODEBUDDY_CONFIG_DIR="$HOME/.workbuddy" node "$workbuddy_cli" plugin install sho
 
 | 宿主 | 对话中 | 保存的页面与工作台 |
 | --- | --- | --- |
-| Cursor | 对话中展示可交互的 MCP App | Agent 可通过 MCP 读取和续改原页；用户在 ShowAI 中直接编辑，也可以在 Cursor 的 Browser 面板打开导出的 HTML。 |
-| Qoder | 对话中展示可交互的 MCP App | 本机插件在「更多」中提供 ShowAI 全局工作台，在任务的应用面板提供工作台。可以让 Agent 在右侧编辑器打开原页，也可以自行选择工作台。 |
-| WorkBuddy | 对话中展示可交互的 MCP App | Agent 可通过 MCP 读取和续改原页；用户可在 ShowAI 中直接编辑。 |
+| Cursor Agents | 可交互的 MCP App 和原页卡片 | 从卡片在浏览器打开原页，或复制实时编辑链接到 Cursor Browser。 |
+| Cursor IDE | 随包 Agent 插件提供 MCP App 和原页卡片 | 从命令面板运行「ShowAI：打开工作台」，或打开 `.showai-ref`，在 IDE 标签页编辑原页。 |
+| Qoder | 可交互的 MCP App 和原页卡片 | 从「更多 → ShowAI」打开全局工作台。在任务里让 Agent 将原页打开到右侧。聊天里的卡片指向 ShowAI App。 |
+| WorkBuddy | 可交互的 MCP App 和原页卡片 | WorkBuddy 提供内置浏览器时，可在里面打开原页编辑链接。 |
 
 Qoder 的工作台入口需要本机插件和支持 Qoder 工作台的已登记 ShowAI 运行时。旧运行时可能仍提供基础 MCP 工具，但不会出现工作台入口；使用前需构建并登记当前源码运行时，或更新已安装的运行时。远程 MCP 连接以实际提供的展示能力为准。WorkBuddy 使用其原生插件清单和 MCP 配置，除检查插件管理页外，也需要在新任务中确认工具可用。
+
+### Kimi Code 和 TRAE
+
+在 ShowAI「设置 → 外部 Agent 插件」准备关联当前内容库的安装包。**Kimi Code** 可以添加带 `kimi.plugin.json` 的插件，也可以把复制的 MCP 配置合并到 `~/.kimi-code/mcp.json`。桌面版可在文件预览打开 HTML，并在任务右侧的 Browser 编辑原页。CLI 会交付文件和编辑链接。[Kimi Code 插件说明](https://www.kimi.com/code/docs/kimi-code-cli/customization/plugins.html)
+
+**TRAE IDE** 在扩展市场导入 VSIX，在 MCP 设置中加入复制的本机配置。用命令面板的「ShowAI：打开工作台」浏览项目，或打开 `.showai-ref` 在 IDE 中编辑原页。从源码生成 VSIX 的命令为 `npm run package:cursor -- --host trae --out showai-trae.vsix`。[TRAE 扩展市场](https://docs.trae.cn/ide_manage-extensions) · [TRAE MCP 配置](https://docs.trae.cn/ide_add-mcp-servers)
 
 ## 宿主包与公共源码
 

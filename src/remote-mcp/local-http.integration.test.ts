@@ -11,6 +11,8 @@ import { REMOTE_FETCH } from "../core/dataset-sources";
 import { withDatasetAccess } from "../core/dataset-access";
 import { localLibraryPolicy } from "./local-library";
 import { parameterComponent } from "../test/parameter-component";
+import { chromium } from "playwright-core";
+import { readingBrowserExecutable } from "../agent/reading-renderer";
 
 let directory: string;
 let service: AgentService;
@@ -149,6 +151,7 @@ beforeAll(async () => {
   http = await startMcpHttpServer({
     port: 0,
     stateDirectory: join(directory, "state"),
+    workbenchAssetsDirectory: join(process.cwd(), "dist-agent/codex-workbench-assets"),
     local: authorizationOptions(),
   });
   expect(REMOTE_FETCH.publicAddressesOnly).toBe(original);
@@ -158,6 +161,145 @@ afterAll(async () => {
   await http?.close();
   await rm(directory, { recursive: true, force: true });
 });
+
+test("the remote workbench opens only approved Pages and saves revisions and drafts under its grant", async () => {
+  const original = await service.createPage(selected, { title: "Remote workbench original" });
+  const privatePage = await service.createPage(hidden, { title: "Unshared workbench Page" });
+  const connection = await authorize();
+  const editor = await client(connection.access_token);
+  const call = async (c: Client, name: string, args: Record<string, unknown>) =>
+    c.callTool({ name, arguments: args });
+  const target = { projectId: selected, pageId: original.document.id };
+  const { tools } = await editor.listTools();
+  expect(tools.find(tool => tool.name === "workbench_open_global")?._meta).toMatchObject({
+    "openai/ui": { entrypoints: [{ type: "global" }] },
+  });
+  expect(tools.find(tool => tool.name === "workbench_open_page")?._meta).toMatchObject({
+    "openai/ui": { entrypoints: [{ type: "thread" }] },
+  });
+  const launched = await call(editor, "workbench_open_global", {});
+  expect(launched.isError, JSON.stringify(launched.content)).not.toBe(true);
+  expect(launched._meta?.showaiWorkbench).toMatchObject({ bundle: { entry: expect.any(String) } });
+  const cards = await call(editor, "card_present", target);
+  expect(cards.structuredContent).toMatchObject({ data: { ...target, title: original.document.title } });
+  const denied = await call(editor, "card_present", {
+    ...target,
+    additionalTargets: [{ projectId: hidden, pageId: privatePage.document.id }],
+  });
+  expect(denied.isError).toBe(true);
+  expect(JSON.stringify(denied)).not.toContain("Unshared workbench Page");
+  const response = await call(editor, "workbench_remote_read", { action: "pages:get", projectId: selected, args: target });
+  const page = response._meta?.showaiWorkbenchData as { data: typeof original & { readOnly: boolean } };
+  expect(page.data.document.id).toBe(target.pageId);
+  expect(page.data.readOnly).toBe(false);
+  const changed = { ...page.data.document, title: "Saved from remote editor" };
+  const draft = await call(editor, "workbench_remote_write", {
+    action: "drafts:save", projectId: selected, args: {
+      input: {
+        kind: "page", resourceId: target.pageId, clientId: "workbench-test", sequence: 1,
+        title: changed.title, content: changed, baseRevision: page.data.revision,
+      },
+    },
+  });
+  expect(draft.isError, JSON.stringify(draft.content)).not.toBe(true);
+  const draftData = (draft._meta?.showaiWorkbenchData as { data: { id: string; generation: string } }).data;
+  const anotherGrant = await authorize("projects.read");
+  const reader = await client(anotherGrant.access_token);
+  const readOnly = await call(reader, "workbench_remote_read", { action: "pages:get", projectId: selected, args: target });
+  expect(readOnly._meta?.showaiWorkbenchData).toMatchObject({ data: { readOnly: true } });
+  const foreignDraft = await call(reader, "workbench_remote_read", { action: "drafts:read", args: { id: draftData.id } });
+  expect(foreignDraft.isError).toBe(true);
+  const save = {
+    action: "pages:save", projectId: selected, args: {
+      ...target, document: changed, baseHash: page.data.hash, baseRevision: page.data.revision,
+    },
+  };
+  expect((await call(reader, "workbench_remote_write", save)).isError).toBe(true);
+  const saved = await call(editor, "workbench_remote_write", save);
+  expect(saved.isError, JSON.stringify(saved.content)).not.toBe(true);
+  const persisted = await service.store.readPage(selected, target.pageId);
+  expect(persisted.document.title).toBe(changed.title);
+  expect(persisted.revision).not.toBe(original.revision);
+  const finished = await call(editor, "workbench_remote_write", {
+    action: "drafts:complete", args: { ...draftData, revision: persisted.revision },
+  });
+  expect(finished._meta?.showaiWorkbenchData).toMatchObject({ ok: true, data: true });
+});
+
+test("the remote MCP App card opens the real editor and persists an edit", async () => {
+  const original = await service.createPage(selected, { title: "Remote card original" });
+  const other = await service.createPage(selected, { title: "Other card" });
+  const editor = await client((await authorize()).access_token);
+  const tools = (await editor.listTools()).tools;
+  const resourceUri = (tools.find(tool => tool.name === "card_present")?._meta?.ui as { resourceUri: string }).resourceUri;
+  const resource = (await editor.readResource({ uri: resourceUri })).contents[0];
+  if (!("text" in resource)) throw new Error("The ShowAI card did not return HTML.");
+  const cards = await editor.callTool({ name: "card_present", arguments: {
+    projectId: selected, pageId: other.document.id,
+    additionalTargets: [{ projectId: selected, pageId: original.document.id }],
+  } });
+  const browser = await chromium.launch({ executablePath: await readingBrowserExecutable() });
+  try {
+    const page = await browser.newPage({ locale: "en-US", viewport: { width: 1230, height: 810 } });
+    const failures: Array<{ name: string; action: unknown; content: unknown }> = [];
+    await page.exposeFunction("relayTool", async (params: { name: string; arguments: Record<string, unknown> }) => {
+      const result = await editor.callTool(params);
+      if (result.isError) failures.push({ name: params.name, action: params.arguments.action, content: result.content });
+      return result;
+    });
+    const hostUrl = http.url + "/workbench-test";
+    await page.route(hostUrl, route => route.fulfill({ contentType: "text/html", body:
+      '<iframe title="ShowAI MCP App" style="width:100%;height:780px;border:0"></iframe>',
+    }));
+    await page.goto(hostUrl);
+    await page.evaluate(({ html, cards }) => {
+      const frame = document.querySelector("iframe")!;
+      let currentMode = "inline";
+      const context = () => ({ displayMode: currentMode, availableDisplayModes: ["inline", "fullscreen"], locale: "en-US" });
+      const send = (value: object) => frame.contentWindow!.postMessage({ jsonrpc: "2.0", ...value }, "*");
+      const relay = (window as unknown as { relayTool(params: unknown): Promise<unknown> }).relayTool;
+      window.addEventListener("message", async (event) => {
+        const input = event.data;
+        if (event.source !== frame.contentWindow || input?.jsonrpc !== "2.0") return;
+        if (input.method === "ui/initialize") send({ id: input.id, result: {
+          protocolVersion: "2026-01-26", hostInfo: { name: "MCP App test host", version: "1" },
+          hostCapabilities: { serverTools: {} }, hostContext: context(),
+        } });
+        if (input.method === "ui/notifications/initialized") send({ method: "ui/notifications/tool-result", params: cards });
+        if (input.method === "tools/call") {
+          try {
+            send({ id: input.id, result: await relay(input.params) });
+          } catch (error) {
+            send({ id: input.id, error: { code: -32603, message: String(error) } });
+          }
+        }
+        if (input.method === "ui/request-display-mode") {
+          currentMode = input.params.mode;
+          send({ id: input.id, result: { displayMode: currentMode } });
+          send({ method: "ui/notifications/host-context-changed", params: context() });
+        }
+      });
+      frame.srcdoc = html as string;
+    }, { html: resource.text, cards });
+    const app = page.frameLocator('iframe[title="ShowAI MCP App"]');
+    await app.getByRole("heading", { name: original.document.title, exact: true }).waitFor({ timeout: 8_000 });
+    await app.locator(".showai-card").filter({ hasText: original.document.title })
+      .locator(".showai-card-open").click({ timeout: 8_000 });
+    const title = app.getByRole("textbox", { name: "Page title", exact: true }).and(app.locator("input"));
+    await title.waitFor({ timeout: 15_000 }).catch(async error => {
+      throw new Error(`Remote editor did not load.\n${await app.locator("body").ariaSnapshot()}`, { cause: error });
+    });
+    expect(await title.inputValue()).toBe(original.document.title);
+    await title.fill("Edited in the remote MCP App");
+    await title.press("Tab");
+    await expect.poll(async () => (await service.store.readPage(selected, original.document.id)).document.title,
+      { timeout: 8_000 }).toBe("Edited in the remote MCP App");
+    expect((await service.store.readPage(selected, other.document.id)).revision).toBe(other.revision);
+    expect(failures).toEqual([]);
+  } finally {
+    await browser.close();
+  }
+}, 45_000);
 
 test("local OAuth protects projects and saves real pages directly to the desktop library", async () => {
   const anonymous = await client();
@@ -272,8 +414,7 @@ test("local OAuth protects projects and saves real pages directly to the desktop
     ).isError,
   ).toBe(true);
   canWrite = true;
-  const grants = http.authorization.connections();
-  http.authorization.revoke(grants[0].id);
+  http.authorization.revoke(http.authorization.verify(token.access_token, "projects.read").id);
   expect(
     (await c.callTool({ name: "projects_list", arguments: {} })).isError,
   ).toBe(true);

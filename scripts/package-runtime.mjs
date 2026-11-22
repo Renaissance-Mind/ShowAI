@@ -1,6 +1,7 @@
 import { frontendManifest } from "./build-info.mjs";
 import { trimEmbeddedGit } from "./trim-embedded-git.mjs";
 import "./package-plugin.mjs";
+import { compileCursorExtension } from "../src/plugin/cursor-workbench-package.mjs";
 import { build } from "esbuild";
 import {
   copyFile,
@@ -25,6 +26,10 @@ await cp(join(root, "plugins/showai"), join(runtime, "assets/agent-plugin"), {
   recursive: true,
   verbatimSymlinks: true,
 });
+await writeFile(
+  join(runtime, "assets/agent-plugin/host-adapters/cursor-ide/extension.cjs"),
+  await compileCursorExtension(join(root, "plugins/showai")),
+);
 await rm(join(runtime, "assets/kimi-plugin"), { recursive: true, force: true });
 await cp(join(root, "plugins/showai-kimi"), join(runtime, "assets/kimi-plugin"), {
   recursive: true,

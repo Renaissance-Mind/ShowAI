@@ -14,6 +14,7 @@ const hostManifestPaths = {
   cursor: ".cursor-plugin/plugin.json",
   qoder: ".qoder-plugin/plugin.json",
   workbuddy: ".workbuddy-plugin/plugin.json",
+  "kimi-code": "kimi.plugin.json",
 };
 const hostPluginRoots = {
   cursor: "${CURSOR_PLUGIN_ROOT}",
@@ -57,8 +58,9 @@ async function mcpConnection(mcp, runtimeConfig, auth, host) {
       command: "node",
       args: ["./mcp/launch.mjs"],
       env: {
-        SHOWAI_HOST_DISPLAY: "mcp-app",
+        SHOWAI_HOST_DISPLAY: host === "kimi-code" ? "fragment-file" : "mcp-app",
         ...(host === "qoder" && { SHOWAI_QODER_WORKBENCH: "1" }),
+        ...(host !== "qoder" && { SHOWAI_LINKED_WORKBENCH: "1" }),
         ...binding,
       },
     };
@@ -161,10 +163,18 @@ export async function universalPluginFiles(
   };
   const json = (value) => Buffer.from(JSON.stringify(value, null, 2) + "\n");
   const files = new Map();
-  if (host !== "workbuddy") files.set("plugin.json", json(manifest));
+  if (host !== "workbuddy" && host !== "kimi-code") files.set("plugin.json", json(manifest));
   if (appId)
     files.set(".app.json", json({ apps: { [appAlias]: { id: appId } } }));
-  if (host) {
+  if (host === "kimi-code") {
+    files.set(hostManifestPaths[host], json({
+      name, version: manifest.version, description, skills: "./skills/",
+      interface: { displayName },
+      ...(connection && { mcpServers: { showai: connection.type === "stdio" ? {
+        command: connection.command, args: connection.args, cwd: "./", env: connection.env,
+      } : { url: connection.url } } }),
+    }));
+  } else if (host) {
     files.set(
       hostManifestPaths[host],
       json({
@@ -197,7 +207,7 @@ export async function universalPluginFiles(
             args: [`${hostPluginRoots.cursor}/mcp/launch.mjs`],
           }
         : connection;
-    if (host !== "workbuddy")
+    if (host !== "workbuddy" && host !== "kimi-code")
       files.set(
         "mcp.json",
         json({ $schema: MCP_SCHEMA, mcpServers: { [serverName]: core } }),
@@ -293,7 +303,7 @@ export async function universalPluginFiles(
   return { name, version: manifest.version, files };
 }
 
-function archive(entries) {
+export function archive(entries) {
   const locals = [],
     central = [];
   let offset = 0;

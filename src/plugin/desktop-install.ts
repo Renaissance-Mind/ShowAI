@@ -541,6 +541,7 @@ export class DesktopPluginInstaller {
       SHOWAI_HOME: runtime.home,
       SHOWAI_RUNTIME_CONFIG: record,
       SHOWAI_HOST_DISPLAY: HOST_PROFILES[host],
+      ...(host === "claude" && { SHOWAI_LINKED_WORKBENCH: "1" }),
       ...(host === "antigravity" && {
         SHOWAI_ANTIGRAVITY_WORKBENCH: "1",
       }),

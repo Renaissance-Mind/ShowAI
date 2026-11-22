@@ -34,7 +34,7 @@ description: 在聊天中用原创 HTML 直接展示一至五个可交互的图�
 <!-- showai-host-delivery:start -->
 
 - 原创 HTML 的展示工具标记为预加载。若用户的 Claude Code 设置启用了强制延迟加载，可用 ToolSearch 一次选择所需工具。按当前 HTML 展示工具的调用要求，将 `show_component` 以 `delivery:"auto"` 返回的 `delivery.compact` 原样交给它。
-- 新作品保存后用 `page_present`，按 `conversation.next` 展示 `conversation.fragment`，给出 `openUrl`。续改说明所改内容、项目与原页链接。
+- 新建或续改保存成功后用 `card_present`。有 HTML 展示工具时把卡片 `delivery.compact` 原样交给它，同时提供 `targets` 里的原页入口。只有终端时给出原页链接和可打开的 `delivery.html`。用户明确要求阅读正文时用 `page_present` 并按 `conversation.next` 交付。
 - 收到 `image`、`too-large`、`unavailable` 或阅读器加载失败时查完整宿主适配。
 
 <!-- showai-host-delivery:end -->
@@ -43,7 +43,7 @@ description: 在聊天中用原创 HTML 直接展示一至五个可交互的图�
 
 ## 之后要保存
 
-用户要保留当前 HTML 成品时，保留对应的 HTML 和交互，按请求交付文件。已展示的目录组件可以用原有数据[保存到页面](references/catalog.md#保存到页面)。需要整理为完整文档时按 show-document 处理。
+用户要保留 HTML 成品时，沿用这次的源码和交互，按请求交付文件。已展示的目录组件可以用原有数据[保存到页面](references/catalog.md#保存到页面)。用户明确要写入 ShowAI Page 时，按 show-document 核对页面身份、使用当前运行时支持的页面内容格式并验证保存回执。只有生成 HTML 文件时，报告交付的是文件。
 
 用户明确要“注册”“做成组件以后换数据用”时，取回选中那一项的原始 HTML。本机读回回执的 source 文件；HTTP 可以按 artifactId 用 presentation_source 分块读回。缓存过期时沿用本次聊天中相同的工具输入。跨聊天且无法取回源码时，请用户提供原片段或含源码的展示回执。保留图形、样式和交互，把需要替换的业务数据提成参数，由 HTML 读取 `window.showaiData`。原始数据作为 defaultData，准备一组有真实含义且能观察出差异的替代数据。
 

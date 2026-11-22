@@ -24,6 +24,7 @@ test("local host packages keep their native format and the selected library", as
   try {
     for (const [host, manifest, mcpConfig] of [
       ["kimi", "kimi.plugin.json", "kimi.plugin.json"],
+      ["kimi-code", "kimi.plugin.json", "kimi.plugin.json"],
       ["cursor", ".cursor-plugin/plugin.json", "mcp.json"],
       ["workbuddy", ".workbuddy-plugin/marketplace.json", ".mcp.json"],
       ["qoder", ".qoder-plugin/plugin.json", ".mcp.json"],
@@ -49,6 +50,18 @@ test("local host packages keep their native format and the selected library", as
       );
       expect(await read("mcp/launch.mjs")).toContain("SHOWAI_RUNTIME_CONFIG");
     }
+    const cursor = await prepareLocalPlugin("cursor-ide", options);
+    const vsix = unzipSync(await readFile(cursor.path));
+    const manifest = JSON.parse(Buffer.from(vsix["extension/package.json"]).toString());
+    expect(manifest.contributes.customEditors[0].selector).toEqual([{ filenamePattern: "*.showai-ref" }]);
+    expect(JSON.parse(Buffer.from(vsix["extension/binding.json"]).toString())).toMatchObject({ library: home });
+    const cursorMcp = JSON.parse(Buffer.from(vsix["extension/agent-plugins/showai-cursor-ide/mcp.json"]).toString());
+    expect(cursorMcp.mcpServers["showai-cursor-ide"].env).toMatchObject({
+      SHOWAI_CURSOR_WORKBENCH_LINK: "1", SHOWAI_HOME: home,
+    });
+    const trae = unzipSync(await readFile((await prepareLocalPlugin("trae", options)).path));
+    expect(trae["extension/extension.cjs"]).toEqual(vsix["extension/extension.cjs"]);
+    expect(Object.keys(trae).some(path => path.startsWith("extension/agent-plugins/"))).toBe(false);
     expect(JSON.parse(launchSnippet("opencode", cli))).toEqual({
       mcp: {
         showai: {
@@ -61,4 +74,4 @@ test("local host packages keep their native format and the selected library", as
   } finally {
     await rm(root, { recursive: true, force: true });
   }
-});
+}, 30_000);

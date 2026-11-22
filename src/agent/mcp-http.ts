@@ -50,6 +50,7 @@ import { serverBaseUrl } from "../sync/server-url";
 import { FileStore } from "../core/store";
 import type { CloudBrowserCheck } from "./cloud-browser-check";
 import { McpCallLog, type McpLogResponse } from "./mcp-call-log";
+import { registerRemoteWorkbench, remoteWorkbenchGlobalCall } from "./remote-workbench";
 
 const writeTools = new Set([
   ...organizationWriteTools,
@@ -64,6 +65,7 @@ const writeTools = new Set([
   "catalog_version",
   "page_merge_save",
   "workspace_resolve",
+  "workbench_remote_write",
 ]);
 const localOnly = new Set([
   "publication_prepare",
@@ -123,6 +125,7 @@ export interface McpHttpOptions {
   publicUrl: string;
   syncServers?: string[];
   widgetDomain?: string;
+  workbenchAssetsDirectory?: string;
   allowedHosts?: string[];
   instanceId?: string;
   local?: LocalMcpAuthorization & {
@@ -158,6 +161,7 @@ export async function createMcpHttpApp(options: McpHttpOptions) {
     );
   const origin = url.origin,
     state = resolve(options.stateDirectory);
+  const workbenchChoices = new Map<string, { index: number; expires: number }>();
   const callLog = new McpCallLog({
     transport: "http",
     directory: options.local
@@ -734,6 +738,10 @@ export async function createMcpHttpApp(options: McpHttpOptions) {
           }
         },
       );
+    if (options.local && options.workbenchAssetsDirectory)
+      registerRemoteWorkbench(server, {
+        origin, assetsDirectory: options.workbenchAssetsDirectory, local: options.local, grant, choices: workbenchChoices,
+      });
     const transport = new WebStandardStreamableHTTPServerTransport({
       sessionIdGenerator: undefined,
       enableJsonResponse: true,
@@ -1084,6 +1092,11 @@ export async function createMcpHttpApp(options: McpHttpOptions) {
                     ),
                   );
                 if (name === "projects_list" || name === "project_create")
+                  return execute(request, body, undefined, grant);
+                if (
+                  options.local && options.workbenchAssetsDirectory &&
+                  remoteWorkbenchGlobalCall(name, params?.arguments)
+                )
                   return execute(request, body, undefined, grant);
                 if (
                   (name === "page_create" || name === "page_save") &&

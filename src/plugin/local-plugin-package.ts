@@ -16,6 +16,7 @@ import {
 } from "../agent/runtime";
 import { withLibraryLock } from "../core/library-lock";
 import { publishPluginDirectory } from "./host-package.mjs";
+import { cursorWorkbenchArchive } from "./cursor-workbench-package.mjs";
 import {
   universalPluginArchive,
   universalPluginFiles,
@@ -33,7 +34,10 @@ export async function prepareLocalPlugin(
 ) {
   if (
     host !== "kimi" &&
+    host !== "kimi-code" &&
     host !== "cursor" &&
+    host !== "cursor-ide" &&
+    host !== "trae" &&
     host !== "qoder" &&
     host !== "workbuddy"
   )
@@ -61,6 +65,14 @@ export async function prepareLocalPlugin(
             SHOWAI_RUNTIME_CONFIG: runtimeConfig,
           });
           await writeFile(path, JSON.stringify(manifest, null, 2) + "\n");
+        } else if (host === "cursor-ide" || host === "trae") {
+          const file = name + ".vsix";
+          const bytes = await cursorWorkbenchArchive(options.pluginRoot(), {
+            runtimeConfig, host: host === "trae" ? "trae" : "cursor",
+          });
+          await writeFile(join(staging, file), bytes);
+          await rename(join(staging, file), join(root, file));
+          return { path: join(root, file) };
         } else {
           const config = {
             host,

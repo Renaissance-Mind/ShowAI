@@ -46,7 +46,7 @@ for (let i = 0; i < args.length; i += 2) {
     !args[i + 1]
   )
     throw new Error(
-      "Usage: package-plugin.mjs [--out NEW_DIRECTORY_OR_ZIP [--host cursor|qoder|workbuddy] [--mcp local|MCP_URL] [--runtime-config ABSOLUTE_PATH] [--mcp-auth oauth|none] [--mcp-url MANUAL_SETUP_HINT] [--name PLUGIN_NAME] [--display-name NAME] [--chatgpt-app asdk_app_ID]]",
+      "Usage: package-plugin.mjs [--out NEW_DIRECTORY_OR_ZIP [--host cursor|qoder|workbuddy|kimi-code] [--mcp local|MCP_URL] [--runtime-config ABSOLUTE_PATH] [--mcp-auth oauth|none] [--mcp-url MANUAL_SETUP_HINT] [--name PLUGIN_NAME] [--display-name NAME] [--chatgpt-app asdk_app_ID]]",
     );
   settings[args[i]] = args[i + 1];
 }
@@ -154,7 +154,7 @@ await writeFile(
         showai: {
           command: "node",
           args: ["${CLAUDE_PLUGIN_ROOT}/mcp/launch.mjs"],
-          env: { SHOWAI_HOST_DISPLAY: "model-html" },
+          env: { SHOWAI_HOST_DISPLAY: "model-html", SHOWAI_LINKED_WORKBENCH: "1" },
         },
       },
     },

@@ -6,7 +6,8 @@
         "${CLAUDE_PLUGIN_ROOT}/mcp/launch.mjs"
       ],
       "env": {
-        "SHOWAI_HOST_DISPLAY": "model-html"
+        "SHOWAI_HOST_DISPLAY": "model-html",
+        "SHOWAI_LINKED_WORKBENCH": "1"
       }
     }
   }

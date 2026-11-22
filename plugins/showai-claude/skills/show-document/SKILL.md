@@ -180,7 +180,7 @@ description: 创作或修改要保存的作品：可交互报告、讲解页面�
 <!-- showai-host-delivery:start -->
 
 - 原创 HTML 的展示工具标记为预加载。若用户的 Claude Code 设置启用了强制延迟加载，可用 ToolSearch 一次选择所需工具。按当前 HTML 展示工具的调用要求，将 `show_component` 以 `delivery:"auto"` 返回的 `delivery.compact` 原样交给它。
-- 新作品保存后用 `page_present`，按 `conversation.next` 展示 `conversation.fragment`，给出 `openUrl`。续改说明所改内容、项目与原页链接。
+- 新建或续改保存成功后用 `card_present`。有 HTML 展示工具时把卡片 `delivery.compact` 原样交给它，同时提供 `targets` 里的原页入口。只有终端时给出原页链接和可打开的 `delivery.html`。用户明确要求阅读正文时用 `page_present` 并按 `conversation.next` 交付。
 - 收到 `image`、`too-large`、`unavailable` 或阅读器加载失败时查完整宿主适配。
 
 <!-- showai-host-delivery:end -->
@@ -189,4 +189,4 @@ description: 创作或修改要保存的作品：可交互报告、讲解页面�
 
 ## 从对话展示升级
 
-用户在 [show-visual](../show-visual/SKILL.md) 展示之后只想保存那几个组件时，按 show-visual 的“之后要保存”原样写入，不必走制作流程。要把多次展示整理成一份有结构的文档时，从理解意图开始走完整流程，已有展示的数据作为材料，组件按设计稿取舍。
+用户只想保存刚展示的目录组件时，按 [show-visual](../show-visual/SKILL.md) 的「之后要保存」，把同一组件和数据写入 Page。原创 HTML 文件本身按原格式交付。用户要把它的内容整理到 Page 时，仍须用实际页面格式保存，确认原页位置与保存回执。要把多次展示整理成完整文档时，从理解意图开始，沿用已有展示的数据。

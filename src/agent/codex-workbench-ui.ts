@@ -20,7 +20,7 @@ export function codexWorkbenchHtml(
   entrypoint?: "file" | "card" | "open",
   icon?: string,
   hasGlobalEntrypoint = false,
-  host: "codex" | "qoder" = "codex",
+  host: "codex" | "qoder" | "linked" | "cursor" | "remote" = "codex",
 ) {
   const useCard = entrypoint === "card" || entrypoint === "open";
   const card = useCard
@@ -49,11 +49,18 @@ ${card}
   const translations = ${JSON.stringify(messages.catalogs)};
   const hasGlobalEntrypoint = ${hasGlobalEntrypoint};
   const qoder = ${host === "qoder"};
+  const linked = ${host === "linked"};
+  const cursor = ${host === "cursor"};
+  const remote = ${host === "remote"};
+  const editorBridge = cursor && typeof acquireVsCodeApi === "function" ? acquireVsCodeApi() : null;
+  const scriptNonce = document.currentScript?.nonce;
+  const send = value => editorBridge ? editorBridge.postMessage(value) : parent.postMessage(value, "*");
   const messageExtension = ${JSON.stringify(host === "qoder" ? "qoder/message" : "openai/message")};
+  const deepLinkExtension = ${JSON.stringify(host === "qoder" ? "qoder/deepLink" : "openai/deepLink")};
   const chunkBytes = ${workbenchChunkBytes};
   const useFileEntrypoint = ${entrypoint === "file"};
   const usePageCard = ${useCard};
-  const directEditor = ${entrypoint === "open"};
+  const directEditor = ${entrypoint === "open" || host === "remote" && entrypoint === "card"};
   const referenceLimit = ${codexPageReferenceMaxLength};
   let mode = ${JSON.stringify(mode) ?? "null"};
   const status = document.getElementById("showai-launch");
@@ -88,7 +95,7 @@ ${card}
     retry.hidden = key !== "failed" || usePageCard || !!window.showai ||
       (useFileEntrypoint && !fileInput) || (!launch && !capabilities.serverTools);
     external.textContent = t("openInBrowser");
-    external.hidden = key !== "failed" || !launchUrl;
+    external.hidden = remote || key !== "failed" || !launchUrl;
     status.hidden = false;
   }
 
@@ -100,7 +107,7 @@ ${card}
         reject(new Error(t("timedOut")));
       }, 8000);
       pending.set(id, { resolve, reject, timeout });
-      parent.postMessage({ jsonrpc: "2.0", id, method, params }, "*");
+      send({ jsonrpc: "2.0", id, method, params });
     });
   }
 
@@ -115,7 +122,7 @@ ${card}
 
   function currentUrl() {
     const url = new URL(launch);
-    const path = context["openai/deepLink"]?.url;
+    const path = context[deepLinkExtension]?.url;
     if (referencePage) {
       url.searchParams.set("project", referencePage.projectId);
       url.searchParams.set("page", referencePage.pageId);
@@ -144,6 +151,7 @@ ${card}
   }
 
   async function openWorkbench(projectId, pageId, blockId) {
+    if (editorBridge) return request("showai/open-workbench", { projectId, pageId, blockId });
     if (!hasGlobalEntrypoint) throw new Error(t("cannotOpenWorkbench"));
     return callWorkbench("workbench_open_destination", {
       destination: "workbench", projectId, pageId, ...(blockId && { blockId }),
@@ -151,6 +159,7 @@ ${card}
   }
 
   async function openPageTab({ projectId, pageId, blockId }) {
+    if (editorBridge) return request("showai/open-page", { projectId, pageId, blockId });
     if (!capabilities.experimental?.["openai/files"] || !capabilities.serverTools)
       throw new Error(t("cannotOpenPageTab"));
     const path = await callWorkbench("workbench_side_file", { projectId, pageId, ...(blockId && { blockId }) });
@@ -217,6 +226,29 @@ ${card}
   }
 
   async function workbenchRequest(route, args, client) {
+    if (remote) {
+      if (route === "locale") return { ok: true, data: { locale } };
+      if (route !== "invoke") return { ok: false, error: { code: "INVALID_DATA", message: t("unavailable") } };
+      const { action, args: input = {} } = args;
+      const { projectId = input.input?.projectId, ...rest } = input;
+      const write = [
+        "folders:create", "folders:rename", "pages:create", "pages:save",
+        "pages:duplicate", "pages:rename", "pages:pin", "pages:move", "pages:markSeen",
+        "page:mergeSave", "drafts:save", "drafts:remove", "drafts:complete",
+      ].includes(action);
+      try {
+        const payload = resultPayload(await request("tools/call", {
+          name: write ? "workbench_remote_write" : "workbench_remote_read",
+          arguments: { action, projectId, args: rest },
+        }));
+        if (payload?.isError && payload.structuredContent?.error)
+          return { ok: false, error: payload.structuredContent.error };
+        if (!payload?._meta?.showaiWorkbenchData) throw new Error(t("unavailable"));
+        return payload._meta.showaiWorkbenchData;
+      } catch (error) {
+        return { ok: false, error: { code: "INVALID_DATA", message: error.message } };
+      }
+    }
     const input = { route, args, client };
     if (!qoder) return callWorkbench("workbench_request", input);
     const text = JSON.stringify(input);
@@ -301,6 +333,7 @@ ${card}
     if (Object.keys(imports).length) {
       const map = document.createElement("script");
       map.type = "importmap";
+      if (scriptNonce) map.nonce = scriptNonce;
       map.textContent = JSON.stringify({ imports });
       document.head.appendChild(map);
     }
@@ -320,9 +353,10 @@ ${card}
     const descriptor = (payload?._meta ?? payload)?.showaiWorkbench;
     const url = typeof descriptor?.url === "string" ? URL.parse(descriptor.url) : null;
     const targetMode = url?.searchParams.get("codexMode");
-    if (!url || url.protocol !== "http:" || url.hostname !== "127.0.0.1" ||
-        !/^[0-9a-f]{64}$/.test(url.searchParams.get("codexWorkbench") || "") ||
-        (targetMode !== "global" && targetMode !== "thread")) return null;
+    if (!url || (targetMode !== "global" && targetMode !== "thread")) return null;
+    const loopback = url.protocol === "http:" && url.hostname === "127.0.0.1";
+    if (remote ? !loopback && url.protocol !== "https:"
+      : !loopback || !/^[0-9a-f]{64}$/.test(url.searchParams.get("codexWorkbench") || "")) return null;
     if (mode && targetMode !== mode) return null;
     mode ??= targetMode;
     navigationScope ??= descriptor.scope;
@@ -331,8 +365,18 @@ ${card}
 
   function showPageCard() {
     if (!pageCards.length || (ready && !root.hidden) || refreshing) return;
-    cards.updateActions(t, { busy: !initialized || openingCard,
-      workbench: hasGlobalEntrypoint && !!capabilities.serverTools, desktop: !!capabilities.serverTools });
+    const webLinks = linked && pageCards.every(item => typeof item.editorUrl === "string");
+    cards.updateActions(t, {
+      busy: !initialized || openingCard || ((qoder || linked || remote) && !capabilities.serverTools && !webLinks),
+      workbench: webLinks || ((hasGlobalEntrypoint || linked) && !!capabilities.serverTools),
+      desktop: !!capabilities.serverTools,
+      ...(qoder && { openLabel: t("cardDesktop"), showOptions: false }),
+      ...(remote && { openLabel: t("openRemotePage"), showOptions: false }),
+      ...(linked && {
+        openLabel: t(hasGlobalEntrypoint ? "cardCursor" : "cardBrowser"),
+        workbenchLabel: t("copyEditorLink"),
+      }),
+    });
     card.hidden = false;
     if (initialized && adjustSpacing && !spacingEditor) {
       spacingEditor = createShowaiSpacingEditor(spacingForm, card, t, {
@@ -352,6 +396,23 @@ ${card}
       });
     }
     spacingForm.hidden = !spacingEditor || !adjustSpacing;
+  }
+
+  function revealEditorLink(row, url) {
+    const link = document.createElement("a");
+    link.textContent = t("openInBrowser");
+    link.href = url;
+    link.target = "_blank";
+    link.rel = "noopener noreferrer";
+    const input = document.createElement("input");
+    input.type = "text";
+    input.readOnly = true;
+    input.value = url;
+    input.setAttribute("aria-label", t("editorLink"));
+    row.replaceChildren(link, " ", input);
+    row.hidden = false;
+    input.focus();
+    input.select();
   }
 
   async function showCardEditor(target) {
@@ -381,7 +442,9 @@ ${card}
       showPageCard();
     } else if (!referencePage) {
       try {
-        await showCardEditor(pageCards[0]);
+        const picked = remote && cardGroup &&
+          await callWorkbench("workbench_card_choice", { groupId: cardGroup });
+        await showCardEditor(pageCards[typeof picked === "number" ? picked : 0] ?? pageCards[0]);
       } catch (error) {
         show("failed", error.message);
         showPageCard();
@@ -400,6 +463,40 @@ ${card}
     showPageCard();
     status.hidden = true;
     try {
+      if (remote) {
+        if (cardGroup) await callWorkbench("workbench_card_choice", { groupId: cardGroup, index });
+        const reply = await request(${JSON.stringify(host === "remote" ? "ui/request-display-mode" : "")}, { mode: "fullscreen" });
+        if (reply?.displayMode !== "fullscreen" && context.displayMode !== "fullscreen")
+          throw new Error(t("cannotOpenTarget"));
+        await showCardEditor(target);
+        return;
+      }
+      if (linked && hasGlobalEntrypoint && destination === "panel")
+        return await callWorkbench("workbench_open_destination", { ...target, destination: "workbench" });
+      if (linked && destination !== "desktop") {
+        const url = pageCard.editorUrl ?? (await callWorkbench("workbench_page_url", target)).url;
+        if (destination === "panel") {
+          if (!capabilities.openLinks) revealEditorLink(errorMessage, url);
+          else {
+            try {
+              const result = await openLink(url);
+              if (result?.isError) revealEditorLink(errorMessage, url);
+            } catch {
+              revealEditorLink(errorMessage, url);
+            }
+          }
+        } else {
+          try {
+            await navigator.clipboard.writeText(url);
+            errorMessage.textContent = t("copiedEditorLink");
+          } catch {
+            revealEditorLink(errorMessage, url);
+          }
+          errorMessage.hidden = false;
+        }
+        return;
+      }
+      if (qoder && destination === "panel") destination = "desktop";
       if (destination !== "panel")
         return await callWorkbench("workbench_open_destination", { ...target, destination });
       if (capabilities.serverTools) {
@@ -435,9 +532,9 @@ ${card}
       const target = meta?.showaiPageCard ?? data;
       const targets = group?.cards ?? (target?.pageId ? [target] : undefined);
       if (!targets?.length) return;
-      adjustSpacing = !directEditor && (group ?? target)?.adjustSpacing === true;
+      adjustSpacing = !qoder && !directEditor && (group ?? target)?.adjustSpacing === true;
       navigationScope ??= meta?.showaiNavigationScope;
-      const singleChanged = !group && (["projectId", "pageId", "blockId", "title", "blockTitle", "description"]
+      const singleChanged = !group && (["projectId", "pageId", "blockId", "title", "blockTitle", "description", "editorUrl"]
         .some(key => pageCards[0]?.[key] !== target?.[key]) ||
         JSON.stringify(pageCards[0]?.breadcrumb) !== JSON.stringify(target?.breadcrumb));
       if (!pageCards.length || group?.id !== cardGroup || singleChanged) {
@@ -531,18 +628,19 @@ ${card}
         token: "",
         apiOrigin: launchUrl.origin,
         search: launchUrl.search,
-        codexWorkbench: { key: launchUrl.searchParams.get("codexWorkbench"), mode, instance },
+        codexWorkbench: { key: launchUrl.searchParams.get("codexWorkbench") ?? "", mode, instance, remote },
       };
       window.__SHOWAI_CODEX_HOST__ = {
         attachReference,
         canReference,
         openLink,
-        ...(hasGlobalEntrypoint && { openWorkbench }),
+        ...((hasGlobalEntrypoint || editorBridge) && { openWorkbench }),
         openPageTab,
         importAsset,
-        readMedia,
+        ...(!remote && { readMedia }),
         workbenchRequest,
         workbenchChanges: async (after, client) => {
+          if (remote) return { cursor: after, changes: [] };
           const panel = ready && mode === "thread" ? {
             scope: navigationScope, visible: !root.hidden && document.visibilityState === "visible",
             page: activePage, acknowledged: acknowledgedNavigation,
@@ -579,6 +677,7 @@ ${card}
       if (qoder) {
         const script = document.createElement("script");
         script.type = "module";
+        if (scriptNonce) script.nonce = scriptNonce;
         script.textContent = await downloadAsset(bundle.entry);
         await new Promise((resolve, reject) => {
           script.onload = resolve;
@@ -602,9 +701,9 @@ ${card}
         status.getBoundingClientRect().height);
       if (height === reportedHeight) return;
       reportedHeight = height;
-      parent.postMessage({ jsonrpc: "2.0", method: "ui/notifications/size-changed", params: {
+      send({ jsonrpc: "2.0", method: "ui/notifications/size-changed", params: {
         height,
-      } }, "*");
+      } });
     });
     observer.observe(card);
     observer.observe(spacingForm);
@@ -619,7 +718,8 @@ ${card}
   });
 
   addEventListener("message", event => {
-    if (event.source !== parent || event.data?.jsonrpc !== "2.0") return;
+    const fromHost = editorBridge ? event.origin === window.origin : event.source === parent;
+    if (!fromHost || event.data?.jsonrpc !== "2.0") return;
     const data = event.data;
     const waiting = pending.get(data.id);
     if (waiting) {
@@ -632,10 +732,10 @@ ${card}
     if (data.method === "ui/notifications/tool-input") receiveFileInput(data.params?.arguments);
     if (data.method === "ui/notifications/tool-result") fromResult(data.params);
     if (data.method === "ui/notifications/host-context-changed") {
-      const previous = context["openai/deepLink"]?.url;
+      const previous = context[deepLinkExtension]?.url;
       configure({ ...context, ...data.params });
       if (usePageCard && initialized && !openingCard) presentPageCard();
-      if (ready && !useFileEntrypoint && !usePageCard && previous !== context["openai/deepLink"]?.url) {
+      if (ready && !useFileEntrypoint && !usePageCard && previous !== context[deepLinkExtension]?.url) {
         const target = currentUrl();
         const pageId = target.searchParams.get("page");
         if (pageId) displayPage(
@@ -664,7 +764,7 @@ ${card}
     configure(result?.hostContext);
     initialized = true;
     if (!ready && !pageCards.length) show("loading");
-    parent.postMessage({ jsonrpc: "2.0", method: "ui/notifications/initialized" }, "*");
+    send({ jsonrpc: "2.0", method: "ui/notifications/initialized" });
     if (usePageCard) presentPageCard();
     else if (useFileEntrypoint) {
       if (fileInput) void readReferenceFile();

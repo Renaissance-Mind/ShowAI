@@ -134,7 +134,7 @@ export function usePageActions({
     { id: string; name: string; extensions: string[] }[]
   >([]);
   const loadImporters = () => {
-    if (!selectedProject) return setImporters([]);
+    if (!selectedProject || codexWorkbench()?.remote) return setImporters([]);
     void desktop
       .invoke<{
         importers: { id: string; name: string; extensions: string[] }[];

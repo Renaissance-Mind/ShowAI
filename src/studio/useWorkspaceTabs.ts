@@ -43,7 +43,7 @@ export function useWorkspaceTabs({
   const dsh = window.__SHOWAI_LOCAL__?.dshWorkbench;
   const ag = antigravityWorkbench();
   const hostScope = dsh ? `:dsh:${dsh.instance}` :
-    embed ? `:codex:${embed.instance}` : ag ? ":antigravity" : "";
+    embed ? `:codex:${embed.instance}` : ag ? (ag.global ? ":antigravity:global" : ":antigravity") : "";
   const storageKey = (library: string) => `showai:tabs:${library}${hostScope}`;
   const [state, setState] = useState(() => createWorkspace(entry));
   const current = useRef(state);

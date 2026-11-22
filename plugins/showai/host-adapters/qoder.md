@@ -3,7 +3,7 @@
 <!-- showai-host-delivery:start -->
 
 - 临时可视化用 `show_component` 的 `delivery:"auto"` 在对话中展示。Qoder 的 MCP Apps 卡片支持交互。
-- 用户需要打开已保存的原页时，用 `card_open({projectId,pageId})` 在当前任务右侧打开 ShowAI 编辑器。需要定位组件时补充保存后读取到的 `blockId`。新建或续改成功后，也可以用此工具交付原页。
+- 新建或续改保存成功后，用 `card_present` 在聊天里留下原页卡片，多页用同一组交付。卡片按钮在 ShowAI App 中打开。用户要求在 Qoder 当前任务右侧打开时，用 `card_open({projectId,pageId})`。需要定位组件时补充保存后读取到的 `blockId`。
 - Qoder 的「更多」菜单可打开 ShowAI 全局工作台，任务右侧应用菜单可打开当前任务的工作台。连接或展示失败时保留原页并说明实际状态。
 
 <!-- showai-host-delivery:end -->

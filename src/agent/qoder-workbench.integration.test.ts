@@ -28,7 +28,13 @@ it("opens Qoder workbench entries and saves a large page through its MCP transpo
       });
     }
     expect(tools.find((tool) => tool.name === "card_open")).toBeDefined();
-    expect(tools.find((tool) => tool.name === "card_present")).toBeUndefined();
+    const cardUri = (tools.find((tool) => tool.name === "card_present")?._meta?.ui as
+      { resourceUri?: string } | undefined)?.resourceUri;
+    expect(cardUri).toBeTruthy();
+    const cardResource = await client.readResource({ uri: cardUri! });
+    expect(cardResource.contents[0]._meta).toMatchObject({
+      "qoder/ui": { availableDisplayModes: ["inline"], preferredDisplayMode: "inline" },
+    });
     const resource = await client.readResource({ uri: "ui://showai/workbench-v3.html" });
     expect(resource.contents[0]._meta).toMatchObject({
       "qoder/ui": { preferredDisplayMode: "fullscreen" },
@@ -57,6 +63,8 @@ it("opens Qoder workbench entries and saves a large page through its MCP transpo
     })).structuredContent as { data: { document: any; hash: string; revision: string } };
     const page = created.data;
     const pageId = page.document.id;
+    expect((await call("card_present", { projectId, pageId })).structuredContent)
+      .toMatchObject({ data: { projectId, pageId, title: "Large page" } });
     await call("card_open", { projectId, pageId });
 
     const text = "Qoder 片段 ".repeat(90_000);

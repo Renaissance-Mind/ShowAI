@@ -10,6 +10,7 @@ export interface CodexWorkbenchConnection {
   key: string;
   instance: string;
   mode: "global" | "thread";
+  remote?: boolean;
 }
 
 declare global {
@@ -32,6 +33,7 @@ declare global {
       readMedia?(grant: string): Promise<Blob>;
     };
     __SHOWAI_ANTIGRAVITY_HOST__?: {
+      global?: boolean;
       attachReference(
         reference?: PageReference,
         text?: string,
@@ -60,9 +62,10 @@ export function antigravityWorkbench() {
 /** The host already owns the surrounding page tabs in its conversation pane. */
 export function isSinglePageWorkbench() {
   if (typeof window === "undefined") return false;
+  const antigravity = antigravityWorkbench();
   return codexWorkbench()?.mode === "thread" ||
     window.__SHOWAI_LOCAL__?.dshWorkbench?.session === true ||
-    !!antigravityWorkbench();
+    (!!antigravity && !antigravity.global);
 }
 
 export function antigravityWorkbenchCanReference() {

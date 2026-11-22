@@ -12,6 +12,7 @@ import { afterEach, describe, expect, test } from "vitest";
 import {
   antigravityCardUri,
   antigravityFileUri,
+  antigravityGlobalUri,
   antigravityWorkbenchConnection,
   buildAntigravitySidecarUrl,
   writeAntigravityNavTarget,
@@ -873,6 +874,19 @@ for await (const line of createInterface({ input: process.stdin })) {
 
     const abort = new AbortController();
     try {
+      const entry = (await client.listTools()).tools.find(tool => tool.name === "workbench_open_global");
+      expect(entry?._meta).toMatchObject({
+        ui: { resourceUri: antigravityGlobalUri, visibility: ["app"] },
+        "com.google.antigravity/ui": { entrypoints: [{ type: "global", title: "ShowAI Workbench" }] },
+      });
+      const workbenchResult = await client.callTool({ name: "workbench_open_global", arguments: {} });
+      const { launchUrl } = workbenchResult._meta?.showaiWorkbenchData as { launchUrl: string };
+      expect(new URL(launchUrl).searchParams.get("agMode")).toBe("global");
+      expect((await client.readResource({ uri: antigravityGlobalUri })).contents[0]._meta).toMatchObject({
+        ui: { csp: { frameDomains: [new URL(launchUrl).origin] } },
+      });
+      expect(await (await fetch(launchUrl)).text()).toContain('global: params.get("agMode") === "global"');
+
       const createdProject = await client.callTool({
         name: "project_create",
         arguments: { name: "防闪烁测试" },

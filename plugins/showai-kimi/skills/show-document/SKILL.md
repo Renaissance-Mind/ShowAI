@@ -181,7 +181,7 @@ description: 创作或修改要保存的作品：可交互报告、讲解页面�
 
 - 使用当前 Widget 的工作区、大小上限与显示动作。已注册的工具可直接调用；当前会话提供 `select_tools` 且延迟加载时，一次选择用到的 ShowAI 工具。用 `show_component` 的 `delivery:"auto"` 取得 `fragment-file`。
 - 核对 `display.reader:"bundled"` 和压缩大小，把回执的 `delivery.inline` 原样复制到该 Widget 的 `workspace/index.html`，执行显示动作。
-- 新作品保存后用 `page_present` 预览，续改给出所在项目、改动和原页链接。缺少 Widget、超限或阅读器为 `cdn` 时查完整宿主适配。
+- 新建或续改保存成功后用 `card_present` 取得原页卡片，将卡片的 `delivery.inline` 交给 Widget，并提供 `targets` 里的原页链接。用户要在聊天里读正文时用 `page_present`。缺少 Widget、超限或阅读器为 `cdn` 时查完整宿主适配。
 
 <!-- showai-host-delivery:end -->
 
@@ -189,4 +189,4 @@ description: 创作或修改要保存的作品：可交互报告、讲解页面�
 
 ## 从对话展示升级
 
-用户在 [show-visual](../show-visual/SKILL.md) 展示之后只想保存那几个组件时，按 show-visual 的“之后要保存”原样写入，不必走制作流程。要把多次展示整理成一份有结构的文档时，从理解意图开始走完整流程，已有展示的数据作为材料，组件按设计稿取舍。
+用户只想保存刚展示的目录组件时，按 [show-visual](../show-visual/SKILL.md) 的「之后要保存」，把同一组件和数据写入 Page。原创 HTML 文件本身按原格式交付。用户要把它的内容整理到 Page 时，仍须用实际页面格式保存，确认原页位置与保存回执。要把多次展示整理成完整文档时，从理解意图开始，沿用已有展示的数据。

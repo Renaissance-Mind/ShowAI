@@ -8,6 +8,8 @@
 
 <!-- showai-host-delivery:end -->
 
+Antigravity App 的插件区提供 **ShowAI Workbench** 全局入口，用来浏览项目并继续编辑。当前任务的右侧原页和 `.showai-ref` 文件仍通过任务侧边入口打开。
+
 ## 本轮结果怎样交付
 
 本机 Antigravity 插件声明 `SHOWAI_HOST_DISPLAY=mcp-app` 与 `SHOWAI_ANTIGRAVITY_WORKBENCH=1`，并在右侧 Auxiliary Pane 内置实时 **ShowAI 工作台 Sidecar**（`sidecar://showai/workbench/`）。以下调用以当前连接实际提供的工具为准。
@@ -22,7 +24,7 @@
 
 **避免重复展示**：Antigravity 原生渲染附带 `ui://` 资源的 MCP 工具调用（`show_component`、`card_present`、`page_present`、`render_document`）。当回执 `delivery.mode === "mcp-app"` 时，视图已经在工具调用步骤显示，**禁止再把 `.inline.html` 复制到 Artifact 目录，也禁止再输出 `<agent-embed>`**，否则同一视图会在消息前后出现两次。
 
-连接缺少 `card_present`（例如旧版运行时）时，新建或续改保存成功后给出侧栏工作台直达胶囊 `[在 ShowAI 工作台打开《页面标题》](sidecar://showai/workbench/?project=<projectId>&page=<pageId>)`、项目名称与 `openUrl`。
+连接缺少 `card_present`（例如旧版运行时）时，给出项目名称与可用的 `openUrl`。已确认宿主侧栏工作台可用时，可以用实际页面身份构造 `[在 ShowAI 工作台打开《页面标题》](sidecar://showai/workbench/?project=<projectId>&page=<pageId>)`。
 
 ## 页面卡片与侧栏实时工作台
 
@@ -43,6 +45,6 @@
 
 ## 分批生成与回退路径
 
-- **分批持续更新**：用户要求边生成边看或内容分批到达时，按 show-visual 的持续更新流程调用 `show_component({kind, data, live:true, delivery:"mcp-app"})`，后续用同一 `viewId` 调用 `show_component_update`，最后传 `complete:true`。内容已齐的小任务直接一次展示。
+- **分批持续更新**适用于用户明确选用已有组件且当前宿主和连接都支持持续更新的场景。按 show-visual 调用 `show_component({kind, data, live:true, delivery:"mcp-app"})`，沿用同一 `viewId` 更新，最后传 `complete:true`。原创 HTML 按当前可用的展示方式一次交付。
 - **超出内联预算**：当 `page_present` 出现 `inlineError` 或页面过大时，优先交付 `card_present`（侧栏工作台无内联体积限制，可完整交互查看与编辑）；确需在对话内嵌局部摘要时，用 `page_read`（`detail:"outline"`）选 1–3 个不含大图的关键块传 `blockIds` 再调 `page_present`。
 - **仅当宿主明确无法显示 MCP Apps 或用户点名要求独立 Artifact 嵌入文件时**：才显式传 `delivery:"fragment-file"`，在确认 `display.reader === "bundled"` 后将 `delivery.inline` 复制到当前会话 `<Artifact Directory>` 下再输出 `<agent-embed src="file:///..."></agent-embed>`；不要手写或改写 ShowAI 生成的 HTML。

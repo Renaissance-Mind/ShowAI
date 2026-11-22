@@ -27,6 +27,7 @@ import type {
 } from "../../agent-host/types";
 import { desktop, errorMessage } from "../../host/bridge";
 import { MacPairingPrompt } from "../LanPairing";
+import { workbenchCapabilities } from "../capabilities";
 import { AgentExecutionPicker, remoteExecution } from "../AgentExecution";
 import type { Translator } from "../../i18n";
 import { useTranslator } from "../../i18n/react";
@@ -1209,7 +1210,7 @@ export default function AssistantWorkbench({
   return (
     <AssistantContext.Provider value={bridge}>
       {children}
-      {!remoteExecution() && <MacPairingPrompt />}
+      {!remoteExecution() && !workbenchCapabilities().remote && <MacPairingPrompt />}
       {composer && bridge && (
         <Composer
           target={composer}

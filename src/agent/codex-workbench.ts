@@ -59,7 +59,7 @@ export function codexWorkbenchConnection(
   open: OpenCodexWorkbench,
   service: AgentService,
   presentationDirectory?: string,
-  host: "codex" | "qoder" = "codex",
+  host: "codex" | "qoder" | "cursor" = "codex",
 ) {
   return {
     icons: codexWorkbenchIcons,
@@ -77,7 +77,7 @@ function registerCodexWorkbench(
   open: OpenCodexWorkbench,
   service: AgentService,
   presentationDirectory?: string,
-  host: "codex" | "qoder" = "codex",
+  host: "codex" | "qoder" | "cursor" = "codex",
 ) {
   const qoder = host === "qoder";
   const key = randomBytes(32).toString("hex");
@@ -251,20 +251,20 @@ function registerCodexWorkbench(
       return mcpFailure(error);
     }
   }
-  if (!qoder) server.registerTool("card_present", {
+  server.registerTool("card_present", {
     ...cardTool,
     title: "Show saved ShowAI cards",
-    description: "Deliver the original Page as a clickable card after successfully creating or editing it in Codex, or when the user asks for a saved target. Optionally use a blockId from page_read to point to a component and description to summarize its contents or changes. Put remaining targets in additionalTargets to deliver all cards together. The user chooses where to open them.",
+    description: "Deliver the original Page as a clickable card after successfully creating or editing it, or when the user asks for a saved target. Optionally use a blockId from page_read to point to a component and description to summarize its contents or changes. Put remaining targets in additionalTargets to deliver all cards together.",
     inputSchema: {
       ...codexCardTarget,
       additionalTargets: z.array(z.object(codexCardTarget)).optional(),
-      adjustSpacing: z.boolean().optional().describe("Show live spacing controls only when the user wants to tune the card layout."),
+      ...(!qoder && { adjustSpacing: z.boolean().optional().describe("Show live spacing controls only when the user wants to tune the card layout.") }),
     },
   }, ({ additionalTargets = [], adjustSpacing, ...first }, extra) =>
     presentPageCard([first, ...additionalTargets], extra._meta, adjustSpacing));
   server.registerTool("workbench_open_destination", {
     title: "Open a ShowAI page",
-    description: "Open the selected saved Page or component in Codex Workbench or the ShowAI app using its registered desktop link.",
+    description: "Open the selected saved Page or component in the ShowAI app, or in the host's registered Workbench when available.",
     inputSchema: { ...codexPageTarget, destination: z.enum(["workbench", "desktop"]) },
     annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: true },
     _meta: appOnly,

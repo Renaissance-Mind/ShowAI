@@ -3,7 +3,7 @@
 <!-- showai-host-delivery:start -->
 
 - 原创 HTML 的展示工具标记为预加载。若用户的 Claude Code 设置启用了强制延迟加载，可用 ToolSearch 一次选择所需工具。按当前 HTML 展示工具的调用要求，将 `show_component` 以 `delivery:"auto"` 返回的 `delivery.compact` 原样交给它。
-- 新作品保存后用 `page_present`，按 `conversation.next` 展示 `conversation.fragment`，给出 `openUrl`。续改说明所改内容、项目与原页链接。
+- 新建或续改保存成功后用 `card_present`。有 HTML 展示工具时把卡片 `delivery.compact` 原样交给它，同时提供 `targets` 里的原页入口。只有终端时给出原页链接和可打开的 `delivery.html`。用户明确要求阅读正文时用 `page_present` 并按 `conversation.next` 交付。
 - 收到 `image`、`too-large`、`unavailable` 或阅读器加载失败时查完整宿主适配。
 
 <!-- showai-host-delivery:end -->
@@ -19,6 +19,8 @@ page_present 与 render_document 在此宿主返回 `conversation`，按其 `mod
 - `unavailable`：运行时没有 CDN 阅读器。告诉用户这次无法在对话里展示，给出 openUrl 或完整 HTML 文件。
 
 会话有草稿目录（scratchpad）时，它就是任务工作目录，操作列表、自查截图等中间文件放在那里。
+
+如果用户要求在 Claude Code Desktop 的预览里继续编辑，用 `workbench_page_url` 取得可编辑原页的地址，并使用该会话提供的 Browser 或预览入口。Terminal 会话可以交付同一地址供用户在浏览器打开。另开预览前先核对是否需要用户执行宿主的首次设置。
 
 交付完整 HTML 文件时，宿主有发送或展示文件的工具（例如 SendUserFile）就用它把 delivery.html 交给用户；没有这类工具时给出文件路径。
 

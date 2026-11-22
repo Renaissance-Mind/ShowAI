@@ -363,7 +363,7 @@ export function StudioTopbar({
           )}
           {view === "page" && (
             <>
-              {codexPage ? (
+              {codexPage && !capabilities.remote ? (
                 <button
                   type="button"
                   className="studio-codex-workbench-link"
@@ -798,7 +798,7 @@ export function StudioTopbar({
               documentId={page.draft.id}
               onOpen={() => changeAssistantOpen(false)}
             />
-            <button
+            {!capabilities.remote && <button
               className={`studio-icon studio-icon-labeled${assistantOpen ? " is-active" : ""}`}
               aria-pressed={assistantOpen}
               title={ta("panel.toggle")}
@@ -806,7 +806,7 @@ export function StudioTopbar({
             >
               <Sparkles size={15} aria-hidden="true" />
               <span>{ta("panel.button")}</span>
-            </button>
+            </button>}
             <button
               className="studio-icon"
               aria-label={t("pageActions")}

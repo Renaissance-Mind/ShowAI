@@ -30,6 +30,7 @@ import cardSpacingEditor from "./codex-workbench-card-spacing.js?raw";
 
 export const antigravityCardUri = "ui://showai/antigravity-card-v1.html";
 export const antigravityFileUri = "ui://showai/antigravity-file-v1.html";
+export const antigravityGlobalUri = "ui://showai/antigravity-workbench-v1.html";
 const NAV_FILE = "antigravity-workbench-nav.json";
 const STATE_FILE = "antigravity-workbench-state.json";
 const ACTIVE_STATE_MAX_AGE_MS = 15_000;
@@ -443,7 +444,7 @@ ${cardStyles}
 </script></body></html>`;
 }
 
-export function antigravityFileHtml() {
+export function antigravityFileHtml(mode: "file" | "global" = "file") {
   return `<!doctype html>
 <html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <style>
@@ -461,6 +462,7 @@ html, body { margin: 0; width: 100%; height: 100%; overflow: hidden; background:
 <script>
 (() => {
   const translations = ${JSON.stringify(messages.catalogs)};
+  const globalWorkbench = ${mode === "global"};
   const referenceLimit = ${codexPageReferenceMaxLength};
   const statusEl = document.getElementById("showai-status");
   const msgEl = document.getElementById("showai-msg");
@@ -602,6 +604,24 @@ html, body { margin: 0; width: 100%; height: 100%; overflow: hidden; background:
     throw lastError ?? new Error(t("unavailable"));
   }
 
+  function mountFrame(targetUrl) {
+    frameOrigin = targetUrl.origin;
+    if (hostTheme) targetUrl.searchParams.set("theme", hostTheme);
+    delete frame.dataset.ready;
+    if (revealTimer) {
+      clearTimeout(revealTimer);
+      revealTimer = 0;
+    }
+    frame.onload = () => {
+      if (frame.dataset.ready !== "1") revealTimer = setTimeout(revealFrame, 1600);
+      if (hostTheme && frame.contentWindow) {
+        frame.contentWindow.postMessage({ type: "showai:ag-host-theme", theme: hostTheme }, frameOrigin);
+      }
+      sendHostVisibility();
+    };
+    frame.src = targetUrl.href;
+  }
+
   async function readReferenceFile(refreshOnly = false) {
     if (!initialized || !fileInput || readingFile) return;
     const currentFile = fileInput;
@@ -624,11 +644,9 @@ html, body { margin: 0; width: 100%; height: 100%; overflow: hidden; background:
         throw new Error(t("unavailable"));
       }
       const targetUrl = new URL(resolved.launchUrl);
-      frameOrigin = targetUrl.origin;
       targetUrl.searchParams.set("project", resolved.projectId);
       targetUrl.searchParams.set("page", resolved.pageId);
       if (resolved.blockId) targetUrl.searchParams.set("block", resolved.blockId);
-      if (hostTheme) targetUrl.searchParams.set("theme", hostTheme);
       if (
         mountedPage &&
         mountedPage.projectId === resolved.projectId &&
@@ -645,21 +663,7 @@ html, body { margin: 0; width: 100%; height: 100%; overflow: hidden; background:
         return;
       }
       mountedPage = resolved;
-      delete frame.dataset.ready;
-      if (revealTimer) {
-        clearTimeout(revealTimer);
-        revealTimer = 0;
-      }
-      frame.onload = () => {
-        if (frame.dataset.ready !== "1") {
-          revealTimer = setTimeout(revealFrame, 1600);
-        }
-        if (hostTheme && frame.contentWindow) {
-          frame.contentWindow.postMessage({ type: "showai:ag-host-theme", theme: hostTheme }, frameOrigin);
-        }
-        sendHostVisibility();
-      };
-      frame.src = targetUrl.href;
+      mountFrame(targetUrl);
     } catch (err) {
       if (!mountedPage) {
         statusEl.style.opacity = "1";
@@ -720,6 +724,11 @@ html, body { margin: 0; width: 100%; height: 100%; overflow: hidden; background:
         fileInput = f;
         if (initialized) void readReferenceFile();
       }
+    } else if (msg.method === "ui/notifications/tool-result" && globalWorkbench && !frameOrigin) {
+      const payload = resultPayload(msg.params);
+      const data = payload?._meta?.showaiWorkbenchData ?? payload?.structuredContent?.data ?? parseTextData(payload);
+      if (data?.launchUrl) mountFrame(new URL(data.launchUrl));
+      else if (payload?.isError) showStatus(payload.structuredContent?.error?.message ?? t("unavailable"));
     } else if (msg.method === "ui/notifications/host-context-changed") {
       applyHostContext(msg.params);
     }
@@ -883,6 +892,35 @@ export function antigravityWorkbenchConnection(
           }
         },
       );
+
+      if (ensureWorkbench) {
+        server.registerResource("antigravity_global_workbench", antigravityGlobalUri, { mimeType }, async () => {
+          const wb = await workbenchLaunchUrl();
+          return { contents: [{
+            uri: antigravityGlobalUri, mimeType, text: antigravityFileHtml("global"),
+            _meta: { ui: { csp: { frameDomains: [wb!.origin] }, prefersBorder: false } },
+          }] };
+        });
+        server.registerTool("workbench_open_global", {
+          title: "ShowAI Workbench",
+          description: "Open the ShowAI project library independently of the current conversation.",
+          inputSchema: {},
+          annotations: readOnly,
+          _meta: {
+            ui: { resourceUri: antigravityGlobalUri, visibility: ["app"] },
+            "com.google.antigravity/ui": { entrypoints: [{ type: "global", title: "ShowAI Workbench" }] },
+          },
+        }, async () => {
+          try {
+            const wb = await workbenchLaunchUrl();
+            const target = new URL(wb!.launchUrl);
+            target.searchParams.set("agMode", "global");
+            return { content: [], _meta: { showaiWorkbenchData: { launchUrl: target.href } } };
+          } catch (error) {
+            return mcpFailure(error);
+          }
+        });
+      }
 
       server.registerTool(
         "workbench_resolve_reference",

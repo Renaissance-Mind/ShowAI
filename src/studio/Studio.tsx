@@ -335,9 +335,9 @@ export default function Studio() {
     report,
     openFullPage: (pageId, projectId) => openPage(pageId, projectId),
   });
-  const assistantOpen = workspace.assistantOpen;
+  const assistantOpen = !capabilities.remote && workspace.assistantOpen;
   const changeAssistantOpen = (open: boolean) =>
-    workspace.setAssistantOpen(open, workspace.activeId);
+    workspace.setAssistantOpen(!capabilities.remote && open, workspace.activeId);
   const launchedWelcome = useRef(false);
   useEffect(() => {
     if (!workspaceReady || !info || launchedWelcome.current) return;

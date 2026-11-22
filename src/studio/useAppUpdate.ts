@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import type { AppUpdateState } from "../host/protocol";
 import { desktop, errorMessage } from "../host/bridge";
+import { workbenchCapabilities } from "./capabilities";
 
 export type AppUpdateAction =
   | "appUpdate:check"
@@ -12,7 +13,7 @@ export function useAppUpdate() {
   const [state, setState] = useState<AppUpdateState | null>(null);
   const [error, setError] = useState("");
   useEffect(() => {
-    if (!window.showai) return;
+    if (!window.showai || workbenchCapabilities().remote) return;
     let stopped = false;
     const stop = window.showai.onAppUpdate
       ? desktop.onAppUpdate((next) => setState(next))

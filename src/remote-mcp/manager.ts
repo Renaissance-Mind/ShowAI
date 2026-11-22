@@ -139,6 +139,7 @@ export class RemoteMcpManager {
       decrypt: (value: string) => string;
       provider?: RemoteMcpProvider;
       toolsDirectory?: string;
+      workbenchAssetsDirectory?: string;
       onApprovalRequest?(name: string): void;
       reserveHttpsPort?: (
         config: Parameters<typeof tailscalePort>[0],
@@ -359,6 +360,7 @@ export class RemoteMcpManager {
   private serverOptions(c: RemoteMcpConfig, origin?: string) {
     return {
       local: this.localPolicy(c),
+      workbenchAssetsDirectory: this.options.workbenchAssetsDirectory,
       instanceId: this.instanceId,
       stateDirectory: join(
         this.options.directory,

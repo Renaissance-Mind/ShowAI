@@ -64,6 +64,7 @@ export interface BrowserServerOptions {
   settingsPath: string;
   registerAgentRuntime?: boolean;
   codexWorkbench?: { key: string };
+  linkedWorkbench?: { id: string };
   antigravityWorkbench?: { key: string };
   dshWorkbench?: { key: string; parentOrigin: string };
   additionalActions?: ReadonlySet<string>;
@@ -122,13 +123,14 @@ export async function startBrowserServer(options: BrowserServerOptions) {
   }
   const workbenchParameter = dsh ? "dshWorkbench" : "codexWorkbench";
   const antigravityEmbedding = options.antigravityWorkbench;
-  const embeddedHost = !!(embedding || antigravityEmbedding);
+  const embeddedHost = !!(embedding || antigravityEmbedding || options.linkedWorkbench);
   if (
     (embedding && (!fixedHome || options.development || !/^[0-9a-f]{64}$/.test(embedding.key))) ||
     (antigravityEmbedding &&
-      (!fixedHome || options.development || !/^[0-9a-f]{64}$/.test(antigravityEmbedding.key)))
+      (!fixedHome || options.development || !/^[0-9a-f]{64}$/.test(antigravityEmbedding.key))) ||
+    (options.linkedWorkbench && (!fixedHome || options.development))
   )
-    throw new Error("The embedded workbench requires a fixed library and a private key.");
+    throw new Error("The plugin workbench requires a fixed library and a valid embedding configuration.");
   let savedHome: string | undefined;
   if (!fixedHome) {
     const source = await readFile(options.settingsPath, "utf8").catch(
@@ -619,6 +621,11 @@ export async function startBrowserServer(options: BrowserServerOptions) {
         }
       }
       const url = new URL(request.url ?? "/", origin);
+      if (options.linkedWorkbench && url.pathname === "/_showai/workbench" && request.method === "HEAD") {
+        response.writeHead(204, { "X-ShowAI-Workbench": options.linkedWorkbench.id });
+        response.end();
+        return;
+      }
       const printable = /^\/api\/print\/([0-9a-f-]{36})$/.exec(url.pathname);
       if (printable && request.method === "GET") {
         const html = printables.get(printable[1]);
@@ -1004,6 +1011,7 @@ export async function startBrowserServer(options: BrowserServerOptions) {
     });
   }
   window.__SHOWAI_ANTIGRAVITY_HOST__ = {
+    global: params.get("agMode") === "global",
     canReference() { return window.parent !== window; },
     attachReference(reference, text, components) {
       const id = ++seq;

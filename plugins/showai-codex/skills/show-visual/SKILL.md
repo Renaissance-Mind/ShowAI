@@ -43,7 +43,7 @@ description: 在聊天中用原创 HTML 直接展示一至五个可交互的图�
 
 ## 之后要保存
 
-用户要保留当前 HTML 成品时，保留对应的 HTML 和交互，按请求交付文件。已展示的目录组件可以用原有数据[保存到页面](references/catalog.md#保存到页面)。需要整理为完整文档时按 show-document 处理。
+用户要保留 HTML 成品时，沿用这次的源码和交互，按请求交付文件。已展示的目录组件可以用原有数据[保存到页面](references/catalog.md#保存到页面)。用户明确要写入 ShowAI Page 时，按 show-document 核对页面身份、使用当前运行时支持的页面内容格式并验证保存回执。只有生成 HTML 文件时，报告交付的是文件。
 
 用户明确要“注册”“做成组件以后换数据用”时，取回选中那一项的原始 HTML。本机读回回执的 source 文件；HTTP 可以按 artifactId 用 presentation_source 分块读回。缓存过期时沿用本次聊天中相同的工具输入。跨聊天且无法取回源码时，请用户提供原片段或含源码的展示回执。保留图形、样式和交互，把需要替换的业务数据提成参数，由 HTML 读取 `window.showaiData`。原始数据作为 defaultData，准备一组有真实含义且能观察出差异的替代数据。
 

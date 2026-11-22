@@ -2010,6 +2010,7 @@ else {
       remoteConnector = new RemoteMacConnector(agentHost, () => store.root);
       remoteMcp = new RemoteMcpConnections({
         directory: join(app.getPath("userData"), "remote-mcp"),
+        workbenchAssetsDirectory: join(runtimePath(), "scripts/codex-workbench-assets"),
         onApprovalRequest(name) {
           if (presentation.background || BrowserWindow.getFocusedWindow() || !Notification.isSupported())
             return;

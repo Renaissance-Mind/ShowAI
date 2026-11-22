@@ -92,6 +92,9 @@
   color: var(--card-muted);
   border-radius: 0 9px 9px 0;
 }
+.showai-card-actions > .showai-card-toggle[hidden] { display: none }
+.showai-card-actions > .showai-card-open:only-of-type,
+.showai-card-actions > .showai-card-open:has(+ .showai-card-toggle[hidden]) { border-radius: 9px }
 .showai-card-toggle::after {
   content: "";
   width: 5px;

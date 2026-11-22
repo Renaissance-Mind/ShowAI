@@ -3,6 +3,7 @@ import type { JSONContent } from "@tiptap/core";
 import type { ShowDocument } from "../types";
 import { desktop } from "../host/bridge";
 import { PageSessions } from "./page-sessions";
+import { workbenchCapabilities } from "./capabilities";
 import { saveNow } from "./page-session";
 import type { LoadedPage, PageSnapshot, SaveStatus } from "./page-session";
 export type { LoadedPage, SaveStatus } from "./page-session";
@@ -85,6 +86,7 @@ export function usePage(home?: string) {
     sessionStorage.setItem("showai:editor-client", clientId);
     sessionsRef.current = new PageSessions({
       clientId,
+      externalChanges: workbenchCapabilities().externalChanges,
       invoke: desktop.invoke,
     });
   }

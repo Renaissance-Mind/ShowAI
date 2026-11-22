@@ -10,10 +10,12 @@ import { SettingsPath } from "./SettingsPath";
 
 const hosts = [
   { id: "kimi", name: "Kimi Work", brand: "kimi-work", method: "package" },
-  { id: "cursor", name: "Cursor", brand: "cursor", method: "package" },
+  { id: "cursor", name: "Cursor Agents", brand: "cursor", method: "package" },
+  { id: "cursor-ide", name: "Cursor IDE", brand: "cursor", method: "package" },
+  { id: "trae", name: "TRAE IDE", brand: "trae", method: "package" },
   { id: "qoder", name: "Qoder", brand: "qoder", method: "package" },
   { id: "workbuddy", name: "WorkBuddy", brand: "workbuddy", method: "package" },
-  { id: "kimi-cli", name: "Kimi Code CLI", brand: "kimi", method: "json" },
+  { id: "kimi-code", name: "Kimi Code", brand: "kimi", method: "package" },
   { id: "gemini", name: "Gemini CLI", brand: "gemini", method: "json" },
   { id: "opencode", name: "OpenCode", brand: "opencode", method: "opencode" },
 ] as const;
@@ -27,6 +29,18 @@ export default function LocalPluginSetups() {
   const [prepared, setPrepared] = useState<{ host: Host; path: string }>();
   const [error, setError] = useState<{ host: Host["id"]; message: string }>();
 
+  async function copyConfig(host: Host) {
+    const launch = await desktop.invoke<McpLaunch>("plugins:launchConfig");
+    const method = host.method === "opencode" ? "opencode" : "json";
+    const env = {
+      ...launch.env, SHOWAI_LINKED_WORKBENCH: "1",
+      ...((host.id === "trae" || host.id === "kimi-code") && { SHOWAI_HOST_DISPLAY: "fragment-file" }),
+      ...(host.id === "trae" && { SHOWAI_LOCAL_PAGE_REFERENCES: "1" }),
+    };
+    await desktop.invoke("clipboard:write", { text: launchSnippet(method, { ...launch, env }) });
+    notify(t("copied"));
+  }
+
   async function setup(host: Host) {
     setPending(host.id);
     setError(undefined);
@@ -38,11 +52,7 @@ export default function LocalPluginSetups() {
         );
         setPrepared({ host, path });
       } else {
-        const launch = await desktop.invoke<McpLaunch>("plugins:launchConfig");
-        await desktop.invoke("clipboard:write", {
-          text: launchSnippet(host.method, launch),
-        });
-        notify(t("copied"));
+        await copyConfig(host);
       }
     } catch (reason) {
       setError({ host: host.id, message: errorMessage(reason) });
@@ -115,6 +125,11 @@ export default function LocalPluginSetups() {
               >
                 {t("workbuddyGuide")}
               </a>
+            )}
+            {(prepared.host.id === "trae" || prepared.host.id === "kimi-code") && (
+              <button type="button" className="settings-button" onClick={() =>
+                void copyConfig(prepared.host).catch(reason => notify(errorMessage(reason), { kind: "warning" }))
+              }>{t("copyMcpConfig")}</button>
             )}
           </div>
         </Dialog>

@@ -104,6 +104,7 @@ export interface PageSession {
 export interface PageSessionOptions {
   clientId: string;
   sourceHomeId?: string;
+  externalChanges?: boolean;
   invoke<T>(action: string, args?: Record<string, unknown>): Promise<T>;
   saveDelayMs?: number;
   draftDelayMs?: number;
@@ -433,6 +434,7 @@ export function createPageSession(options: PageSessionOptions): PageSession {
       );
   };
   const restoreExternalChange = (projectId: string, page: LoadedPage) => {
+    if (options.externalChanges === false) return;
     const pageId = page.document.id;
     void options
       .invoke<StoredExternalChange[]>("pages:externalChanges", {

@@ -1,8 +1,11 @@
 import { dirname, isAbsolute, join, resolve } from "node:path";
 import { homedir } from "node:os";
 import { fileURLToPath } from "node:url";
-import { access } from "node:fs/promises";
-import { randomBytes } from "node:crypto";
+import { access, mkdir, open, readFile, rename, writeFile } from "node:fs/promises";
+import { spawn } from "node:child_process";
+import { randomBytes, randomUUID } from "node:crypto";
+import { setTimeout as delay } from "node:timers/promises";
+import { withLibraryLock } from "../core/library-lock";
 import { startBrowserServer } from "./server";
 import { workbenchAssets } from "./workbench-assets";
 import { openSystemUrl } from "../host/local-system";
@@ -63,13 +66,102 @@ export async function startAntigravityWorkbenchBrowser(options: {
   });
 }
 
+interface LinkedWorkbenchSession { id: string; url: string; home: string; pid: number }
+
+async function linkedWorkbenchSession(home: string, id?: string) {
+  try {
+    const session = JSON.parse(await readFile(join(home, "local", "linked-workbench", "session.json"), "utf8")) as LinkedWorkbenchSession;
+    if (session.home !== home || (id && session.id !== id) || !/^[a-f0-9-]{36}$/.test(session.id) ||
+      !Number.isInteger(session.pid) || session.pid < 1) return;
+    const url = new URL(session.url);
+    if (url.hostname !== "127.0.0.1" || url.protocol !== "http:" || !url.port || url.username || url.password) return;
+    const response = await fetch(new URL("/_showai/workbench", url), {
+      method: "HEAD", redirect: "error", signal: AbortSignal.timeout(800),
+    });
+    if (response.headers.get("X-ShowAI-Workbench") === session.id) return session;
+  } catch (error) {
+    if (!(error instanceof SyntaxError || error instanceof TypeError ||
+      (error instanceof Error && error.name === "TimeoutError") || (error as NodeJS.ErrnoException).code === "ENOENT")) throw error;
+  }
+}
+
+export async function startLinkedWorkbenchBrowser(home: string) {
+  return withLibraryLock(home, async () => {
+    const running = await linkedWorkbenchSession(home);
+    if (running) return running;
+    const { cliEntry } = await browserRuntime();
+    const profile = join(home, "local", "linked-workbench");
+    await mkdir(profile, { recursive: true });
+    const id = randomUUID();
+    const logPath = join(profile, "server.log");
+    const log = await open(logPath, "a", 0o600);
+    const child = spawn(process.execPath, [cliEntry, "serve", "--home", home, "--linked-workbench", id, "--no-open", "--json"], {
+      detached: true, windowsHide: true, stdio: ["ignore", log.fd, log.fd], cwd: home,
+    });
+    let failed: Error | undefined;
+    child.once("error", error => { failed = error; });
+    child.unref();
+    await log.close();
+    const deadline = Date.now() + 20_000;
+    while (Date.now() < deadline && !failed && child.exitCode === null) {
+      const session = await linkedWorkbenchSession(home, id);
+      if (session) return session;
+      await delay(120);
+    }
+    if (child.exitCode === null && child.pid) child.kill("SIGTERM");
+    throw new Error(`ShowAI browser workbench could not start. See ${logPath}.`, { cause: failed });
+  }, "linked-workbench");
+}
+
+async function runLinkedWorkbench(home: string, id: string) {
+  const profile = join(home, "local", "linked-workbench");
+  const server = await startBrowserServer({
+    ...await browserRuntime(),
+    home,
+    settingsPath: join(profile, "settings.json"),
+    agentWorkspaceRoot: join(profile, "agent-workspaces"),
+    registerAgentRuntime: false,
+    linkedWorkbench: { id },
+  });
+  const receipt = join(profile, "session.json");
+  const temporary = join(profile, `${id}.json`);
+  try {
+    await mkdir(profile, { recursive: true });
+    await writeFile(temporary, JSON.stringify({ id, url: server.url, home: server.home, pid: process.pid }), { mode: 0o600 });
+    await rename(temporary, receipt);
+  } catch (error) {
+    await server.close();
+    throw error;
+  }
+  let lastSeen = Date.now();
+  const idle = setInterval(() => {
+    if (server.connectedClients()) lastSeen = Date.now();
+    if (Date.now() - lastSeen > 30 * 60_000) void stop();
+  }, 30_000);
+  idle.unref();
+  async function stop() {
+    clearInterval(idle);
+    process.off("SIGTERM", stop);
+    process.off("SIGINT", stop);
+    await server.close();
+  }
+  process.on("SIGTERM", stop);
+  process.on("SIGINT", stop);
+}
+
 export async function runBrowser(options: {
   home?: string;
   port?: string;
   open: boolean;
   json: boolean;
   dshOrigin?: string;
+  linkedWorkbench?: string;
 }) {
+  if (options.linkedWorkbench) {
+    if (!options.home || !isAbsolute(options.home) || options.open || options.dshOrigin ||
+      !/^[a-f0-9-]{36}$/.test(options.linkedWorkbench)) throw new Error("Invalid local ShowAI workbench launch.");
+    return runLinkedWorkbench(options.home, options.linkedWorkbench);
+  }
   const port = options.port === undefined ? 0 : Number(options.port);
   if (!Number.isInteger(port) || port < 0 || port > 65535)
     throw new Error(

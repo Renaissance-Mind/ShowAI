@@ -43,7 +43,8 @@
         "./mcp-run.sh"
       ],
       "env": {
-        "SHOWAI_HOST_DISPLAY": "fragment-file"
+        "SHOWAI_HOST_DISPLAY": "fragment-file",
+        "SHOWAI_LINKED_WORKBENCH": "1"
       },
       "startupTimeoutMs": 60000,
       "toolTimeoutMs": 300000

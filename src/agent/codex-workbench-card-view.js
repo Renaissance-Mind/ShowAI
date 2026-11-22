@@ -110,20 +110,23 @@ function createShowaiCardView(list, template, openTarget) {
     }));
   }
 
-  function updateActions(t, { busy, workbench, desktop }) {
+  function updateActions(t, { busy, workbench, desktop, openLabel, workbenchLabel, showOptions = true }) {
     if (busy) closeMenu();
     for (const row of list.children) {
       const open = row.querySelector(".showai-card-open");
-      open.textContent = t("openPage");
+      open.textContent = openLabel ?? t("openPage");
       open.disabled = busy;
       const toggle = row.querySelector(".showai-card-toggle");
+      toggle.hidden = !showOptions;
       toggle.setAttribute("aria-label", t("openOptions"));
       toggle.disabled = busy || (!workbench && !desktop);
       const menu = row.querySelector(".showai-card-menu");
       menu.setAttribute("aria-label", t("openOptions"));
       for (const button of menu.querySelectorAll("button")) {
         const isWorkbench = button.dataset.destination === "workbench";
-        button.lastElementChild.textContent = t(isWorkbench ? "cardWorkbench" : "cardDesktop");
+        button.lastElementChild.textContent = isWorkbench
+          ? workbenchLabel ?? t("cardWorkbench")
+          : t("cardDesktop");
         button.disabled = busy || !(isWorkbench ? workbench : desktop);
       }
     }
