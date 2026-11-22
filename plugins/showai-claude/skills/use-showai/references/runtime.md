@@ -2,19 +2,19 @@
 
 本文件用于宿主接入、连接错误或切换内容库。普通 Agent 文档操作始终使用已连接的 MCP 工具，不先执行 CLI 文档命令。
 
-通用插件可以附上已知连接，也可以复用宿主已配置的 MCP。没有工具、已有连接待授权或不知道选哪种网络时，按[连接向导](connect-mcp.md)逐步确认。
+先检查当前连接的工具和授权状态。安装、重连和内容库绑定方式见随包的[连接向导](connect-mcp.md)。
 
 工具未出现在当前会话中，可能需要宿主刷新连接。先核对安装和连接状态；需要重启宿主时协调用户，不自行退出宿主。没有 MCP 连接时说明缺少的入口，不以 CLI 创作或独立文件替代正式项目操作。
 
 ## 本机插件
 
-本地插件的 `mcp.json` 启动 `mcp/launch.mjs`。启动器读取宿主指定的 `SHOWAI_HOME`，未指定时使用当前用户的 `~/.showai`，再读取该库的 `agent-runtime.json`。`SHOWAI_RUNTIME_CONFIG` 可显式指定配置文件，但其中 home 必须与选定库一致；出错时不搜索其他库。
+本地插件的 MCP 配置启动 `mcp/launch.mjs`。启动器读取宿主指定的 `SHOWAI_HOME`，未指定时使用当前用户的 `~/.showai`，再读取该库的 `agent-runtime.json`。`SHOWAI_RUNTIME_CONFIG` 可显式指定配置文件，但其中 home 必须与选定库一致；出错时不搜索其他库。
 
 启动器只用 CLI 做 runtime info 能力探测和启动 MCP；探测结果按运行时文件缓存在库的 `local/` 中。运行时必须声明 `capabilities.agentOperations.protocol=showai-mcp-v1`。缺少时需要更新并登记目标 ShowAI 软件；更新 Skill 不会更新软件。插件本身不包含文档编译运行时。
 
 启动器在启动 MCP 之前失败时（缺少或无法读取 `agent-runtime.json`、内容库不一致、运行时过旧或无法启动），仍完成 MCP 握手，只提供一个 `showai_connection_problem` 工具。看到这个工具时调用它，把返回的错误码、原因和修复步骤用用户的语言转述，例如在 ShowAI「设置 → Agent 插件」点「修复登记」或「更新并启用」，再重启 Agent 会话或刷新宿主连接。返回内容中的路径已脱敏为 `~` 与 `<library>`，转述时保持脱敏，不要补全为本机完整路径。不要重试其他工具、换内容库或修改配置文件。ShowAI「设置 → Agent 插件」也会显示这次失败。
 
-桌面 App 和本机浏览器版都可在「设置 → Agent 插件」给 Codex 或 Claude Code 安装插件，该页同时显示「当前登记的运行时」与各插件连接的内容库。先安装目标宿主及其可用的插件管理 CLI；macOS 也会检测常见 Codex App 位置的内置 CLI。App 复制自带插件，以 App 可执行文件启动 launcher，无需 ShowAI 源码或单独安装 Node.js。安装器检查文件与启用状态，但宿主能力刷新和会话加载仍需分别确认。已有其他来源的 ShowAI 插件时，先在宿主中停用原插件，再安装 App 版本。此入口生成的连接绑定安装时的内容库。继续旧项目时，先确认项目实际所在的库；只有需要重新绑定目标库或移动了 App，才在 App 选定目标库后「更新并启用」，再刷新或重启宿主。外部宿主连接时启动 stdio MCP，App 窗口关闭后仍可使用，App 文件必须保留。
+在 ShowAI「设置 → Agent 插件」检查当前登记的运行时、内容库和插件状态。安装、刷新会话和重新绑定内容库请按[连接向导](connect-mcp.md)执行。
 
 源码方式的插件 launcher 使用系统 Node.js，需要 Node.js 22.12+ 和已登记的 ShowAI 软件。
 
@@ -35,14 +35,14 @@
 
 ## 连接中断或没有工具
 
-先辨别连接类型：通过 HTTPS 地址连接的客户端应按[远程连接](#远程)检查 App、隧道地址与授权状态，不检查本机 launcher 或要求安装 Node.js。以下步骤只适用于本机 stdio 插件。
+先辨别连接类型：通过 HTTPS 地址连接的客户端应按[连接向导](connect-mcp.md)检查 App、隧道地址与授权状态，不检查本机 launcher 或要求安装 Node.js。以下步骤只适用于本机 stdio 插件。
 
 宿主报告 ShowAI 连接已关闭（例如 `Connection closed`），或会话中没有任何 ShowAI 工具（连 `showai_connection_problem` 也没有）时，说明 MCP 进程没有启动或已经退出。启动时就失败的操作没有写入 ShowAI；保存进行中连接断开时，结果不确定，恢复连接后先 `page_read` 核对内容是否已保存，再决定是否重试。
 
 1. 告诉用户连接失败、哪一步没有完成，并把要保存的内容留在对话中，便于重试。
 2. 请用户打开 ShowAI「设置 → Agent 插件」：查看「当前登记的运行时」、各插件连接的内容库和「最近一次连接失败」。「修复登记」修复内容库里登记的运行时，任何安装方式都适用；「更新并启用」重新安装 App 自带的插件，适用于从 App 安装的插件。源码或插件市场安装时，先修复登记，仍失败再按第 4 步检查 Node.js，或在宿主中停用原插件后改从 App 安装。
 3. 修复后需要重启 Agent 会话或刷新宿主连接，才会重新启动 MCP；协调用户完成，不自行退出宿主。
-4. 判断安装方式：App 安装的 `mcp.json` 以 ShowAI App 的可执行文件启动 launcher；`command` 为 `node` 时是源码或插件市场安装，需要 Node.js 22.12+，缺少或版本过旧也会导致连接关闭。
+4. 判断安装方式：App 安装的 MCP 配置 以 ShowAI App 的可执行文件启动 launcher；`command` 为 `node` 时是源码或插件市场安装，需要 Node.js 22.12+，缺少或版本过旧也会导致连接关闭。
 5. 具体原因记录在宿主的 MCP 日志（launcher 的 stderr）中；仍无法解决时，请用户在 ShowAI「设置 → 关于与反馈」报告问题（这一入口不依赖 Agent 连接）。
 
 ## 错误码与下一步
@@ -85,28 +85,6 @@
 
 工具返回 CONFLICT、NOT_FOUND、LOCKED 等可恢复错误时，按回执的 `nextStep` 处理，不当作故障上报。工具失败且无法恢复时（错误码为 ERROR、连接问题工具报告的启动失败，或按 `nextStep` 处理后仍失败），告诉用户哪一步失败，并给出错误码与 message；`userMessage` 是可直接转述的一句话。再提示用户在 ShowAI「设置 → 关于与反馈」点「复制诊断信息」或「报告问题」，或打开 `showai_capabilities` / `runtime info` 返回的 `support.reportUrl` 提交反馈，排障说明见 `support.docsUrl`。连接不可用、拿不到 `support` 时，「设置 → 关于与反馈」仍然可用。不要代替用户提交反馈，不要转述 Token、密钥或本机路径。
 
-## 自定义 Agent / 服务器 runner
-
-宿主也可直接启动已核实运行入口，追加 `mcp --home /ABSOLUTE_LIBRARY`；明确绑定项目时再追加 `--project PROJECT`。可选 `--presentation-directory /HOST_OUTPUT`。配置中的 command/args/env 用参数数组执行，不交给 shell eval。MCP 启动后，Agent 使用工具，不为每次读写拼接 shell 命令。
-
-ShowAI 内置 Agent由宿主提供项目绑定 MCP；它安装的私有 Skill 副本不再同时加载插件的整个内容库启动器。模型 API 与文档 MCP 是两个连接。
-
-## 远程
-
-桌面 App 的「设置 → 远程 MCP」按“选择方式 → 建立连接 → 连接客户端”先从「局域网与私网」或「公网入口」选择连接方式。局域网只监听所选网卡，以 HTTP 和访问密钥连接；Tailscale 私网使用该设备的 HTTPS 地址，首次接入可在 ShowAI 直接批准设备，已有 OAuth 模式继续使用 Serve；公网访问使用 Cloudflare 临时/固定隧道或 Tailscale Funnel，并通过 HTTPS 与 OAuth 连接。此模式由 `showai_capabilities.projects.storage:"local"` 标识。新连接默认完整授权当前及以后新增的全部项目，支持读取、编辑、侧栏组织和 `project_create`。项目创建需要工具确实可用、完整内容库授权和 projects.create scope；保留返回的 project.id，后续操作显式使用它。同一次创建重试沿用同一个 operationId 和名称。受限连接仍只返回配置及授权同时允许的项目，不能从另一个连接照搬 ID。用户可以在「访问规则」中选择指定项目与只读权限；显式指定的访问规则保留；旧版没有 access 模式字段的配置采用全部内容库默认值，但原有受限 OAuth 授权会在启用前撤销，客户端必须重新配对确认新范围。将仅授权指定项目的客户端改为全部内容库授权时，设备和 OAuth 客户端需要重新获得批准。局域网客户端可以使用新的接入邀请或访问密钥。
-
-能够配置 MCP 的 Agent 可以使用「设置 → 远程 MCP」为当前连接生成的「复制接入提示词」。Tailscale 私网的「设备授权」模式要求 Agent 所在设备能访问对应的 tailnet。Grok Bot 按提示词添加 Command / stdio 连接「ShowAI 私网直连」，在 Grok 的 Tailscale 设备上运行其中的 mcp-remote 命令，访问同一个私网 HTTPS 地址。核对已有连接时同时匹配地址与传输方式。其他支持远程 HTTP 的客户端直接注册 Streamable HTTP，认证字段留空。ShowAI 向用户显示由 Tailscale 核实的设备和所属账号，用户在 App 允许一次，同一设备上的 Agent 共用所选项目权限。「客户端」可撤销整台设备的权限。Agent 等待批准后使用同一连接实际调用 projects_list。
-
-可信局域网的接入提示词包含一个十分钟内有效的一次性邀请。支持设置请求头和本地凭据存储的 Agent 按提示申请接入，用户在 ShowAI 批准。手动设置局域网客户端时，用户也可以在 App 中填写名称并创建访问密钥，再将其填入客户端的 Bearer Token 字段或 Authorization 请求头。密钥只显示一次，保存为摘要，90 天后到期，可单独撤销；模型不索取、读取或转述访问密钥。HTTP 只用于可信局域网，要求 HTTPS/OAuth 的客户端应选择 Tailscale 私网或公网方式。服务自检只证明本机访问，其他设备是否连通以真实调用为准。Tailscale 私网需要两端加入同一 tailnet 并启用 MagicDNS/HTTPS，不需要 Funnel。Serve 与 Funnel 使用未占用的 443、8443 或 10000，保留其他服务路由，断开只停止本次连接器。
-
-ChatGPT 网页从云端连接，需要公网地址。在客户端步骤选择 ChatGPT，依次填写服务器、OAuth 和连接确认；其他客户端直接使用通用接入步骤。通用 Skills 包可在连接前导入。需要将 Skills 明确关联到 ChatGPT 已注册的连接时，把该连接的插件页链接交给 App，导出 ShowAI Personal ZIP。绑定会保存，后续无需重复填写；仅含 HTTP MCP 声明的 ZIP 在 ChatGPT 中可能仅桌面可用，不能把导入成功当作网页可用。导入完整插件后使用关联连接。客户端授权页显示等待本机确认，用户回到 ShowAI 核对连接编号并点击允许，网页自动完成 OAuth。用户可在该连接的「客户端」中单独撤销一个已授权的 OAuth 客户端。连接请求会在 ShowAI 工作台弹窗显示，无需先进入设置。请求十分钟有效；服务重启会取消尚未完成的请求，但保留已有有效授权。旧授权窗口失效时，无需重新安装插件：回 ChatGPT 打开该插件，重新点击连接，在 ShowAI 确认新请求。没有弹窗时先确认设备上的 App 已运行且版本支持本机确认，查看「设置 → 远程 MCP」的状态；不要让模型代为批准。旧版本仍可能使用一次性配对码；模型不代替用户批准连接，不索取、读取或转述配对码、隧道令牌。保存直接进入本机内容库，persistence.storage:local 不表示已同步到云端。远程客户端不能传本机文件路径。电脑需要保持联网、唤醒且 App 运行；已经启用的连接会随 App 启动恢复，主动断开后不会自动恢复。Quick 地址重新连接后变化，需要更新客户端地址或重新导出插件。实际接入成功以所选地址的检查和客户端真实调用为依据。
-
-端口由程序自动绑定。自有域名步骤先保留本机监听，再让用户复制实际 HTTP 地址并配置 Cloudflare 路由，之后填写公网域名与隧道令牌；公网地址切换不释放监听端口。已有固定路由端口被其他程序占用时使用新的可用端口并引导更新路由，不结束其他程序。客户端使用流程生成的完整 /mcp 地址；局域网填写访问密钥，Tailscale 设备授权模式等待本机批准，OAuth 模式按客户端配置完成授权。详细操作见[用户教程](https://github.com/Renaissance-Mind/ShowAI/blob/main/docs/i18n/chatgpt.zh-CN.md)。
-
-以下为配置了同步服务器的托管 HTTP 连接：宿主连接明确的 HTTP MCP 地址，完成所需授权。授权可限定项目，也可覆盖该服务器账号当前及以后有权限的所有项目。`projects_list` 每次读取服务器最新成员权限；账号授权会发现后续同步到服务器的项目。仅保存在本机且尚未同步的项目不在远程列表中：请用户在 ShowAI 应用的“设置 → 账号与同步”把项目同步到同一服务器账号，再重新调用 `projects_list`；仅授权单个项目的连接需重新授权为账号范围才能看到新项目。用户明确要求新项目时，且当前工具暴露 `project_create`、账号已授予 `projects.create`，使用该工具创建；保留返回的项目 ID 和 synchronization 回执，后续页面操作显式使用该 ID。创建超时或结果不明时，用同一个 operationId 和同一名称重试：已创建则返回原项目，不会重复创建；同一 operationId 换名称会被拒绝。不同请求使用不同 ID。受限授权或工具缺失时说明所缺权限，不绕过到本机创建。项目权限来自服务端当前成员身份。远程没有本机文件配置步骤，不能把用户电脑的 home 当作远程项目路径。远程网关部署与本机内容同步服务是不同模块。
-
-GitHub／Google 登录由所选 ShowAI Server 的已配置登录方式提供。已有账号需先绑定对应身份。用户在第三方登录标签页完成验证后，该页显示一个 8 位完成码；用户回到 MCP 授权标签页填入完成码并继续，再确认项目或账号范围授权。完成码一次性、短期有效，由用户本人填写；模型不索取或转述。用户把完成码贴到对话中时不使用它，提醒其在授权页填写。模型不读取、索取或转发密码、登录轮询密钥和会话 Token。服务器未启用对应登录方式时报告实际错误，不把登录按钮可见当作登录已配置。
-
 ## 内容组织接口
 
 先读 `showai_capabilities.management` 和当前工具参数。项目操作都显式传 `projectId`。只读查找不创建项目或文件夹；用户要求整理内容时才执行对应写操作。项目、文件夹、正式 Page 和侧栏分组是不同对象，分别使用各自接口。
@@ -143,7 +121,3 @@ GitHub／Google 登录由所选 ShowAI Server 的已配置登录方式提供。�
 明确放弃已阅读草稿时调用 `draft_remove({projectId,draftId,generation})`；只处理读取到的代次，发现新代次时报告冲突并保留。丢弃内容仍由本地恢复机制保留。page 草稿先通过正常 page_save/page_apply/合并路径保存，再用 `draft_write({projectId,action:"complete",draftId,generation,revision})` 完成；revision 来自实际保存结果，正式内容必须与该代草稿一致。组件和模板使用各自保存流程，成功后按用户意图移除已处理草稿。
 
 草稿不会随项目同步。本机接口只访问当前库中的项目草稿；远程接口只访问该授权连接持久工作区的项目草稿，不能读取另一设备尚未上传的编辑草稿。远程回执的 `workspace.draftsSynchronized:false` 表示这一点。草稿接口不可访问其他项目或全局未归属草稿。
-
-## 远程参数边界
-
-远程 `page_export` 只声明 html、inline；整站 site 导出需要支持它的本机连接和用户指定的导出任务。远程 page_create/page_save 不接受 components 或 remoteComponents，先 `component_save` 编译可编辑源，再在页面中引用返回的精确版本和 integrity。本机仍可按实际参数传已编译组件或导入外部发布依赖。工具列表、参数和 `management` 能力以当前连接为准；插件更新不会自动更新正在运行的本机服务或远程部署。

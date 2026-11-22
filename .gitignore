@@ -87,6 +87,7 @@ plugins/showai/scripts/cli.mjs
 !/plugins/showai/README.md
 !/plugins/showai/host-adapters/qoder.md
 !/plugins/showai/host-adapters/cursor.md
+!/plugins/showai/host-adapters/cursor-ide.md
 !/plugins/showai/host-adapters/workbuddy.md
 !/plugins/showai/host-adapters/kimi-code.md
 !/plugins/dsh-showai/README.md

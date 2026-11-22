@@ -1,0 +1,11 @@
+{
+  "name": "WorkBuddy",
+  "en": {
+    "install": "Install the detected WorkBuddy plugin from Settings → Agent plugins in ShowAI, or register the prepared directory as a local WorkBuddy marketplace and install ShowAI. Start a new local task and check its connectors and tools.",
+    "features": "Show interactive previews and page cards in chat. When a task provides an embedded browser, use the card’s edit link to open the original."
+  },
+  "zh": {
+    "install": "在 ShowAI 的「设置 → Agent 插件」安装检测到的 WorkBuddy，或将准备好的目录注册为 WorkBuddy 本地插件市场并安装 ShowAI。新建本机任务，检查连接器和工具。",
+    "features": "聊天内显示交互预览和原页卡片。任务提供内置浏览器时，用卡片的编辑链接打开原页。"
+  }
+}

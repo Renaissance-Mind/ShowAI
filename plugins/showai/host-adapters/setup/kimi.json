@@ -1,0 +1,11 @@
+{
+  "name": "Kimi Work",
+  "en": {
+    "install": "Prepare the Kimi Work plugin directory in ShowAI under Settings → Agent plugins. Register that directory with the Kimi Work plugin manager, then install or update and enable ShowAI under Plugins → Personal. Refresh the session tools.",
+    "features": "A Widget can show offline interactive previews and page cards. Open the editable original in the host browser when it can reach the local machine, or use the ShowAI page link."
+  },
+  "zh": {
+    "install": "在 ShowAI 的「设置 → Agent 插件」准备 Kimi Work 插件目录，用 Kimi Work 的插件管理器注册该目录，然后在「插件 → 个人 → ShowAI」安装或更新并启用。刷新会话工具。",
+    "features": "Widget 可以显示离线交互预览和原页卡片。宿主浏览器能访问本机时可打开可编辑原页，也可使用 ShowAI 页面链接。"
+  }
+}

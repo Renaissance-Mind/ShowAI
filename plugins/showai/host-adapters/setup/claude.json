@@ -1,0 +1,14 @@
+{
+  "name": "Claude Code",
+  "en": {
+    "install": "Install or update the Claude Code plugin in ShowAI under Settings → Agent plugins and restart the session. Check that ShowAI is enabled in the plugin manager and connected in the MCP status view.",
+    "features": "Sessions with an HTML display tool can show interactive previews and page cards. Desktop sessions can edit the original in an available browser or preview. Terminal sessions deliver an HTML file and a page link.",
+    "source": "For a source marketplace install, add the ShowAI repository to Claude Code and install `showai@renaissance-mind`. Use `npm run plugin:claude -- --port <port> --json` to bind a development instance."
+  },
+  "zh": {
+    "install": "在 ShowAI 的「设置 → Agent 插件」安装或更新 Claude Code 插件，重启会话。在插件管理器核对 ShowAI 已启用，在 MCP 状态中检查连接。",
+    "features": "会话提供 HTML 展示工具时可展示交互预览和原页卡片。桌面会话可在可用的 Browser 或预览中编辑原页；终端交付 HTML 文件和原页链接。",
+    "source": "使用源码市场时，将 ShowAI 仓库添加为 Claude Code 插件市场并安装 `showai@renaissance-mind`。绑定开发实例可运行 `npm run plugin:claude -- --port <端口> --json`。",
+    "t3": "在 T3 Code 中使用 Claude Code 时，线程可复用同一提供方配置目录中的插件。独立目录在 ShowAI「设置 → Agent 插件 → T3 Code」复制 Claude Code 配置，然后在 T3 命令面板重启智能体会话。详见 [T3 Code 展示与编辑](host-display.md#t3-code)。"
+  }
+}

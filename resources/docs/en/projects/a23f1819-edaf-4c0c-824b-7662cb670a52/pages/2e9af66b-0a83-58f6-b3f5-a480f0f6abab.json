@@ -211,7 +211,7 @@
           "content": [
             {
               "type": "text",
-              "text": "You need a Mac with Apple silicon (macOS 13 or later), and Claude Code or Codex signed in. No agent yet? Use the built-in agent with a model API key."
+              "text": "The desktop app requires a Mac with Apple silicon and macOS 13 or later. Connect a supported host or configure the built-in agent with a model API key."
             }
           ],
           "attrs": {
@@ -233,7 +233,7 @@
                   },
                   {
                     "title": "Connect your agent",
-                    "body": "Open ShowAI; the welcome screen finds Claude Code or Codex. Click Install plugin, then restart the agent."
+                    "body": "Choose a host in ShowAI under Settings → Agent plugins, install or import its package, then start a new session."
                   },
                   {
                     "title": "Ask for an interface",
@@ -859,7 +859,7 @@
               "content": [
                 {
                   "type": "text",
-                  "text": "Codex, Claude Code, Antigravity and the built-in agent are supported. DeepSeek Harness, Kimi Work, Cursor, Qoder, WorkBuddy, Kimi Code and TRAE IDE have host-specific setups. ChatGPT web uses public HTTPS and OAuth. See "
+                  "text": "ShowAI supports Codex, Claude Code, Antigravity, DeepSeek Harness, Kimi Work, Kimi Code, Cursor Agents, Cursor IDE, Qoder, WorkBuddy and TRAE IDE. Installation, chat previews and original-page editing vary by host. You can also use the built-in agent or connect ChatGPT on the web over public HTTPS with OAuth. See "
                 },
                 {
                   "type": "text",

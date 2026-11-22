@@ -1,0 +1,13 @@
+{
+  "name": "Antigravity",
+  "en": {
+    "install": "Install or update the Antigravity plugin in ShowAI under Settings → Agent plugins and restart the session. For a source install, make sure `agy` is available and run `npm run plugin:antigravity`.",
+    "features": "Show interactive previews and page cards in chat. Edit originals, navigate to components and quote selections in the auxiliary pane, or browse projects in the global workbench.",
+    "source": "To bind a development instance, run `npm run plugin:antigravity -- --port <port> --json`. Use `--remove` to uninstall that plugin."
+  },
+  "zh": {
+    "install": "在 ShowAI 的「设置 → Agent 插件」安装或更新 Antigravity 插件，重启会话。从源码安装时先确认 `agy` 可用，再运行 `npm run plugin:antigravity`。",
+    "features": "聊天内显示交互预览和原页卡片。右侧辅助面板可编辑原页、定位组件并引用选区，全局工作台可浏览项目。",
+    "source": "绑定开发实例时可运行 `npm run plugin:antigravity -- --port <端口> --json`，用 `--remove` 卸载该插件。"
+  }
+}

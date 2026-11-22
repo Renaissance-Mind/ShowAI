@@ -1,0 +1,11 @@
+{
+  "name": "DeepSeek Harness",
+  "en": {
+    "install": "Open DeepSeek Harness once and quit it completely. Install or update its plugin in ShowAI under Settings → Agent plugins, then reopen Harness. If ShowAI reports conflicting registrations, use the sources listed in Settings.",
+    "features": "The graphical client shows interactive previews and page cards in chat. Edit the original and quote a selection into the draft from a session tab, or open the global workbench from the left navigation. Terminal sessions deliver files or links."
+  },
+  "zh": {
+    "install": "先打开一次 DeepSeek Harness 并完全退出。在 ShowAI 的「设置 → Agent 插件」安装或更新 DeepSeek Harness 插件，再打开 Harness。若提示旧注册冲突，按设置页列出的来源处理。",
+    "features": "图形客户端支持聊天内交互预览、原页卡片、右侧会话标签页编辑和引用到草稿，左侧导航可打开全局工作台。终端交付文件或链接。"
+  }
+}

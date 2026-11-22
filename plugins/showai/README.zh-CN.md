@@ -2,7 +2,7 @@
 
 **语言：** [English](README.md) | 简体中文 · [文档目录](https://github.com/Renaissance-Mind/ShowAI/blob/main/docs/i18n/README.zh-CN.md)
 
-ShowAI 让 Agent 用界面回答——可以交互、可以归档、在使用中不断进化。它由两部分组成：本插件为 Agent 提供 ShowAI 的工具（stdio MCP launcher）和六个 Skill；ShowAI App 保存页面，并提供插件连接的运行时。兼容性以运行时报告的实际能力为准。
+ShowAI 提供六个 Skill，用来创建、编辑和展示交互页面。本机宿主包启动所选内容库登记的运行时。通用包可使用宿主已经配置的连接。当前连接能调用的工具和展示方式由运行时报告。
 
 ## 安装
 
@@ -144,6 +144,8 @@ Qoder 的工作台入口需要本机插件和支持 Qoder 工作台的已登记 
 在 ShowAI「设置 → Agent 插件」对已检测到的 Gemini CLI 点击「配置 MCP」，再启动新会话。手动安装时点击「复制 MCP 配置」，将配置合并到 Gemini CLI 的 `~/.gemini/settings.json` 或 OpenCode 的 `opencode.json`。这一步接入 ShowAI 的 MCP 工具。[Gemini CLI MCP 文档](https://geminicli.com/docs/tools/mcp-server/)
 
 ## 宿主包与公共源码
+
+专用包按宿主提供入口 Skill、连接向导、页面交付步骤和 README。通用下载包保留跨宿主安装与连接说明。TRAE IDE 扩展提供工作台，Agent 通过单独配置的 MCP 连接。
 
 公共工作流只维护 `plugins/showai/skills`，宿主展示契约分别维护在 `plugins/showai/host-adapters`。运行 `npm run package:plugin` 自动生成 Codex、Claude Code、Antigravity 和 Kimi 的安装内容；DeepSeek 准备插件时绑定自己的适配，远程 MCP Apps 使用原生视图指南。
 

@@ -58,7 +58,7 @@ export function renderReleaseNotes({ version, headline, changes = {}, notarized 
     en.usage,
     "",
     "1. **Open ShowAI.**",
-    "2. **Connect your agent** — the welcome screen finds Claude Code or Codex. Click **Install plugin**, then restart the agent.",
+    "2. **Connect your agent** — open **Settings → Agent plugins**, select your host and follow its install or import steps before starting a new session.",
     "3. **Ask for an interface** — paste this into a new conversation:",
     "",
     `   > ${en.prompt}`,

@@ -105,7 +105,7 @@
           "content": [
             {
               "type": "text",
-              "text": "You need a Mac with Apple silicon (macOS 13 or later), and Claude Code or Codex signed in. No agent yet? Use the built-in agent with a model API key."
+              "text": "The desktop app requires a Mac with Apple silicon and macOS 13 or later. Connect a supported host or configure the built-in agent with a model API key."
             }
           ],
           "attrs": {
@@ -362,7 +362,7 @@
                   },
                   {
                     "title": "Install plugin",
-                    "body": "ShowAI checks for Claude Code and Codex. Click Install plugin next to the agent you use.",
+                    "body": "Select the host you use in Settings → Agent plugins and follow its row to install directly, prepare a plugin directory or import a package.",
                     "result": "The plugin shows “Installed and enabled”."
                   },
                   {
@@ -1184,7 +1184,7 @@
                     "title": "Other agents",
                     "tag": "Host plugins and remote MCP",
                     "tone": "teal",
-                    "body": "DeepSeek Harness, Kimi Work, Kimi Code and TRAE IDE have host-specific setups. ChatGPT web uses public HTTPS and OAuth to reach your desktop or an administrator’s service. Gemini CLI and OpenCode can use a local MCP configuration.",
+                    "body": "All 11 host plugins and extensions are supported. Select a host in ShowAI under Settings → Agent plugins and install or import its package. ChatGPT on the web connects over public HTTPS with OAuth. Gemini CLI and OpenCode can use a local MCP configuration.",
                     "href": "https://showai.renaissancemind.ai/doc/agent-hosts"
                   },
                   {

@@ -1,0 +1,11 @@
+{
+  "name": "Cursor IDE",
+  "en": {
+    "install": "Install the Cursor IDE workbench extension from Settings → Agent plugins in ShowAI and reload the window. For a manual install, choose Install from VSIX in Extensions. The extension registers its bundled agent plugin.",
+    "features": "Show interactive previews and page cards in chat. Click a card or open a `.showai-ref` file to edit the original in an IDE pane. Use ShowAI: Open Workbench from the command palette to browse projects."
+  },
+  "zh": {
+    "install": "在 ShowAI 的「设置 → Agent 插件 → Cursor IDE」安装工作台扩展并重载窗口。手动安装时在扩展菜单选择「从 VSIX 安装」。扩展会注册随包的 Agent 插件。",
+    "features": "聊天内显示交互预览和原页卡片。点击卡片或打开 `.showai-ref` 可在 IDE 分栏编辑原页；从命令面板选择「ShowAI：打开工作台」浏览项目。"
+  }
+}

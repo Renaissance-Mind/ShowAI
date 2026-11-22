@@ -6,6 +6,16 @@ export type HostProfile =
   | "kimi"
   | "mcp-app";
 export const HOST_PROFILES: Record<HostProfile, string>;
+export interface HostSetup {
+  name: string;
+  en: { install: string; features: string };
+  zh: { install: string; features: string };
+}
+export function readHostSetup(source: string, profile: string): Promise<HostSetup>;
+export function hostGuidance(source: string, profile: string, transport?: "local" | "remote" | "manual"): Promise<{
+  files: Record<string, string>;
+  readmes?: Record<string, string>;
+}>;
 export const HOST_GUIDE: string;
 export const DELIVERY_WORKFLOWS: readonly string[];
 export function workflowWithHostDelivery(file: string, workflow: string, adapter: string): string;
@@ -33,6 +43,8 @@ export function bindHostSkills(options: {
   workflowFiles: Record<string, string>;
   adapterSha256: string;
   entrySha256?: string;
+  connectionSha256?: string;
+  runtimeSha256?: string;
 }>;
 export function writeHostLauncher(
   source: string,

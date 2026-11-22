@@ -1,0 +1,11 @@
+{
+  "name": "Cursor Agents",
+  "en": {
+    "install": "Install Cursor Agents from Settings → Agent plugins in ShowAI, reload the window and start a local chat. For a manual install, place the plugin directory under `~/.cursor/plugins/local/` and check Customize → MCPs.",
+    "features": "Show interactive previews and page cards in chat. Open the card’s live edit link in Cursor Browser to edit the original."
+  },
+  "zh": {
+    "install": "在 ShowAI 的「设置 → Agent 插件 → Cursor Agents」安装插件，重载窗口并新建本机对话。手动安装时将插件目录放入 `~/.cursor/plugins/local/`，在 Customize → MCPs 检查连接。",
+    "features": "聊天内显示交互预览和原页卡片。卡片提供实时编辑链接，可在 Cursor Browser 中打开原页。"
+  }
+}

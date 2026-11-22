@@ -2,7 +2,7 @@
 
 **Language:** English | [简体中文](README.zh-CN.md) · [Documentation](https://github.com/Renaissance-Mind/ShowAI/blob/main/docs/README.md)
 
-ShowAI lets your agent answer with interfaces — interactive, archived, and evolving as you use them. It has two parts: this plugin gives the agent ShowAI's tools (a stdio MCP launcher) and six Skills, and the ShowAI app keeps the pages and provides the runtime the plugin talks to. Compatibility is determined by the runtime's reported capabilities.
+ShowAI provides six Skills for creating, editing and presenting interactive pages. A local host package starts the runtime registered for the selected ShowAI library. A universal package can use a connection already configured in the host. The runtime reports the tools and presentation modes available to that connection.
 
 ## Install
 
@@ -95,6 +95,8 @@ For a detected **TRAE IDE**, choose **Install plugin** in ShowAI. TRAE CN opens 
 Choose **Configure MCP** for a detected Gemini CLI in ShowAI **Settings → Agent plugins**, then start a new CLI session. For a manual setup, use **Copy MCP config** and merge the configuration into `~/.gemini/settings.json` for Gemini CLI or `opencode.json` for OpenCode. This configures the ShowAI tools through MCP. [Gemini CLI MCP docs](https://geminicli.com/docs/tools/mcp-server/)
 
 ## Host packages and shared source
+
+Each dedicated package includes its own entry Skill, connection guide, delivery steps and README. The universal download includes the cross-host installation and connection guides. The TRAE IDE extension provides the workbench and uses a separate MCP connection.
 
 Host packages use `plugins/showai-<host>/`. Kimi Work is packaged in `plugins/showai-kimi/` and the DeepSeek Harness bundle source lives in `plugins/showai-deepseek/`. Packaging also generates the original install paths `plugins-kimi/showai/` and `plugins/dsh-showai/` with the same plugin identities.
 

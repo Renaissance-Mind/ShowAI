@@ -1,0 +1,14 @@
+{
+  "name": "Codex",
+  "en": {
+    "install": "Install or update the Codex plugin in ShowAI under Settings → Agent plugins. Refresh plugins or restart Codex, then start a new chat. From a source checkout, run `npm run plugin:install`.",
+    "features": "Interact with previews in chat. Open a saved page card to edit the original or jump to a component in the side panel. Desktop builds with plugin extensions also offer a global workbench and selection references in chat.",
+    "source": "After a source install, run `npm run plugin:update -- --json` to update. The receipt records the version, enabled state and file fingerprint."
+  },
+  "zh": {
+    "install": "在 ShowAI 的「设置 → Agent 插件」安装或更新 Codex 插件，在 Codex 中刷新插件或重启后新开对话。源码安装可在仓库运行 `npm run plugin:install`。",
+    "features": "在聊天内操作交互预览。点击已保存页面的卡片可在右侧编辑原页、定位组件；支持插件扩展的桌面端还可打开全局工作台并把选区引用到聊天。",
+    "source": "源码安装后可运行 `npm run plugin:update -- --json` 更新，回执记录版本、启用状态和安装文件指纹。",
+    "t3": "在 T3 Code 中使用 Codex 时，线程可复用同一提供方配置目录中的插件。独立目录在 ShowAI「设置 → Agent 插件 → T3 Code」复制 Codex 配置，然后在 T3 命令面板重启智能体会话。详见 [T3 Code 展示与编辑](host-display.md#t3-code)。"
+  }
+}

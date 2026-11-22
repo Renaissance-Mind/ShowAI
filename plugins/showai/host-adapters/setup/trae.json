@@ -1,0 +1,11 @@
+{
+  "name": "TRAE IDE",
+  "en": {
+    "install": "Install the TRAE IDE extension from Settings → Agent plugins in ShowAI or choose Install from VSIX in the IDE. Confirm the MCP import in TRAE China, or copy the ShowAI configuration into MCP settings.",
+    "features": "Use ShowAI: Open Workbench from the command palette to browse projects and open a `.showai-ref` in an IDE tab to edit the original. The agent uses a separately configured MCP connection to deliver HTML files and page references."
+  },
+  "zh": {
+    "install": "在 ShowAI 的「设置 → Agent 插件」安装 TRAE IDE 扩展，或在 IDE 中选择「从 VSIX 安装」。在 TRAE 中国版确认 MCP 导入，其他安装方式可复制 ShowAI 提供的配置到 MCP 设置。",
+    "features": "从命令面板选择「ShowAI：打开工作台」浏览项目，打开 `.showai-ref` 在 IDE 标签页编辑原页。Agent 使用单独配置的 MCP 连接，可交付 HTML 文件与原页引用。"
+  }
+}

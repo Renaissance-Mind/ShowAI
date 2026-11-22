@@ -10,7 +10,17 @@
 
 配置和验证见[连接向导](connect-mcp.md)。最终回复只补充必要解释。远程 delivery 中的 URL 是可访问的交付地址，按返回的链接交付。
 
-ChatGPT Work 连接有授权的桌面运行时并提供 `card_open` 时，用它打开指定原页的编辑器。用户也能从对话的 ShowAI 面板编辑页面，或从全局 ShowAI 入口浏览已授权项目。通用本机连接提供 `workbench_page_url` 时，可将原页编辑链接交给宿主的 Browser。
+<!-- showai-only:chatgpt -->
+
+ChatGPT Work 连接有授权的桌面运行时并提供 `card_open` 时，用它打开指定原页的编辑器。用户也能从对话的 ShowAI 面板编辑页面，或从全局 ShowAI 入口浏览已授权项目。
+
+<!-- /showai-only -->
+
+<!-- showai-only:local -->
+
+通用本机连接提供 `workbench_page_url` 时，可将原页编辑链接交给宿主的 Browser。
+
+<!-- /showai-only -->
 
 页面超出对话预算时（嵌入图片是常见原因）结果带 `inlineError`，附带视图只显示原因和完整文件链接：用 page_read 的 `detail:"outline"` 取得块 ID，带一到三个关键块的 blockIds 再调用一次，并说明整页的打开方式。
 

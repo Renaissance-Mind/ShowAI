@@ -26,10 +26,10 @@ https://github.com/user-attachments/assets/375d6ff3-fe3e-47c2-b6a4-d69df1b86b20
 
 ShowAI 在你已经在用的 Agent 里工作：装上插件后，Agent 就能把回答做成界面；ShowAI App 负责保存、打开和继续编辑这些界面。
 
-需要：Apple Silicon Mac（macOS 13 或更高版本），以及已登录的 Claude Code 或 Codex（也可以在 App 中填写模型 API Key）。使用 Windows 或 Linux 时，运行[浏览器版](#从源码构建)。
+桌面版需要 Apple Silicon Mac 和 macOS 13 或更高版本。可以连接受支持的宿主，也可以使用带模型 API Key 的内置 Agent。使用 Windows 或 Linux 时，运行[浏览器版](#从源码构建)。
 
 1. **下载 ShowAI** — 下载[最新版本](https://github.com/Renaissance-Mind/ShowAI/releases/latest)，打开 DMG，把 ShowAI 拖进「应用程序」。当前版本尚未经过 Apple 公证；macOS 阻止首次打开时，见[首次打开](quick-start.zh-CN.md#1-安装-showai)。
-2. **连接你的 Agent** — 打开 ShowAI，在欢迎页（或「设置 → Agent 插件」）为 Claude Code 或 Codex 安装插件，然后重启 Agent。
+2. **连接你的 Agent** — 在 ShowAI「设置 → Agent 插件」选择宿主，按提示安装或导入插件，再新开会话。
 3. **让 Agent 做第一个界面** — 在新对话中粘贴示例提示词：
 
    > 用 ShowAI 做一个房贷计算器。让我调整房价、首付比例、利率和期限，显示月供和总利息，并保存为 ShowAI 页面。
@@ -38,18 +38,23 @@ ShowAI 在你已经在用的 Agent 里工作：装上插件后，Agent 就能把
 
 ## 🤖 支持的 Agent
 
-| Agent                                      | 状态     | 接入方式                                                                                                                       |
-| ------------------------------------------ | -------- | ------------------------------------------------------------------------------------------------------------------------------ |
-| Claude Code                                | 正式     | ShowAI「设置 → Agent 插件」→ 安装插件                                                                                                |
-| Codex                                      | 正式     | ShowAI「设置 → Agent 插件」→ 安装插件                                                                                                |
-| Antigravity                                | 正式     | ShowAI「设置 → Agent 插件」→ 安装插件                                                                                                |
-| 内置 Agent                                 | 正式     | 在 ShowAI 中使用本机 Codex 或 Claude Code 的登录、模型 API Key 或 Cloud                                                        |
-| DeepSeek Harness                           | 预览     | 完全退出 DeepSeek Harness，在 ShowAI「设置 → Agent 插件」点「安装插件」（[步骤](../../plugins/showai/README.zh-CN.md#deepseek-harness)） |
-| Kimi Work                                  | 预览     | 在「设置 → Agent 插件」准备插件目录，再[在 Kimi Work 中安装](../../plugins/showai-kimi/README.md)                                      |
-| Cursor、Qoder、WorkBuddy                   | 预览     | 「设置 → Agent 插件」可直接安装已检测到的 Cursor 和 WorkBuddy。Qoder 通过 ZIP 导入。[安装说明](../../plugins/showai/README.zh-CN.md#cursorqoder-和-workbuddy) |
-| 网页版 ChatGPT                             | 自行部署 | 在桌面 App 开启远程连接，使用自己的 Cloudflare 或 Tailscale 接入本机项目（[指南](chatgpt.zh-CN.md)）                           |
-| Kimi Code、TRAE IDE | 预览 | 在「设置 → Agent 插件」准备 Kimi Code 安装包，或直接安装已检测到的 TRAE 扩展。[接入说明](../../plugins/showai/README.zh-CN.md#kimi-code-和-trae) |
-| Gemini CLI、OpenCode | 实验 | 在「设置 → Agent 插件」为已检测到的 Gemini CLI 配置 MCP，或复制相应客户端的配置。[Agent 接入](agent-integration.zh-CN.md) |
+| 宿主 | 状态 | 安装与连接 | 展示与编辑 |
+| --- | --- | --- | --- |
+| Codex | 已支持 | 设置中安装，刷新插件并新开对话 | 在聊天内操作交互预览。点击已保存页面的卡片可在右侧编辑原页、定位组件；支持插件扩展的桌面端还可打开全局工作台并把选区引用到聊天。 |
+| Claude Code | 已支持 | 设置中安装，重启会话 | 会话提供 HTML 展示工具时可展示交互预览和原页卡片。桌面会话可在可用的 Browser 或预览中编辑原页；终端交付 HTML 文件和原页链接。 |
+| Antigravity | 已支持 | 设置中安装，重启会话 | 聊天内显示交互预览和原页卡片。右侧辅助面板可编辑原页、定位组件并引用选区，全局工作台可浏览项目。 |
+| DeepSeek Harness | 已支持 | 退出宿主后在设置中安装 | 图形客户端支持聊天内交互预览、原页卡片、右侧会话标签页编辑和引用到草稿，左侧导航可打开全局工作台。终端交付文件或链接。 |
+| Kimi Work | 已支持 | 在宿主注册并安装插件目录 | Widget 可以显示离线交互预览和原页卡片。宿主浏览器能访问本机时可打开可编辑原页，也可使用 ShowAI 页面链接。 |
+| Cursor Agents | 已支持 | 安装本地 Agent 插件，重载窗口 | 聊天内显示交互预览和原页卡片。卡片提供实时编辑链接，可在 Cursor Browser 中打开原页。 |
+| Cursor IDE | 已支持 | 安装 VSIX，重载窗口 | 聊天内显示交互预览和原页卡片。点击卡片或打开 `.showai-ref` 可在 IDE 分栏编辑原页；从命令面板选择「ShowAI：打开工作台」浏览项目。 |
+| Qoder | 已支持 | 在宿主导入插件 ZIP | 聊天内显示交互预览和原页卡片。卡片可定位已打开的任务侧栏编辑器；Agent 可打开新的右侧原页标签，「更多 → ShowAI」打开全局工作台。 |
+| WorkBuddy | 已支持 | 在设置中安装，或注册本地插件市场 | 聊天内显示交互预览和原页卡片。任务提供内置浏览器时，用卡片的编辑链接打开原页。 |
+| Kimi Code | 已支持 | 在宿主安装自定义插件目录 | 桌面版在文件预览中显示交互 HTML，可在任务右侧 Browser 中编辑原页。CLI 交付 HTML 文件和原页编辑链接。 |
+| TRAE IDE | 已支持 | 安装 VSIX，另行导入 MCP 配置 | 从命令面板选择「ShowAI：打开工作台」浏览项目，打开 `.showai-ref` 在 IDE 标签页编辑原页。Agent 使用单独配置的 MCP 连接，可交付 HTML 文件与原页引用。 |
+| 内置 Agent | 已支持 | 在 ShowAI 中配置本机 Agent 登录、模型 API 或 Cloud。 | 在项目中创建、修改和展示原页。 |
+| 网页版 ChatGPT | 自行部署 | [配置远程 MCP 和 OAuth](chatgpt.zh-CN.md)。 | 在聊天内预览交互内容，按连接权限读写项目。 |
+| T3 Code | 随提供方接入 | 在线程中复用提供方插件，或配置对应的 MCP 连接。 | 按提供方能力显示 MCP App 或 HTML，可在 T3 Browser 中编辑原页。 |
+| Gemini CLI、OpenCode | 实验 | 在设置中配置 Gemini CLI，或复制 MCP 配置到客户端。 | 通过 MCP 读写项目，按客户端能力交付文件或链接。 |
 
 ### 按 Agent 宿主选择插件目录
 

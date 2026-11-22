@@ -1,0 +1,21 @@
+{
+  "en": {
+    "remote": "Enable the ShowAI MCP connection supplied by this package in {host}, authorize it if prompted and refresh the session tools.",
+    "manual": "Enable the plugin in {host}. Select an existing ShowAI MCP connection or add one for the intended library in the host’s MCP settings.",
+    "remoteFeatures": "Check the current connection’s presentation capabilities with `showai_capabilities` and its project access with `projects_list`.",
+    "verify": "In a new session, call `showai_capabilities` to check the connection and `projects_list` to see the projects you can access.",
+    "references": "[Connection guide](skills/use-showai/references/connect-mcp.md) · [Presentation and editing](skills/use-showai/references/host-adapter.md)"
+  },
+  "zh": {
+    "entry": "在 {host} 中连接 ShowAI、查找和管理项目、切换内容库及处理连接问题。创作或续改作品用 show-document，在聊天里展示图表用 show-visual。",
+    "remote": "在 {host} 中启用本包的 ShowAI MCP 连接，按连接提示完成授权，然后刷新会话工具。",
+    "manual": "在 {host} 中启用插件，选择已有的 ShowAI MCP 连接，或在宿主的 MCP 设置中添加所选内容库的连接。",
+    "remoteFeatures": "用 `showai_capabilities` 核对当前连接支持的展示方式，用 `projects_list` 检查项目权限。",
+    "verify": "打开新会话，调用 `showai_capabilities` 确认 ShowAI 可用，再用 `projects_list` 查看可访问的项目。项目绑定连接用 `project_context` 确认项目。",
+    "recoverLocal": "若会话只提供 `showai_connection_problem`，调用它并按回执修复所选内容库的运行时，再刷新连接。换库时在 ShowAI 选定目标库，按本页的安装步骤重新绑定并开启新会话。 若在宿主中另选了 HTTP 连接，检查该连接的服务地址、认证方式和项目范围，重新授权后调用 `projects_list`。",
+    "recoverRemote": "连接要求重新授权时，在宿主中刷新原连接，核对服务地址、认证方式和项目权限。",
+    "recoverManual": "刷新宿主中选定的 MCP 连接。使用本机启动命令时核对绑定的内容库，使用远程地址时核对端点、认证方式和项目权限。",
+    "references": "[连接与排查](skills/use-showai/references/connect-mcp.md) · [展示与编辑](skills/use-showai/references/host-adapter.md)",
+    "diagnostics": "进一步排查见[运行时与错误码](runtime.md)。显示方式和已保存页面的打开方式见[当前宿主适配](host-adapter.md)。"
+  }
+}

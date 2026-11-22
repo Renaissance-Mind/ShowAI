@@ -29,7 +29,11 @@ description: 在聊天中用原创 HTML 直接展示一至五个可交互的图�
 
 ## 当前宿主交付
 
+<!-- showai-only:codex,claude -->
+
 当前对话运行在 T3 Code 时，按 [T3 Code 展示](../use-showai/references/host-display.md#t3-code)选择 MCP App 或 T3 HTML，优先于下方提供方的桌面交付步骤。
+
+<!-- /showai-only -->
 
 已绑定的宿主直接调用展示工具。显示能力未知时用 `showai_capabilities({view:"presentation"})` 查看 `presentation.show.html` 和 `declaredHostDisplay`。旧运行时只支持已有组件时，支持 HTML 文件展示的宿主可按其原生入口展示原创片段；其他宿主提示更新后重连。工具发现后仍缺少 ShowAI 或连接提示未授权时，按[连接向导](../use-showai/references/connect-mcp.md)恢复或配置连接。用户需要操作控件时说明所缺的展示能力，静态说明可先用 Mermaid 或表格。
 

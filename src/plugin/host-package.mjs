@@ -68,6 +68,118 @@ export async function bindWorkflowDelivery(sourceSkills, targetSkills, adapter) 
   return hashes;
 }
 
+const ENTRY = "use-showai/SKILL.md";
+const CONNECTION = "use-showai/references/connect-mcp.md";
+const RUNTIME = "use-showai/references/runtime.md";
+
+export async function readHostSetup(source, profile) {
+  return JSON.parse(
+    await readFile(
+      join(source, "host-adapters/setup", profile + ".json"),
+      "utf8",
+    ),
+  );
+}
+
+function scopedSections(text, profile, transport) {
+  if (!text.includes("<!-- showai-only:")) return text;
+  return (
+    text
+      .replace(
+        /<!-- showai-only:(\S+) -->\r?\n([\s\S]*?)<!-- \/showai-only -->\r?\n?/g,
+        (_, audience, body) =>
+          audience.split(",").includes(profile) ||
+          audience === transport ||
+          (transport === "manual" && ["local", "remote"].includes(audience))
+            ? body.trim() + "\n"
+            : "",
+      )
+      .replace(/\n{3,}/g, "\n\n")
+      .trimEnd() + "\n"
+  );
+}
+
+function hostReadme(setup, text, install, locale, native) {
+  const guide = setup[locale];
+  const parts = [
+    `# ShowAI for ${setup.name}`,
+    locale === "zh" ? "[English](README.md)" : "[简体中文](README.zh-CN.md)",
+    native ? guide.features : text.remoteFeatures,
+    install,
+    text.verify,
+  ];
+  if (native && guide.source) parts.push(guide.source);
+  parts.push(text.references);
+  return parts.join("\n\n") + "\n";
+}
+
+export async function hostGuidance(source, profile, transport = "local") {
+  const skills = join(source, "skills");
+  const universal = profile === "mcp-app";
+  const adapterName = transport === "local" ? profile : "mcp-app";
+  let adapter = await readFile(
+    join(source, "host-adapters", adapterName + ".md"),
+    "utf8",
+  );
+  if (!universal) adapter = scopedSections(adapter, profile, transport);
+  const files = { [HOST_GUIDE]: adapter };
+  for (const path of DELIVERY_WORKFLOWS) {
+    const original = await readFile(join(skills, path), "utf8");
+    const workflow = workflowWithHostDelivery(path, original, adapter);
+    files[path] = universal
+      ? workflow
+      : scopedSections(workflow, profile, transport);
+  }
+  if (universal) return { files };
+  const setup = await readHostSetup(source, profile);
+  const copy = JSON.parse(
+    await readFile(join(source, "host-adapters/setup/guidance.json"), "utf8"),
+  );
+  const native = transport === "local" || profile === "chatgpt";
+  const install = (locale) =>
+    native
+      ? setup[locale].install
+      : copy[locale][transport].replace("{host}", setup.name);
+  const original = await readFile(join(skills, ENTRY), "utf8");
+  const description = copy.zh.entry.replace("{host}", setup.name);
+  files[ENTRY] = original.replace(
+    /^description:[^\r\n]*(?:\r?\n[ \t]+[^\r\n]*)*/m,
+    () => "description: " + description,
+  );
+  if (profile === "codex" || profile === "antigravity") {
+    const note = await readFile(
+      join(source, "host-adapters", profile + "-entry.md"),
+      "utf8",
+    );
+    files[ENTRY] = files[ENTRY].trimEnd() + "\n\n" + note;
+  }
+  const recovery = {
+    local: copy.zh.recoverLocal,
+    remote: copy.zh.recoverRemote,
+    manual: copy.zh.recoverManual,
+  };
+  files[CONNECTION] =
+    [
+      `# 在 ${setup.name} 中连接 ShowAI`,
+      install("zh"),
+      copy.zh.verify,
+      recovery[transport],
+      ...(setup.zh.t3 ? [setup.zh.t3] : []),
+      copy.zh.diagnostics,
+    ].join("\n\n") + "\n";
+  for (const file of await readdir(skills, { recursive: true })) {
+    if (!file.endsWith(".md")) continue;
+    const path = file.split(sep).join("/");
+    const markdown = files[path] ?? await readFile(join(skills, path), "utf8");
+    if (markdown.includes("<!-- showai-only:")) files[path] = scopedSections(markdown, profile, transport);
+  }
+  const readmes = {
+    "README.md": hostReadme(setup, copy.en, install("en"), "en", native),
+    "README.zh-CN.md": hostReadme(setup, copy.zh, install("zh"), "zh", native),
+  };
+  return { files, readmes };
+}
+
 export async function bindHostSkills({ source, target, profile }) {
   if (!Object.hasOwn(HOST_PROFILES, profile))
     throw new Error(`Unknown ShowAI host profile: ${profile}`);
@@ -75,57 +187,39 @@ export async function bindHostSkills({ source, target, profile }) {
     throw new Error(
       "Bind a host profile in a distribution copy, not in the common source.",
     );
-  const adapter = await readFile(
-    join(source, "host-adapters", `${profile}.md`),
-    "utf8",
-  );
-  const sourceFiles = await skillFiles(join(source, "skills"));
+  const sourceSkills = join(source, "skills");
+  const targetSkills = join(target, "skills");
+  const sourceFiles = await skillFiles(sourceSkills);
   if (!(HOST_GUIDE in sourceFiles))
     throw new Error(
       "The common Skills must contain the host adapter reference.",
     );
-  await rm(join(target, "skills"), { recursive: true, force: true });
-  await cp(join(source, "skills"), join(target, "skills"), { recursive: true });
-  await writeFile(join(target, "skills", HOST_GUIDE), adapter);
-  const commonFiles = Object.fromEntries(
-    Object.entries(sourceFiles).filter(([name]) => name !== HOST_GUIDE),
-  );
-  const workflowFiles = await bindWorkflowDelivery(
-    join(source, "skills"),
-    join(target, "skills"),
-    adapter,
-  );
-  const expected = { ...commonFiles, ...workflowFiles };
-  const entry = "use-showai/SKILL.md";
-  const notePath =
-    profile === "codex"
-      ? join(source, "host-adapters/codex-entry.md")
-      : profile === "antigravity"
-        ? join(source, "host-adapters/antigravity-entry.md")
-        : undefined;
-  const note = notePath ? await readFile(notePath, "utf8") : undefined;
-  if (note !== undefined) {
-    const original = await readFile(join(source, "skills", entry), "utf8");
-    const bound = original.trimEnd() + "\n\n" + note;
-    await writeFile(join(target, "skills", entry), bound);
-    expected[entry] = hash(bound);
+  const guidance = await hostGuidance(source, profile);
+  await rm(targetSkills, { recursive: true, force: true });
+  await cp(sourceSkills, targetSkills, { recursive: true });
+  const expected = { ...sourceFiles };
+  for (const [file, contents] of Object.entries(guidance.files)) {
+    await writeFile(join(targetSkills, file), contents);
+    expected[file] = hash(contents);
   }
-  const copied = await skillFiles(join(target, "skills"));
-  const copiedCommon = Object.fromEntries(
-    Object.entries(copied).filter(([name]) => name !== HOST_GUIDE),
-  );
+  if (["codex", "claude", "antigravity"].includes(profile)) {
+    for (const [file, contents] of Object.entries(guidance.readmes))
+      await writeFile(join(target, file), contents);
+  }
   if (
-    JSON.stringify(copiedCommon) !== JSON.stringify(expected) ||
-    (note !== undefined && (await readFile(notePath, "utf8")) !== note) ||
-    JSON.stringify(await skillFiles(join(source, "skills"))) !==
+    JSON.stringify(await skillFiles(targetSkills)) !==
+      JSON.stringify(expected) ||
+    JSON.stringify(await skillFiles(sourceSkills)) !==
       JSON.stringify(sourceFiles) ||
-    (await readFile(join(source, "host-adapters", `${profile}.md`), "utf8")) !==
-      adapter
-  ) {
+    JSON.stringify(await hostGuidance(source, profile)) !==
+      JSON.stringify(guidance)
+  )
     throw new Error(
       "The common Skills or host adapter changed while packaging. Retry after the source settles.",
     );
-  }
+  const commonFiles = Object.fromEntries(
+    Object.entries(sourceFiles).filter(([name]) => name !== HOST_GUIDE),
+  );
   const receipt = {
     protocol: "showai-host-profile-v1",
     profile,
@@ -135,9 +229,15 @@ export async function bindHostSkills({ source, target, profile }) {
     ).version,
     commonSha256: hash(JSON.stringify(commonFiles)),
     commonFiles,
-    workflowFiles,
-    adapterSha256: hash(adapter),
-    ...(note !== undefined && { entrySha256: expected[entry] }),
+    workflowFiles: Object.fromEntries(
+      DELIVERY_WORKFLOWS.map((file) => [file, expected[file]]),
+    ),
+    adapterSha256: expected[HOST_GUIDE],
+    ...(guidance.readmes && {
+      entrySha256: expected[ENTRY],
+      connectionSha256: expected[CONNECTION],
+      runtimeSha256: expected[RUNTIME],
+    }),
   };
   await writeFile(
     join(target, "host-profile.json"),

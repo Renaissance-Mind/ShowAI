@@ -2,6 +2,7 @@ import { existsSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { build } from "esbuild";
+import { readHostSetup } from "./host-package.mjs";
 import { archive, universalPluginFiles } from "./universal-package.mjs";
 
 export async function compileCursorExtension(source) {
@@ -20,14 +21,17 @@ export async function compileCursorExtension(source) {
 export async function cursorWorkbenchArchive(source, { runtimeConfig, host = "cursor" } = {}) {
   const packaged = join(source, "host-adapters/cursor-ide/extension.cjs");
   const extension = existsSync(packaged) ? await readFile(packaged) : undefined;
-  const agent = await universalPluginFiles(source, {
+  const agent = host === "cursor" ? await universalPluginFiles(source, {
     host: "cursor",
+    cursorWorkbench: true,
     name: "showai-cursor-ide",
     displayName: "ShowAI for Cursor IDE",
     mcp: "local",
     runtimeConfig,
-  });
-  const version = agent.version;
+  }) : undefined;
+  const profile = host === "cursor" ? "cursor-ide" : "trae";
+  const setup = await readHostSetup(source, profile);
+  const { version } = JSON.parse(await readFile(join(source, "plugin.json"), "utf8"));
   const packageJson = {
     name: "showai-workbench",
     publisher: "renaissancemind",
@@ -79,8 +83,13 @@ export async function cursorWorkbenchArchive(source, { runtimeConfig, host = "cu
   const record = runtimeConfig && JSON.parse(await readFile(runtimeConfig, "utf8"));
   addJson("binding.json", record ? { runtimeConfig, library: record.home } : {});
   add("extension/extension.cjs", extension ?? await compileCursorExtension(source));
-  add("extension/assets/logo.svg", agent.files.get("assets/logo.svg"));
-  if (host === "cursor") for (const [name, data] of agent.files)
+  add("extension/assets/logo.svg", await readFile(join(source, "assets/logo.svg")));
+  for (const [name, language] of [["README.md", "en"], ["README.zh-CN.md", "zh"]]) {
+    const { install, features } = setup[language];
+    const switcher = language === "en" ? "[简体中文](README.zh-CN.md)" : "[English](README.md)";
+    add("extension/" + name, [`# ShowAI for ${setup.name}`, switcher, features, install].join("\n\n") + "\n");
+  }
+  if (agent) for (const [name, data] of agent.files)
     if (name === "mcp.json") {
       const config = JSON.parse(data);
       for (const server of Object.values(config.mcpServers))
@@ -101,7 +110,7 @@ export async function cursorWorkbenchArchive(source, { runtimeConfig, host = "cu
     </Metadata>
     <Installation><InstallationTarget Id="Microsoft.VisualStudio.Code"/></Installation>
     <Dependencies/>
-    <Assets><Asset Type="Microsoft.VisualStudio.Code.Manifest" Path="extension/package.json" Addressable="true"/></Assets>
+    <Assets><Asset Type="Microsoft.VisualStudio.Code.Manifest" Path="extension/package.json" Addressable="true"/><Asset Type="Microsoft.VisualStudio.Services.Content.Details" Path="extension/README.md" Addressable="true"/></Assets>
   </PackageManifest>`);
   const mimeTypes = {
     cjs: "application/javascript", mjs: "application/javascript", json: "application/json",

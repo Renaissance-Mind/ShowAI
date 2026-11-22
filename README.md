@@ -26,10 +26,10 @@ This README describes `main`. For the exact menus and plugin setup in a download
 
 ShowAI works inside the agent you already use: the plugin lets your agent build interfaces, and the ShowAI app keeps, opens and edits them.
 
-You need a Mac with Apple silicon (macOS 13 or later), and Claude Code or Codex signed in. No agent yet? Use the built-in agent with a model API key. On Windows or Linux, run the [browser edition](#build-from-source).
+The desktop app requires a Mac with Apple silicon and macOS 13 or later. Connect a supported host or use the built-in agent with a model API key. On Windows or Linux, run the [browser edition](#build-from-source).
 
 1. **Download ShowAI** — get the [latest release](https://github.com/Renaissance-Mind/ShowAI/releases/latest), open the DMG and drag ShowAI into Applications. Current builds are not yet notarized by Apple; if macOS blocks the first launch, see [first launch](docs/quick-start.md#1-install-showai).
-2. **Connect your agent** — open ShowAI and install the plugin for Claude Code or Codex from the welcome screen (or **Settings → Agent plugins**), then restart the agent.
+2. **Connect your agent** — open **Settings → Agent plugins** in ShowAI, select your host and follow its install or import steps. Start a new session after setup.
 3. **Ask for an interface** — paste the sample prompt into a new conversation:
 
    > Use ShowAI to build a mortgage calculator with adjustable price, down payment, rate and term. Show the monthly payment and total interest, and save it as a ShowAI page.
@@ -38,18 +38,23 @@ A chat visualization is a temporary preview. The sample explicitly requests a sa
 
 ## 🤖 Supported agents
 
-| Agent                                     | Status       | How to connect                                                                                                                         |
-| ----------------------------------------- | ------------ | -------------------------------------------------------------------------------------------------------------------------------------- |
-| Claude Code                               | Supported    | ShowAI → **Settings → Agent plugins** → Install plugin                                                                                       |
-| Codex                                     | Supported    | ShowAI → **Settings → Agent plugins** → Install plugin                                                                                       |
-| Antigravity                               | Supported    | ShowAI → **Settings → Agent plugins** → Install plugin                                                                                       |
-| Built-in agent                            | Supported    | Inside ShowAI, using your local Codex or Claude Code sign-in, a model API key or Cloud                                                 |
-| DeepSeek Harness                          | Preview      | Quit DeepSeek Harness, then choose **Settings → Agent plugins → Install plugin** in ShowAI ([steps](plugins/showai/README.md#deepseek-harness)) |
-| Kimi Work                                 | Preview      | Prepare the plugin directory in **Settings → Agent plugins**, then [install it in Kimi Work](plugins/showai-kimi/README.md)                                              |
-| Cursor, Qoder, WorkBuddy                  | Preview      | Install Cursor and WorkBuddy from **Settings → Agent plugins** when detected. For Qoder, prepare a ZIP and [import it in Qoder](plugins/showai/README.md#cursor-qoder-and-workbuddy). |
-| ChatGPT on the web                        | Self-hosted  | Enable Remote connection in the desktop App with your own Cloudflare or Tailscale account ([guide](docs/chatgpt.md))                   |
-| Kimi Code, TRAE IDE | Preview | Prepare the Kimi Code bundle or install the detected TRAE extension in **Settings → Agent plugins**. [Kimi Code and TRAE setup](plugins/showai/README.md#kimi-code-and-trae) |
-| Gemini CLI, OpenCode | Experimental | Configure Gemini CLI when detected or copy the local MCP settings from **Settings → Agent plugins**. [Agent integration](docs/agent-integration.md) |
+| Host | Status | Installation | Presentation and editing |
+| --- | --- | --- | --- |
+| Codex | Supported | Install in Settings, refresh plugins and start a new chat. | Interact with previews in chat. Open a saved page card to edit the original or jump to a component in the side panel. Desktop builds with plugin extensions also offer a global workbench and selection references in chat. |
+| Claude Code | Supported | Install in Settings and restart the session. | Sessions with an HTML display tool can show interactive previews and page cards. Desktop sessions can edit the original in an available browser or preview. Terminal sessions deliver an HTML file and a page link. |
+| Antigravity | Supported | Install in Settings and restart the session. | Show interactive previews and page cards in chat. Edit originals, navigate to components and quote selections in the auxiliary pane, or browse projects in the global workbench. |
+| DeepSeek Harness | Supported | Quit the host, then install from Settings. | The graphical client shows interactive previews and page cards in chat. Edit the original and quote a selection into the draft from a session tab, or open the global workbench from the left navigation. Terminal sessions deliver files or links. |
+| Kimi Work | Supported | Register and install the plugin directory in the host. | A Widget can show offline interactive previews and page cards. Open the editable original in the host browser when it can reach the local machine, or use the ShowAI page link. |
+| Cursor Agents | Supported | Install the local agent plugin and reload the window. | Show interactive previews and page cards in chat. Open the card’s live edit link in Cursor Browser to edit the original. |
+| Cursor IDE | Supported | Install the VSIX and reload the window. | Show interactive previews and page cards in chat. Click a card or open a `.showai-ref` file to edit the original in an IDE pane. Use ShowAI: Open Workbench from the command palette to browse projects. |
+| Qoder | Supported | Import the plugin ZIP in the host. | Show interactive previews and page cards in chat. A card navigates an open task editor, and the agent can open an original in a new right-side tab. More → ShowAI opens the global workbench. |
+| WorkBuddy | Supported | Install from Settings or register the local marketplace. | Show interactive previews and page cards in chat. When a task provides an embedded browser, use the card’s edit link to open the original. |
+| Kimi Code | Supported | Install the directory as a custom plugin. | Desktop opens interactive HTML in the file preview and edits the original in the task’s Browser pane. The CLI delivers the HTML file and an edit link. |
+| TRAE IDE | Supported | Install the VSIX and import the separate MCP configuration. | Use ShowAI: Open Workbench from the command palette to browse projects and open a `.showai-ref` in an IDE tab to edit the original. The agent uses a separately configured MCP connection to deliver HTML files and page references. |
+| Built-in agent | Supported | Configure local agent sign-in, a model API or Cloud in ShowAI. | Create, edit and present original pages inside a project. |
+| ChatGPT on the web | Self-hosted | [Configure remote MCP and OAuth](docs/chatgpt.md). | Preview interactive content in chat and read or edit authorized projects. |
+| T3 Code | Via the selected provider | Reuse the provider’s plugin or configure its MCP connection for the thread. | Show MCP Apps or HTML according to provider capabilities and open originals in T3 Browser. |
+| Gemini CLI, OpenCode | Experimental | Configure the detected Gemini CLI or copy MCP settings into the client. | Read and write projects over MCP. Files and links follow the client’s capabilities. |
 
 ### Plugin paths by Agent host
 

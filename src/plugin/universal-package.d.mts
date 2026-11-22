@@ -7,6 +7,7 @@ interface UniversalPluginOptions {
   mcp?: string;
   mcpAuth?: "oauth" | "none";
   runtimeConfig?: string;
+  cursorWorkbench?: boolean;
   host?: "cursor" | "qoder" | "workbuddy" | "kimi-code";
 }
 export function universalPluginFiles(

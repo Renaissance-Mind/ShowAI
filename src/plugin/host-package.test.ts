@@ -13,6 +13,7 @@ import { join, resolve } from "node:path";
 import { tmpdir } from "node:os";
 import {
   bindHostSkills,
+  hostGuidance,
   HOST_GUIDE,
   HOST_PROFILES,
   skillFiles,
@@ -39,38 +40,16 @@ async function expectedWorkflowHashes(
   profile: string,
 ) {
   const expected = { ...common };
-  const adapter = await readFile(
-    join(source, "host-adapters", profile + ".md"),
-    "utf8",
-  );
-  const slot =
-    /<!-- showai-host-delivery:start -->[\s\S]*?<!-- showai-host-delivery:end -->/;
-  const delivery = adapter.match(slot)?.[0];
+  const guidance = await hostGuidance(source, profile);
+  const slot = /<!-- showai-host-delivery:start -->[\s\S]*?<!-- showai-host-delivery:end -->/;
+  const delivery = guidance.files[HOST_GUIDE].match(slot)?.[0];
   expect(delivery).toBeTruthy();
-  for (const file of ["show-visual/SKILL.md", "show-document/SKILL.md"]) {
-    const commonWorkflow = await readFile(join(source, "skills", file), "utf8");
-    expect(commonWorkflow).toMatch(slot);
-    const bound = commonWorkflow.replace(slot, () => delivery!);
-    expected[file] = createHash("sha256").update(bound).digest("hex");
+  for (const path of ["show-document/SKILL.md", "show-visual/SKILL.md"])
+    expect(guidance.files[path]).toContain(delivery);
+  for (const [file, contents] of Object.entries(guidance.files)) {
+    if (file !== HOST_GUIDE) expected[file] = createHash("sha256").update(contents).digest("hex");
   }
-  const noteName =
-    profile === "codex"
-      ? "codex-entry.md"
-      : profile === "antigravity"
-        ? "antigravity-entry.md"
-        : undefined;
-  if (!noteName) return expected;
-  const entry = "use-showai/SKILL.md";
-  const original = await readFile(join(source, "skills", entry), "utf8");
-  const note = await readFile(
-    join(source, "host-adapters", noteName),
-    "utf8",
-  );
-  const bound = original.trimEnd() + "\n\n" + note;
-  return {
-    ...expected,
-    [entry]: createHash("sha256").update(bound).digest("hex"),
-  };
+  return expected;
 }
 
 describe("host-specific plugin distributions", () => {

@@ -9,7 +9,7 @@ One Harness bundle supplies everything ShowAI needs in DeepSeek Harness:
 | Row | Module | Purpose |
 | --- | --- | --- |
 | `showai-mcp` | `@deepseek-ai/dsh-mcp-client` | The ShowAI MCP tools (`mcp__showai__*`), started through the bundled launcher with this machine's ShowAI runtime and library. |
-| `showai-skills` | `@showai/dsh-showai/skills` | The ShowAI agent Skills from [plugins/showai](../showai/README.md), published at the Harness bundled-skill rank. |
+| `showai-skills` | `@showai/dsh-showai/skills` | The ShowAI agent Skills from [ShowAI](https://github.com/Renaissance-Mind/ShowAI/tree/main/plugins/showai-deepseek), published at the Harness bundled-skill rank. |
 | `showai-preview` | `@showai/dsh-showai` | Shows inline previews and opens the editable library in a session sidebar tab or the global ShowAI panel. |
 
 Open DeepSeek Harness Desktop once, then quit it completely. Choose **Settings → Agent plugins → DeepSeek Harness → Install plugin** in ShowAI. ShowAI stages the runtime and library binding, calls the Harness desktop CLI and checks that the package is linked and enabled. Open Harness to load it. After an update or library change, use **Update and enable** in ShowAI and reopen Harness.
@@ -112,7 +112,7 @@ npm test
 
 在聊天中看图时，工具结果和回合末尾都提供交互预览。保存页面后，点击整张原页卡片就能在当前会话右侧打开编辑器，还能把页面或选区引用放进当前对话草稿。也可以从右侧栏的新标签打开 ShowAI，再用宿主的全屏、分栏或浮动控件调整空间。左侧导航的 ShowAI 打开全局工作台。以上入口共用安装时绑定的本机内容库。
 
-此 Harness bundle 提供 ShowAI 在 DeepSeek Harness 中所需的全部内容：`showai-mcp` 行通过 bundle 内的启动器连接本机 ShowAI 运行时与内容库，提供 `mcp__showai__*` 工具；`showai-skills` 行以 Harness 内置 Skill 的优先级发布 [plugins/showai](../showai/README.md) 的 Skill；`showai-preview` 行在对话中显示页面。
+此 Harness bundle 提供 ShowAI 在 DeepSeek Harness 中所需的全部内容：`showai-mcp` 行通过 bundle 内的启动器连接本机 ShowAI 运行时与内容库，提供 `mcp__showai__*` 工具；`showai-skills` 行以 Harness 内置 Skill 的优先级发布 [ShowAI](https://github.com/Renaissance-Mind/ShowAI/tree/main/plugins/showai-deepseek) 的 Skill；`showai-preview` 行在对话中显示页面。
 
 首次打开 DeepSeek Harness 后完全退出，在 ShowAI「设置 → Agent 插件 → DeepSeek Harness」点「安装插件」。ShowAI 准备绑定当前内容库的插件包，通过 Harness CLI 安装并核验启用状态。打开 Harness 即可使用。源码方式可以用 `npm run plugin:dsh` 准备目录，然后运行 `dsh plugin --profile desktop add "link:/插件包的绝对路径"`。使用图形界面手动安装时，在 Harness「插件 → 添加插件」选择该目录并点「立即启用」。
 

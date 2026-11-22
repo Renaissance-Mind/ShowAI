@@ -130,13 +130,14 @@ test("refuses to overwrite another package in the configured directory", async (
 
 test("publishes every staged Skill without its frontmatter", async () => {
   const { target } = await stage();
-  for (const file of ["mcp/launch.mjs", "skills/use-showai/SKILL.md"]) {
-    expect(await readFile(join(target, file), "utf8")).toBe(
-      await readFile(resolve("plugins/showai", file), "utf8"),
-    );
-  }
+  expect(await readFile(join(target, "mcp/launch.mjs"), "utf8")).toBe(
+    await readFile(resolve("plugins/showai/mcp/launch.mjs"), "utf8"),
+  );
   const provider = createProvider(join(target, "skills"));
   const listed = await provider.list();
+  const entry = listed.find((skill: { name: string }) => skill.name === "use-showai");
+  expect(entry.description).toContain("DeepSeek Harness");
+  expect(entry.description).not.toContain("ChatGPT");
   expect(listed.map((skill: { name: string }) => skill.name).sort()).toEqual(
     (await readdir(resolve("plugins/showai/skills"))).sort(),
   );

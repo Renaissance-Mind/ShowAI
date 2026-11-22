@@ -1,0 +1,11 @@
+{
+  "name": "ChatGPT",
+  "en": {
+    "install": "Select the registered ShowAI MCP connection in ChatGPT plugin settings. For first-time setup, add the public HTTPS MCP URL with OAuth and dynamic client registration, approve the matching request in ShowAI and refresh the session.",
+    "features": "Show interactive MCP App previews and page cards in chat. Connections with page-opening tools can open the authorized editor from a card."
+  },
+  "zh": {
+    "install": "在 ChatGPT 的插件设置中选用已注册的 ShowAI MCP 连接。首次接入时添加可从公网访问的 HTTPS MCP 地址，选择 OAuth 和动态客户端注册，在 ShowAI 核对并批准连接后刷新会话。",
+    "features": "在会话内显示 MCP App 交互预览和原页卡片。连接提供打开原页的工具时，可从卡片进入已授权的页面编辑器。"
+  }
+}

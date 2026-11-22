@@ -9,7 +9,7 @@ ShowAI works inside the agent you already use: the plugin lets your agent build 
 ## Before you start
 
 - A Mac with Apple silicon running macOS 13 or later.
-- **Claude Code** or **Codex**, installed and signed in. ShowAI installs its plugin through the agent's command-line tool, so that tool must be available; for Codex, ShowAI also finds the CLI bundled with the Codex app.
+- Install the host you want to connect and sign in if it requires an account. See the [supported hosts](../README.md#-supported-agents) for installation options and capabilities.
 - No agent yet? Use the [built-in agent](#without-claude-code-or-codex) with a model API key.
 - On Windows or Linux, [run the browser edition from source](#run-from-source).
 
@@ -26,8 +26,8 @@ ShowAI keeps itself up to date: it checks the latest release in the background, 
 The menus below follow `main`. In the [public 0.13.0 build](https://github.com/Renaissance-Mind/ShowAI/blob/v0.13.0/plugins/showai/README.md#deepseek-harness), open the **External Agent plugins** section in Settings to copy the local launch configuration. For DeepSeek Harness, choose **Prepare plugin** there and finish installing the bundle in Harness. The current source build installs it from **Settings → Agent plugins**.
 
 1. In ShowAI, open the plugin panel: the welcome screen shows it on first launch, and it is always available under **Settings → Agent plugins**.
-2. ShowAI checks for Claude Code and Codex. Click **Install plugin** next to the agent you use and wait for **Installed and enabled**.
-3. Reload the agent: restart the Claude Code session, or refresh plugins or restart Codex. A conversation that was already open keeps its old tool list, so start a new one.
+2. Select your host and follow its row to install directly, prepare a plugin directory or import a package.
+3. Refresh the host as directed and start a new session. For example, restart the Claude Code session or refresh plugins in Codex and start a new chat.
 
 After using ShowAI in your Agent, open **Settings → MCP → Call history** to see the tool, client, result and duration. The MCP section also shows the local runtime, lets you copy a launch configuration and sets how long this library keeps call records.
 

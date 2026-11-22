@@ -203,6 +203,8 @@ function hostFiles(host: PluginHost, files: [string, string][]) {
     if (name.startsWith("host-adapters/"))
       return (
         name === `host-adapters/${host}.md` ||
+        name === `host-adapters/setup/${host}.json` ||
+        name === "host-adapters/setup/guidance.json" ||
         (host === "codex" &&
           [
             "host-adapters/codex-entry.md",

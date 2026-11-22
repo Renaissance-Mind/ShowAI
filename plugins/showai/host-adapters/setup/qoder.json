@@ -1,0 +1,11 @@
+{
+  "name": "Qoder",
+  "en": {
+    "install": "Prepare the Qoder ZIP in ShowAI under Settings → Agent plugins. In Qoder, import and enable it under Extensions → Plugins → Add plugin → Import plugin. Check ShowAI under Extensions → Connectors.",
+    "features": "Show interactive previews and page cards in chat. A card navigates an open task editor, and the agent can open an original in a new right-side tab. More → ShowAI opens the global workbench."
+  },
+  "zh": {
+    "install": "在 ShowAI 的「设置 → Agent 插件」准备 Qoder ZIP，在 Qoder 的「扩展 → 插件 → 添加插件 → 导入插件」导入并启用。到「扩展 → 连接器」检查 ShowAI。",
+    "features": "聊天内显示交互预览和原页卡片。卡片可定位已打开的任务侧栏编辑器；Agent 可打开新的右侧原页标签，「更多 → ShowAI」打开全局工作台。"
+  }
+}

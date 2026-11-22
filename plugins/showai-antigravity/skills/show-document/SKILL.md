@@ -175,8 +175,6 @@ description: 创作或修改要保存的作品：可交互报告、讲解页面�
 
 ### 当前宿主交付
 
-当前对话运行在 T3 Code 时，按 [T3 Code 展示](../use-showai/references/host-display.md#t3-code)交付最终原页、阅读预览、浏览器编辑器或文件，优先于下方提供方的桌面交付步骤。
-
 新建或续改作品后，根据本轮最终保存回执，在同一轮给出原页入口。用户指定只保存、只导出或直接打开时按其要求交付。
 
 <!-- showai-host-delivery:start -->

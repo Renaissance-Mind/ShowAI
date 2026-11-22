@@ -105,7 +105,7 @@
           "content": [
             {
               "type": "text",
-              "text": "需要：Apple Silicon Mac（macOS 13 或更高版本），以及已登录的 Claude Code 或 Codex（也可以在 App 中填写模型 API Key）。"
+              "text": "桌面版需要 Apple Silicon Mac 和 macOS 13 或更高版本。可以连接受支持的宿主，也可以在 App 中配置模型 API Key 使用内置 Agent。"
             }
           ],
           "attrs": {
@@ -362,7 +362,7 @@
                   },
                   {
                     "title": "安装插件",
-                    "body": "ShowAI 会检测 Claude Code 与 Codex。在你使用的 Agent 旁点「安装插件」。",
+                    "body": "在「设置 → Agent 插件」选择你使用的宿主，按该行说明直接安装、准备插件目录或导入安装包。",
                     "result": "插件显示「已安装并启用」。"
                   },
                   {
@@ -1184,7 +1184,7 @@
                     "title": "其他 Agent",
                     "tag": "宿主插件与远程 MCP",
                     "tone": "teal",
-                    "body": "DeepSeek Harness、Kimi Work、Kimi Code 和 TRAE IDE 有专用接入方式。网页版 ChatGPT 通过公网 HTTPS 和 OAuth 连接你的桌面 App 或管理员提供的服务。Gemini CLI、OpenCode 可手动配置本机 MCP。",
+                    "body": "11 种宿主插件和扩展均已支持。在 ShowAI「设置 → Agent 插件」选择宿主，直接安装或按提示导入。网页版 ChatGPT 通过公网 HTTPS 和 OAuth 接入。Gemini CLI 和 OpenCode 可配置本机 MCP。",
                     "href": "https://showai.renaissancemind.ai/doc/agent-hosts"
                   },
                   {

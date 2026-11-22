@@ -9,7 +9,7 @@ ShowAI 在你已经在用的 Agent 里工作：装上插件后，Agent 就能把
 ## 开始前
 
 - 一台 Apple Silicon Mac，系统为 macOS 13 或更高版本。
-- 已安装并登录 **Claude Code** 或 **Codex**。ShowAI 通过 Agent 的命令行工具安装插件，需要该工具可用；Codex 也可以使用 Codex App 自带的命令行工具，ShowAI 会自动查找。
+- 安装要连接的宿主，并按它的要求登录。各宿主的安装方式与功能见[支持清单](README.zh-CN.md#-支持的-agent)。
 - 还没有 Agent？可以在 App 中填写模型 API Key，使用[内置 Agent](#不使用-claude-code-或-codex)。
 - Windows 或 Linux 用户[从源码运行浏览器版](#从源码运行)。
 
@@ -26,8 +26,8 @@ ShowAI 会自动更新：它在后台检查最新发行版，下载新版本，�
 以下菜单按 `main` 说明。在[公开发行的 0.13.0](https://github.com/Renaissance-Mind/ShowAI/blob/v0.13.0/plugins/showai/README.zh-CN.md#deepseek-harness) 中，打开设置里的「外部 Agent 插件」栏目即可复制本机启动配置。该发行版接入 DeepSeek Harness 时，先点「准备插件」，再去 Harness 完成安装。当前源码构建可在「设置 → Agent 插件」直接安装。
 
 1. 在 ShowAI 中打开插件面板：首次启动时欢迎页会显示它，之后随时可以在「设置 → Agent 插件」中找到。
-2. ShowAI 会检测 Claude Code 与 Codex。在你使用的 Agent 旁点「安装插件」，等待显示「已安装并启用」。
-3. 重新加载 Agent：Claude Code 重启会话；Codex 刷新插件或重启 Codex。已经打开的对话仍使用旧的工具列表，请新开一个对话。
+2. 选择宿主，按该行提示直接安装、准备插件目录或导入安装包。
+3. 按宿主提示刷新并新开会话。例如，Claude Code 重启会话，Codex 刷新插件或重启后新开对话。
 
 在 Agent 中使用 ShowAI 后，打开「设置 → MCP → 调用记录」，即可看到工具名、客户端、结果和耗时。同一栏目也可以查看本机运行时、复制启动配置和设置记录保留时间。
 

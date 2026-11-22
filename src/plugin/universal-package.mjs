@@ -3,10 +3,8 @@ import { createHash } from "node:crypto";
 import { isAbsolute, join } from "node:path";
 import { crc32, deflateRawSync } from "node:zlib";
 import {
-  DELIVERY_WORKFLOWS,
-  HOST_GUIDE,
+  hostGuidance,
   skillFiles,
-  workflowWithHostDelivery,
 } from "./host-package.mjs";
 
 const MCP_SCHEMA = "https://agent-plugins.org/schemas/1.0.0/mcp.schema.json";
@@ -115,6 +113,7 @@ export async function universalPluginFiles(
     mcpAuth,
     runtimeConfig,
     host,
+    cursorWorkbench = false,
   } = {},
 ) {
   if (!/^[a-z0-9][a-z0-9_-]*$/.test(name))
@@ -180,17 +179,34 @@ export async function universalPluginFiles(
   };
   const json = (value) => Buffer.from(JSON.stringify(value, null, 2) + "\n");
   const files = new Map();
-  if (host !== "workbuddy" && host !== "kimi-code") files.set("plugin.json", json(manifest));
+  if (host !== "workbuddy" && host !== "kimi-code")
+    files.set("plugin.json", json(manifest));
   if (appId)
     files.set(".app.json", json({ apps: { [appAlias]: { id: appId } } }));
   if (host === "kimi-code") {
-    files.set(hostManifestPaths[host], json({
-      name, version: manifest.version, description, skills: "./skills/",
-      interface: { displayName },
-      ...(connection && { mcpServers: { showai: connection.type === "stdio" ? {
-        command: connection.command, args: connection.args, cwd: "./", env: connection.env,
-      } : { url: connection.url } } }),
-    }));
+    files.set(
+      hostManifestPaths[host],
+      json({
+        name,
+        version: manifest.version,
+        description,
+        skills: "./skills/",
+        interface: { displayName },
+        ...(connection && {
+          mcpServers: {
+            showai:
+              connection.type === "stdio"
+                ? {
+                    command: connection.command,
+                    args: connection.args,
+                    cwd: "./",
+                    env: connection.env,
+                  }
+                : { url: connection.url },
+          },
+        }),
+      }),
+    );
   } else if (host) {
     files.set(
       hostManifestPaths[host],
@@ -250,16 +266,16 @@ export async function universalPluginFiles(
       files.set(".mcp.json", json({ mcpServers: { [serverName]: native } }));
     }
   }
-  const adapter = await readFile(
-    join(
-      source,
-      "host-adapters",
-      host && mcp === "local" ? `${host}.md` : "mcp-app.md",
-    ),
-    "utf8",
-  );
+  const profile = appId
+    ? "chatgpt"
+    : host === "cursor" && cursorWorkbench
+      ? "cursor-ide"
+      : (host ?? "mcp-app");
+  const transport =
+    mcp === "local" ? "local" : connection || appId ? "remote" : "manual";
   const skillRoot = join(source, "skills");
   const snapshot = await skillFiles(skillRoot, { includeHidden: false });
+  const guidance = await hostGuidance(source, profile, transport);
   if (
     Object.keys(snapshot).filter((file) => /^[^/]+\/SKILL\.md$/.test(file))
       .length !== 6
@@ -273,11 +289,8 @@ export async function universalPluginFiles(
       throw new Error(
         "The source Skills changed during packaging. Retry after the source settles.",
       );
-    if (file === HOST_GUIDE) data = Buffer.from(adapter);
-    if (DELIVERY_WORKFLOWS.includes(file))
-      data = Buffer.from(
-        workflowWithHostDelivery(file, data.toString("utf8"), adapter),
-      );
+    if (Object.hasOwn(guidance.files, file))
+      data = Buffer.from(guidance.files[file]);
     files.set(`skills/${file}`, data);
   }
   for (const skill of [
@@ -296,27 +309,38 @@ export async function universalPluginFiles(
     );
   for (const icon of ["logo.svg", "logo-dark.svg"])
     files.set("assets/" + icon, await readFile(join(source, "assets", icon)));
-  files.set(
-    "README.md",
-    Buffer.from(
-      [
-        `# ${displayName}`,
-        "",
-        "Install the plugin in a compatible host, or load the six folders under `skills/` in an Agent Skills client. " + instructions.en,
-        "",
-        "在支持插件的宿主中导入本包，或在支持 Agent Skills 的客户端加载 `skills/` 下的六个目录。" + instructions.zh,
-        "",
-        ...(setupUrl
-          ? [
-              `MCP address for manual setup / 手动配置地址：${new URL(setupUrl).href}`,
-              "",
-            ]
-          : []),
-        "[Connection guide / 接入向导](skills/use-showai/references/connect-mcp.md)",
-        "",
-      ].join("\n"),
-    ),
-  );
+  for (const [file, locale] of [
+    ["README.md", "en"],
+    ["README.zh-CN.md", "zh"],
+  ]) {
+    let readme;
+    if (guidance.readmes) {
+      readme = guidance.readmes[file];
+    } else {
+      const manual = await readFile(join(source, file), "utf8");
+      readme = manual.replace(
+        /^# .+$/m,
+        () => `# ${displayName}\n\n${instructions[locale]}`,
+      );
+    }
+    if (setupUrl)
+      readme +=
+        "\n" +
+        (locale === "en"
+          ? "MCP address for manual setup"
+          : "手动配置使用的 MCP 地址") +
+        "\n\n" +
+        new URL(setupUrl).href +
+        "\n";
+    files.set(file, Buffer.from(readme));
+  }
+  if (
+    JSON.stringify(await hostGuidance(source, profile, transport)) !==
+    JSON.stringify(guidance)
+  )
+    throw new Error(
+      "The host guidance changed during packaging. Retry after the source settles.",
+    );
   return { name, version: manifest.version, files };
 }
 

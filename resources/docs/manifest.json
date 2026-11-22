@@ -169,7 +169,7 @@
      "title": "快速上手",
      "icon": "🚀",
      "file": "zh-CN/projects/a23f1819-edaf-4c0c-824b-7662cb670a52/pages/0b49bb7a-052c-5fe7-a05f-f647bb862a91.json",
-     "sha256": "527c853b7cf1dae4806b1effab01ee658d38d9e17d32c8148c628e93a00d5de4",
+     "sha256": "4a1eb85ff855ec3bad2b74cdc88e962290528f1013096ddd1add1799e34cdcc0",
      "components": [
       "zh-CN/projects/a23f1819-edaf-4c0c-824b-7662cb670a52/packages/components/doc-hero/1.0.0/compiled.json",
       "zh-CN/projects/a23f1819-edaf-4c0c-824b-7662cb670a52/packages/components/doc-steps/1.0.0/compiled.json",
@@ -205,7 +205,7 @@
      "title": "ShowAI 文档",
      "icon": "📚",
      "file": "zh-CN/projects/a23f1819-edaf-4c0c-824b-7662cb670a52/pages/2e9af66b-0a83-58f6-b3f5-a480f0f6abab.json",
-     "sha256": "6461d3cb94beb823842891559c7751f6f4e211b51714e00aacfa8835df491f51",
+     "sha256": "23856651079caf744401b2c1605536b225af5f90157306ae98ac996336510dca",
      "components": [
       "zh-CN/projects/a23f1819-edaf-4c0c-824b-7662cb670a52/packages/components/doc-hero/1.0.0/compiled.json",
       "zh-CN/projects/a23f1819-edaf-4c0c-824b-7662cb670a52/packages/components/doc-cards/1.0.0/compiled.json",
@@ -570,7 +570,7 @@
      "title": "Quick Start",
      "icon": "🚀",
      "file": "en/projects/a23f1819-edaf-4c0c-824b-7662cb670a52/pages/0b49bb7a-052c-5fe7-a05f-f647bb862a91.json",
-     "sha256": "4c091a6fb0b9c38b9e32cc1c3e66b2dc47a3e9d26f9270d228e9bc5a5e70cc11",
+     "sha256": "cef7e19fae1a2bb0282986278a4a3645ba80372902632857a7a449b19c6f755f",
      "components": [
       "en/projects/a23f1819-edaf-4c0c-824b-7662cb670a52/packages/components/doc-hero/1.0.0/compiled.json",
       "en/projects/a23f1819-edaf-4c0c-824b-7662cb670a52/packages/components/doc-steps/1.0.0/compiled.json",
@@ -606,7 +606,7 @@
      "title": "ShowAI Documentation",
      "icon": "📚",
      "file": "en/projects/a23f1819-edaf-4c0c-824b-7662cb670a52/pages/2e9af66b-0a83-58f6-b3f5-a480f0f6abab.json",
-     "sha256": "ac2ea6778d7c8200add3f86404b8065ee9916f9d4dfaf7321bca8d2cee608e6e",
+     "sha256": "df2a6fb95da6ef55e1ee53b49c68da9b4c3e1f6d7b77ad1aaa88c0fdfcd489fc",
      "components": [
       "en/projects/a23f1819-edaf-4c0c-824b-7662cb670a52/packages/components/doc-hero/1.0.0/compiled.json",
       "en/projects/a23f1819-edaf-4c0c-824b-7662cb670a52/packages/components/doc-cards/1.0.0/compiled.json",

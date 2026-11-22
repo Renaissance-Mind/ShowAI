@@ -1,0 +1,11 @@
+{
+  "name": "Kimi Code",
+  "en": {
+    "install": "Prepare the Kimi Code plugin directory in ShowAI under Settings → Agent plugins. Choose Install custom plugin in Kimi Code and select that directory. You can also merge the MCP configuration into `~/.kimi-code/mcp.json`.",
+    "features": "Desktop opens interactive HTML in the file preview and edits the original in the task’s Browser pane. The CLI delivers the HTML file and an edit link."
+  },
+  "zh": {
+    "install": "在 ShowAI 的「设置 → Agent 插件」准备 Kimi Code 插件目录，在 Kimi Code 的插件设置选择「安装自定义插件」并指定该目录。也可把 MCP 配置合并进 `~/.kimi-code/mcp.json`。",
+    "features": "桌面版在文件预览中显示交互 HTML，可在任务右侧 Browser 中编辑原页。CLI 交付 HTML 文件和原页编辑链接。"
+  }
+}
