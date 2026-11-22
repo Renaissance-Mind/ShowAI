@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
 import { expect, it } from "vitest";
+import { codexWorkbenchTargetUri } from "./codex-workbench-ui";
 
 it("opens Qoder workbench entries and saves a large page through its MCP transport", async () => {
   const root = await mkdtemp(join(tmpdir(), "showai-qoder-workbench-"));
@@ -27,7 +28,13 @@ it("opens Qoder workbench entries and saves a large page through its MCP transpo
         ui: { visibility: ["app"] },
       });
     }
-    expect(tools.find((tool) => tool.name === "card_open")).toBeDefined();
+    expect(tools.find((tool) => tool.name === "card_open")?._meta?.ui)
+      .toMatchObject({ resourceUri: codexWorkbenchTargetUri });
+    const card = await client.readResource({ uri: codexWorkbenchTargetUri });
+    expect(card.contents[0]._meta).toMatchObject({
+      "openai/widgetMinFrameHeight": 0,
+      "qoder/ui": { preferredDisplayMode: "fullscreen" },
+    });
     expect(tools.find((tool) => tool.name === "card_present")).toBeUndefined();
     const resource = await client.readResource({ uri: "ui://showai/workbench-v3.html" });
     expect(resource.contents[0]._meta).toMatchObject({

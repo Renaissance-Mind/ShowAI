@@ -75,7 +75,7 @@ it("opens both Codex workbench entries and saves into the MCP library", async ()
         .toEqual({ resourceUri: codexWorkbenchCardUri, visibility: ["model", "app"] });
     }
     const cardResource = await client.readResource({ uri: codexWorkbenchCardUri });
-    for (const version of [5, 6, 7, 8]) {
+    for (const version of [5, 6, 7, 8, 9]) {
       const previous = await client.readResource({ uri: `ui://showai/workbench-card-v${version}.html` });
       expect(previous.contents[0].mimeType).toBe("text/html;profile=mcp-app");
     }
@@ -104,6 +104,7 @@ it("opens both Codex workbench entries and saves into the MCP library", async ()
     ));
     const direct = await client.readResource({ uri: codexWorkbenchTargetUri });
     expect(direct.contents[0]._meta?.["openai/ui"]).toMatchObject({ preferredDisplayMode: "fullscreen" });
+    expect(direct.contents[0]._meta?.["openai/widgetMinFrameHeight"]).toBe(0);
     const fileResource = await client.readResource({ uri: codexWorkbenchFileUri });
     expect(fileResource.contents[0]).toMatchObject({
       mimeType: "text/html;profile=mcp-app",

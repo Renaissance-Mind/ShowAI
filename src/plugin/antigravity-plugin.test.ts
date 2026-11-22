@@ -136,6 +136,9 @@ describe("Antigravity page cards and live workbench navigation", () => {
       expect(resource.contents).toHaveLength(1);
       const cardContent = resource.contents[0];
       expect(cardContent?.mimeType).toBe("text/html;profile=mcp-app");
+      expect(cardContent?._meta?.["openai/widgetMinFrameHeight"]).toBe(0);
+      const previousCard = await client.readResource({ uri: "ui://showai/antigravity-card-v1.html" });
+      expect(previousCard.contents[0]?.uri).toBe("ui://showai/antigravity-card-v1.html");
       const htmlText = cardContent && "text" in cardContent ? cardContent.text : "";
       expect(htmlText).toContain("showai-page-card");
       expect(htmlText).toContain("workbench_open_destination");
