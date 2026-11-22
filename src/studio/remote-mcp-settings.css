@@ -201,7 +201,7 @@
 }
 .rm-field {
   display: grid;
-  gap: 9px;
+  gap: 8px;
   min-width: 0;
 }
 .rm-field > label {
@@ -258,7 +258,11 @@
   padding: 4px 34px 4px var(--field-pad);
 }
 .rm-short-field {
-  flex: 0 1 9rem;
+  flex: 0 1 10rem;
+}
+.rm-port-field {
+  width: 7rem;
+  max-width: 100%;
 }
 .rm-icon-button {
   display: inline-flex;
@@ -344,14 +348,28 @@
 }
 .rm-readonly-row {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
-  gap: 20px;
-  padding: 12px 0;
+  gap: 8px 16px;
+  padding: 8px 0;
   border-block: 1px solid var(--line);
 }
-.rm-readonly-row > span:first-child {
+.rm-auth-method {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px 12px;
+}
+.rm-readonly-row > span:first-child,
+.rm-auth-method > span:first-child {
   color: var(--muted);
+}
+.rm-client-fields {
+  display: grid;
+  align-items: start;
+  gap: 12px 18px;
+  min-width: 0;
 }
 .rm-capability {
   display: inline-flex;
@@ -384,16 +402,29 @@
   min-width: 0;
 }
 .rm-address-field {
-  width: min(100%, 18rem);
+  width: max-content;
+  max-width: 100%;
 }
 .rm-address-field .rm-input-action {
   flex-wrap: wrap;
 }
 .rm-address-field .rm-select {
-  flex: 1 1 16ch;
+  flex: 0 1 auto;
+  width: calc(15ch + 2.75rem);
+  max-width: 100%;
+  font-variant-numeric: tabular-nums;
+}
+.rm-network-fields > p {
+  flex-basis: 100%;
+  grid-column: 1 / -1;
+  margin: 0;
+}
+.rm-access-fields {
+  align-items: stretch;
 }
 .rm-access-fields > .rm-field {
   flex: 1 1 max-content;
+  grid-template-rows: auto 1fr;
 }
 .rm-access-fields .rm-permission-capabilities {
   align-items: center;
@@ -407,8 +438,12 @@
   grid-template-columns: repeat(auto-fit, minmax(min(100%, 15rem), 1fr));
   gap: 14px 18px;
 }
-.rm-route-config > :first-child {
+.rm-origin-row {
   grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 8px 16px;
 }
 .rm-oauth-fields {
   display: grid;
@@ -421,9 +456,6 @@
   display: flex;
   flex-wrap: wrap;
   gap: 10px;
-}
-.rm-external {
-  width: fit-content;
 }
 .rm-permission-capabilities {
   display: flex;
@@ -482,6 +514,7 @@
   align-items: center;
   gap: 10px;
   min-width: 0;
+  overflow-wrap: anywhere;
 }
 .rm-permission-project > span > svg {
   flex: none;
@@ -1205,10 +1238,11 @@
   background: var(--line);
 }
 .rm-step-body {
+  container: remote-step / inline-size;
   min-width: 0;
-  padding-bottom: 22px;
+  padding-bottom: 10px;
   display: grid;
-  gap: 12px;
+  gap: 10px;
 }
 .rm-step:last-child .rm-step-body {
   padding-bottom: 0;
@@ -1253,9 +1287,6 @@
 }
 .rm-step-placeholder {
   margin: 0;
-  padding: 12px 14px;
-  border: 1px dashed var(--line);
-  border-radius: 8px;
   color: var(--muted);
   font-size: 12.5px;
   line-height: 1.55;
@@ -1263,6 +1294,27 @@
 .rm-client-status.success {
   border-color: color-mix(in srgb, var(--ok) 35%, var(--line));
   color: var(--ok);
+}
+
+@container remote-step (min-width: 38rem) {
+  .rm-network-fields:has(.rm-address-field),
+  .rm-access-fields {
+    display: grid;
+    grid-template-columns: minmax(max-content, 1fr) minmax(0, 1fr);
+  }
+  .rm-client-fields {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 2fr);
+  }
+}
+
+@container remote-step (max-width: 25rem) {
+  .rm-permission-project {
+    flex-wrap: wrap;
+    gap: 6px 14px;
+  }
+  .rm-permission-picker {
+    max-width: 100%;
+  }
 }
 
 @container (max-width: 620px) {

@@ -69,7 +69,7 @@ export default defineMessages("agentSettings", {
     apiKeyKeep: "已保存，留空保留现有 Key",
     apiKeyEnter: "输入此来源的 API Key",
     modelName: "模型名称",
-    modelPlaceholder: "从列表选择，或填写服务提供的模型 ID",
+    modelPlaceholder: "选择或输入模型 ID",
     saveSource: "保存来源",
     fetchModels: "获取模型列表",
     cloudChatgptHelp:
@@ -215,8 +215,7 @@ export default defineMessages("agentSettings", {
     apiKeyKeep: "Saved. Leave blank to keep the current key",
     apiKeyEnter: "Enter the API key for this source",
     modelName: "Model",
-    modelPlaceholder:
-      "Choose from the list or enter a model ID from the service",
+    modelPlaceholder: "Select or enter a model ID",
     saveSource: "Save source",
     fetchModels: "Fetch model list",
     cloudChatgptHelp:

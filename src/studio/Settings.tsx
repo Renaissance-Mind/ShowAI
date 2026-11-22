@@ -638,7 +638,7 @@ export function SettingsPanel({
         ) : (
           <>
             <section
-              className="settings-group"
+              className="settings-group settings-theme-group"
               aria-labelledby="settings-theme-title"
             >
               <h2 id="settings-theme-title">{t("theme")}</h2>

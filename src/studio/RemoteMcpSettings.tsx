@@ -483,9 +483,7 @@ export default function RemoteMcpSettings({ home }: { home?: string }) {
   );
 
   const guideLines = selected
-    ? t(`guide.${remoteProviderKeys[selected]}` as never)
-        .split("\n")
-        .filter(Boolean)
+    ? t(`guide.${selected}`).split("\n")
     : [];
 
   const step1Done = valid;
@@ -818,42 +816,27 @@ export default function RemoteMcpSettings({ home }: { home?: string }) {
                       {guideLines.map((line, i) => (
                         <p key={i}>{line}</p>
                       ))}
-                      {(selected === "cloudflare" ||
-                        isTailscaleProvider(selected)) && (
+                      {isTailscaleProvider(selected) && (
                         <div className="rm-external-links">
-                          {selected === "cloudflare" ? (
+                          <a
+                            className="rm-button"
+                            href="https://login.tailscale.com/admin"
+                            target="_blank"
+                            rel="noreferrer"
+                          >
+                            {t("tailscale")}
+                            <ExternalLink size={14} />
+                          </a>
+                          {!state.executables.tailscale && (
                             <a
-                              className="rm-button rm-external"
-                              href="https://dash.cloudflare.com/"
+                              className="rm-button"
+                              href="https://tailscale.com/download"
                               target="_blank"
                               rel="noreferrer"
                             >
-                              {t("cloudflare")}
+                              {t("downloadTailscale")}
                               <ExternalLink size={14} />
                             </a>
-                          ) : (
-                            <>
-                              <a
-                                className="rm-button"
-                                href="https://login.tailscale.com/admin"
-                                target="_blank"
-                                rel="noreferrer"
-                              >
-                                {t("tailscale")}
-                                <ExternalLink size={14} />
-                              </a>
-                              {!state.executables.tailscale && (
-                                <a
-                                  className="rm-button"
-                                  href="https://tailscale.com/download"
-                                  target="_blank"
-                                  rel="noreferrer"
-                                >
-                                  {t("downloadTailscale")}
-                                  <ExternalLink size={14} />
-                                </a>
-                              )}
-                            </>
                           )}
                         </div>
                       )}
@@ -861,18 +844,18 @@ export default function RemoteMcpSettings({ home }: { home?: string }) {
 
                     {selected === "cloudflare" && (
                       <div className="rm-route-config">
-                        {state.localUrl ||
-                        (state.configured && state.config.port) ? (
-                          <RemoteCopyField
-                            label={t("localRoute")}
-                            value={
-                              state.localUrl ||
-                              `http://127.0.0.1:${config.port}`
-                            }
-                            onCopy={copy}
-                          />
-                        ) : (
-                          <div>
+                        <div className="rm-origin-row">
+                          {state.localUrl ||
+                          (state.configured && state.config.port) ? (
+                            <RemoteCopyField
+                              label={t("localRoute")}
+                              value={
+                                state.localUrl ||
+                                `http://127.0.0.1:${state.config.port}`
+                              }
+                              onCopy={copy}
+                            />
+                          ) : (
                             <button
                               className="rm-button"
                               type="button"
@@ -882,8 +865,17 @@ export default function RemoteMcpSettings({ home }: { home?: string }) {
                               <Network size={16} />
                               {t("generateRoute")}
                             </button>
-                          </div>
-                        )}
+                          )}
+                          <a
+                            className="rm-button"
+                            href="https://dash.cloudflare.com/"
+                            target="_blank"
+                            rel="noreferrer"
+                          >
+                            {t("cloudflare")}
+                            <ExternalLink size={14} />
+                          </a>
+                        </div>
                         <div className="rm-field">
                           <label htmlFor="remote-hostname">
                             {t("hostname")}
@@ -931,7 +923,11 @@ export default function RemoteMcpSettings({ home }: { home?: string }) {
                             <RemoteSelect
                               id="remote-bind-address"
                               aria-invalid={missingAddress}
-                              aria-describedby={missingAddress || !state.addresses.length ? addressErrorId : undefined}
+                              aria-describedby={
+                                missingAddress || !state.addresses.length
+                                  ? addressErrorId
+                                  : undefined
+                              }
                               value={config.bindAddress ?? ""}
                               disabled={busy}
                               onChange={(event) =>
@@ -966,16 +962,11 @@ export default function RemoteMcpSettings({ home }: { home?: string }) {
                               {t("refresh")}
                             </button>
                           </div>
-                          {(missingAddress || !state.addresses.length) && (
-                            <p className="settings-help" id={addressErrorId}>
-                              {t(state.addresses.length ? "addressUnavailable" : "recoverAddress")}
-                            </p>
-                          )}
                         </div>
                       )}
                       {isTailscaleProvider(selected) && (
                         <>
-                          <div className="rm-field rm-short-field">
+                          <div className="rm-field rm-port-field">
                             <label htmlFor="remote-https-port">
                               {t("httpsPort")}
                             </label>
@@ -1024,7 +1015,7 @@ export default function RemoteMcpSettings({ home }: { home?: string }) {
                         </>
                       )}
                       {(selected === "lan" || selected === "cloudflare") && (
-                        <div className="rm-field rm-short-field">
+                        <div className="rm-field rm-port-field">
                           <label htmlFor="remote-local-port">{t("port")}</label>
                           <input
                             className="showai-input"
@@ -1044,11 +1035,6 @@ export default function RemoteMcpSettings({ home }: { home?: string }) {
                               })
                             }
                           />
-                          {invalidPort && (
-                            <p id={portErrorId} className="studio-form-error">
-                              {t("invalidPort")}
-                            </p>
-                          )}
                         </div>
                       )}
                       {selected !== "lan" && (
@@ -1090,6 +1076,18 @@ export default function RemoteMcpSettings({ home }: { home?: string }) {
                           </div>
                         </div>
                       )}
+                      {selected === "lan" &&
+                        (missingAddress || !state.addresses.length) && (
+                          <p className="settings-help" id={addressErrorId}>
+                            {t(state.addresses.length ? "addressUnavailable" : "recoverAddress")}
+                          </p>
+                        )}
+                      {(selected === "lan" || selected === "cloudflare") &&
+                        invalidPort && (
+                          <p id={portErrorId} className="studio-form-error">
+                            {t("invalidPort")}
+                          </p>
+                        )}
                     </div>
                   </div>
                 </div>
@@ -1295,29 +1293,30 @@ export default function RemoteMcpSettings({ home }: { home?: string }) {
                   <span className="rm-step-num">4</span>
                 </div>
                 <div className="rm-step-body">
-                  <h3 className="rm-step-title">{t("step4Title")}</h3>
-                  <div className="rm-step-content">
-                    {ready && state.url ? (
-                      <RemoteMcpClientSetup
-                        key={selected}
-                        state={state}
-                        busy={busy}
-                        onCopy={copy}
-                        onCopyPrompt={copyPrompt}
-                        promptCopied={copiedPrompt === state.url}
-                        onRefresh={() => refresh()}
-                        onExport={() => {
-                          setPluginLink("");
-                          setModal("plugin");
-                        }}
-                        onBackToOverview={back}
-                      />
-                    ) : (
+                  <div className="rm-step-heading">
+                    <h3 className="rm-step-title">{t("step4Title")}</h3>
+                    {!step3Done && (
                       <p className="rm-step-placeholder">
                         {t("step4Inactive")}
                       </p>
                     )}
                   </div>
+                  {step3Done && (
+                    <RemoteMcpClientSetup
+                      key={selected}
+                      state={state}
+                      busy={busy}
+                      onCopy={copy}
+                      onCopyPrompt={copyPrompt}
+                      promptCopied={copiedPrompt === state.url}
+                      onRefresh={() => refresh()}
+                      onExport={() => {
+                        setPluginLink("");
+                        setModal("plugin");
+                      }}
+                      onBackToOverview={back}
+                    />
+                  )}
                 </div>
               </li>
             </ol>

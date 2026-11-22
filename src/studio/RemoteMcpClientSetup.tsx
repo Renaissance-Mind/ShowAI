@@ -227,7 +227,18 @@ export default function RemoteMcpClientSetup({
                   />
                 ) : (
                   <div className="rm-client-recipe">
-                    <div className="rm-form-actions">
+                    <div className="rm-readonly-row">
+                      <div className="rm-auth-method">
+                        <span>{t("authentication")}</span>
+                        <span className="rm-capability">
+                          <KeyRound size={14} />
+                          {lan
+                            ? "Bearer"
+                            : state.config.privateAuth === "device"
+                              ? t("sharedDevice")
+                              : "OAuth"}
+                        </span>
+                      </div>
                       <button
                         type="button"
                         className="rm-button primary"
@@ -243,17 +254,6 @@ export default function RemoteMcpClientSetup({
                           {t(promptCopied ? "copied" : "setupPrompt")}
                         </span>
                       </button>
-                    </div>
-                    <div className="rm-readonly-row">
-                      <span>{t("authentication")}</span>
-                      <span className="rm-capability">
-                        <KeyRound size={14} />
-                        {lan
-                          ? "Bearer"
-                          : state.config.privateAuth === "device"
-                            ? t("sharedDevice")
-                            : "OAuth"}
-                      </span>
                     </div>
                     {lan &&
                       (!key ? (

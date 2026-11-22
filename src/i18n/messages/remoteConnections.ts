@@ -187,10 +187,10 @@ export default defineMessages("remoteConnections", {
     step2Title: "配置内容访问权限",
     step3Title: "开启连接并获取 MCP 地址",
     step4Title: "接入客户端并验证",
-    step4Inactive: "先完成第 3 步开启连接，之后即可在此获取访问密钥、接入提示词或引导 ChatGPT 验证。",
+    step4Inactive: "开启连接后即可接入客户端。",
     viewAllClients: "在连接列表中管理已授权客户端",
     "guide.lan":
-      "选择在同一 Wi-Fi 或以太网下可访问的本机网络接口；端口留空时将自动分配可用端口。",
+      "选择客户端在同一局域网内可访问的 IP 地址。端口留空时自动分配。",
     "guide.tailscale-private":
       "1. 本机与远程设备需登录同一 Tailscale 账号；\n2. 打开 Tailscale 控制台的 DNS 页面，确保开启 MagicDNS 与 HTTPS 证书支持；\n3. 选择下方 HTTPS 端口与鉴权方式，然后前往第 3 步开启连接。",
     "guide.tailscale":
@@ -391,11 +391,10 @@ export default defineMessages("remoteConnections", {
     step2Title: "Choose content permissions",
     step3Title: "Start connection and get MCP URL",
     step4Title: "Connect client and verify",
-    step4Inactive:
-      "Start the connection in Step 3 first to issue an access key, copy a setup prompt or verify ChatGPT.",
+    step4Inactive: "Start the connection to set up a client.",
     viewAllClients: "Manage clients on overview",
     "guide.lan":
-      "Choose a local network interface reachable over your Wi-Fi or Ethernet network. Leave port blank to assign one automatically.",
+      "Choose an IP address your client can reach on the same network. Leave the port blank to assign one automatically.",
     "guide.tailscale-private":
       "1. Sign in to the same Tailscale network on this computer and your client device.\n2. In the Tailscale console DNS settings, enable MagicDNS and HTTPS certificates.\n3. Pick an HTTPS port and authentication mode below, then start in Step 3.",
     "guide.tailscale":

@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { createServer } from "node:http";
+import { isIPv4 } from "node:net";
 import { createHash, randomBytes } from "node:crypto";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
@@ -237,6 +238,7 @@ try {
     const port = rect("#remote-local-port");
     const scope = rect(".rm-access-fields label");
     const operations = rect(".rm-access-fields > :last-child label");
+    const capabilities = rect(".rm-permission-capabilities");
     const title = rect("[data-remote-step='3'] .rm-step-title");
     const start = rect("[data-remote-step='3'] .rm-button.primary");
     return {
@@ -244,6 +246,10 @@ try {
       portAfterRefresh: port.left >= refresh.right,
       portAlignment: Math.abs(centerY(port) - centerY(address)),
       permissionAlignment: Math.abs(scope.top - operations.top),
+      columnAlignment: Math.abs(port.left - operations.left),
+      capabilityAlignment: Math.abs(
+        centerY(rect(".rm-segmented")) - centerY(capabilities),
+      ),
       actionAlignment: Math.abs(centerY(start) - centerY(title)),
     };
   });
@@ -254,10 +260,17 @@ try {
   assert.ok(
     lanLayout.portAlignment < 2 &&
       lanLayout.permissionAlignment < 2 &&
+      lanLayout.columnAlignment < 2 &&
+      lanLayout.capabilityAlignment < 2 &&
       lanLayout.actionAlignment < 2,
     JSON.stringify(lanLayout),
   );
   await shot("lan-settings-layout");
+  await page.locator(".rm-step-flow").screenshot({
+    animations: "disabled",
+    scale: "css",
+    path: join(output, "lan-settings-card.png"),
+  });
   result.checks.push(
     "LAN address, refresh and port share a row; permissions and start actions align",
   );
@@ -291,6 +304,7 @@ try {
     exact: true,
   });
   if ((await addresses.getAttribute("data-has-options")) === "true") {
+    assert.ok(isIPv4((await addresses.innerText()).trim()));
     await button("开启连接").click();
     await page.locator('.rm-client-area[data-client-view="setup"]').waitFor();
     assert.equal(await button("ChatGPT").count(), 0);
@@ -362,6 +376,7 @@ try {
   await shot("tailscale-private-setup");
   await button("返回连接列表").click();
   await button("配置Cloudflare 自有域名").click();
+  await page.getByRole("link", { name: "Cloudflare 控制台" }).waitFor();
   assert.equal((await status("cloudflare")).config.port, 0);
   await button("生成回源地址").click();
   await page.waitForFunction(
@@ -373,6 +388,14 @@ try {
       ).config.port > 0,
   );
   const saved = await status("cloudflare");
+  const originRow = page.locator(".rm-origin-row");
+  await originRow.locator("code").waitFor();
+  const originBox = await originRow.locator(".rm-copy-field").boundingBox();
+  const consoleBox = await originRow.getByRole("link").boundingBox();
+  assert.ok(
+    consoleBox.x >= originBox.x + originBox.width &&
+      consoleBox.y < originBox.y + originBox.height,
+  );
   const prepared = await page.evaluate(
     (config) => window.showai.invoke("remoteMcp:prepare", { config }),
     saved.config,
@@ -417,6 +440,72 @@ try {
   await shot("network-modes-dark-narrow");
   result.checks.push(
     "dark narrow layout and keyboard order work in hidden Electron",
+  );
+
+  await page.getByRole("separator", { name: "调整侧栏宽度" }).press("End");
+  for (const locale of ["zh-CN", "en"]) {
+    if (locale === "en") {
+      await button("外观").click();
+      await page.getByRole("combobox", { name: "语言", exact: true }).click();
+      await page.getByRole("option", { name: "English", exact: true }).click();
+      await button("Remote connection").click();
+    }
+    for (const [provider, zhGuide, enGuide] of [
+      ["lan", "IP 地址", "IP address"],
+      ["tailscale-private", "同一 Tailscale 账号", "same Tailscale network"],
+      ["tailscale", "公网 HTTPS", "public HTTPS"],
+      ["cloudflare-quick", "临时公网", "temporary HTTPS"],
+      ["cloudflare", "隧道令牌", "tunnel token"],
+    ]) {
+      await page
+        .locator(`[data-connection="${provider}"]`)
+        .getByRole("button")
+        .click();
+      await page
+        .locator(".rm-route-guide")
+        .getByText(locale === "en" ? enGuide : zhGuide)
+        .first()
+        .waitFor();
+      if (provider === "lan") {
+        const port = page.locator("#remote-local-port");
+        await port.fill("1");
+        const warning = page.locator(".rm-network-fields .studio-form-error");
+        await warning.waitFor();
+        assert.equal(
+          await port.getAttribute("aria-describedby"),
+          await warning.getAttribute("id"),
+        );
+        await shot("lan-settings-narrow-" + locale);
+        await port.fill("");
+        await button(
+          locale === "en" ? "Selected projects" : "指定项目",
+        ).click();
+      }
+      const fits = await page
+        .locator(".rm-step-body")
+        .evaluateAll((steps) =>
+          steps.every(
+            (el) =>
+              el.scrollWidth <= el.clientWidth + 1 &&
+              el.getBoundingClientRect().right <=
+                document.documentElement.clientWidth + 1,
+          ),
+        );
+      assert.ok(fits, provider + " " + locale);
+      if (provider === "lan")
+        await button(locale === "en" ? "All projects" : "全部项目").click();
+      await button(
+        locale === "en" ? "Back to connections" : "返回连接列表",
+      ).click();
+    }
+  }
+  await page.getByRole("separator", { name: "Resize sidebar" }).press("Home");
+  await button("Appearance").click();
+  await page.locator("#settings-language").click();
+  await page.getByRole("option", { name: "简体中文", exact: true }).click();
+  await button("远程连接").click();
+  result.checks.push(
+    "all five localized setup guides and port validation fit the narrow settings panel",
   );
 
   if (process.env.SHOWAI_TEST_TAILSCALE) {

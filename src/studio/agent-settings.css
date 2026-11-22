@@ -273,17 +273,17 @@
   align-items: center;
   gap: 12px;
 }
-.agent-source-form-heading p {
-  margin: 2px 0 0;
-  color: var(--muted);
-  font-size: 12px;
-}
-.agent-source-fields {
+.agent-source-fields,
+.agent-source-names {
   display: grid;
   gap: 12px;
 }
+.agent-source-names {
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 11rem), 1fr));
+}
 .agent-source-fields label {
   display: grid;
+  min-width: 0;
   gap: 6px;
   font-size: 12.5px;
   font-weight: 500;
@@ -292,6 +292,9 @@
 .agent-source-fields :is(input, select, .showai-custom-select) {
   width: 100%;
   min-width: 0;
+}
+.studio-modal.agent-edit-source-dialog {
+  width: min(30rem, 100%);
 }
 .studio-modal .agent-source-form {
   border: 0;

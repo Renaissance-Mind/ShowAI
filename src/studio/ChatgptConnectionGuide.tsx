@@ -23,12 +23,14 @@ export default function ChatgptConnectionGuide({
     values = oauthSetupValues(endpoint);
   return (
     <div className="rm-client-recipe">
-      <RemoteCopyField
-        label={r("formName")}
-        value={r("formNameValue")}
-        onCopy={onCopy}
-      />
-      <RemoteCopyField label={t("endpoint")} value={endpoint} onCopy={onCopy} />
+      <div className="rm-client-fields">
+        <RemoteCopyField
+          label={r("formName")}
+          value={r("formNameValue")}
+          onCopy={onCopy}
+        />
+        <RemoteCopyField label={t("endpoint")} value={endpoint} onCopy={onCopy} />
+      </div>
       <div className="rm-readonly-row">
         <span>{t("authentication")}</span>
         <span className="rm-capability">

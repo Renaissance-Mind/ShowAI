@@ -431,30 +431,47 @@ export default function AgentSettings({
       >
         <div className="agent-source-form-heading">
           <AgentBrandIcon brand={editing.provider} />
-          <div>
-            <h3>{editingExisting ? t("manageSource") : t("addSource")}</h3>
-            <p>
-              {presetName(
-                editing.provider,
-                sourcePresets.find(
-                  (preset) => preset.provider === editing.provider,
-                )?.name ?? editing.name,
-              )}
-            </p>
-          </div>
+          <h3>
+            {presetName(
+              editing.provider,
+              sourcePresets.find((preset) => preset.provider === editing.provider)
+                ?.name ?? editing.name,
+            )}
+          </h3>
         </div>
         <div className="agent-source-fields">
-          <label>
-            <span>{t("name")}</span>
-            <input
-              className="showai-input"
-              required
-              value={editing.name}
-              onChange={(event) =>
-                setEditing({ ...editing, name: event.target.value })
-              }
-            />
-          </label>
+          <div className="agent-source-names">
+            <label>
+              <span>{t("name")}</span>
+              <input
+                className="showai-input"
+                required
+                value={editing.name}
+                onChange={(event) =>
+                  setEditing({ ...editing, name: event.target.value })
+                }
+              />
+            </label>
+            <label>
+              <span>{t("modelName")}</span>
+              <input
+                className="showai-input"
+                list="agent-model-options"
+                value={editing.model}
+                onChange={(event) =>
+                  setEditing({ ...editing, model: event.target.value })
+                }
+                placeholder={t("modelPlaceholder")}
+              />
+              <datalist id="agent-model-options">
+                {models.map((model) => (
+                  <option key={model.id} value={model.id}>
+                    {model.name}
+                  </option>
+                ))}
+              </datalist>
+            </label>
+          </div>
           {editing.credential === "api-key" && !editing.hosted && (
             <>
               <label>
@@ -505,25 +522,6 @@ export default function AgentSettings({
               </label>
             </>
           )}
-          <label>
-            <span>{t("modelName")}</span>
-            <input
-              className="showai-input"
-              list="agent-model-options"
-              value={editing.model}
-              onChange={(event) =>
-                setEditing({ ...editing, model: event.target.value })
-              }
-              placeholder={t("modelPlaceholder")}
-            />
-            <datalist id="agent-model-options">
-              {models.map((model) => (
-                <option key={model.id} value={model.id}>
-                  {model.name}
-                </option>
-              ))}
-            </datalist>
-          </label>
         </div>
         {editing.credential === "chatgpt" && (
           <p className="settings-help">
@@ -1265,6 +1263,7 @@ export default function AgentSettings({
               : t("addModelSource")
           }
           wide={!editing}
+          className={editing ? "agent-edit-source-dialog" : undefined}
           onClose={closeSourceModal}
         >
           <div className="studio-dialog-body studio-dialog-form">
