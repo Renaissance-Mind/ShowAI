@@ -1,5 +1,5 @@
 import { test, expect } from "vitest";
-import { cp, mkdtemp, writeFile, rm } from "node:fs/promises";
+import { cp, mkdtemp, readFile, writeFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { execFile } from "node:child_process";
@@ -164,26 +164,31 @@ test("desktop packages include the selected runtime and the host's native entry"
       });
       const read = (path: string) => JSON.parse(files.get(path)!.toString());
       expect(read(`.${host}-plugin/plugin.json`).version).toBe(
-        read("plugin.json").version,
+        JSON.parse(await readFile(join(source, "plugin.json"), "utf8")).version,
       );
       const serverName = host === "qoder" ? "showai" : "showai-universal";
-      const connection = read("mcp.json").mcpServers[serverName];
+      const connection = read(host === "workbuddy" ? ".mcp.json" : "mcp.json").mcpServers[serverName];
       expect(connection).toMatchObject({
         type: "stdio",
-        args: [`${host === "cursor" ? root : "."}/mcp/launch.mjs`],
+        args: [`${host === "qoder" ? "." : root}/mcp/launch.mjs`],
         env: { SHOWAI_HOME: home, SHOWAI_RUNTIME_CONFIG: runtimeConfig },
       });
       expect(files.has("mcp/launch.mjs")).toBe(true);
-      if (host !== "cursor")
+      expect(files.get("skills/use-showai/references/host-adapter.md")?.toString())
+        .toContain(host === "workbuddy" ? "# WorkBuddy" : host === "qoder" ? "# Qoder" : "# Cursor");
+      if (host === "qoder")
         expect(read(".mcp.json").mcpServers[serverName]).toEqual({
           ...connection,
           args: [`${root}/mcp/launch.mjs`],
-          ...(host === "qoder" && { cwd: root }),
+          cwd: root,
         });
-      if (host === "workbuddy")
+      if (host === "workbuddy") {
+        expect(files.has("plugin.json")).toBe(false);
+        expect(files.has("mcp.json")).toBe(false);
         expect(
           read(".workbuddy-plugin/marketplace.json").plugins[0],
         ).toMatchObject({ source: "./", name: "showai-universal" });
+      }
     }
     const qoder = await universalPluginArchive(source, {
       host: "qoder",

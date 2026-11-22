@@ -144,6 +144,7 @@ async function pluginVersion() {
   for (const file of [
     "plugin.json",
     ".claude-plugin/plugin.json",
+    ".workbuddy-plugin/plugin.json",
     "package.json",
   ]) {
     const value = await readJson(join(pluginRoot, file)).catch((error) => {

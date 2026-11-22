@@ -14,6 +14,7 @@ export interface WorkbenchBundle {
   entry: string;
   style: string;
   assets: Record<string, WorkbenchAsset>;
+  qoder?: { entry: string; style: string };
 }
 
 export interface WorkbenchMediaChunk {

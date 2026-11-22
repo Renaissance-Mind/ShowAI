@@ -83,9 +83,32 @@ export async function buildWorkbenchAssets(directory) {
     await store(chunk.fileName, code, imports);
   }
   await store(style.fileName, style.source, []);
+
+  // Qoder's MCP App sandbox accepts inline scripts but rejects blob: in its
+  // script CSP. Bundle the same renderer as one module for that host.
+  const qoderBundle = await build({
+    publicDir: false,
+    build: {
+      write: false,
+      cssCodeSplit: false,
+      assetsInlineLimit: () => true,
+      rolldownOptions: {
+        input: "src/main.tsx",
+        output: { format: "es", codeSplitting: false },
+      },
+    },
+  });
+  const qoderOutput = (Array.isArray(qoderBundle) ? qoderBundle : [qoderBundle])
+    .flatMap((value) => value.output);
+  const qoderEntry = qoderOutput.find((item) => item.type === "chunk" && item.isEntry);
+  const qoderStyle = qoderOutput.find((item) => item.type === "asset" && item.fileName.endsWith(".css"));
+  if (!qoderEntry || !qoderStyle) throw new Error("The Qoder workbench bundle is incomplete.");
+  await store("qoder-workbench.js", qoderEntry.code, []);
+  await store("qoder-workbench.css", qoderStyle.source, []);
   await writeFile(join(directory, "index.json"), JSON.stringify({
     entry: entry.fileName,
     style: style.fileName,
+    qoder: { entry: "qoder-workbench.js", style: "qoder-workbench.css" },
     assets: Object.fromEntries(assets),
   }) + "\n");
   console.log(`Prepared ${assets.length} Codex workbench assets.`);

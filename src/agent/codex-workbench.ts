@@ -1,6 +1,7 @@
 import { randomBytes, randomUUID } from "node:crypto";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
+import { CAPACITY } from "../portable/capacity.mjs";
 import lightLogo from "../../plugins/showai/assets/logo.svg?raw";
 import darkLogo from "../../plugins/showai/assets/logo-dark.svg?raw";
 import { workbenchRoutes, type CodexWorkbenchTransport } from "../host/codex-workbench-transport";
@@ -58,11 +59,12 @@ export function codexWorkbenchConnection(
   open: OpenCodexWorkbench,
   service: AgentService,
   presentationDirectory?: string,
+  host: "codex" | "qoder" = "codex",
 ) {
   return {
     icons: codexWorkbenchIcons,
     configure(server: McpServer) {
-      registerCodexWorkbench(server, open, service, presentationDirectory);
+      registerCodexWorkbench(server, open, service, presentationDirectory, host);
       process.stdin.once("end", () =>
         void server.close().catch((error) => console.error("ShowAI MCP shutdown:", error)),
       );
@@ -75,11 +77,28 @@ function registerCodexWorkbench(
   open: OpenCodexWorkbench,
   service: AgentService,
   presentationDirectory?: string,
+  host: "codex" | "qoder" = "codex",
 ) {
+  const qoder = host === "qoder";
   const key = randomBytes(32).toString("hex");
   const navigation = new CodexWorkbenchNavigation(key);
   // Cached v1–v6 card views use this choice when the host remounts them in fullscreen.
   const cardChoices = new Map<string, { index: number; expires: number }>();
+  const uploads = new Map<string, {
+    parts: string[];
+    length: number;
+    total: number;
+    expires: number;
+    result?: Promise<unknown>;
+    completed?: boolean;
+  }>();
+  const responses = new Map<string, { text: string; expires: number }>();
+  const transferLifetime = 5 * 60_000;
+  function expireTransfers() {
+    const now = Date.now();
+    for (const [id, upload] of uploads) if (upload.expires <= now) uploads.delete(id);
+    for (const [id, response] of responses) if (response.expires <= now) responses.delete(id);
+  }
   const plugin = /^([\w-]+)@([\w-]+)$/.exec(process.env.SHOWAI_CODEX_PLUGIN_ID ?? "");
   // A test installation can coexist with the stable file handler. Keep the
   // side tab on the same MCP connection as its inline navigation controls.
@@ -137,18 +156,24 @@ function registerCodexWorkbench(
         contents: [{
           uri,
           mimeType,
-          text: codexWorkbenchHtml(mode, entrypoint, codexWorkbenchIcons[0].src, !!globalEntrypoint),
+          text: codexWorkbenchHtml(mode, entrypoint, codexWorkbenchIcons[0].src, !!globalEntrypoint, host),
           _meta: {
             ui: {
-              csp: {
+              ...(!qoder && { csp: {
                 resourceDomains: ["blob:", "data:"],
                 frameDomains: ["blob:", "data:"],
-              },
+              } }),
               prefersBorder: false,
               permissions: { clipboardWrite: {} },
             },
             ...(entrypoint === "card" || entrypoint === "open" ? {
               "openai/ui": { availableDisplayModes: entrypoint === "open" ? ["inline", "fullscreen"] : ["inline"], preferredDisplayMode: entrypoint === "open" ? "fullscreen" : "inline" },
+            } : {}),
+            ...(qoder ? {
+              "qoder/ui": {
+                availableDisplayModes: entrypoint === "card" ? ["inline"] : ["fullscreen"],
+                preferredDisplayMode: entrypoint === "card" ? "inline" : "fullscreen",
+              },
             } : {}),
           },
         }],
@@ -181,12 +206,12 @@ function registerCodexWorkbench(
       annotations: readOnly,
       _meta: {
         ui: { resourceUri: uri, visibility: ["app"] },
-        "openai/ui": { entrypoints: [{ type: mode }] },
+        [qoder ? "qoder/ui" : "openai/ui"]: { entrypoints: [{ type: mode }] },
       },
     }, (_, extra) => launch(mode, extra._meta));
   }
 
-  server.registerTool("workbench_open_file", {
+  if (!qoder) server.registerTool("workbench_open_file", {
     title: "ShowAI",
     description: "Open the original Page linked by a ShowAI reference file.",
     inputSchema: {
@@ -226,7 +251,7 @@ function registerCodexWorkbench(
       return mcpFailure(error);
     }
   }
-  server.registerTool("card_present", {
+  if (!qoder) server.registerTool("card_present", {
     ...cardTool,
     title: "Show saved ShowAI cards",
     description: "Deliver the original Page as a clickable card after successfully creating or editing it in Codex, or when the user asks for a saved target. Optionally use a blockId from page_read to point to a component and description to summarize its contents or changes. Put remaining targets in additionalTargets to deliver all cards together. The user chooses where to open them.",
@@ -274,10 +299,12 @@ function registerCodexWorkbench(
   server.registerTool("card_open", {
     ...cardTool,
     title: "Open a ShowAI editor",
-    description: "Open a saved Page or component directly in a new expanded editor. Try card_navigate first to reuse the current conversation's open editor.",
+    description: qoder
+      ? "Open a saved Page or component in the Qoder side workspace."
+      : "Open a saved Page or component directly in a new expanded editor. Try card_navigate first to reuse the current conversation's open editor.",
     _meta: { ui: { resourceUri: codexWorkbenchTargetUri, visibility: ["model", "app"] } },
   }, (target, extra) => presentPageCard([target], extra._meta));
-  server.registerTool("card_navigate", {
+  if (!qoder) server.registerTool("card_navigate", {
     title: "Navigate the current ShowAI editor",
     description: "Locate a saved Page or its blockId in a visible ShowAI tab already showing that Page in this conversation. If status is unavailable, call card_open with the same target to open a separate Codex tab.",
     inputSchema: codexPageTarget,
@@ -293,7 +320,7 @@ function registerCodexWorkbench(
       return mcpFailure(error);
     }
   });
-  server.registerTool("workbench_side_file", {
+  if (!qoder) server.registerTool("workbench_side_file", {
     description: "Prepare a saved Page or component reference for an independent Codex file tab.",
     inputSchema: codexPageTarget,
     _meta: appOnly,
@@ -305,7 +332,7 @@ function registerCodexWorkbench(
       return mcpFailure(error);
     }
   });
-  server.registerTool("workbench_page_reference", {
+  if (!qoder) server.registerTool("workbench_page_reference", {
     ...cardTool,
     title: "Create a ShowAI page reference file",
     description: "Return the local .showai-ref file for a saved Page. Use card_present when the user asks for an interactive card.",
@@ -321,7 +348,7 @@ function registerCodexWorkbench(
     }
   });
 
-  server.registerTool("workbench_resolve_reference", {
+  if (!qoder) server.registerTool("workbench_resolve_reference", {
     description: "Verify a ShowAI reference file read through the Codex host and locate its saved Page.",
     inputSchema: { source: z.string().min(1).max(codexPageReferenceMaxLength) },
     annotations: readOnly,
@@ -353,6 +380,16 @@ function registerCodexWorkbench(
   async function proxy<T>(run: (transport: CodexWorkbenchTransport) => T | Promise<T>) {
     try {
       const value = await run((await workbench()).transport);
+      if (qoder) {
+        const text = JSON.stringify(value);
+        if (text && Buffer.byteLength(text) > 512 * 1024) {
+          expireTransfers();
+          if (responses.size >= 8) throw new Error("Too many workbench responses are waiting to be read.");
+          const id = randomUUID();
+          responses.set(id, { text, expires: Date.now() + transferLifetime });
+          return { content: [], _meta: { showaiWorkbenchData: { qoderTransfer: { id, length: text.length } } } };
+        }
+      }
       return { content: [], _meta: { showaiWorkbenchData: value } };
     } catch (error) {
       return mcpFailure(error);
@@ -373,6 +410,78 @@ function registerCodexWorkbench(
     },
     _meta: appOnly,
   }, ({ route, args, client }) => proxy((transport) => transport.request(route, args, client)));
+  if (qoder) {
+    const request = z.object({
+      route: z.enum(workbenchRoutes),
+      args: z.record(z.string(), z.unknown()),
+      client: clientId,
+    });
+    server.registerTool("workbench_upload_begin", {
+      description: "Start a large Qoder workbench request.",
+      inputSchema: { length: z.number().int().positive().max(CAPACITY.authoringRequestBytes) },
+      _meta: appOnly,
+    }, ({ length }) => {
+      expireTransfers();
+      if ([...uploads.values()].filter((upload) => !upload.completed).length >= 4)
+        return mcpFailure(new Error("Too many workbench requests are in progress."));
+      const id = randomUUID();
+      uploads.set(id, { parts: [], length: 0, total: length, expires: Date.now() + transferLifetime });
+      return { content: [], _meta: { showaiWorkbenchData: id } };
+    });
+    server.registerTool("workbench_upload_chunk", {
+      description: "Append a chunk to a large Qoder workbench request.",
+      inputSchema: { id: z.string().uuid(), offset: z.number().int().nonnegative(), text: z.string().min(1).max(100_000) },
+      _meta: appOnly,
+    }, ({ id, offset, text }) => {
+      const upload = uploads.get(id);
+      if (!upload || upload.expires <= Date.now() || upload.result || offset !== upload.length || offset + text.length > upload.total)
+        return mcpFailure(new Error("The workbench request is unavailable or its chunks are out of order."));
+      upload.parts.push(text);
+      upload.length += text.length;
+      upload.expires = Date.now() + transferLifetime;
+      return { content: [], _meta: { showaiWorkbenchData: upload.length } };
+    });
+    server.registerTool("workbench_upload_finish", {
+      description: "Run a complete Qoder workbench request once.",
+      inputSchema: { id: z.string().uuid() },
+      _meta: appOnly,
+    }, async ({ id }) => {
+      const upload = uploads.get(id);
+      if (!upload || upload.expires <= Date.now() || upload.length !== upload.total)
+        return mcpFailure(new Error("The workbench request is incomplete or expired."));
+      if (!upload.result) {
+        const text = upload.parts.join("");
+        if (Buffer.byteLength(text) > CAPACITY.authoringRequestBytes)
+          return mcpFailure(new Error("The workbench request exceeds the authoring limit."));
+        const input = request.parse(JSON.parse(text));
+        upload.parts = [];
+        upload.expires = Date.now() + transferLifetime;
+        upload.result = proxy((transport) => transport.request(input.route, input.args, input.client))
+          .finally(() => { upload.completed = true; });
+      }
+      return await upload.result as Awaited<ReturnType<typeof proxy>>;
+    });
+    server.registerTool("workbench_response_chunk", {
+      description: "Read a chunk of a large Qoder workbench response.",
+      inputSchema: { id: z.string().uuid(), offset: z.number().int().nonnegative() },
+      annotations: readOnly,
+      _meta: appOnly,
+    }, ({ id, offset }) => {
+      const response = responses.get(id);
+      if (!response || response.expires <= Date.now() || offset >= response.text.length)
+        return mcpFailure(new Error("The workbench response is unavailable or expired."));
+      response.expires = Date.now() + transferLifetime;
+      return { content: [], _meta: { showaiWorkbenchData: response.text.slice(offset, offset + 100_000) } };
+    });
+    server.registerTool("workbench_response_release", {
+      description: "Release a completed Qoder workbench response.",
+      inputSchema: { id: z.string().uuid() },
+      _meta: appOnly,
+    }, ({ id }) => {
+      responses.delete(id);
+      return { content: [], _meta: { showaiWorkbenchData: true } };
+    });
+  }
   server.registerTool("workbench_changes", {
     description: "Read workbench changes after a cursor.",
     inputSchema: {

@@ -58,6 +58,7 @@ async function mcpConnection(mcp, runtimeConfig, auth, host) {
       args: ["./mcp/launch.mjs"],
       env: {
         SHOWAI_HOST_DISPLAY: "mcp-app",
+        ...(host === "qoder" && { SHOWAI_QODER_WORKBENCH: "1" }),
         ...binding,
       },
     };
@@ -159,7 +160,8 @@ export async function universalPluginFiles(
     },
   };
   const json = (value) => Buffer.from(JSON.stringify(value, null, 2) + "\n");
-  const files = new Map([["plugin.json", json(manifest)]]);
+  const files = new Map();
+  if (host !== "workbuddy") files.set("plugin.json", json(manifest));
   if (appId)
     files.set(".app.json", json({ apps: { [appAlias]: { id: appId } } }));
   if (host) {
@@ -195,10 +197,11 @@ export async function universalPluginFiles(
             args: [`${hostPluginRoots.cursor}/mcp/launch.mjs`],
           }
         : connection;
-    files.set(
-      "mcp.json",
-      json({ $schema: MCP_SCHEMA, mcpServers: { [serverName]: core } }),
-    );
+    if (host !== "workbuddy")
+      files.set(
+        "mcp.json",
+        json({ $schema: MCP_SCHEMA, mcpServers: { [serverName]: core } }),
+      );
     if (connection.type === "stdio")
       files.set(
         "mcp/launch.mjs",
@@ -221,7 +224,11 @@ export async function universalPluginFiles(
     }
   }
   const adapter = await readFile(
-    join(source, "host-adapters/mcp-app.md"),
+    join(
+      source,
+      "host-adapters",
+      host && mcp === "local" ? `${host}.md` : "mcp-app.md",
+    ),
     "utf8",
   );
   const skillRoot = join(source, "skills");

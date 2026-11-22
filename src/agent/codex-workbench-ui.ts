@@ -20,6 +20,7 @@ export function codexWorkbenchHtml(
   entrypoint?: "file" | "card" | "open",
   icon?: string,
   hasGlobalEntrypoint = false,
+  host: "codex" | "qoder" = "codex",
 ) {
   const useCard = entrypoint === "card" || entrypoint === "open";
   const card = useCard
@@ -47,6 +48,8 @@ ${card}
   ${entrypoint === "card" ? cardSpacingEditor : ""}
   const translations = ${JSON.stringify(messages.catalogs)};
   const hasGlobalEntrypoint = ${hasGlobalEntrypoint};
+  const qoder = ${host === "qoder"};
+  const messageExtension = ${JSON.stringify(host === "qoder" ? "qoder/message" : "openai/message")};
   const chunkBytes = ${workbenchChunkBytes};
   const useFileEntrypoint = ${entrypoint === "file"};
   const usePageCard = ${useCard};
@@ -159,7 +162,7 @@ ${card}
   function canReference() {
     return launchUrl.searchParams.get("codexMode") === "thread"
       ? !!capabilities.updateModelContext
-      : !!capabilities.message && !!capabilities.experimental?.["openai/message"];
+      : !!capabilities.message && !!capabilities.experimental?.[messageExtension];
   }
 
   function attachReference(reference, text, components) {
@@ -175,9 +178,9 @@ ${card}
         content,
         structuredContent: reference ? { showai: { reference, ...(components?.length ? { components } : {}) } } : {},
       });
-    if (mode === "global" && capabilities.message && capabilities.experimental?.["openai/message"])
+    if (mode === "global" && capabilities.message && capabilities.experimental?.[messageExtension])
       return request("ui/message", {
-        role: "user", content, _meta: { "openai/message": { target: "new", send: false } },
+        role: "user", content, _meta: { [messageExtension]: { target: "new", send: false } },
       });
     return Promise.reject(new Error(t("unavailable")));
   }
@@ -195,7 +198,34 @@ ${card}
     }
     if (!Object.hasOwn(payload?._meta ?? {}, "showaiWorkbenchData"))
       throw new Error(t("unavailable"));
-    return payload._meta.showaiWorkbenchData;
+    const data = payload._meta.showaiWorkbenchData;
+    if (qoder && data?.qoderTransfer) {
+      const { id, length } = data.qoderTransfer;
+      if (typeof id !== "string" || !Number.isSafeInteger(length) || length < 1)
+        throw new Error(t("invalidBundle"));
+      let text = "";
+      while (text.length < length) {
+        const part = await callWorkbench("workbench_response_chunk", { id, offset: text.length });
+        if (typeof part !== "string" || !part || text.length + part.length > length)
+          throw new Error(t("invalidBundle"));
+        text += part;
+      }
+      void callWorkbench("workbench_response_release", { id }).catch(() => {});
+      return JSON.parse(text);
+    }
+    return data;
+  }
+
+  async function workbenchRequest(route, args, client) {
+    const input = { route, args, client };
+    if (!qoder) return callWorkbench("workbench_request", input);
+    const text = JSON.stringify(input);
+    if (new TextEncoder().encode(text).length <= 512 * 1024)
+      return callWorkbench("workbench_request", input);
+    const id = await callWorkbench("workbench_upload_begin", { length: text.length });
+    for (let offset = 0; offset < text.length; offset += 100_000)
+      await callWorkbench("workbench_upload_chunk", { id, offset, text: text.slice(offset, offset + 100_000) });
+    return callWorkbench("workbench_upload_finish", { id });
   }
 
   async function fetchPart(read, offset) {
@@ -511,7 +541,7 @@ ${card}
         openPageTab,
         importAsset,
         readMedia,
-        workbenchRequest: (route, args, client) => callWorkbench("workbench_request", { route, args, client }),
+        workbenchRequest,
         workbenchChanges: async (after, client) => {
           const panel = ready && mode === "thread" ? {
             scope: navigationScope, visible: !root.hidden && document.visibilityState === "visible",
@@ -546,7 +576,16 @@ ${card}
       style.id = "showai-workbench-style";
       style.textContent = await downloadAsset(bundle.style);
       document.head.appendChild(style);
-      await importAsset(bundle.entry);
+      if (qoder) {
+        const script = document.createElement("script");
+        script.type = "module";
+        script.textContent = await downloadAsset(bundle.entry);
+        await new Promise((resolve, reject) => {
+          script.onload = resolve;
+          script.onerror = () => reject(new Error(t("invalidBundle")));
+          document.body.appendChild(script);
+        });
+      } else await importAsset(bundle.entry);
       if (!ready) throw new Error(t("invalidBundle"));
     } catch (error) {
       if (!ready) show("failed", error.message);

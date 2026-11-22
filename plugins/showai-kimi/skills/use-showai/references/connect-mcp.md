@@ -1,6 +1,6 @@
 # 帮用户连接 ShowAI
 
-通用插件随包提供六个 Skills。使用随包提供或宿主已配置的 ShowAI MCP。ChatGPT Personal 可引用已经注册的连接。Codex、Claude Code、Antigravity、Kimi Work 和 DeepSeek Harness 的本机专用包同时提供 Skills 和 MCP 启动配置。为 Cursor、Qoder 或 WorkBuddy 生成通用包时也可以附上本机连接。
+通用插件随包提供六个 Skills。使用随包提供或宿主已配置的 ShowAI MCP。ChatGPT Personal 可引用已经注册的连接。Codex、Claude Code、Antigravity、Kimi Work 和 DeepSeek Harness 的本机专用包同时提供 Skills 和 MCP 启动配置。Cursor、Qoder 和 WorkBuddy 也可生成各自的本机插件包，附上选定内容库的 MCP 启动配置。
 
 ## 先判断当前状态
 
@@ -27,7 +27,7 @@
 
 ### 其他 Agent
 
-已明确 ShowAI 和 Agent 在同一台电脑时，直接使用宿主的设置。Qoder 在「扩展 → 插件」检查插件是否启用，在「扩展 → 连接器」看 ShowAI 的连接状态，含本机配置的 ZIP 会带 `.mcp.json`。WorkBuddy 在「连接器 → 自定义连接器」检查工具或添加本机配置。Cursor 在「Customize → MCPs」管理连接。修复后在同一客户端刷新并验证工具，必要时新建本机对话。连通后沿用原任务的项目和材料。
+已明确 ShowAI 和 Agent 在同一台电脑时，直接使用宿主的设置。Qoder 在「扩展 → 插件」检查插件是否启用，在「扩展 → 连接器」看 ShowAI 的连接状态，含本机配置的 ZIP 会带 `.mcp.json`。WorkBuddy 本机插件先检查插件是否启用，并在新任务确认工具可用；手动连接在「连接器 → 自定义连接器」检查或添加。Cursor 在「Customize → MCPs」管理连接。修复后在同一客户端刷新并验证工具，必要时新建本机对话。连通后沿用原任务的项目和材料。
 
 运行位置仍不明确时，先问「MCP 客户端运行在 ShowAI 这台电脑、同一网络的另一台设备，还是云端？」再看该宿主接受远程 URL 还是本机命令。
 

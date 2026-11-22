@@ -3,10 +3,17 @@ import { join } from "node:path";
 import { CoreError } from "../core/model";
 import { workbenchChunkBytes, type WorkbenchBundle } from "../host/codex-workbench-transport";
 
-export function workbenchAssets(directory: string) {
+export function workbenchAssets(directory: string, host: "codex" | "qoder" = "codex") {
   let manifest: Promise<WorkbenchBundle> | undefined;
   const bundle = () => manifest ??= readFile(join(directory, "index.json"), "utf8")
-    .then((json) => JSON.parse(json) as WorkbenchBundle);
+    .then((json) => {
+      const value = JSON.parse(json) as WorkbenchBundle;
+      if (host === "qoder") {
+        if (!value.qoder) throw new CoreError("NOT_FOUND", "The Qoder workbench bundle is missing.");
+        return { ...value, ...value.qoder };
+      }
+      return value;
+    });
   return {
     bundle,
     async asset(name: string, offset: number) {

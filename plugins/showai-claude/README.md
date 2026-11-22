@@ -72,7 +72,15 @@ CODEBUDDY_CONFIG_DIR="$HOME/.workbuddy" node "$workbuddy_cli" plugin marketplace
 CODEBUDDY_CONFIG_DIR="$HOME/.workbuddy" node "$workbuddy_cli" plugin install showai-workbuddy@showai-workbuddy-local
 ```
 
-Start a new local task and check `projects_list` to confirm the active library. For an interactive reading preview, use MCP Apps in chat. Qoder can also open the exported HTML in its built-in browser beside the chat. Cursor can open an exported file in its Browser pane. Open saved pages in ShowAI for direct editing and use the chat agent to revise the same Page through MCP.
+Start a new local task and check `projects_list` to confirm the active library. The packages share the six Skills, but use the host's own installation format and delivery instructions:
+
+| Host | Conversation | Saved pages and workspace |
+| --- | --- | --- |
+| Cursor | Interactive MCP Apps in chat | The agent can read and edit a saved Page through MCP. Open the Page in ShowAI to edit it directly; the Cursor Browser can also open exported HTML. |
+| Qoder | Interactive MCP Apps in chat | The local package adds a ShowAI global workbench under **More** and a workbench in the task's app panel. Ask the agent to open a saved Page in the side editor, or select the workbench yourself. |
+| WorkBuddy | Interactive MCP Apps in chat | The agent can read and edit a saved Page through MCP. Open the Page in ShowAI to edit it directly. |
+
+Qoder's workbench entry points require the local package and its registered runtime. Remote MCP connections use the display capabilities provided by that connection. WorkBuddy uses its native plugin manifest and MCP configuration; verify the tools in a new task as well as in the plugin manager.
 
 ## Host packages and shared source
 
@@ -87,6 +95,9 @@ Edit workflows in `plugins/showai/skills` and host delivery contracts in `plugin
 | Antigravity      | `plugins/showai-antigravity`          | Native MCP Apps views, page cards, and side-pane workbench |
 | DeepSeek Harness | Prepared bundle directory             | Inline preview, editable session sidebar, global workbench |
 | Kimi Work        | `plugins/showai-kimi`                 | Offline Widget workspace and display action                |
+| Qoder            | Generated local plugin                | Chat MCP Apps, global and task workbenches                 |
+| Cursor           | Generated local plugin                | Chat MCP Apps; saved pages edited through MCP or ShowAI    |
+| WorkBuddy        | Generated local marketplace           | Chat MCP Apps; saved pages edited through MCP or ShowAI    |
 | Universal        | Six Skills; configure MCP in the host | MCP Apps view when supported, otherwise results and links  |
 
 The marketplace identity stays `showai@renaissance-mind`. The generated Codex and Claude directories are committed so Git-backed marketplace installation also works in a fresh checkout. Regenerate them when changing shared source; do not edit generated Skills or launchers. `host-profile.json` records the profile, declared display and shared-file fingerprints. App installation binds the same adapters from bundled source resources. Each host must reload its installed plugin and reconnect separately; updating source does not replace an already running MCP process.

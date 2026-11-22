@@ -25,6 +25,7 @@ export async function startCodexWorkbenchBrowser(options: {
   home: string;
   profile: string;
   key: string;
+  host?: "codex" | "qoder";
 }) {
   if (!isAbsolute(options.profile))
     throw new Error("SHOWAI_CODEX_WORKBENCH_PROFILE must be an absolute directory.");
@@ -40,7 +41,7 @@ export async function startCodexWorkbenchBrowser(options: {
     ...server,
     transport: {
       ...server.workbench,
-      ...workbenchAssets(join(dirname(runtime.cliEntry), "codex-workbench-assets")),
+      ...workbenchAssets(join(dirname(runtime.cliEntry), "codex-workbench-assets"), options.host),
     },
   };
 }

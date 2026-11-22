@@ -102,11 +102,18 @@ export const connectionCommands: CommandDeclaration[] = [
         const { startLibraryMcp } = await import("../mcp-library");
         const profile = process.env.SHOWAI_CODEX_WORKBENCH_PROFILE;
         const home = service.store.root;
-        const workbench = profile
+        const qoderProfile = process.env.SHOWAI_QODER_WORKBENCH === "1"
+          ? join(home, "local", "qoder-workbench")
+          : undefined;
+        const workbench = profile || qoderProfile
           ? (await import("../codex-workbench")).codexWorkbenchConnection(
-              async (key) => (await loadBrowser()).startCodexWorkbenchBrowser({ home, profile, key }),
+              async (key) => (await loadBrowser()).startCodexWorkbenchBrowser({
+                home, profile: profile ?? qoderProfile!, key,
+                host: profile ? "codex" : "qoder",
+              }),
               service,
               presentationDirectory,
+              profile ? "codex" : "qoder",
             )
           : process.env.SHOWAI_ANTIGRAVITY_WORKBENCH === "1"
             ? (await import("../antigravity-workbench")).antigravityWorkbenchConnection(
