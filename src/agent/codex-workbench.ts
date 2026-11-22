@@ -7,7 +7,7 @@ import darkLogo from "../../plugins/showai/assets/logo-dark.svg?raw";
 import { workbenchRoutes, type CodexWorkbenchTransport } from "../host/codex-workbench-transport";
 import { mcpFailure, mcpSuccess } from "./presentation-tools";
 import { openSystemUrl } from "../host/local-system";
-import { pageLink } from "../document/page-link.mjs";
+import { openDesktopPage } from "./desktop-page";
 import type { AgentService } from "./service";
 import {
   codexPageIdentity,
@@ -134,6 +134,7 @@ function registerCodexWorkbench(
     ...views,
     { mode: "thread", name: "workbench_file", uri: codexWorkbenchFileUri, entrypoint: "file" },
     { mode: "thread", name: "workbench_page_card", uri: codexWorkbenchCardUri, entrypoint: "card" },
+    { mode: "thread", name: "workbench_page_card_v12", uri: "ui://showai/workbench-card-v12.html", entrypoint: "card" },
     { mode: "thread", name: "workbench_page_card_v11", uri: "ui://showai/workbench-card-v11.html", entrypoint: "card" },
     { mode: "thread", name: "workbench_page_card_v10", uri: previousWorkbenchCardUri, entrypoint: "card" },
     { mode: "thread", name: "workbench_page_card_v9", uri: "ui://showai/workbench-card-v9.html", entrypoint: "card" },
@@ -245,6 +246,7 @@ function registerCodexWorkbench(
     targets: CodexCardTarget[],
     meta?: Record<string, unknown>,
     adjustSpacing = false,
+    openIn?: "desktop",
   ) {
     try {
       const cards = await readCodexPageCards(service, targets);
@@ -254,6 +256,7 @@ function registerCodexWorkbench(
         ...mcpSuccess(data),
         _meta: {
           [cards.length === 1 ? "showaiPageCard" : "showaiCardGroup"]: data,
+          ...(openIn && { showaiCardDestination: openIn }),
           showaiNavigationScope: navigation.scope(meta),
         },
       };
@@ -267,11 +270,12 @@ function registerCodexWorkbench(
     description: "Deliver the original Page as a clickable card after successfully creating or editing it, or when the user asks for a saved target. Optionally use a blockId from page_read to point to a component and description to summarize its contents or changes. Put remaining targets in additionalTargets to deliver all cards together.",
     inputSchema: {
       ...codexCardTarget,
+      openIn: z.literal("desktop").optional().describe("Open the original in the local ShowAI desktop app when the user clicks the card."),
       additionalTargets: z.array(z.object(codexCardTarget)).optional(),
       ...(!qoder && { adjustSpacing: z.boolean().optional().describe("Show live spacing controls only when the user wants to tune the card layout.") }),
     },
-  }, ({ additionalTargets = [], adjustSpacing, ...first }, extra) =>
-    presentPageCard([first, ...additionalTargets], extra._meta, adjustSpacing));
+  }, ({ additionalTargets = [], adjustSpacing, openIn, ...first }, extra) =>
+    presentPageCard([first, ...additionalTargets], extra._meta, adjustSpacing, openIn));
   server.registerTool("workbench_open_destination", {
     title: "Open a ShowAI page",
     description: "Open the selected saved Page or component in the ShowAI app, or in the host's registered Workbench when available.",
@@ -285,10 +289,10 @@ function registerCodexWorkbench(
       if (destination === "workbench") {
         if (!globalEntrypoint) throw new Error("This installation has no Codex Workbench entrypoint.");
         url = codexWorkbenchPageLink(globalEntrypoint, target);
+        await openSystemUrl(url);
       } else {
-        url = pageLink({ ...target, blockIds: target.blockId ? [target.blockId] : [] });
+        url = await openDesktopPage(service.store.root, target);
       }
-      await openSystemUrl(url);
       return { content: [], _meta: { showaiWorkbenchData: { url } } };
     } catch (error) {
       return mcpFailure(error);

@@ -59,6 +59,8 @@
 }
 .showai-card-error { color: var(--color-text-danger, light-dark(#9d2828, #ffaba4)) }
 .showai-card-error[data-kind="info"] { color: var(--card-muted) }
+.showai-card-app-link { display: block; margin-top: 8px; font-size: 12px; color: var(--card-muted) }
+.showai-card-app-link input { box-sizing: border-box; width: 100%; font: inherit; color: var(--card-ink); background: transparent; border: 1px solid var(--card-border); border-radius: 4px; padding: 4px 6px }
 .showai-card-error :is(a, input) { position: relative; z-index: 1 }
 .showai-card-error input { box-sizing: border-box; width: 100%; font: inherit }
 .showai-card-open {
@@ -72,6 +74,7 @@
   cursor: pointer;
 }
 .showai-card-open:disabled { cursor: default }
+.showai-card-destination { margin-inline-start: var(--showai-card-actions-gap); color: var(--card-muted); font-size: 12px; pointer-events: none }
 .showai-card-open:focus-visible { outline: 2px solid var(--card-focus); outline-offset: -2px }
 .showai-card-list .showai-card:has(> .showai-card-open:active:not(:disabled)) { background: var(--card-hover) }
 @media (hover: hover) {

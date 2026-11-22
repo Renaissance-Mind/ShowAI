@@ -14,6 +14,7 @@ export function t3CodeLaunchSnippet(provider: T3CodeProvider, launch: McpLaunch,
     env: {
       ...launch.env,
       SHOWAI_LINKED_WORKBENCH: "1",
+      SHOWAI_CARD_DESTINATION: "desktop",
       SHOWAI_HOST_DISPLAY: provider === "codex" || provider === "claude" ? "mcp-app" : "t3-html",
     },
   }, platform);

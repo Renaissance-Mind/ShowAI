@@ -42,19 +42,19 @@ T3 Code 0.1.11 中的 Claude Code 2.1.301 及以上可展示 MCP App。更早的
 
 <!-- showai-only:codex,claude -->
 
-- 正式 Page 或 Board 保存成功后，用最终 projectId、pageId 调用一次 `card_present`，多页用 additionalTargets。点击 MCP 卡片的编辑按钮后，T3 会请用户确认发送打开原页的请求。
+- 使用 MCP App 时，正式 Page 或 Board 保存成功后，用最终 projectId、pageId 调用一次本机 `card_present({projectId,pageId,openIn:"desktop"})`，多页用 additionalTargets。卡片可以带要定位的 blockId。读者点卡片后，T3 请其批准打开操作，随后在运行该连接的电脑上启动 ShowAI App 并定位原页。卡片留在聊天中。
 
 <!-- /showai-only -->
 
 <!-- showai-only:claude,universal -->
 
-配置为 `t3-html` 的本机连接可调用 `card_present({…,delivery:"t3-html"})`，用返回的 `delivery.path` 预览并发布。使用文件式卡片时给出原页和可打开的交付文件。
+配置为 `t3-html` 的本机连接可调用 `card_present({…,delivery:"t3-html"})`，用返回的 `delivery.path` 预览并发布。纯 HTML 卡片提供可选中复制的 ShowAI 原页链接。用户明确要求启动桌面 App 时，使用该连接提供的 `workbench_open_destination({projectId,pageId,blockId?,destination:"desktop"})`。远程执行环境的桌面动作发生在运行连接的电脑上。
 
 <!-- /showai-only -->
 
 <!-- showai-only:codex,claude -->
 
-- 用户要求打开原页或组件时，调用本机 `workbench_page_url({projectId,pageId,blockId?,surface:"t3-code"})`。用 `preview_status` 核对已有标签，已显示同页时按 tabId 定位；其他页面用 `preview_open({target:previewTarget,reuseExistingTab:false})`。T3 Browser 可编辑原页并写回同一内容库。全库入口用 `workbench_url({surface:"t3-code"})`。远程执行环境同样使用返回的 environment-port target。HTTP MCP 采用该连接实际返回的授权入口。
+- 用户明确指定在 T3 Browser 中编辑时，调用本机 `workbench_page_url({projectId,pageId,blockId?,surface:"t3-code"})`。用 `preview_status` 核对已有标签，已显示同页时按 tabId 定位；其他页面用 `preview_open({target:previewTarget,reuseExistingTab:false})`。全库入口用 `workbench_url({surface:"t3-code"})`。HTTP MCP 采用该连接实际返回的授权入口。
 - 用户要文件时用原有导出工具，给出执行环境的绝对路径链接。图片、音视频和可预览文档可使用 T3 自带的文件查看器。
 
 <!-- /showai-only -->

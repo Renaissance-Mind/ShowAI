@@ -127,7 +127,7 @@ function createShowaiCardView(list, template, openTarget) {
     }));
   }
 
-  function updateActions(t, { busy, workbench, desktop, openLabel, workbenchLabel, showOptions = true }) {
+  function updateActions(t, { busy, workbench, desktop, openLabel, workbenchLabel, showOptions = true, showDestination = false }) {
     if (busy) closeMenu();
     for (const row of list.children) {
       const open = row.querySelector(".showai-card-open");
@@ -135,6 +135,9 @@ function createShowaiCardView(list, template, openTarget) {
       open.setAttribute("aria-label", label + " · " + row.querySelector(".showai-card-title").textContent);
       open.title = label;
       open.disabled = busy;
+      const destination = row.querySelector(".showai-card-destination");
+      destination.hidden = !showDestination;
+      destination.textContent = showDestination ? label : "";
       const toggle = row.querySelector(".showai-card-toggle");
       toggle.parentElement.hidden = !showOptions;
       toggle.setAttribute("aria-label", t("openOptions"));

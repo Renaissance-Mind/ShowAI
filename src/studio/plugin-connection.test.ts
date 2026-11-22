@@ -150,6 +150,7 @@ test("per-host launch configuration is accepted by the Claude Code CLI", async (
   };
   const codex = launchSnippet("codex", server);
   expect(t3CodeLaunchSnippet("codex", server)).toContain('SHOWAI_HOST_DISPLAY = "mcp-app"');
+  expect(t3CodeLaunchSnippet("codex", server)).toContain('SHOWAI_CARD_DESTINATION = "desktop"');
   expect(t3CodeLaunchSnippet("claude", server)).toContain("SHOWAI_HOST_DISPLAY=mcp-app");
   expect(t3CodeLaunchSnippet("claude-legacy", server)).toContain("SHOWAI_HOST_DISPLAY=t3-html");
   expect(JSON.parse(t3CodeLaunchSnippet("opencode", server)).mcp.showai.environment).toMatchObject({

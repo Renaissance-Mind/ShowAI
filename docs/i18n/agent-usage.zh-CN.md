@@ -180,7 +180,7 @@ showai_capabilities  template_apply  template_context  template_save
 
 ## 使用正确的运行时
 
-T3 Code 支持 MCP App 的提供方可以在对话里直接显示交互组件。其他提供方用 `t3-html` 获取完整 HTML，再交给 `html_preview` 和 `html_render`。需要编辑时用 `workbench_page_url` 返回的执行环境目标打开原页。[提供方接入与展示](agent-integration.zh-CN.md#t3-code)
+T3 Code 支持 MCP App 的提供方可以在对话里直接显示交互组件。其他提供方用 `t3-html` 获取完整 HTML，再交给 `html_preview` 和 `html_render`。本机 `card_present` 传 `openIn:"desktop"` 可让读者点卡片在 ShowAI App 打开原页。用户指定 T3 浏览器时使用 `workbench_page_url`。[提供方接入与展示](agent-integration.zh-CN.md#t3-code)
 
 下面的 `showai` 代表经过核实的命令前缀，例如 `node /absolute/path/ShowAI/dist-runtime/scripts/cli.mjs`，不假设已安装全局 npm 命令。本机独立运行需要 Node.js 22.12+；桌面 App 的「设置 → MCP → 本机启动配置」提供内置可执行文件、CLI 路径和环境变量。
 

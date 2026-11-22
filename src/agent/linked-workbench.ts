@@ -6,6 +6,7 @@ import { z } from "zod";
 import lightLogo from "../../plugins/showai/assets/logo.svg?raw";
 import { pageLink } from "../document/page-link.mjs";
 import { openSystemUrl } from "../host/local-system";
+import { openDesktopPage } from "./desktop-page";
 import { getLocale, translator } from "../i18n";
 import messages from "../i18n/messages/codex-workbench";
 import cardStyles from "./codex-workbench-card.css?raw";
@@ -21,7 +22,7 @@ import { codexWorkbenchHtml } from "./codex-workbench-ui";
 import { hostDisplay, mcpFailure, mcpSuccess } from "./presentation-tools";
 import type { AgentService } from "./service";
 
-const cardUri = "ui://showai/saved-page-card-v3.html";
+const cardUri = "ui://showai/saved-page-card-v4.html";
 const mimeType = "text/html;profile=mcp-app";
 const icon = "data:image/svg+xml;base64," + Buffer.from(lightLogo).toString("base64");
 const readOnly = { readOnlyHint: true, destructiveHint: false, openWorldHint: false };
@@ -97,19 +98,21 @@ async function cardFiles(
   root: string,
   cards: Awaited<ReturnType<typeof readCodexPageCards>>,
   display: "fragment-file" | "model-html" | "t3-html",
-  browser?: { url: string },
 ) {
   const locale = getLocale();
-  const label = translator(messages)(browser ? "openRemotePage" : "cardDesktop");
+  const t = translator(messages);
+  const label = t("cardDesktop");
   const rows = cards.map(card => {
-    const href = browser ? editorUrl(browser.url, card, true).href
-      : pageLink({ ...card, blockIds: card.blockId ? [card.blockId] : [] });
+    const href = escapeHtml(pageLink({ ...card, blockIds: card.blockId ? [card.blockId] : [] }));
     const detail = card.description || card.blockTitle;
+    const linkField = display === "t3-html"
+      ? `<label class="showai-card-app-link">${escapeHtml(t("desktopPageLink"))}<input readonly value="${href}" onfocus="this.select()" onclick="this.select()"></label>`
+      : "";
     return `<article class="showai-card"><span class="showai-card-icon" aria-hidden="true"><img src="${icon}" alt=""></span>
       <div class="showai-card-content"><h2 class="showai-card-title">${escapeHtml(card.title)}</h2>
       <p class="showai-card-path">${escapeHtml(card.breadcrumb.join(" / "))}</p>
-      ${detail ? `<p class="showai-card-body">${escapeHtml(detail)}</p>` : ""}</div>
-      <a class="showai-card-open" href="${escapeHtml(href)}" aria-label="${escapeHtml(label + " · " + card.title)}" title="${escapeHtml(label)}"></a></article>`;
+      ${detail ? `<p class="showai-card-body">${escapeHtml(detail)}</p>` : ""}${linkField}</div>
+      ${linkField ? "" : `<a class="showai-card-open" href="${href}" aria-label="${escapeHtml(label + " · " + card.title)}" title="${escapeHtml(label)}"></a>`}</article>`;
   }).join("\n");
   const fragment = `<style>${cardStyles}</style><section class="showai-card-list" aria-label="ShowAI">${rows}</section>`;
   await mkdir(root, { recursive: true });
@@ -122,7 +125,7 @@ async function cardFiles(
   return {
     delivery: display === "model-html"
       ? { mode: display, html, ...(Buffer.byteLength(fragment) <= 32 * 1024 && { compact: fragment }) }
-      : display === "t3-html" ? { mode: display, path: html, next: "Use html_preview then html_render with this path." }
+      : display === "t3-html" ? { mode: display, path: html, next: "Use html_preview then html_render once. This HTML card has a selectable ShowAI app link. If the person asks to open the page on this computer, use workbench_open_destination with destination desktop when available." }
       : { mode: display, html, inline: html },
     display: { reader: "bundled" },
   };
@@ -141,6 +144,7 @@ export function linkedWorkbenchConnection(
       registerBrowserWorkbenchTools(server, service, open);
       if (!fileCards) for (const [name, uri] of [
         ["saved_page_card", cardUri],
+        ["saved_page_card_v3", "ui://showai/saved-page-card-v3.html"],
         ["saved_page_card_v2", "ui://showai/saved-page-card-v2.html"],
         ["saved_page_card_v1", "ui://showai/saved-page-card-v1.html"],
       ]) {
@@ -157,10 +161,15 @@ export function linkedWorkbenchConnection(
       server.registerTool("card_present", {
         title: "Show saved ShowAI cards",
         description: "Deliver the original Page as a clickable card after saving it, or when the user asks for a saved target. Use blockId to link a specific component and additionalTargets for other Pages.",
-        inputSchema: { ...codexCardTarget, additionalTargets: z.array(z.object(codexCardTarget)).optional(), delivery: z.literal("t3-html").optional() },
+        inputSchema: {
+          ...codexCardTarget,
+          additionalTargets: z.array(z.object(codexCardTarget)).optional(),
+          delivery: z.literal("t3-html").optional(),
+          openIn: z.literal("desktop").optional().describe("Open the original in the local ShowAI desktop app when the user clicks an MCP App card."),
+        },
         annotations: readOnly,
         ...(!fileCards && { _meta: { ui: { resourceUri: cardUri, visibility: ["model", "app"] } } }),
-      }, async ({ additionalTargets = [], delivery, ...first }) => {
+      }, async ({ additionalTargets = [], delivery, openIn, ...first }) => {
         try {
           const cards = await readCodexPageCards(service, [first, ...additionalTargets]);
           const data = cards.length === 1 ? cards[0] : { id: randomUUID(), cards };
@@ -172,27 +181,25 @@ export function linkedWorkbenchConnection(
           }));
           const fileMode = delivery ?? fileCards;
           if (fileMode) {
-            const browser = fileMode === "t3-html" ? await open() : undefined;
             const output = await cardFiles(
               presentationDirectory ?? join(service.store.root, "local", "presentations"),
               cards,
               fileMode,
-              browser,
             );
-            return mcpSuccess({ ...data, ...output, targets: browser
-              ? targets.map((target, index) => ({ ...target, ...browserDestination(editorUrl(browser.url, cards[index], true), true) }))
-              : targets });
+            return mcpSuccess({ ...data, ...output, targets });
           }
-          const browser = await open().catch(error => {
+          const desktop = openIn === "desktop" || process.env.SHOWAI_CARD_DESTINATION === "desktop" || !!process.env.T3CODE_THREAD_ID;
+          const browser = desktop ? undefined : await open().catch(error => {
             console.error("ShowAI browser workbench:", error);
             return undefined;
           });
           const attachments = browser ? cards.map(card => ({ ...card, editorUrl: editorUrl(browser.url, card).href })) : cards;
           return {
             ...mcpSuccess({ ...data, targets }),
-            _meta: cards.length === 1
-              ? { showaiPageCard: attachments[0] }
-              : { showaiCardGroup: { ...data, cards: attachments } },
+            _meta: {
+              ...(cards.length === 1 ? { showaiPageCard: attachments[0] } : { showaiCardGroup: { ...data, cards: attachments } }),
+              ...(desktop && { showaiCardDestination: "desktop" }),
+            },
           };
         } catch (error) {
           return mcpFailure(error);
@@ -214,23 +221,28 @@ export function linkedWorkbenchConnection(
         }
       });
 
-      if (!fileCards) server.registerTool("workbench_open_destination", {
-        description: "Open the selected Page in the local ShowAI App from a card action.",
-        inputSchema: { ...codexPageTarget, destination: z.enum(["desktop", "workbench"]) },
+      if (!fileCards || fileCards === "t3-html") server.registerTool("workbench_open_destination", {
+        description: fileCards === "t3-html"
+          ? "Open the saved Page or Board in the ShowAI desktop app on this computer only when the person asks. Use the target from the card."
+          : "Open the selected Page in the local ShowAI App from a card action.",
+        inputSchema: { ...codexPageTarget, destination: fileCards === "t3-html" ? z.literal("desktop") : z.enum(["desktop", "workbench"]) },
         annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: true },
-        _meta: { ui: { visibility: ["app"] } },
+        _meta: { ui: { visibility: fileCards === "t3-html" ? ["model"] : ["app"] } },
       }, async ({ destination, ...target }) => {
         try {
           await readCodexPageTarget(service, target);
-          let url = pageLink({ ...target, blockIds: target.blockId ? [target.blockId] : [] });
+          let url: string;
           if (destination === "workbench") {
             if (!cursorEditor) throw new Error("This host does not have a registered ShowAI workbench.");
             const query = new URLSearchParams({ projectId: target.projectId, pageId: target.pageId });
             if (target.blockId) query.set("blockId", target.blockId);
             url = "cursor://renaissancemind.showai-workbench/page?" + query;
-          }
-          await openSystemUrl(url);
-          return { content: [], _meta: { showaiWorkbenchData: { url } } };
+            await openSystemUrl(url);
+          } else url = await openDesktopPage(service.store.root, target);
+          const result = fileCards === "t3-html"
+            ? mcpSuccess({ ...target, openUrl: url, dispatched: true })
+            : { content: [] };
+          return { ...result, _meta: { showaiWorkbenchData: { url } } };
         } catch (error) {
           return mcpFailure(error);
         }

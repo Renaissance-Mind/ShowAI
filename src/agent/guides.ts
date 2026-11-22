@@ -66,7 +66,7 @@ const guides: Record<
     purpose:
       "Use common ShowAI capabilities across harnesses, choosing display and synchronization independently.",
     rules: [
-      "In T3 Code, Codex and compatible Claude Code sessions use MCP Apps. Other providers use delivery t3-html with html_preview then html_render. A local workbench_page_url or workbench_url request with surface t3-code returns previewTarget for the thread's Browser. Files open in the environment's file viewer.",
+      "In T3 Code, local MCP App cards open saved originals in the ShowAI desktop app when clicked; pass openIn desktop to card_present. Other providers can render a t3-html card with a selectable ShowAI link. For an explicit Browser request, workbench_page_url or workbench_url with surface t3-code returns previewTarget.",
       "Across stdio and HTTP, start public visuals with show-visual. Send original HTML directly to show_component. Only when the user explicitly requests an existing component, look up its guide; list the catalog if selection is needed. Discover deferred tools together through the host. Known display contracts need no capabilities call. For an unknown display use showai_capabilities view=presentation; for private access or live updates use the full report.",
       "CLI scripts can preview import and datasets transform with --dry-run. Commands reject unsupported options before opening the library. With --json, argument errors return ok:false and error.message.",
       "Public components/templates and customization do not require a personal project or synchronization. public list/describe and render are the CLI equivalents of public_catalog_list/describe and render_document.",

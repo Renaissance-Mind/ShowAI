@@ -12,7 +12,7 @@ export const codexWorkbenchUri = "ui://showai/workbench-v3.html";
 export const codexWorkbenchThreadUri = "ui://showai/workbench-thread-v5.html";
 export const codexWorkbenchFileUri = "ui://showai/workbench-file-v3.html";
 
-export const codexWorkbenchCardUri = "ui://showai/workbench-card-v12.html";
+export const codexWorkbenchCardUri = "ui://showai/workbench-card-v13.html";
 export const previousWorkbenchCardUri = "ui://showai/workbench-card-v10.html";
 export const codexWorkbenchTargetUri = "ui://showai/workbench-target-v3.html";
 
@@ -80,7 +80,7 @@ ${card}
   let locale = navigator.language.startsWith("zh") ? "zh-CN" : "en";
   let context = {};
   let capabilities = {};
-  let t3Browser = false;
+  let t3Local = false, desktopRequested = false;
   let launch, launchUrl, bundle, launchTimer, initialized = false;
   let ready = false, refreshing = false, sequence = 0;
   let fileInput, referencePage, readingFile = false;
@@ -104,7 +104,9 @@ ${card}
   function request(method, params) {
     const id = ++sequence;
     return new Promise((resolve, reject) => {
-      const timeout = method === "ui/message" && t3Browser ? undefined : setTimeout(() => {
+      const awaitsApproval = t3Local && (method === "ui/message" ||
+        (method === "tools/call" && params.name === "workbench_open_destination"));
+      const timeout = awaitsApproval ? undefined : setTimeout(() => {
         pending.delete(id);
         reject(new Error(t("timedOut")));
       }, 8000);
@@ -368,8 +370,9 @@ ${card}
   function showPageCard() {
     if (!pageCards.length || (ready && !root.hidden) || refreshing) return;
     const webLinks = linked && pageCards.every(item => typeof item.editorUrl === "string");
+    const desktop = t3Local || desktopRequested;
     cards.updateActions(t, {
-      busy: !initialized || openingCard || ((linked || remote) && !capabilities.serverTools && !webLinks),
+      busy: !initialized || openingCard || (!capabilities.serverTools && (desktop || ((linked || remote) && !webLinks))),
       workbench: webLinks || ((hasGlobalEntrypoint || linked) && !!capabilities.serverTools),
       desktop: !!capabilities.serverTools,
       ...(qoder && { showOptions: false }),
@@ -378,7 +381,7 @@ ${card}
         openLabel: t(hasGlobalEntrypoint ? "cardCursor" : "cardEditorLink"),
         workbenchLabel: t("copyEditorLink"),
       }),
-      ...(t3Browser && { openLabel: t("openT3Page"), showOptions: false }),
+      ...(desktop && { openLabel: t("cardDesktop"), showOptions: false, showDestination: true }),
     });
     card.hidden = false;
     if (initialized && adjustSpacing && !spacingEditor) {
@@ -463,11 +466,8 @@ ${card}
     showPageCard();
     status.hidden = true;
     try {
-      if (t3Browser) {
-        await request("ui/message", {
-          role: "user",
-          content: [{ type: "text", text: t("openT3Request") + " " + JSON.stringify({ ...target, surface: "t3-code" }) }],
-        });
+      if ((t3Local || desktopRequested) && destination === "panel") {
+        await callWorkbench("workbench_open_destination", { ...target, destination: "desktop" });
         return;
       }
       if (remote) {
@@ -536,6 +536,7 @@ ${card}
       const target = meta?.showaiPageCard ?? data;
       const targets = group?.cards ?? (target?.pageId ? [target] : undefined);
       if (!targets?.length) return;
+      desktopRequested = !remote && meta?.showaiCardDestination === "desktop";
       adjustSpacing = !qoder && !directEditor && (group ?? target)?.adjustSpacing === true;
       navigationScope ??= meta?.showaiNavigationScope;
       const singleChanged = !group && (["projectId", "pageId", "blockId", "title", "blockTitle", "description", "editorUrl"]
@@ -760,7 +761,7 @@ ${card}
     protocolVersion: "2026-01-26",
   }).then(result => {
     capabilities = result?.hostCapabilities || {};
-    t3Browser = ${host === "codex" || host === "linked"} && result?.hostInfo?.name === "t3-code" && !!capabilities.message?.text;
+    t3Local = ${host === "codex" || host === "linked"} && result?.hostInfo?.name === "t3-code";
     configure(result?.hostContext);
     initialized = true;
     if (!ready && !pageCards.length) show("loading");

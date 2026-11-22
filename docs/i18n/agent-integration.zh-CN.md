@@ -30,7 +30,7 @@ library MCP 增加 projects_list/project_resolve/project_create；绑定项目�
 
 T3 在线程所在的环境加载提供方的 MCP 配置。共用配置目录的 Codex、Claude Code 可以直接复用已有 ShowAI 插件。独立配置目录可在 ShowAI「设置 → Agent 插件 → T3 Code」选择 Codex TOML、Claude CLI、OpenCode 或 MCP JSON，在目标机器应用后，从 T3 命令面板选择 **重启智能体会话**。
 
-T3 Code 0.1.11 的 Codex 和 Claude Code 2.1.301 及以上支持交互式 MCP App。其他提供方可传 `delivery:"t3-html"`，用 T3 的 `html_preview` 检查返回的路径或 HTML，再用 `html_render` 放进对话。已保存页面的卡片可以请求在 T3 浏览器中编辑原件。本机 `workbench_page_url` 和 `workbench_url` 接受 `surface:"t3-code"`，返回线程执行环境的端口目标，每个原页可独立占用一个宿主标签。[T3 展示协议](https://github.com/pingdotgg/t3code/blob/v0.1.11/docs/user/html-renders.md)
+T3 Code 0.1.11 的 Codex 和 Claude Code 2.1.301 及以上支持交互式 MCP App。其他提供方可传 `delivery:"t3-html"`，用 T3 的 `html_preview` 检查返回的路径或 HTML，再用 `html_render` 放进对话。读者点击本机 MCP App 卡片并确认后，运行连接的电脑会在 ShowAI 桌面 App 中打开原页或指定组件。纯 HTML 卡片提供可复制的 ShowAI 链接。用户明确选择 T3 浏览器时，本机 `workbench_page_url` 和 `workbench_url` 接受 `surface:"t3-code"`，返回线程执行环境的端口目标，每个原页可独立占用一个宿主标签。[T3 展示协议](https://github.com/pingdotgg/t3code/blob/v0.1.11/docs/user/html-renders.md)
 
 ## 远程 MCP 服务
 

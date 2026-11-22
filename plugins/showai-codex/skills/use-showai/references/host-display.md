@@ -10,9 +10,9 @@ T3 Code 0.1.11 的 Codex 会话可展示交互式 MCP App。
 
 - 临时图表、原创 HTML 和交互原型使用 `show_component`。支持 MCP App 时传 `delivery:"mcp-app"`，可在图内切换全屏。分批生成已有组件时用本机 stdio 的 `live:true` 和同一 viewId。已保存页面的阅读器可将选区和控件值通过 `ui/update-model-context` 交给下一条消息。
 
-- 正式 Page 或 Board 保存成功后，用最终 projectId、pageId 调用一次 `card_present`，多页用 additionalTargets。点击 MCP 卡片的编辑按钮后，T3 会请用户确认发送打开原页的请求。
+- 使用 MCP App 时，正式 Page 或 Board 保存成功后，用最终 projectId、pageId 调用一次本机 `card_present({projectId,pageId,openIn:"desktop"})`，多页用 additionalTargets。卡片可以带要定位的 blockId。读者点卡片后，T3 请其批准打开操作，随后在运行该连接的电脑上启动 ShowAI App 并定位原页。卡片留在聊天中。
 
-- 用户要求打开原页或组件时，调用本机 `workbench_page_url({projectId,pageId,blockId?,surface:"t3-code"})`。用 `preview_status` 核对已有标签，已显示同页时按 tabId 定位；其他页面用 `preview_open({target:previewTarget,reuseExistingTab:false})`。T3 Browser 可编辑原页并写回同一内容库。全库入口用 `workbench_url({surface:"t3-code"})`。远程执行环境同样使用返回的 environment-port target。HTTP MCP 采用该连接实际返回的授权入口。
+- 用户明确指定在 T3 Browser 中编辑时，调用本机 `workbench_page_url({projectId,pageId,blockId?,surface:"t3-code"})`。用 `preview_status` 核对已有标签，已显示同页时按 tabId 定位；其他页面用 `preview_open({target:previewTarget,reuseExistingTab:false})`。全库入口用 `workbench_url({surface:"t3-code"})`。HTTP MCP 采用该连接实际返回的授权入口。
 - 用户要文件时用原有导出工具，给出执行环境的绝对路径链接。图片、音视频和可预览文档可使用 T3 自带的文件查看器。
 
 ## 通用交付

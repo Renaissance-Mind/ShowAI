@@ -262,6 +262,8 @@ it("opens both Codex workbench entries and saves into the MCP library", async ()
       ok: true, data: { projectId, pageId, title: data.title, breadcrumb },
     });
     expect(card._meta?.showaiPageCard).toEqual({ projectId, pageId, title: data.title, breadcrumb });
+    const desktopCard = await client.callTool({ name: "card_present", arguments: { projectId, pageId, openIn: "desktop" } });
+    expect(desktopCard._meta).toMatchObject({ showaiCardDestination: "desktop", showaiPageCard: { projectId, pageId } });
     expect(card.content).toHaveLength(1);
     const blockId = saved.document.content.attrs!.id as string;
     const component = { projectId, pageId, blockId };

@@ -41,6 +41,14 @@ test.each(["mcp-app", "model-html", "fragment-file", "t3-html"])(
       }
       const { tools } = await client.listTools();
       const cardTool = tools.find(tool => tool.name === "card_present")!;
+      const sessionFile = join(home, "local", "linked-workbench", "session.json");
+      if (display === "mcp-app") {
+        const native = await call("card_present", { ...target, openIn: "desktop" });
+        expect(native._meta?.showaiCardDestination).toBe("desktop");
+        expect(native._meta?.showaiPageCard).toMatchObject(target);
+        expect(native._meta?.showaiPageCard).not.toHaveProperty("editorUrl");
+        await expect(readFile(sessionFile)).rejects.toMatchObject({ code: "ENOENT" });
+      }
       const shown = await call("card_present", target);
       expect(shown.structuredContent).toMatchObject({ data: { ...target, title } });
       if (display === "mcp-app") {
@@ -53,8 +61,16 @@ test.each(["mcp-app", "model-html", "fragment-file", "t3-html"])(
         const output = shown.structuredContent as { data: { delivery: { html: string; path: string } } };
         const html = await readFile(display === "t3-html" ? output.data.delivery.path : output.data.delivery.html, "utf8");
         expect(html).toContain("Saved Page &lt;&amp;&gt;");
-        if (display === "t3-html") expect(html).toContain(`page=${target.pageId}&amp;t3Page=1`);
-        else expect(html).toContain(`showai://project/${target.projectId}/page/${target.pageId}`);
+        expect(html).toContain(`showai://project/${target.projectId}/page/${target.pageId}`);
+        if (display === "t3-html") {
+          expect(html).toContain("<input readonly");
+          expect(html).not.toContain("localhost:");
+          await expect(readFile(sessionFile)).rejects.toMatchObject({ code: "ENOENT" });
+          expect(tools.find(tool => tool.name === "workbench_open_destination")?._meta?.ui)
+            .toEqual({ visibility: ["model"] });
+          const missing = await client.callTool({ name: "workbench_open_destination", arguments: { ...target, destination: "desktop", blockId: "missing" } });
+          expect(missing.isError).toBe(true);
+        }
       }
       const missing = await client.callTool({
         name: "workbench_page_url",
