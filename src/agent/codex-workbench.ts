@@ -130,6 +130,7 @@ function registerCodexWorkbench(
     ...views,
     { mode: "thread", name: "workbench_file", uri: codexWorkbenchFileUri, entrypoint: "file" },
     { mode: "thread", name: "workbench_page_card", uri: codexWorkbenchCardUri, entrypoint: "card" },
+    { mode: "thread", name: "workbench_page_card_v8", uri: "ui://showai/workbench-card-v8.html", entrypoint: "card" },
     { mode: "thread", name: "workbench_page_card_v7", uri: "ui://showai/workbench-card-v7.html", entrypoint: "card" },
     { mode: "thread", name: "workbench_page_card_v6", uri: "ui://showai/workbench-card-v6.html", entrypoint: "card" },
     { mode: "thread", name: "workbench_page_card_v5", uri: "ui://showai/workbench-card-v5.html", entrypoint: "card" },
@@ -166,6 +167,7 @@ function registerCodexWorkbench(
               prefersBorder: false,
               permissions: { clipboardWrite: {} },
             },
+            ...(!qoder && entrypoint === "card" && { "openai/widgetMinFrameHeight": 0 }),
             ...(entrypoint === "card" || entrypoint === "open" ? {
               "openai/ui": { availableDisplayModes: entrypoint === "open" ? ["inline", "fullscreen"] : ["inline"], preferredDisplayMode: entrypoint === "open" ? "fullscreen" : "inline" },
             } : {}),
