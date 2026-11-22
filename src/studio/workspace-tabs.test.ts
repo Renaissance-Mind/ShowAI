@@ -26,6 +26,14 @@ const page = (id: string, projectId = "project-a"): WorkspaceEntry => ({
 });
 
 describe("workspace tabs", () => {
+  it("restores only the active tab and its history in a single-page pane", () => {
+    let state = addWorkspaceTab(createWorkspace(page("one")), page("two"));
+    state = visitWorkspace(state, page("three"));
+    const saved = JSON.stringify({ version: 1, ...state });
+    expect(parseWorkspaceTabs(saved, true)).toEqual({ activeId: state.activeId, tabs: [state.tabs[1]] });
+    expect(parseWorkspaceTabs(saved)).toEqual(state);
+  });
+
   it("treats an entry as unchanged only when nothing the tab shows differs", () => {
     const entry = page("page-a");
     expect(sameEntry(entry, { ...entry })).toBe(true);

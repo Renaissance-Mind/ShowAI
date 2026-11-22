@@ -1,5 +1,5 @@
 import { ToastContext } from "../problems/toast-context";
-import { browserSearch, codexWorkbench } from "../browser/codex-workbench";
+import { browserSearch } from "../browser/codex-workbench";
 import { useCodexReferenceLabel } from "./shell/useCodexReferenceLabel";
 import RemoteMcpApprovalDialog from "./RemoteMcpApprovalDialog";
 import { trackDesktopPreviewActivity } from "./preview-work";
@@ -118,7 +118,8 @@ export default function Studio() {
     setRevealNode,
     catalogScrollRef,
   } = route;
-  const codexThread = codexWorkbench()?.mode === "thread";
+  const pageOnly = capabilities.singlePage &&
+    (view === "page" || (!workspaceReady && browserSearch().has("page")));
   const appUpdate = useAppUpdate();
   const catalog = useCatalogState(route);
   const dialogs = useDialogState();
@@ -475,8 +476,13 @@ export default function Studio() {
         />
         <AutoHideSidebar
           enabled={view === "page" && !!page.draft}
-          pageOnly={codexThread && view === "page"}
-          compactOverlay={codexThread ? "always" : view === "settings" && (settingsSection === "sync" || settingsSection === "projects")}
+          pageOnly={pageOnly}
+          compactOverlay={
+            capabilities.singlePage
+              ? "always"
+              : view === "settings" &&
+                (settingsSection === "sync" || settingsSection === "projects")
+          }
           mobileBoardKey={
             view === "page" && page.draft?.content.attrs?.kind === "board"
               ? page.draft.id

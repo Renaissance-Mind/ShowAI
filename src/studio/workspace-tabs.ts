@@ -200,6 +200,7 @@ export function moveWorkspaceTab(
 
 export function parseWorkspaceTabs(
   bytes: string | null,
+  singlePage = false,
 ): WorkspaceTabsState | undefined {
   if (!bytes) return;
   let value: unknown;
@@ -271,7 +272,8 @@ export function parseWorkspaceTabs(
     }
   }
   if (!ids.has(state.activeId)) return;
-  return { tabs: state.tabs, activeId: state.activeId };
+  const tabs = singlePage ? state.tabs.filter(tab => tab.id === state.activeId) : state.tabs;
+  return { tabs, activeId: state.activeId };
 }
 
 const detourViews = new Set<WorkspaceView>(["templates", "components", "settings"]);
