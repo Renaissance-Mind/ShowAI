@@ -6,7 +6,7 @@ ShowAI lets your agent answer with interfaces — interactive, archived, and evo
 
 ## Install
 
-**Recommended: install from the ShowAI app.** Download the app from [GitHub Releases](https://github.com/Renaissance-Mind/ShowAI/releases/latest), open it, and use the plugin panel on the welcome screen or under **Settings → External Agent plugins** to install the plugin for Claude Code, Codex or Antigravity. Install the agent first and make its command-line tool available. The app supplies the plugin and runtime; no source checkout or separate Node.js is needed. Restart the Claude Code or Antigravity session, or refresh plugins or restart Codex, then start a new conversation. The connection uses the app's current library; click **Update and enable** after switching libraries or moving the app. If the app reports a conflicting plugin source, disable the listed plugin in the host before installing the app version. See [Use ShowAI in Claude Code and Codex](https://github.com/Renaissance-Mind/ShowAI/blob/main/docs/codex.md).
+**Recommended: install from the ShowAI app.** Download the app from [GitHub Releases](https://github.com/Renaissance-Mind/ShowAI/releases/latest), open it, and use the plugin panel on the welcome screen or under **Settings → Agent plugins** to install the plugin for Claude Code, Codex or Antigravity. Install the agent first and make its command-line tool available. The app supplies the plugin and runtime; no source checkout or separate Node.js is needed. Restart the Claude Code or Antigravity session, or refresh plugins or restart Codex, then start a new conversation. The connection uses the app's current library; click **Update and enable** after switching libraries or moving the app. If the app reports a conflicting plugin source, disable the listed plugin in the host before installing the app version. See [Use ShowAI in Claude Code and Codex](https://github.com/Renaissance-Mind/ShowAI/blob/main/docs/codex.md).
 
 ### From a source checkout
 
@@ -42,7 +42,7 @@ npm run plugin:antigravity -- --port <port> --json
 
 ### DeepSeek Harness
 
-Open DeepSeek Harness once to initialize its desktop profile, then quit the application completely. In ShowAI choose **Settings → External Agent plugins → DeepSeek Harness → Install plugin**. ShowAI uses the Harness package manager to install and enable the local [bundle](https://github.com/Renaissance-Mind/ShowAI/blob/main/plugins/showai-deepseek/README.md) and verifies its link. Open Harness to use the six Skills, local MCP tools, inline previews, session sidebar and global workbench.
+Open DeepSeek Harness once to initialize its desktop profile, then quit the application completely. In ShowAI choose **Settings → Agent plugins → DeepSeek Harness → Install plugin**. ShowAI uses the Harness package manager to install and enable the local [bundle](https://github.com/Renaissance-Mind/ShowAI/blob/main/plugins/showai-deepseek/README.md) and verifies its link. Open Harness to use the six Skills, local MCP tools, inline previews, session sidebar and global workbench.
 
 After switching libraries or updating ShowAI, choose **Update and enable** and reopen Harness. For source development, `npm run plugin:dsh` prepares the bundle. With Harness closed, run `dsh plugin --profile desktop add "link:/absolute/path/to/the/bundle"` using the printed directory. Harness also accepts that directory through **Plugins → Add plugin → Enable now**.
 
@@ -137,7 +137,7 @@ Follow the distribution’s bound host adapter for display. The shared workflows
 
 The five host-specific packages install six Skills and the local MCP launch configuration together. Run the Agent and ShowAI on the same computer and use the host's installer. ShowAI installs and enables the DeepSeek bundle through the Harness CLI; Kimi Work installs its registered local plugin.
 
-For another client, use **Settings → External Agent plugins** in ShowAI or generate the universal directory from source:
+For another client, use **Settings → Agent plugins** in ShowAI or generate the universal directory from source:
 
 ```sh
 npm run package:plugin -- --out NEW_DIRECTORY

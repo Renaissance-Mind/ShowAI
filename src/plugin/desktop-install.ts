@@ -48,6 +48,8 @@ import {
   type DshProfileState,
 } from "./dsh-stage.mjs";
 import { dshDesktopRunning, dshPackageLauncher } from "./dsh-cli";
+import { readMcpCallHistory } from "../agent/mcp-call-history";
+import { mcpLogSettings, saveMcpRetention } from "../agent/mcp-log-settings";
 
 export type PluginHost = "codex" | "claude" | "antigravity" | "deepseek";
 export interface DshPendingSteps {
@@ -107,6 +109,9 @@ export const desktopPluginActions = new Set([
   "plugins:setPath",
   "plugins:launchConfig",
   "plugins:prepareLocal",
+  "mcp:settings",
+  "mcp:setLogRetention",
+  "mcp:callHistory",
 ]);
 
 export function pluginInstallerAction(
@@ -115,6 +120,12 @@ export function pluginInstallerAction(
   args: Record<string, unknown>,
 ) {
   switch (action) {
+    case "mcp:settings":
+      return mcpLogSettings(installer.libraryHome);
+    case "mcp:setLogRetention":
+      return saveMcpRetention(installer.libraryHome, args.days);
+    case "mcp:callHistory":
+      return readMcpCallHistory(installer.libraryHome, args);
     case "plugins:status":
       return installer.status(
         args.host === undefined ? undefined : pluginHost(args.host),
@@ -320,6 +331,10 @@ export class DesktopPluginInstaller {
       channel: RuntimeChannel;
     },
   ) {}
+
+  get libraryHome() {
+    return this.options.runtime().home;
+  }
 
   private manualPaths(): Promise<Partial<Record<PluginHost, string>>> {
     return readFile(join(this.options.root, "host-paths.json"), "utf8").then(

@@ -18,8 +18,6 @@ import {
   DshInstallFeedback,
   PluginError,
   RestartHints,
-  RUNTIME_FAILURES,
-  VerifyConnection,
 } from "./PluginInstallSettings";
 import { workbenchCapabilities } from "./capabilities";
 import {
@@ -105,9 +103,6 @@ export default function Welcome({
       setCopyError({ key, message: errorMessage(reason) });
     }
   };
-  const installedHosts = plugins.hosts.filter(
-    (host) => host.installed && host.enabled,
-  );
   const shown = plugins.hosts.filter(
     (host) =>
       (host.host !== "deepseek" && host.host !== "antigravity") ||
@@ -286,19 +281,6 @@ export default function Welcome({
                 {!plugins.receipt.dsh && <RestartHints hosts={[plugins.receipt.host]} />}
               </div>
             )}
-          </div>
-        )}
-        {plugins.receipt && !plugins.receipt.dsh && installedHosts.length > 0 && (
-          <div className="studio-welcome-verify plugin-install-settings">
-            <VerifyConnection
-              hosts={installedHosts}
-              busy={!!plugins.busy}
-              onRepair={(host, failure) =>
-                plugins.install(host, {
-                  repairRuntime: RUNTIME_FAILURES.has(failure),
-                })
-              }
-            />
           </div>
         )}
         <PluginError message={plugins.error} details={plugins.errorDetails} />

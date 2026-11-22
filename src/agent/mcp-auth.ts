@@ -219,6 +219,9 @@ export class McpAuthorization {
       )
       .run(new Date().toISOString(), id, Date.now());
   }
+  clientName(clientId: string) {
+    return this.get<Client>("client", clientId)?.client_name;
+  }
   connections() {
     return (
       this.db
@@ -228,9 +231,7 @@ export class McpAuthorization {
       const grant = JSON.parse(value) as ProjectGrant;
       return {
         id: grant.id,
-        name:
-          this.get<Client>("client", grant.clientId)?.client_name ??
-          "MCP client",
+        name: this.clientName(grant.clientId) ?? "MCP client",
         projectIds: grant.projectIds,
         projectAccess: grant.projectAccess,
         scopes: grant.scopes,

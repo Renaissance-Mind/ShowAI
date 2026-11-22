@@ -8,7 +8,7 @@
 
 需要 ShowAI 桌面 App（见[快速上手](quick-start.zh-CN.md#1-安装-showai)），以及已安装并登录的 Claude Code 或 Codex。
 
-1. 在 ShowAI 中打开插件面板：首次启动时的欢迎页，或随时打开「设置 → 外部 Agent 插件」。
+1. 在 ShowAI 中打开插件面板：首次启动时的欢迎页，或随时打开「设置 → Agent 插件」。
 2. 在 Claude Code 或 Codex 旁点「安装插件」，等待显示「已安装并启用」。
 3. Claude Code 重启会话；Codex 刷新插件或重启 Codex。然后新开一个对话。
 
@@ -22,7 +22,7 @@ ShowAI 通过 Agent 自己的插件命令安装，因此需要 Agent 的命令�
 
 > 用 ShowAI 帮我做一个房贷计算器：房价、首付比例、利率和贷款年限可以调整，显示月供和总利息。
 
-Agent 应当调用 ShowAI 工具、保存页面并展示出来。「设置 → 外部 Agent 插件」也会显示每个 Agent 在本次安装后是否调用过 ShowAI（「等待第一次调用」/「本次安装后尚未调用」/「已收到第一次调用」）、最近一次连接失败及「修复并重新连接」，并提供一条更短、可以复制的测试提示词。如果它只用文字回答，见 [Agent 找不到 ShowAI 时](quick-start.zh-CN.md#agent-找不到-showai-时)。
+Agent 应当调用 ShowAI 工具、保存页面并展示出来。「设置 → MCP → 调用记录」显示它调用的工具和结果。如果它只用文字回答，见 [Agent 找不到 ShowAI 时](quick-start.zh-CN.md#agent-找不到-showai-时)。
 
 ## 选择内容库与项目
 

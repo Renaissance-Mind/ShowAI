@@ -13,6 +13,7 @@ import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import { AgentService } from "./service";
+import { readMcpCallHistory } from "./mcp-call-history";
 import { startMcpHttpServer } from "./mcp-http";
 import { syncManager } from "../sync/manager";
 import { CloudState } from "./cloud-state";
@@ -97,6 +98,9 @@ test.each(["library", "project", "public"])(
     if (mode === "public")
       cleanup.push(() => rm(logDirectory, { recursive: true, force: true }));
     const saved = await logs(logDirectory);
+    const history = await readMcpCallHistory(root, { transport: "stdio" });
+    expect(history.records).toHaveLength(3);
+    expect(history.records).toContainEqual(expect.objectContaining({ tool: "showai_capabilities", status: "success" }));
     expect(saved).toHaveLength(6);
     expect(saved[1]).toMatchObject({
       event: "completed",
@@ -172,6 +176,11 @@ test.each([false, true])(
       ? join(root, "local", "mcp-logs")
       : join(root, "state", "logs", "mcp");
     const saved = await logs(directory);
+    if (local) {
+      const history = await readMcpCallHistory(root, { transport: "http" });
+      expect(history.records).toHaveLength(3);
+      expect(history.records).toContainEqual(expect.objectContaining({ tool: "pages_list", errorCode: "invalid_token" }));
+    }
     expect(saved.filter((r) => r.event === "completed")).toHaveLength(3);
     expect(
       saved.find((r) => r.event === "completed" && r.tool === "showai_capabilities"),

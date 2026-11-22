@@ -1069,7 +1069,12 @@ export async function createMcpHttpApp(options: McpHttpOptions) {
                     "insufficient_scope",
                     403,
                   );
-                callLog.authorize(loggedCall, grant.id);
+                if (loggedCall)
+                  callLog.authorize(
+                    loggedCall,
+                    grant.id,
+                    authorization.clientName(grant.clientId),
+                  );
                 if (options.local && publicTools.has(name))
                   return execute(request, body, undefined, grant);
                 if (

@@ -8,7 +8,7 @@ With ShowAI connected, Claude Code and Codex can answer with an interface instea
 
 You need the ShowAI desktop app ([quick start](quick-start.md#1-install-showai)) and Claude Code or Codex, installed and signed in.
 
-1. Open the plugin panel in ShowAI: the welcome screen on first launch, or **Settings → External Agent plugins** at any time.
+1. Open the plugin panel in ShowAI: the welcome screen on first launch, or **Settings → Agent plugins** at any time.
 2. Click **Install plugin** next to Claude Code or Codex and wait for **Installed and enabled**.
 3. Restart the Claude Code session, or refresh plugins or restart Codex, then start a new conversation.
 
@@ -22,7 +22,7 @@ Installing the plugin, reloading the agent and a conversation picking up the new
 
 > Use ShowAI to build a mortgage calculator: price, down payment, rate and term are adjustable; show the monthly payment and total interest.
 
-The agent should use the ShowAI tools, save the page and present it. **Settings → External Agent plugins** also shows, for each agent, whether the current installation has received its first call (**Waiting for the first call** / **Not called since this installation** / **First call received**), the latest failed connection with **Repair and reconnect**, and a shorter test prompt you can copy. If it answers in plain text, see [If the agent can't find ShowAI](quick-start.md#if-the-agent-cant-find-showai).
+The agent should use ShowAI tools, save the page and present it. **Settings → MCP → Call history** shows its tool calls and their results. If it answers in plain text, see [If the agent can't find ShowAI](quick-start.md#if-the-agent-cant-find-showai).
 
 ## Choose a library and project
 

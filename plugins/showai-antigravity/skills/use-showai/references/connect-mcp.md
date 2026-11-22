@@ -14,7 +14,7 @@
 
 ### ChatGPT 网页
 
-- 需要新建连接且公网地址未知时，问「你已经有 ShowAI 的公网 HTTPS MCP 地址了吗？」已有地址就进入注册；还没有则请用户在运行 ShowAI 的电脑打开「设置 → 远程连接 → 公网入口」。
+- 需要新建连接且公网地址未知时，问「你已经有 ShowAI 的公网 HTTPS MCP 地址了吗？」已有地址就进入注册；还没有则请用户在运行 ShowAI 的电脑打开「设置 → 远程 MCP → 公网入口」。
 - 临时试用可选 Cloudflare 临时域名。长期使用可配置 Cloudflare 固定域名，或已开通的 Tailscale **Funnel** 公网入口。保持电脑在线、ShowAI 运行，在 App 检查通过后复制以 `/mcp` 结尾的 HTTPS 地址。ChatGPT 的云端无法直连用户的 localhost、家庭局域网或仅 tailnet 可达的 Serve 地址。
 - 在 [ChatGPT 插件设置](https://chatgpt.com/plugins) 点击加号 → Add custom MCP server，选 Server URL，填写地址，选择 OAuth 和动态客户端注册（DCR），再点 Create as a plugin。要求开发者模式时在设置中启用；受组织管理时由有权限的管理员添加。打开连接，在 ShowAI 对照连接编号批准，再返回 ChatGPT 完成授权。用户已经注册过服务时从原条目继续。
 - 连接已授权且工具已加载时，通用 Skills 可复用该连接。希望把 Skills 明确关联到这个 ChatGPT 连接时，在 ShowAI 的对应公网入口选择 ChatGPT，使用「导出 ChatGPT 插件」并填写已注册连接的插件页链接，再按宿主支持的方式导入 ShowAI Personal。
@@ -22,12 +22,12 @@
 ### Grok Bot
 
 - 先问「运行 Grok Bot 连接器的设备，与运行 ShowAI 的电脑在同一个 Tailscale 私网吗？」以实际运行连接器的设备为准。若两种网络都可用，让用户选择私网或公网。
-- **同一 tailnet**：在两端登录同一 tailnet，确认访问规则允许连接，并启用 MagicDNS 和 HTTPS。在 ShowAI「设置 → 远程连接 → Tailscale 私网」开启 Serve，选择「设备授权」，复制接入提示词。在 Grok Bot 的 Add MCP server 中使用 **Command / stdio**，填提示词给出的 `mcp-remote` 命令；支持直接 HTTP 的入口也可填私网 HTTPS 地址。由用户在 ShowAI 批准核实过的 Tailscale 设备。选择私网 OAuth 时按 App 给出的 OAuth 配置操作。
+- **同一 tailnet**：在两端登录同一 tailnet，确认访问规则允许连接，并启用 MagicDNS 和 HTTPS。在 ShowAI「设置 → 远程 MCP → 局域网与私网 → Tailscale 私网」开启 Serve，选择「设备授权」，复制接入提示词。在 Grok Bot 的 Add MCP server 中使用 **Command / stdio**，填提示词给出的 `mcp-remote` 命令；支持直接 HTTP 的入口也可填私网 HTTPS 地址。由用户在 ShowAI 批准核实过的 Tailscale 设备。选择私网 OAuth 时按 App 给出的 OAuth 配置操作。
 - **公网**：请用户在 ShowAI 开启一个公网 HTTPS 入口并复制地址。若 Grok 的 MCP 设置支持 HTTP 和 OAuth，填入该地址并完成授权；只有 Command / stdio 时，用 `npx -y mcp-remote@0.16.6 <公网HTTPS地址/mcp> --transport http-only` 连接。OAuth 需要在能接收该桥接进程回调的设备上完成。若回调失败，指出需要支持该回调的客户端。私网可用时可选设备授权；用户已明确只能走公网时继续处理公网 OAuth。
 
 ### 其他 Agent
 
-同机使用 DeepSeek Harness 专用包时，首次打开一次 Harness 并完全退出，在 ShowAI「设置 → 外部 Agent 插件 → DeepSeek Harness」点「安装插件」，再打开 Harness。切库时可先完全退出 Harness，在 ShowAI 选定新库后点「更新并启用」，再打开 Harness。
+同机使用 DeepSeek Harness 专用包时，首次打开一次 Harness 并完全退出，在 ShowAI「设置 → Agent 插件 → DeepSeek Harness」点「安装插件」，再打开 Harness。切库时可先完全退出 Harness，在 ShowAI 选定新库后点「更新并启用」，再打开 Harness。
 
 其他本机客户端可从宿主设置检查连接。Qoder 在「扩展 → 插件」检查插件是否启用，在「扩展 → 连接器」看 ShowAI 的连接状态，含本机配置的 ZIP 会带 `.mcp.json`。WorkBuddy 本机插件先检查插件是否启用，并在新任务确认工具可用；手动连接在「连接器 → 自定义连接器」检查或添加。Cursor 在「Customize → MCPs」管理连接。修复后在同一客户端刷新并验证工具，必要时新建本机对话。连通后沿用原任务的项目和材料。
 
@@ -35,8 +35,8 @@
 
 | 位置 | 手动配置 |
 | --- | --- |
-| 与 ShowAI 同机，支持 stdio | 在 ShowAI「设置 → 外部 Agent 插件」安装对应插件，或按源码包说明为宿主配置本机 MCP 启动命令与选定内容库路径。 |
-| 同一可信局域网 | 在 ShowAI 启用局域网连接，填入显示的 Streamable HTTP 地址，在客户端凭据设置中填写 ShowAI 的访问密钥。只接受 HTTPS 的客户端改走 Tailscale 或公网。 |
+| 与 ShowAI 同机，支持 stdio | 在 ShowAI「设置 → Agent 插件」安装对应插件，或按源码包说明为宿主配置本机 MCP 启动命令与选定内容库路径。 |
+| 同一可信局域网 | 在 ShowAI「设置 → 远程 MCP → 局域网与私网」启用局域网连接，填入显示的 Streamable HTTP 地址，在客户端凭据设置中填写 ShowAI 的访问密钥。只接受 HTTPS 的客户端改走 Tailscale 或公网。 |
 | 同一 tailnet | 使用上面的 Tailscale 私网路径。能填 URL 的客户端直接使用 HTTPS；只支持 stdio 的客户端用 App 提示词中的桥接命令。 |
 | 云端或跨网络 | 使用客户端可达的公网 HTTPS 与 OAuth。仅支持 stdio 时先确认运行桥接命令的设备能访问该地址并完成 OAuth。 |
 

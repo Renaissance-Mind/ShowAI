@@ -6,7 +6,7 @@ ShowAI 让 Agent 用界面回答——可以交互、可以归档、在使用中
 
 ## 安装
 
-**推荐从 ShowAI App 安装。** 从 [GitHub Releases](https://github.com/Renaissance-Mind/ShowAI/releases/latest) 下载并打开 App，在欢迎页或「设置 → 外部 Agent 插件」中为 Claude Code、Codex 或 Antigravity 安装插件。先安装 Agent，并确保其命令行工具可用。App 提供插件和运行时，无需源码，也无需单独安装 Node.js。安装后 Claude Code 或 Antigravity 重启会话，Codex 刷新插件或重启，然后新开对话。连接使用 App 当前的内容库；切换内容库或移动 App 后点「更新并启用」。如果 App 提示插件来源冲突，先在宿主中停用提示列出的插件，再安装 App 版本。详见[在 Claude Code 与 Codex 中使用](https://github.com/Renaissance-Mind/ShowAI/blob/main/docs/i18n/codex.zh-CN.md)。
+**推荐从 ShowAI App 安装。** 从 [GitHub Releases](https://github.com/Renaissance-Mind/ShowAI/releases/latest) 下载并打开 App，在欢迎页或「设置 → Agent 插件」中为 Claude Code、Codex 或 Antigravity 安装插件。先安装 Agent，并确保其命令行工具可用。App 提供插件和运行时，无需源码，也无需单独安装 Node.js。安装后 Claude Code 或 Antigravity 重启会话，Codex 刷新插件或重启，然后新开对话。连接使用 App 当前的内容库；切换内容库或移动 App 后点「更新并启用」。如果 App 提示插件来源冲突，先在宿主中停用提示列出的插件，再安装 App 版本。详见[在 Claude Code 与 Codex 中使用](https://github.com/Renaissance-Mind/ShowAI/blob/main/docs/i18n/codex.zh-CN.md)。
 
 ### 从源码安装
 
@@ -42,7 +42,7 @@ npm run plugin:antigravity -- --port <端口> --json
 
 ### DeepSeek Harness
 
-首次使用时先打开一次 DeepSeek Harness，再完全退出。在 ShowAI 中选择「设置 → 外部 Agent 插件 → DeepSeek Harness → 安装插件」。ShowAI 调用 Harness 自带的包管理器安装并启用[本机插件包](https://github.com/Renaissance-Mind/ShowAI/blob/main/plugins/showai-deepseek/README.md)，随后核验实际链接。打开 Harness 即可使用六个 Skills、本机 MCP 工具、对话预览、会话侧栏和全局工作台。
+首次使用时先打开一次 DeepSeek Harness，再完全退出。在 ShowAI 中选择「设置 → Agent 插件 → DeepSeek Harness → 安装插件」。ShowAI 调用 Harness 自带的包管理器安装并启用[本机插件包](https://github.com/Renaissance-Mind/ShowAI/blob/main/plugins/showai-deepseek/README.md)，随后核验实际链接。打开 Harness 即可使用六个 Skills、本机 MCP 工具、对话预览、会话侧栏和全局工作台。
 
 切换内容库或更新 ShowAI 后，点「更新并启用」并重新打开 Harness。源码开发时，`npm run plugin:dsh` 仍可单独准备插件包。Harness 退出后，用命令输出的目录执行 `dsh plugin --profile desktop add "link:/插件包的绝对路径"`，也可在 Harness 的「插件 → 添加插件」选择该目录并点「立即启用」。
 
@@ -89,7 +89,7 @@ page_present 返回完整离线 HTML/source 与聊天预览。预览容纳时使
 
 五个专用包面向同一台电脑上的 Agent 和 ShowAI，一次安装六个 Skills 与本机 MCP 启动配置。DeepSeek Harness 通过宿主 CLI 安装并启用本机插件包，Kimi Work 在宿主里注册并安装本地插件。
 
-在其他客户端使用时，可在桌面「设置 → 外部 Agent 插件」安装，也可从源码生成通用目录：
+在其他客户端使用时，可在桌面「设置 → Agent 插件」安装，也可从源码生成通用目录：
 
 ```sh
 npm run package:plugin -- --out NEW_DIRECTORY

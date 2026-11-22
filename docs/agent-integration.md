@@ -17,7 +17,7 @@ The page model, component compiler, authoring service, revision checks, export r
 
 ## Local use
 
-Find the actual runtime under **Settings → External Agent plugins** (**Registered runtime** and the launch configuration) or in the selected library's `agent-runtime.json`. `showai` below abbreviates that executable and its arguments. Inspect `runtime info --json` and `guide integration --json`.
+Find the actual runtime under **Settings → Agent plugins** (**Registered runtime** and the launch configuration) or in the selected library's `agent-runtime.json`. `showai` below abbreviates that executable and its arguments. Inspect `runtime info --json` and `guide integration --json`.
 
 ```sh
 showai public list --kind component --view compact --json
@@ -36,7 +36,7 @@ For local project work, keep the usual read → modify with hash/revision → sa
 
 ## Remote MCP
 
-The desktop App offers local network HTTP with access keys, private Tailscale Serve, and public Cloudflare or Tailscale Funnel through **Settings → Remote connection**. HTTPS connections use OAuth with desktop approval; all modes save directly in the local library. See [device and client setup](chatgpt.md). The `mcp serve` gateway below uses a configured sync server; passing `--home` alone does not expose that library's private projects.
+The desktop App offers local network HTTP with access keys, private Tailscale Serve, and public Cloudflare or Tailscale Funnel through **Settings → Remote MCP**. HTTPS connections use OAuth with desktop approval; all modes save directly in the local library. See [device and client setup](chatgpt.md). The `mcp serve` gateway below uses a configured sync server; passing `--home` alone does not expose that library's private projects.
 
 Run the agent gateway with the independently installed ShowAI runtime. It uses Node.js and the same compiler/reader assets as the CLI. It is separate from the content synchronization server; the sync server continues storing snapshots and objects without executing components.
 
@@ -107,13 +107,13 @@ MCP Apps resources use `text/html;profile=mcp-app` and `_meta.ui.resourceUri`, w
 
 The same skill source supports local and remote connections. For a remote package:
 
-Generate an unbound universal package with `npm run package:plugin -- --out NEW_DIRECTORY`, or export the ZIP from desktop Settings → External Agent plugins. Install the six Skills in the host and configure its MCP connection manually. The optional ChatGPT Personal export can reference a connection the user has already registered. A supplied `--mcp-url` is a manual setup hint in the README. See [Set up an agent](https://showai.renaissancemind.ai/doc/agent-hosts).
+Generate an unbound universal package with `npm run package:plugin -- --out NEW_DIRECTORY`, or export the ZIP from desktop Settings → Agent plugins. Install the six Skills in the host and configure its MCP connection manually. The optional ChatGPT Personal export can reference a connection the user has already registered. A supplied `--mcp-url` is a manual setup hint in the README. See [Set up an agent](https://showai.renaissancemind.ai/doc/agent-hosts).
 
 ## Saved-page presentation contract
 
 In the Antigravity auxiliary pane and the DeepSeek Harness session sidebar, opening a saved Page shows one editable Page with its own actions. The host manages the surrounding tabs. ShowAI's tab strip and project tree are hidden while editing. In DeepSeek Harness, select ShowAI in the left navigation to browse the full library with workspace tabs.
 
-Install or update the Codex plugin from ShowAI **Settings → External Agent plugins**. Use `show_component` for temporary, interactive results in chat. When the connection exposes `card_present`, finish a successful Page creation or edit with an original-Page card in the same reply. Use the saved `projectId` and `pageId`. The card shows the Page title and its full project and folder path. Its optional `description` (up to 1,000 characters) can summarize the new contents or the edit. Add a verified `blockId` from the saved outline to point to a particular component. An explicit inline reading preview uses `page_present`.
+Install or update the Codex plugin from ShowAI **Settings → Agent plugins**. Use `show_component` for temporary, interactive results in chat. When the connection exposes `card_present`, finish a successful Page creation or edit with an original-Page card in the same reply. Use the saved `projectId` and `pageId`. The card shows the Page title and its full project and folder path. Its optional `description` (up to 1,000 characters) can summarize the new contents or the edit. Add a verified `blockId` from the saved outline to point to a particular component. An explicit inline reading preview uses `page_present`.
 
 For several cards, pass the first target at the top level and the others in the ordered `additionalTargets` array of the same call. Each card has its own target and description. **Open in side panel** opens the original in a separate side tab or navigates its existing tab. The cards stay visible in chat when the tab opens or closes. To tune the layout, set `adjustSpacing:true` on the top-level call. Its controls preview spacing and send the chosen values back to the conversation when applied. The adjacent menu offers **Open in Workbench** and **Open in ShowAI App**, including the component location. For direct navigation, call `card_navigate` and use `card_open` if it reports `unavailable`. Use `workbench_page_reference` to deliver a local reference file.
 

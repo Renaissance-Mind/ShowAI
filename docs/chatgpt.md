@@ -2,7 +2,7 @@
 
 **Language:** English | [简体中文](i18n/chatgpt.zh-CN.md) · [Documentation](README.md)
 
-Open **Settings → Remote connection** in the desktop App. Choose the network, start the service, then connect your client. ShowAI must remain running on an awake, connected computer.
+Open **Settings → Remote MCP** in the desktop App. Choose the network, start the service, then connect your client. ShowAI must remain running on an awake, connected computer.
 
 ## Choose the network
 
@@ -48,7 +48,7 @@ Select **Copy setup prompt** and send it to your agent. For a manual connection,
 
 ## Connect ChatGPT
 
-To get the six Skills before connecting, choose **Settings → External Agent plugins** or generate a universal package (`npm run package:plugin`). Add MCP separately in the host and ask the Agent to help you connect. If you already registered a ChatGPT connection, the optional Personal export below can reference it.
+To get the six Skills before connecting, choose **Settings → Agent plugins** or generate a universal package (`npm run package:plugin`). Add MCP separately in the host and ask the Agent to help you connect. If you already registered a ChatGPT connection, the optional Personal export below can reference it.
 
 Choose **ChatGPT** after a public connection passes its check. The guide has three steps:
 

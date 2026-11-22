@@ -16,7 +16,7 @@
 | 一边聊天一边改已保存的页面 | 在该页预览点「在侧栏编辑」，或打开会话右侧栏，在新标签中选 ShowAI。打开的是绑定内容库里的原页。在页面菜单或选区菜单点「引用到 DeepSeek 对话草稿」，带版本的引用会追加到本会话的输入框，由用户检查并发送。 |
 | 浏览整个内容库 | 点 Harness 左侧导航的 ShowAI，在主区域管理项目和编辑页面。点原来的会话即可返回聊天。 |
 
-这些界面适用于本机运行的 Harness 图形客户端和配套的 ShowAI 运行时。右侧标签随 Harness 会话管理，宿主提供全屏、分栏和浮动。纯终端客户端通过 MCP 读写内容，交付时提供实际页面链接或 HTML。若工作台连接失败，完全退出 Harness，在 ShowAI「设置 → 外部 Agent 插件」为 DeepSeek Harness 点「更新并启用」，再打开 Harness。
+这些界面适用于本机运行的 Harness 图形客户端和配套的 ShowAI 运行时。右侧标签随 Harness 会话管理，宿主提供全屏、分栏和浮动。纯终端客户端通过 MCP 读写内容，交付时提供实际页面链接或 HTML。若工作台连接失败，完全退出 Harness，在 ShowAI「设置 → Agent 插件」为 DeepSeek Harness 点「更新并启用」，再打开 Harness。
 
 此插件声明 `SHOWAI_HOST_DISPLAY=fragment-file`。show_component 使用 `delivery:"auto"`。插件会自动读取 show_component、page_present 和 render_document 返回的本机 delivery.inline（缺省时读取 delivery.html），缓存文件并在工具结果旁显示预览。
 

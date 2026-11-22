@@ -182,7 +182,11 @@ try {
     .getByRole("navigation", { name: "主要导航", exact: true })
     .getByRole("button", { name: "设置", exact: true })
     .click();
-  await page.getByRole("button", { name: "远程连接", exact: true }).click();
+  await page.getByRole("button", { name: "MCP", exact: true }).click();
+  await page.getByRole("heading", { name: "远程 MCP", exact: true }).waitFor();
+  await page.getByText("未运行", { exact: true }).waitFor();
+  await snapshot("mcp-settings");
+  await page.getByRole("button", { name: "管理连接", exact: true }).click();
   const shot = async (name) => {
     await page.evaluate(async () => {
       await document.fonts.ready;
@@ -339,6 +343,15 @@ try {
     await page.locator('.rm-client-area[data-client-view="verified"]').waitFor();
     await button("在连接列表中管理已授权客户端").click();
     await page.locator(".rm-overview-clients").waitFor();
+    await button("MCP").click();
+    await page.getByText("1 个入口运行中", { exact: true }).waitFor();
+    const call = page.getByRole("row").filter({ hasText: "projects_list" }).filter({ hasText: "UI LAN acceptance" }).first();
+    await call.waitFor();
+    assert.match(await call.innerText(), /HTTP/);
+    assert.match(await call.innerText(), /成功/);
+    await shot("mcp-call-history");
+    await button("管理连接").click();
+    await page.locator(".rm-overview-clients").waitFor();
     await button("撤销UI LAN acceptance的授权").click();
     assert.equal(
       (
@@ -415,7 +428,7 @@ try {
 
   await button("外观").click();
   await page.getByRole("radio", { name: "深色", exact: true }).check();
-  await button("远程连接").click();
+  await button("远程 MCP").click();
   const window = await application.browserWindow(page);
   await window.evaluate((w) => w.setSize(800, 1000));
   await button("配置局域网").focus();
@@ -448,7 +461,7 @@ try {
       await button("外观").click();
       await page.getByRole("combobox", { name: "语言", exact: true }).click();
       await page.getByRole("option", { name: "English", exact: true }).click();
-      await button("Remote connection").click();
+      await button("Remote MCP").click();
     }
     for (const [provider, zhGuide, enGuide] of [
       ["lan", "IP 地址", "IP address"],
@@ -503,7 +516,7 @@ try {
   await button("Appearance").click();
   await page.locator("#settings-language").click();
   await page.getByRole("option", { name: "简体中文", exact: true }).click();
-  await button("远程连接").click();
+  await button("远程 MCP").click();
   result.checks.push(
     "all five localized setup guides and port validation fit the narrow settings panel",
   );

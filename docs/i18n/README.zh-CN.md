@@ -27,7 +27,7 @@ ShowAI 在你已经在用的 Agent 里工作：装上插件后，Agent 就能把
 需要：Apple Silicon Mac（macOS 13 或更高版本），以及已登录的 Claude Code 或 Codex（也可以在 App 中填写模型 API Key）。使用 Windows 或 Linux 时，运行[浏览器版](#从源码构建)。
 
 1. **下载 ShowAI** — 下载[最新版本](https://github.com/Renaissance-Mind/ShowAI/releases/latest)，打开 DMG，把 ShowAI 拖进「应用程序」。当前版本尚未经过 Apple 公证；macOS 阻止首次打开时，见[首次打开](quick-start.zh-CN.md#1-安装-showai)。
-2. **连接你的 Agent** — 打开 ShowAI，在欢迎页（或「设置 → 外部 Agent 插件」）为 Claude Code 或 Codex 安装插件，然后重启 Agent。
+2. **连接你的 Agent** — 打开 ShowAI，在欢迎页（或「设置 → Agent 插件」）为 Claude Code 或 Codex 安装插件，然后重启 Agent。
 3. **让 Agent 做第一个界面** — 在新对话中粘贴示例提示词：
 
    > 用 ShowAI 帮我做一个房贷计算器：房价、首付比例、利率和贷款年限可以调整，显示月供和总利息。
@@ -38,15 +38,15 @@ Agent 会把界面保存到 ShowAI 并在对话中展示（不能内嵌显示的
 
 | Agent                                      | 状态     | 接入方式                                                                                                                       |
 | ------------------------------------------ | -------- | ------------------------------------------------------------------------------------------------------------------------------ |
-| Claude Code                                | 正式     | ShowAI「设置 → 外部 Agent 插件」→ 安装插件                                                                                                |
-| Codex                                      | 正式     | ShowAI「设置 → 外部 Agent 插件」→ 安装插件                                                                                                |
-| Antigravity                                | 正式     | ShowAI「设置 → 外部 Agent 插件」→ 安装插件                                                                                                |
+| Claude Code                                | 正式     | ShowAI「设置 → Agent 插件」→ 安装插件                                                                                                |
+| Codex                                      | 正式     | ShowAI「设置 → Agent 插件」→ 安装插件                                                                                                |
+| Antigravity                                | 正式     | ShowAI「设置 → Agent 插件」→ 安装插件                                                                                                |
 | 内置 Agent                                 | 正式     | 在 ShowAI 中使用本机 Codex 或 Claude Code 的登录、模型 API Key 或 Cloud                                                        |
-| DeepSeek Harness                           | 预览     | 完全退出 DeepSeek Harness，在 ShowAI「设置 → 外部 Agent 插件」点「安装插件」（[步骤](../../plugins/showai/README.zh-CN.md#deepseek-harness)） |
-| Kimi Work                                  | 预览     | 在「设置 → 外部 Agent 插件」准备插件目录，再[在 Kimi Work 中安装](../../plugins/showai-kimi/README.md)                                      |
-| Cursor、Qoder、WorkBuddy                   | 预览     | 在「设置 → 外部 Agent 插件」准备对应的安装包，再[在宿主中安装](../../plugins/showai/README.zh-CN.md#cursorqoder-和-workbuddy)                      |
+| DeepSeek Harness                           | 预览     | 完全退出 DeepSeek Harness，在 ShowAI「设置 → Agent 插件」点「安装插件」（[步骤](../../plugins/showai/README.zh-CN.md#deepseek-harness)） |
+| Kimi Work                                  | 预览     | 在「设置 → Agent 插件」准备插件目录，再[在 Kimi Work 中安装](../../plugins/showai-kimi/README.md)                                      |
+| Cursor、Qoder、WorkBuddy                   | 预览     | 在「设置 → Agent 插件」准备对应的安装包，再[在宿主中安装](../../plugins/showai/README.zh-CN.md#cursorqoder-和-workbuddy)                      |
 | 网页版 ChatGPT                             | 自行部署 | 在桌面 App 开启远程连接，使用自己的 Cloudflare 或 Tailscale 接入本机项目（[指南](chatgpt.zh-CN.md)）                           |
-| Kimi Code CLI、Gemini CLI、OpenCode | 实验     | 从「设置 → 外部 Agent 插件」复制该宿主的本地 MCP 配置（[Agent 接入](agent-integration.zh-CN.md)）                                                                 |
+| Kimi Code CLI、Gemini CLI、OpenCode | 实验     | 从「设置 → Agent 插件」复制该宿主的本地 MCP 配置（[Agent 接入](agent-integration.zh-CN.md)）                                                                 |
 
 ### 按 Agent 宿主选择插件目录
 
