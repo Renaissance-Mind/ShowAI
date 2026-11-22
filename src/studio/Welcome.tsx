@@ -15,6 +15,7 @@ import {
 import { desktop, errorMessage } from "../host/bridge";
 import AgentBrandIcon from "./AgentBrandIcon";
 import {
+  DshInstallFeedback,
   PluginError,
   RestartHints,
   RUNTIME_FAILURES,
@@ -22,6 +23,7 @@ import {
 } from "./PluginInstallSettings";
 import { workbenchCapabilities } from "./capabilities";
 import {
+  dshInstallIssue,
   pluginActionBlocked,
   pluginActionLabel,
   pluginUpToDate,
@@ -71,6 +73,7 @@ export default function Welcome({
   const desktopPlugins =
     !!info && workbenchCapabilities(info.platform).localPlugins;
   const plugins = usePluginHosts(desktopPlugins ? info.home : null);
+  const installIssue = dshInstallIssue(plugins.receipt?.dsh);
   const [detectionOverdue, setDetectionOverdue] = useState(false);
   useEffect(() => {
     setDetectionOverdue(false);
@@ -110,15 +113,12 @@ export default function Welcome({
       (host.host !== "deepseek" && host.host !== "antigravity") ||
       !!host.executable,
   );
+  const externalHost =
+    desktopPlugins && plugins.hosts.some((host) => !!host.executable);
   const noHost =
     desktopPlugins &&
     ((plugins.scanned && !plugins.error) || detectionOverdue) &&
-    !plugins.hosts.some(
-      (host) => host.host !== "deepseek" && !!host.executable,
-    );
-  const externalHost =
-    desktopPlugins &&
-    plugins.hosts.some((host) => host.host !== "deepseek" && !!host.executable);
+    !externalHost;
   const promptMode: "builtin" | "copy" | "copyOnly" | null =
     detecting
       ? null
@@ -277,20 +277,14 @@ export default function Welcome({
           <p className="studio-welcome-hint">{t("connect.installHere")}</p>
         )}
         {plugins.receipt && (
-          <div role="status" className="studio-welcome-result">
-            <p>
-              {plugins.receipt.dsh ? tp("dshStagedDone") : tp("success")}
-            </p>
-            {plugins.receipt.dsh ? (
-              <button
-                type="button"
-                className="settings-button"
-                onClick={onOpenPluginSettings}
-              >
-                {t("connect.settings")}
-              </button>
+          <div className="studio-welcome-result">
+            {installIssue ? (
+              <DshInstallFeedback {...installIssue} />
             ) : (
-              <RestartHints hosts={[plugins.receipt.host]} />
+              <div role="status">
+                <p>{plugins.receipt.dsh ? tp("dshStaged") : tp("success")}</p>
+                {!plugins.receipt.dsh && <RestartHints hosts={[plugins.receipt.host]} />}
+              </div>
             )}
           </div>
         )}

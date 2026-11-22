@@ -977,14 +977,11 @@
   margin: 0;
   color: var(--danger, #c43d3d);
 }
-.plugin-install-note,
-.plugin-install-result {
+.plugin-install-note {
+  color: var(--muted);
   font-size: 12px;
   line-height: 1.55;
   overflow-wrap: anywhere;
-}
-.plugin-install-note {
-  color: var(--muted);
 }
 .plugin-install-settings .settings-row-text {
   min-width: 0;

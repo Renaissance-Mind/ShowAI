@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type {
+  DshPendingSteps,
   PluginHost,
   PluginInstallation,
   PluginInstallReceipt,
@@ -79,6 +80,29 @@ export function pluginHostState(
 
 export function pluginActionBlocked(host: PluginInstallation) {
   return !host.executable || !!host.error || !!host.otherSources.length;
+}
+
+export function dshInstallIssue(
+  steps?: DshPendingSteps,
+  automatic = steps?.automatic,
+): { message: string; bundlePath?: string } | undefined {
+  if (!steps) return;
+  const t = translator(messages);
+  if (steps.profileMissing) return { message: t("dshOpenOnce") };
+  const conflicts = [
+    steps.otherSource && t("dshRemoveOther", { source: steps.otherSource }),
+    steps.legacyBundles.length > 0 &&
+      t("dshRemoveLegacy", { names: steps.legacyBundles.join(", ") }),
+    steps.manualMcpRow && t("dshRemoveRow", { path: steps.manualMcpRow }),
+    steps.shadowingSkills.length > 0 &&
+      t("dshRemoveSkills", { path: steps.skillRoot, names: steps.shadowingSkills.join(", ") }),
+  ].filter(Boolean);
+  if (conflicts.length) return { message: conflicts.join(" ") };
+  if (automatic === "quit") return { message: t("dshQuit") };
+  if (automatic === "manual") {
+    if (steps.enable) return { message: t("dshEnable") };
+    return { message: t("dshManual"), bundlePath: steps.bundlePath };
+  }
 }
 
 export function pluginNeedsUpdate(host: PluginInstallation) {
@@ -186,6 +210,7 @@ export function usePluginHosts(home: string | null) {
       if (mounted.current) {
         publishHosts(next);
         setRuntime(registration);
+        setReceipt((previous) => previous?.dsh ? null : previous);
       }
     } catch (reason) {
       if (mounted.current) fail(reason);
@@ -212,12 +237,16 @@ export function usePluginHosts(home: string | null) {
           { host },
         );
         const next = hosts.find((item) => item.host === host);
-        if (mounted.current && next)
+        if (mounted.current && next) {
           publishHosts(
             currentHosts.current.map((item) =>
               item.host === host ? next : item,
             ),
           );
+          setReceipt((previous) =>
+            previous?.host === host && previous.dsh ? null : previous,
+          );
+        }
       } catch (reason) {
         if (mounted.current) fail(reason, host);
       } finally {
@@ -306,7 +335,11 @@ export function usePluginHosts(home: string | null) {
             });
             if (installed.dsh) {
               if (mounted.current) setReceipt(installed);
-              result.failed.push({ host, message: translator(messages)("dshStagedDone") });
+              result.failed.push({
+                host,
+                message: dshInstallIssue(installed.dsh)?.message
+                  ?? translator(messages)("dshStaged"),
+              });
               continue;
             }
             result.updated.push(host);

@@ -567,11 +567,6 @@ describe.skipIf(!output || !config)(
       const browser = await chromium.launch({ headless: true });
       let server: Awaited<ReturnType<typeof startBrowserServer>> | undefined;
       try {
-        await mkdir(profile, { recursive: true });
-        await writeFile(join(profile, "package.json"), JSON.stringify({
-          name: "dsh-profile-desktop", private: true, dependencies: {},
-          dsh: { profile: { bundles: ["@deepseek-ai/dsh-base", "@deepseek-ai/dsh-web-app"] } },
-        }));
         server = await startBrowserServer({
           home, webRoot: resolve("dist-runtime/web"), cliEntry: resolve("dist-runtime/scripts/cli.mjs"),
           settingsPath: join(root, "settings-ui/settings.json"), registerAgentRuntime: false,
@@ -582,10 +577,30 @@ describe.skipIf(!output || !config)(
         await tab.getByRole("button", { name: /外部 Agent 插件|External Agent plugins/i }).click();
         const row = tab.locator('.plugin-host[data-host="deepseek"]');
         const installButton = row.getByRole("button", { name: /^(安装插件|Install plugin)$/i });
+        const setupSteps = row.getByRole("button", { name: /查看安装步骤|Setup steps/i });
+        const copyPath = row.getByRole("button", { name: /复制路径|Copy path/i });
         await installButton.waitFor();
+        await installButton.click();
+        await tab.locator('.plugin-install-settings[aria-busy="false"]').waitFor();
+        await row.getByText(/打开一次 DeepSeek Harness|Open DeepSeek Harness once/i).waitFor();
+        expect(await tab.getByRole("dialog").count()).toBe(0);
+        expect(await setupSteps.count()).toBe(0);
+        expect(await copyPath.count()).toBe(0);
+        await row.screenshot({ path: join(output!, "deepseek-settings-blocked.png") });
+
+        await mkdir(profile, { recursive: true });
+        await writeFile(join(profile, "package.json"), JSON.stringify({
+          name: "dsh-profile-desktop", private: true, dependencies: {},
+          dsh: { profile: { bundles: ["@deepseek-ai/dsh-base", "@deepseek-ai/dsh-web-app"] } },
+        }));
+        await tab.getByRole("button", { name: /^(重新检测|Check again)$/i }).click();
+        await row.getByText(/插件包已准备，等待安装|Plugin prepared, installation pending/i).waitFor();
+        expect(await row.getByRole("button").count()).toBe(1);
         await row.screenshot({ path: join(output!, "deepseek-settings-before.png") });
         await installButton.click();
         await row.getByRole("button", { name: /^(重新安装|Reinstall)$/i }).waitFor();
+        expect(await setupSteps.count()).toBe(0);
+        expect(await copyPath.count()).toBe(0);
         expect(await tab.getByRole("dialog").count()).toBe(0);
         const installed = JSON.parse(await readFile(join(profile, "package.json"), "utf8"));
         expect(installed.dsh.profile.bundles).toEqual(["@deepseek-ai/dsh-base", "@deepseek-ai/dsh-web-app", "@showai/dsh-showai"]);

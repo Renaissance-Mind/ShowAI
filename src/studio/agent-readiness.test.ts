@@ -14,6 +14,7 @@ import {
   unclassifiedProblem,
 } from "./assistant/AgentProblemNotice";
 import {
+  dshInstallIssue,
   pluginActionLabel,
   pluginHostState,
   pluginNeedsUpdate,
@@ -231,5 +232,22 @@ describe("host plugin connection", () => {
       pluginNeedsUpdate({ ...outdated, otherSources: ["showai@other"] }),
     ).toBe(false);
     expect(pluginNeedsUpdate({ ...outdated, error: "failed" })).toBe(false);
+  });
+
+  it("offers the DeepSeek bundle directory only when a manual add is needed", () => {
+    const staged = {
+      bundlePath: "/plugins/showai", profileMissing: false, legacyBundles: [],
+      shadowingSkills: [], skillRoot: "/skills", add: true, enable: false,
+    };
+    expect(dshInstallIssue(staged)).toBeUndefined();
+    expect(dshInstallIssue(staged, "quit")).toEqual({ message: expect.any(String) });
+    expect(dshInstallIssue(staged, "manual")?.bundlePath).toBe(staged.bundlePath);
+    expect(dshInstallIssue({ ...staged, add: false, enable: true }, "manual")).toEqual({
+      message: expect.any(String),
+    });
+    const conflict = dshInstallIssue({ ...staged, otherSource: "/other", shadowingSkills: ["use-showai"] });
+    expect(conflict?.message).toContain("/other");
+    expect(conflict?.message).toContain("use-showai");
+    expect(conflict?.bundlePath).toBeUndefined();
   });
 });

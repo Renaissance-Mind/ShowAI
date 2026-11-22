@@ -1,10 +1,6 @@
 import { useNotify } from "../problems/toast-context";
 import { useEffect, useState } from "react";
-import type {
-  DshPendingSteps,
-  PluginHost,
-  PluginInstallation,
-} from "../plugin/desktop-install";
+import type { PluginHost, PluginInstallation } from "../plugin/desktop-install";
 import type { RuntimeRegistrationStatus } from "../agent/runtime";
 import type { AgentConnectionRecord } from "../agent/mcp-connections";
 import type { DesktopInfo } from "../host/protocol";
@@ -22,9 +18,9 @@ import settingsMessages from "../i18n/messages/settings";
 import { PendingNotice } from "../ui/PendingNotice";
 import { CircleAlert, Copy, ExternalLink, FolderOpen, RefreshCw } from "../ui/icons";
 import Dialog from "../ui/Dialog";
-import commonMessages from "../i18n/messages/common";
 import { desktop, errorMessage } from "../host/bridge";
 import {
+  dshInstallIssue,
   pluginActionBlocked,
   pluginActionLabel,
   pluginErrorText,
@@ -37,53 +33,34 @@ import {
 import { AGENT_TROUBLESHOOTING, connectionHost } from "./AgentReadiness";
 import LocalPluginSetups from "./LocalPluginSetups";
 import AgentBrandIcon from "./AgentBrandIcon";
+import { SettingsPath } from "./SettingsPath";
 import type { Onboarding } from "./sample-project";
 import "./agent-settings.css";
 
-function DshSteps({ steps }: { steps: DshPendingSteps }) {
+export function DshInstallFeedback({
+  message, bundlePath,
+}: {
+  message: string;
+  bundlePath?: string;
+}) {
   const t = useTranslator(messages);
   const notify = useNotify();
-  const items = [
-    steps.profileMissing && t("dshOpenOnce"),
-    steps.automatic === "quit" && t("dshQuit"),
-    steps.automatic === "manual" && t("dshManual"),
-    steps.otherSource && `${t("dshRemoveOther")} ${steps.otherSource}`,
-    ...steps.legacyBundles.map((name) => `${t("dshRemoveLegacy")} ${name}`),
-    steps.manualMcpRow && `${t("dshRemoveRow")} ${steps.manualMcpRow}`,
-    steps.shadowingSkills.length > 0 &&
-      `${t("dshRemoveSkills")} ${steps.skillRoot}: ${steps.shadowingSkills.join(", ")}`,
-    steps.add && t("dshAdd"),
-    steps.enable && t("dshEnable"),
-    t("dshRestart"),
-  ].filter((item): item is string => typeof item === "string");
   return (
-    <div className="plugin-install-result">
-      <ol className="plugin-install-steps">
-        {items.map((item) => (
-          <li key={item}>{item}</li>
-        ))}
-      </ol>
-      <div className="plugin-install-path">
-        <code>{steps.bundlePath}</code>
-        <button
-          type="button"
-          className="settings-button"
-          onClick={() =>
-            void desktop
-              .invoke("clipboard:write", { text: steps.bundlePath })
-              .then(
-                () => notify(t("copied")),
-                (reason) =>
-                  notify(errorMessage(reason), {
-                    kind: "warning",
-                    duration: 8000,
-                  }),
-              )
+    <div role="status">
+      <p className="plugin-host-state" data-tone="warn">{message}</p>
+      {bundlePath && (
+        <SettingsPath
+          value={bundlePath}
+          copyLabel={t("copyPath")}
+          copiedLabel={t("copied")}
+          onCopy={() =>
+            desktop.invoke("clipboard:write", { text: bundlePath }).catch((reason) => {
+              notify(errorMessage(reason), { kind: "warning" });
+              return false;
+            })
           }
-        >
-          {t("copyPath")}
-        </button>
-      </div>
+        />
+      )}
     </div>
   );
 }
@@ -634,7 +611,7 @@ function hostStatus(
   if (!host.installed)
     return {
       text: t(
-        host.host === "deepseek" ? (host.installedPath ? "dshStaged" : "dshReady") : "ready",
+        host.host === "deepseek" && host.installedPath ? "dshStaged" : "ready",
       ),
       tone: "muted",
     };
@@ -690,7 +667,6 @@ export default function PluginInstallSettings({ home }: { home: string }) {
   const t = useTranslator(messages);
   const ts = useTranslator(settingsMessages);
   const tv = useTranslator(onboardingMessages);
-  const tc = useTranslator(commonMessages);
   const {
     hosts,
     scanned,
@@ -709,10 +685,6 @@ export default function PluginInstallSettings({ home }: { home: string }) {
   } = usePluginHosts(home);
   const [batch, setBatch] = useState<PluginBatchResult | null>(null);
   const [manualHost, setManualHost] = useState<PluginHost | null>(null);
-  const [dshHost, setDshHost] = useState<PluginHost | null>(null);
-  useEffect(() => {
-    if (receipt?.dsh) setDshHost("deepseek");
-  }, [receipt]);
   const installed = hosts.filter(
     (host) =>
       host.installed &&
@@ -729,16 +701,6 @@ export default function PluginInstallSettings({ home }: { home: string }) {
   const manualTarget = manualHost
     ? hosts.find((item) => item.host === manualHost)
     : undefined;
-  const dshTarget = dshHost
-    ? hosts.find((item) => item.host === dshHost)
-    : undefined;
-  const dshTargetSteps = dshTarget
-    ? receipt?.host === dshTarget.host && receipt.dsh
-      ? receipt.dsh
-      : dshTarget.dsh && dshTarget.installedPath
-        ? dshTarget.dsh
-        : undefined
-    : undefined;
 
   const renderHostRow = (host: PluginInstallation) => {
     const state = verify.states.get(host.host);
@@ -750,14 +712,13 @@ export default function PluginInstallSettings({ home }: { home: string }) {
     const confirmed =
       (state?.kind === "connected" || state?.kind === "called") &&
       Date.parse(state.at) >= (installedAt[host.host] ?? 0);
-    const dsh =
-      receipt?.host === host.host && receipt.dsh
-        ? receipt.dsh
-        : host.dsh && host.installedPath
-          ? host.dsh
-          : undefined;
+    const automatic =
+      receipt?.host === host.host ? receipt.dsh?.automatic : undefined;
+    const issue = host.executable && !host.error
+      ? dshInstallIssue(host.dsh, automatic)
+      : undefined;
     const hostErr = resolveHostError(host);
-    const canManual = !host.executable || dsh?.automatic === "manual";
+    const canManual = !host.executable || (host.dsh && automatic === "manual");
     const actionKey = pluginActionLabel(host, home);
     return (
       <div
@@ -775,9 +736,11 @@ export default function PluginInstallSettings({ home }: { home: string }) {
               </span>
             )}
           </h3>
-          <p className="plugin-host-state" data-tone={status.tone}>
-            {status.text}
-          </p>
+          {issue ? (
+            <DshInstallFeedback {...issue} />
+          ) : (
+            <p className="plugin-host-state" data-tone={status.tone}>{status.text}</p>
+          )}
           {restart.has(host.host) && !confirmed && (
             <p className="plugin-host-next" role="status">
               {t(`next.${host.host}`)}
@@ -796,7 +759,7 @@ export default function PluginInstallSettings({ home }: { home: string }) {
               {t("manualCurrent", { path: host.manualPath })}
             </p>
           )}
-          {updateFailure && (
+          {updateFailure && updateFailure.message !== issue?.message && (
             <PluginError
               message={updateFailure.message}
               details={updateFailure.details}
@@ -815,15 +778,6 @@ export default function PluginInstallSettings({ home }: { home: string }) {
               onClick={() => setManualHost(host.host)}
             >
               {t("manualToggle")}
-            </button>
-          )}
-          {dsh && (
-            <button
-              type="button"
-              className="settings-button"
-              onClick={() => setDshHost(host.host)}
-            >
-              {t("dshStepsButton")}
             </button>
           )}
           {updateFailure ? (
@@ -971,25 +925,6 @@ export default function PluginInstallSettings({ home }: { home: string }) {
               }}
               onClose={() => setManualHost(null)}
             />
-          </div>
-        </Dialog>
-      )}
-      {dshTarget && dshTargetSteps && (
-        <Dialog
-          title={pluginHostNames[dshTarget.host]}
-          onClose={() => setDshHost(null)}
-        >
-          <div className="studio-dialog-body studio-dialog-form">
-            <DshSteps steps={dshTargetSteps} />
-            <div className="studio-dialog-actions">
-              <button
-                type="button"
-                className="settings-button settings-primary-button"
-                onClick={() => setDshHost(null)}
-              >
-                {tc("done")}
-              </button>
-            </div>
           </div>
         </Dialog>
       )}
