@@ -150,6 +150,40 @@
     }
    ],
    "pages": {
+    "1c7a263c-bd9f-40ce-bc58-1870022f978b": {
+     "title": "通用插件连接向导",
+     "icon": "🤝",
+     "file": "zh-CN/pages/1c7a263c-bd9f-40ce-bc58-1870022f978b.json",
+     "sha256": "7a73e561b7338b5f61b76ccf065b6e5a0ecbcce0f1cd10bbda8f17e4ca4ddf55",
+     "components": [
+      "zh-CN/components/doc-hero@1.0.0-7c2bbe84b003.json",
+      "zh-CN/components/doc-compare@1.0.0-3a5b6ff02c26.json",
+      "zh-CN/components/doc-steps@1.0.0-660edad476b2.json"
+     ]
+    },
+    "cf5d1ce9-369c-55de-923f-8da2ce92c74d": {
+     "title": "在 ChatGPT 中连接 ShowAI",
+     "icon": "💬",
+     "file": "zh-CN/pages/cf5d1ce9-369c-55de-923f-8da2ce92c74d.json",
+     "sha256": "0826e010f104231951757cb1b181d7d21bde7662c6d15a1a2e4fd99dfeecd86e",
+     "components": [
+      "zh-CN/components/doc-hero@1.0.0-7c2bbe84b003.json",
+      "zh-CN/components/doc-compare@1.0.0-3a5b6ff02c26.json",
+      "zh-CN/components/doc-steps@1.0.0-660edad476b2.json"
+     ]
+    },
+    "e8c001a7-4e9f-5515-a2e4-8ed6085ef46d": {
+     "title": "在 Agent 中使用",
+     "icon": "🤝",
+     "file": "zh-CN/pages/e8c001a7-4e9f-5515-a2e4-8ed6085ef46d.json",
+     "sha256": "f741805f4a7a7bcb7144c7f2d9751407164b3df461ff090f0b6ded34b0d7765c",
+     "components": [
+      "zh-CN/components/doc-hero@1.0.0-7c2bbe84b003.json",
+      "zh-CN/components/doc-compare@1.0.0-3a5b6ff02c26.json",
+      "zh-CN/components/doc-steps@1.0.0-660edad476b2.json",
+      "zh-CN/components/doc-cards@1.0.0-96ea3af150bd.json"
+     ]
+    },
     "bd1ef961-f5d1-50a1-aded-0895dc63ebc7": {
      "title": "内容库与版本",
      "icon": "🗂️",
@@ -162,29 +196,6 @@
       "zh-CN/components/doc-steps@1.0.0-660edad476b2.json",
       "zh-CN/components/doc-commands@1.0.0-f2cb922c18c3.json",
       "zh-CN/components/doc-cards@1.0.0-96ea3af150bd.json"
-     ]
-    },
-    "e8c001a7-4e9f-5515-a2e4-8ed6085ef46d": {
-     "title": "在 Agent 中使用",
-     "icon": "🤝",
-     "file": "zh-CN/pages/e8c001a7-4e9f-5515-a2e4-8ed6085ef46d.json",
-     "sha256": "ea744ba3c1c832a076d86b5f40d7f9733aa0c4c07689506a2292c5d6e37c4f91",
-     "components": [
-      "zh-CN/components/doc-hero@1.0.0-7c2bbe84b003.json",
-      "zh-CN/components/doc-compare@1.0.0-3a5b6ff02c26.json",
-      "zh-CN/components/doc-steps@1.0.0-660edad476b2.json",
-      "zh-CN/components/doc-cards@1.0.0-96ea3af150bd.json"
-     ]
-    },
-    "1c7a263c-bd9f-40ce-bc58-1870022f978b": {
-     "title": "通用插件连接向导",
-     "icon": "🤝",
-     "file": "zh-CN/pages/1c7a263c-bd9f-40ce-bc58-1870022f978b.json",
-     "sha256": "2552ec8d92f29da2d0b5d321a64c546120cafc7922eb6a1c900d7eafb9db5ba9",
-     "components": [
-      "zh-CN/components/doc-hero@1.0.0-7c2bbe84b003.json",
-      "zh-CN/components/doc-compare@1.0.0-3a5b6ff02c26.json",
-      "zh-CN/components/doc-steps@1.0.0-660edad476b2.json"
      ]
     },
     "2e9af66b-0a83-58f6-b3f5-a480f0f6abab": {
@@ -208,17 +219,6 @@
       "zh-CN/components/doc-hero@1.0.0-7c2bbe84b003.json",
       "zh-CN/components/doc-steps@1.0.0-660edad476b2.json",
       "zh-CN/components/doc-cards@1.0.0-96ea3af150bd.json"
-     ]
-    },
-    "cf5d1ce9-369c-55de-923f-8da2ce92c74d": {
-     "title": "在 ChatGPT 中连接 ShowAI",
-     "icon": "💬",
-     "file": "zh-CN/pages/cf5d1ce9-369c-55de-923f-8da2ce92c74d.json",
-     "sha256": "0d64ebc420f44c575b40280d498ccd108da7370d91c4810ab92028523a5355e2",
-     "components": [
-      "zh-CN/components/doc-hero@1.0.0-7c2bbe84b003.json",
-      "zh-CN/components/doc-compare@1.0.0-3a5b6ff02c26.json",
-      "zh-CN/components/doc-steps@1.0.0-660edad476b2.json"
      ]
     },
     "6e51cbfe-9394-571a-aa5a-5ff2fa96610e": {
@@ -551,6 +551,40 @@
     }
    ],
    "pages": {
+    "1c7a263c-bd9f-40ce-bc58-1870022f978b": {
+     "title": "Universal plugin connection guide",
+     "icon": "🤝",
+     "file": "en/pages/1c7a263c-bd9f-40ce-bc58-1870022f978b.json",
+     "sha256": "87a64e597514b15aad67663fe7729b4768e1bd6d66ed715e3eccb7f0669d3c9b",
+     "components": [
+      "en/components/doc-hero@1.0.0-6aa1b6a2a0e9.json",
+      "en/components/doc-compare@1.0.0-6450bf2fc82c.json",
+      "en/components/doc-steps@1.0.0-0c4f6546ba7a.json"
+     ]
+    },
+    "cf5d1ce9-369c-55de-923f-8da2ce92c74d": {
+     "title": "Connect ChatGPT to ShowAI",
+     "icon": "💬",
+     "file": "en/pages/cf5d1ce9-369c-55de-923f-8da2ce92c74d.json",
+     "sha256": "b44d6def8c1816f208ec783182e0c127760ba860d6e4ee1a11d4fa8f11605aba",
+     "components": [
+      "en/components/doc-hero@1.0.0-6aa1b6a2a0e9.json",
+      "en/components/doc-compare@1.0.0-6450bf2fc82c.json",
+      "en/components/doc-steps@1.0.0-0c4f6546ba7a.json"
+     ]
+    },
+    "e8c001a7-4e9f-5515-a2e4-8ed6085ef46d": {
+     "title": "Use with an Agent",
+     "icon": "🤝",
+     "file": "en/pages/e8c001a7-4e9f-5515-a2e4-8ed6085ef46d.json",
+     "sha256": "61a3c2596e7b6ce32ed69926d155f05bc61151629aa2914e894ebb9cccd757f7",
+     "components": [
+      "en/components/doc-hero@1.0.0-6aa1b6a2a0e9.json",
+      "en/components/doc-compare@1.0.0-6450bf2fc82c.json",
+      "en/components/doc-steps@1.0.0-0c4f6546ba7a.json",
+      "en/components/doc-cards@1.0.0-25e52118b12f.json"
+     ]
+    },
     "bd1ef961-f5d1-50a1-aded-0895dc63ebc7": {
      "title": "Content Library & Versions",
      "icon": "🗂️",
@@ -563,29 +597,6 @@
       "en/components/doc-steps@1.0.0-0c4f6546ba7a.json",
       "en/components/doc-commands@1.0.0-9832e342e037.json",
       "en/components/doc-cards@1.0.0-25e52118b12f.json"
-     ]
-    },
-    "e8c001a7-4e9f-5515-a2e4-8ed6085ef46d": {
-     "title": "Use with an Agent",
-     "icon": "🤝",
-     "file": "en/pages/e8c001a7-4e9f-5515-a2e4-8ed6085ef46d.json",
-     "sha256": "7d1ce8bcac5d4a9c972843c0e1357506d989320552fdbede2b7c606eee7cec27",
-     "components": [
-      "en/components/doc-hero@1.0.0-6aa1b6a2a0e9.json",
-      "en/components/doc-compare@1.0.0-6450bf2fc82c.json",
-      "en/components/doc-steps@1.0.0-0c4f6546ba7a.json",
-      "en/components/doc-cards@1.0.0-25e52118b12f.json"
-     ]
-    },
-    "1c7a263c-bd9f-40ce-bc58-1870022f978b": {
-     "title": "Universal plugin connection guide",
-     "icon": "🤝",
-     "file": "en/pages/1c7a263c-bd9f-40ce-bc58-1870022f978b.json",
-     "sha256": "4c73fc0d11c0b89b384318e4aa951c11e3c1f6e05d03862cad721ad0021d7bda",
-     "components": [
-      "en/components/doc-hero@1.0.0-6aa1b6a2a0e9.json",
-      "en/components/doc-compare@1.0.0-6450bf2fc82c.json",
-      "en/components/doc-steps@1.0.0-0c4f6546ba7a.json"
      ]
     },
     "2e9af66b-0a83-58f6-b3f5-a480f0f6abab": {
@@ -609,17 +620,6 @@
       "en/components/doc-hero@1.0.0-6aa1b6a2a0e9.json",
       "en/components/doc-steps@1.0.0-0c4f6546ba7a.json",
       "en/components/doc-cards@1.0.0-25e52118b12f.json"
-     ]
-    },
-    "cf5d1ce9-369c-55de-923f-8da2ce92c74d": {
-     "title": "Connect ChatGPT to ShowAI",
-     "icon": "💬",
-     "file": "en/pages/cf5d1ce9-369c-55de-923f-8da2ce92c74d.json",
-     "sha256": "4a183b53a666cbe9c08461fbf5a158184eac817cf6b6e4f7371659ca248a4204",
-     "components": [
-      "en/components/doc-hero@1.0.0-6aa1b6a2a0e9.json",
-      "en/components/doc-compare@1.0.0-6450bf2fc82c.json",
-      "en/components/doc-steps@1.0.0-0c4f6546ba7a.json"
      ]
     },
     "6e51cbfe-9394-571a-aa5a-5ff2fa96610e": {
