@@ -24,8 +24,8 @@ Skills and would shadow them. The installer lists whichever of these it finds.
 
 | Surface | Open it | What you can do |
 | --- | --- | --- |
-| Conversation | Ask for a visual or present a saved Page | Use the interactive preview in the tool result or at the end of the turn. |
-| Session sidebar | Open the right sidebar and select ShowAI, or choose **Edit in sidebar** on a saved Page preview | Edit the original Page alongside chat. The Page or selection menu can append a versioned reference to this conversation's draft. Harness owns the tab's split, fullscreen and floating controls. |
+| Conversation | Ask for a visual or save a Page | Use the interactive preview for reading, or click a saved-Page card to edit its original. |
+| Session sidebar | Click a saved-Page card or select ShowAI in the right sidebar | Edit the original Page alongside chat. The Page or selection menu can append a versioned reference to this conversation's draft. Harness owns the tab's split, fullscreen and floating controls. |
 | Main workbench | Select **ShowAI** in the left navigation | Browse projects and edit Pages in the bound library. Select the conversation to return. |
 
 The graphical surfaces use the Harness Web UI that ships in the desktop app and the local Web profile. The editor starts on demand from the same registered ShowAI runtime as MCP. The local Harness origin and a private editor URL scope each connection. A terminal-only profile can use the MCP tools and file links.
@@ -37,6 +37,8 @@ The plugin takes over the Tool call view of the three ShowAI presentation tools
 (`mcp__showai__show_component`, `mcp__showai__page_present` and `mcp__showai__render_document`) and frames the
 delivered page under a status row with reload, expand, open-in-a-new-tab and
 open-the-full-HTML actions.
+
+`mcp__showai__card_present` delivers compact original-Page cards. Each card opens its own saved target in the current conversation’s side panel.
 
 ### Why the preview is needed
 
@@ -108,7 +110,7 @@ npm test
 
 ## 简体中文
 
-在聊天中看图时，工具结果和回合末尾都提供交互预览。已保存的页面带有「在侧栏编辑」，可以边聊边改原页，还能把页面或选区引用放进当前对话草稿。也可以从右侧栏的新标签打开 ShowAI，再用宿主的全屏、分栏或浮动控件调整空间。左侧导航的 ShowAI 打开全局工作台，可以浏览项目、创建或修改页面。三个入口共用安装时绑定的本机内容库。
+在聊天中看图时，工具结果和回合末尾都提供交互预览。保存页面后，点击整张原页卡片就能在当前会话右侧打开编辑器，还能把页面或选区引用放进当前对话草稿。也可以从右侧栏的新标签打开 ShowAI，再用宿主的全屏、分栏或浮动控件调整空间。左侧导航的 ShowAI 打开全局工作台。以上入口共用安装时绑定的本机内容库。
 
 此 Harness bundle 提供 ShowAI 在 DeepSeek Harness 中所需的全部内容：`showai-mcp` 行通过 bundle 内的启动器连接本机 ShowAI 运行时与内容库，提供 `mcp__showai__*` 工具；`showai-skills` 行以 Harness 内置 Skill 的优先级发布 [plugins/showai](../showai/README.md) 的 Skill；`showai-preview` 行在对话中显示页面。
 

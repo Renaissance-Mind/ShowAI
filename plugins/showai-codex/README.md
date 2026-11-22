@@ -75,9 +75,9 @@ Start a new local task and check `projects_list` to confirm the active library. 
 
 | Host | Conversation | Saved pages and workspace |
 | --- | --- | --- |
-| Cursor Agents | Interactive MCP Apps and original-Page cards | Open the card in a browser, or copy its live editor link into Cursor Browser. |
+| Cursor Agents | Interactive MCP Apps and original-Page cards | Click the card to get the live editor link for Cursor Browser. |
 | Cursor IDE | Interactive MCP Apps and original-Page cards from the bundled Agent plugin | Run **ShowAI: Open Workbench** or open a `.showai-ref` to edit the original Page in an IDE tab. |
-| Qoder | Interactive MCP Apps and original-Page cards | Use **More → ShowAI** for the global workbench. In a task, ask the agent to open the original Page at the right. The in-chat card opens the ShowAI App. |
+| Qoder | Interactive MCP Apps and original-Page cards | Click the card to navigate an already open side editor in the current task. Ask the agent to open the Page on the right to start a new tab. Use **More → ShowAI** for the global workbench. |
 | WorkBuddy | Interactive MCP Apps and original-Page cards | Open the live editor link in WorkBuddy's browser when available. |
 
 Qoder's workbench entry points require the local package and a registered ShowAI runtime that includes Qoder workbench support. An older runtime can still provide basic MCP tools but will not expose those entry points; build and register the current source runtime or update the installed runtime before using them. Remote MCP connections use the display capabilities provided by that connection. WorkBuddy uses its native plugin manifest and MCP configuration; verify the tools in a new task as well as in the plugin manager.

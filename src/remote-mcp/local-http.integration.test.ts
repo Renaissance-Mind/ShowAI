@@ -235,7 +235,7 @@ test("the remote MCP App card opens the real editor and persists an edit", async
   const resourceUri = (tools.find(tool => tool.name === "card_present")?._meta?.ui as { resourceUri: string }).resourceUri;
   const resource = (await editor.readResource({ uri: resourceUri })).contents[0];
   if (!("text" in resource)) throw new Error("The ShowAI card did not return HTML.");
-  const cards = await editor.callTool({ name: "card_present", arguments: {
+    const cards = await editor.callTool({ name: "card_present", arguments: {
     projectId: selected, pageId: other.document.id,
     additionalTargets: [{ projectId: selected, pageId: original.document.id }],
   } });
@@ -283,9 +283,15 @@ test("the remote MCP App card opens the real editor and persists an edit", async
       frame.srcdoc = html as string;
     }, { html: resource.text, cards });
     const app = page.frameLocator('iframe[title="ShowAI MCP App"]');
-    await app.getByRole("heading", { name: original.document.title, exact: true }).waitFor({ timeout: 8_000 });
-    await app.locator(".showai-card").filter({ hasText: original.document.title })
-      .locator(".showai-card-open").click({ timeout: 8_000 });
+    const secondCard = app.getByRole("button", { name: `Open original editor · ${original.document.title}` });
+    await secondCard.waitFor({ timeout: 8_000 });
+    await app.getByRole("button", { name: `Open original editor · ${other.document.title}` }).focus();
+    await page.keyboard.press("Tab");
+    expect(await secondCard.evaluate(element => element === element.ownerDocument.activeElement)).toBe(true);
+    const heading = app.getByRole("heading", { name: original.document.title, exact: true });
+    const titleBounds = await heading.boundingBox();
+    expect(titleBounds).toBeTruthy();
+    await page.mouse.click(titleBounds!.x + 8, titleBounds!.y + titleBounds!.height / 2);
     const title = app.getByRole("textbox", { name: "Page title", exact: true }).and(app.locator("input"));
     await title.waitFor({ timeout: 15_000 }).catch(async error => {
       throw new Error(`Remote editor did not load.\n${await app.locator("body").ariaSnapshot()}`, { cause: error });

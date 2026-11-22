@@ -119,6 +119,7 @@ export async function stageDshBundle({
       ...runtime.env,
       SHOWAI_HOME: home,
       SHOWAI_HOST_DISPLAY: "fragment-file",
+      SHOWAI_LINKED_WORKBENCH: "1",
     },
     cwd: home,
   };

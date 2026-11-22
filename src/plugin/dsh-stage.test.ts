@@ -82,6 +82,7 @@ test("stages the bundle with Skills, the launcher and a literal MCP row", async 
       NOTE: 'quote " and: colon',
       SHOWAI_HOME: join(root, "library"),
       SHOWAI_HOST_DISPLAY: "fragment-file",
+      SHOWAI_LINKED_WORKBENCH: "1",
     },
     cwd: join(root, "library"),
   });

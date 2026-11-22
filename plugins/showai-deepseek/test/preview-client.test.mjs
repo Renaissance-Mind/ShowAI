@@ -61,16 +61,17 @@ async function loadClient({ uiConversation } = {}) {
   if (uiConversation !== undefined) {
     assert.deepEqual(
       registrations.map((entry) => entry.spec.name).sort(),
-      ["conversation.chat.turnTail", "tool.call.toolview", "tool.call.toolview", "tool.call.toolview"],
+      ["conversation.chat.turnTail", "tool.call.toolview", "tool.call.toolview", "tool.call.toolview", "tool.call.toolview"],
     );
     return {
       card: registrations.find((entry) => entry.spec.name === "tool.call.toolview").component,
+      savedCard: registrations.find((entry) => entry.spec.key === "mcp__showai__card_present").component,
       tail: registrations.find((entry) => entry.spec.name === "conversation.chat.turnTail").component,
     };
   }
   assert.deepEqual(
     registrations.map((entry) => entry.spec.key),
-    ["mcp__showai__page_present", "mcp__showai__render_document", "mcp__showai__show_component"],
+    ["mcp__showai__page_present", "mcp__showai__render_document", "mcp__showai__show_component", "mcp__showai__card_present"],
   );
   return registrations[0].component;
 }
@@ -132,6 +133,26 @@ test("the client card distinguishes Pages from block selections and keeps the fu
   });
   assert.match(running, /data-state="running"/);
   assert.doesNotMatch(running, /action\.openFile/);
+});
+
+test("each saved-page card opens its selected original in the sidebar", async () => {
+  const { savedCard } = await loadClient({ uiConversation: { events: { register: () => () => {} } } });
+  const data = { cards: [
+    { projectId: "notes", pageId: "first", title: "First page", breadcrumb: ["Notes", "First page"] },
+    { projectId: "notes", pageId: "second", blockId: "chart", title: "Second page", description: "Saved chart" },
+  ] };
+  const opens = [];
+  const props = {
+    block: resultBlock({}, { ok: true, data }), t: key => key,
+    openInSidebar: (address, title) => opens.push({ address, title }),
+  };
+  const view = savedCard(props);
+  const rendered = renderToStaticMarkup(view);
+  assert.match(rendered, /<button[^>]+class="showai-saved-page"[^>]*>[\s\S]*Second page/);
+  assert.doesNotMatch(rendered, /<iframe/);
+  const buttons = view.type(view.props).props.children;
+  buttons[1].props.onClick();
+  assert.deepEqual(opens, [{ address: "dsh-resource://showai-page/notes/second?blocks=chart", title: "Second page" }]);
 });
 
 test("the Turn tail keeps a presented page outside the folded process", async () => {

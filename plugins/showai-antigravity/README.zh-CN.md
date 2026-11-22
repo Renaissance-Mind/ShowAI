@@ -122,9 +122,9 @@ CODEBUDDY_CONFIG_DIR="$HOME/.workbuddy" node "$workbuddy_cli" plugin install sho
 
 | 宿主 | 对话中 | 保存的页面与工作台 |
 | --- | --- | --- |
-| Cursor Agents | 可交互的 MCP App 和原页卡片 | 从卡片在浏览器打开原页，或复制实时编辑链接到 Cursor Browser。 |
+| Cursor Agents | 可交互的 MCP App 和原页卡片 | 点击卡片获取实时编辑链接，可放到 Cursor Browser。 |
 | Cursor IDE | 随包 Agent 插件提供 MCP App 和原页卡片 | 从命令面板运行「ShowAI：打开工作台」，或打开 `.showai-ref`，在 IDE 标签页编辑原页。 |
-| Qoder | 可交互的 MCP App 和原页卡片 | 从「更多 → ShowAI」打开全局工作台。在任务里让 Agent 将原页打开到右侧。聊天里的卡片指向 ShowAI App。 |
+| Qoder | 可交互的 MCP App 和原页卡片 | 点击卡片可定位到当前任务已打开的侧栏编辑器。需要新标签时，让 Agent 将原页打开到右侧。「更多 → ShowAI」打开全局工作台。 |
 | WorkBuddy | 可交互的 MCP App 和原页卡片 | WorkBuddy 提供内置浏览器时，可在里面打开原页编辑链接。 |
 
 Qoder 的工作台入口需要本机插件和支持 Qoder 工作台的已登记 ShowAI 运行时。旧运行时可能仍提供基础 MCP 工具，但不会出现工作台入口；使用前需构建并登记当前源码运行时，或更新已安装的运行时。远程 MCP 连接以实际提供的展示能力为准。WorkBuddy 使用其原生插件清单和 MCP 配置，除检查插件管理页外，也需要在新任务中确认工具可用。

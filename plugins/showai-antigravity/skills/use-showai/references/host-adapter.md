@@ -34,7 +34,7 @@ Antigravity App 的插件区提供 **ShowAI Workbench** 全局入口，用来浏
 - 需要直达具体组件时，通过 `page_read`（`detail:"outline"`，仅靠大纲不足以区分块语义时用 `rendered:false, response:"source"`）核实真实的 `blockId` 传入；省略 `description` 时组件卡片正文显示组件标题。
 - 同一页在一轮里保存多次只交付最终结果的一张卡片；一轮完成多页或需并列交付多张卡片时，第一张放在顶层，其余按顺序放入同一次调用的 `additionalTargets`（每项含 `{projectId, pageId, blockId?, description?}`）。
 - 用户要求手动调节卡片间距时，在顶层传 `adjustSpacing:true`；普通卡片使用默认布局。
-- 点击卡片上的「侧边打开」（或下拉菜单中的「从工作台打开」），右侧已打开的 ShowAI 工作台会通过实时事件原地跳转到该页面或组件；下拉菜单中的「从 ShowAI App 打开」会在桌面端 ShowAI App 打开对应页面与组件。
+- 点击卡片本身，在右侧打开目标原页或组件。已打开的 ShowAI 工作台可直接定位到该位置。卡片右侧的菜单也提供工作台和 ShowAI App 的打开入口。
 
 用户说「帮我在右侧打开这页」「跳到那个组件」时，调用 `card_navigate({projectId, pageId, blockId?})`（无需再额外调用 `card_present`）：
 

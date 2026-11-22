@@ -131,10 +131,12 @@ function createShowaiCardView(list, template, openTarget) {
     if (busy) closeMenu();
     for (const row of list.children) {
       const open = row.querySelector(".showai-card-open");
-      open.textContent = openLabel ?? t("openPage");
+      const label = openLabel ?? t("openPage");
+      open.setAttribute("aria-label", label + " · " + row.querySelector(".showai-card-title").textContent);
+      open.title = label;
       open.disabled = busy;
       const toggle = row.querySelector(".showai-card-toggle");
-      toggle.hidden = !showOptions;
+      toggle.parentElement.hidden = !showOptions;
       toggle.setAttribute("aria-label", t("openOptions"));
       toggle.disabled = busy || (!workbench && !desktop);
       const menu = row.querySelector(".showai-card-menu");

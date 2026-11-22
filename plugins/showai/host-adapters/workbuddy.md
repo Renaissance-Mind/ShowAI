@@ -4,7 +4,7 @@
 
 - 临时可视化用 `show_component` 的 `delivery:"auto"` 在 WorkBuddy 对话中展示。用户可直接操作 MCP App 内的控件。
 - 新建或续改保存成功后，用 `card_present` 交付一组原页卡片。明确要求在对话中阅读正文时用 `page_present`。用户指定文件交付时导出完整 HTML。
-- 用户要在任务旁编辑时，用 `workbench_page_url` 取得原页编辑地址，再用会话提供的 WorkBuddy 浏览器打开。卡片可打开浏览器并提供复制编辑链接的操作。
+- 点击卡片可取得原页编辑链接，可粘贴到 WorkBuddy 内置浏览器。用户要求 Agent 在任务旁打开时，用 `workbench_page_url` 取得地址，再用会话提供的 Browser 打开。
 
 <!-- showai-host-delivery:end -->
 

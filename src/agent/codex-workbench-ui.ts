@@ -12,7 +12,8 @@ export const codexWorkbenchUri = "ui://showai/workbench-v3.html";
 export const codexWorkbenchThreadUri = "ui://showai/workbench-thread-v5.html";
 export const codexWorkbenchFileUri = "ui://showai/workbench-file-v3.html";
 
-export const codexWorkbenchCardUri = "ui://showai/workbench-card-v10.html";
+export const codexWorkbenchCardUri = "ui://showai/workbench-card-v11.html";
+export const previousWorkbenchCardUri = "ui://showai/workbench-card-v10.html";
 export const codexWorkbenchTargetUri = "ui://showai/workbench-target-v3.html";
 
 export function codexWorkbenchHtml(
@@ -74,7 +75,7 @@ ${card}
   const spacingForm = document.getElementById("showai-card-spacing");
   let adjustSpacing = false, spacingEditor;
   let pageCards = [], cardGroup, openingCard = false;
-  let navigationScope, activePage, acknowledgedNavigation;
+  let navigationScope, activePage, acknowledgedNavigation, requestedNavigation;
   const pending = new Map();
   let locale = navigator.language.startsWith("zh") ? "zh-CN" : "en";
   let context = {};
@@ -367,13 +368,13 @@ ${card}
     if (!pageCards.length || (ready && !root.hidden) || refreshing) return;
     const webLinks = linked && pageCards.every(item => typeof item.editorUrl === "string");
     cards.updateActions(t, {
-      busy: !initialized || openingCard || ((qoder || linked || remote) && !capabilities.serverTools && !webLinks),
+      busy: !initialized || openingCard || ((linked || remote) && !capabilities.serverTools && !webLinks),
       workbench: webLinks || ((hasGlobalEntrypoint || linked) && !!capabilities.serverTools),
       desktop: !!capabilities.serverTools,
-      ...(qoder && { openLabel: t("cardDesktop"), showOptions: false }),
+      ...(qoder && { showOptions: false }),
       ...(remote && { openLabel: t("openRemotePage"), showOptions: false }),
       ...(linked && {
-        openLabel: t(hasGlobalEntrypoint ? "cardCursor" : "cardBrowser"),
+        openLabel: t(hasGlobalEntrypoint ? "cardCursor" : "cardEditorLink"),
         workbenchLabel: t("copyEditorLink"),
       }),
     });
@@ -399,17 +400,13 @@ ${card}
   }
 
   function revealEditorLink(row, url) {
-    const link = document.createElement("a");
-    link.textContent = t("openInBrowser");
-    link.href = url;
-    link.target = "_blank";
-    link.rel = "noopener noreferrer";
     const input = document.createElement("input");
     input.type = "text";
     input.readOnly = true;
     input.value = url;
     input.setAttribute("aria-label", t("editorLink"));
-    row.replaceChildren(link, " ", input);
+    row.dataset.kind = "info";
+    row.replaceChildren(t("editorLinkSideHint"), document.createElement("br"), input);
     row.hidden = false;
     input.focus();
     input.select();
@@ -459,6 +456,7 @@ ${card}
     const target = { projectId, pageId, ...(blockId && { blockId }) };
     const errorMessage = card.children[index].querySelector(".showai-card-error");
     errorMessage.hidden = true;
+    errorMessage.removeAttribute("data-kind");
     openingCard = true;
     showPageCard();
     status.hidden = true;
@@ -475,19 +473,11 @@ ${card}
         return await callWorkbench("workbench_open_destination", { ...target, destination: "workbench" });
       if (linked && destination !== "desktop") {
         const url = pageCard.editorUrl ?? (await callWorkbench("workbench_page_url", target)).url;
-        if (destination === "panel") {
-          if (!capabilities.openLinks) revealEditorLink(errorMessage, url);
-          else {
-            try {
-              const result = await openLink(url);
-              if (result?.isError) revealEditorLink(errorMessage, url);
-            } catch {
-              revealEditorLink(errorMessage, url);
-            }
-          }
-        } else {
+        if (destination === "panel") revealEditorLink(errorMessage, url);
+        else {
           try {
             await navigator.clipboard.writeText(url);
+            errorMessage.dataset.kind = "info";
             errorMessage.textContent = t("copiedEditorLink");
           } catch {
             revealEditorLink(errorMessage, url);
@@ -496,7 +486,6 @@ ${card}
         }
         return;
       }
-      if (qoder && destination === "panel") destination = "desktop";
       if (destination !== "panel")
         return await callWorkbench("workbench_open_destination", { ...target, destination });
       if (capabilities.serverTools) {
@@ -507,6 +496,12 @@ ${card}
         if (reply?.isError) throw new Error(reply.structuredContent?.error?.message ?? t("unavailable"));
         const status = reply?.structuredContent?.data?.status;
         if (status === "accepted" || status === "superseded") return;
+      }
+      if (qoder) {
+        errorMessage.dataset.kind = "info";
+        errorMessage.textContent = t("qoderSideHint");
+        errorMessage.hidden = false;
+        return;
       }
       await openPageTab(target);
     } catch (error) {
@@ -648,9 +643,11 @@ ${card}
           const changes = await callWorkbench("workbench_changes", { after, client, panel });
           if (changes.navigation && !root.hidden && document.visibilityState === "visible") {
             const { id, target } = changes.navigation;
-            if (activePage?.projectId === target.projectId && activePage?.pageId === target.pageId) {
+            const samePage = activePage?.projectId === target.projectId && activePage?.pageId === target.pageId;
+            if (qoder || samePage) {
+              if (qoder && !samePage) requestedNavigation = { id, target };
+              else acknowledgedNavigation = id;
               displayPage(target.pageId, target.projectId, target.blockId);
-              acknowledgedNavigation = id;
             }
           }
           return changes;
@@ -658,6 +655,10 @@ ${card}
         updatePage: (projectId, pageId) => {
           if (mode !== "thread") return;
           activePage = projectId && pageId ? { projectId, pageId } : undefined;
+          if (requestedNavigation && requestedNavigation.target.projectId === projectId && requestedNavigation.target.pageId === pageId) {
+            acknowledgedNavigation = requestedNavigation.id;
+            requestedNavigation = undefined;
+          }
           if (activePage)
             window.openai?.setWidgetState?.({
               ...window.openai.widgetState,

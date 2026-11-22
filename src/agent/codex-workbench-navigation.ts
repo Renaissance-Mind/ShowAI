@@ -9,17 +9,19 @@ type Pending = {
 };
 type PageIdentity = Pick<CodexPageTarget, "projectId" | "pageId">;
 type PanelReport = { visible: boolean; page?: PageIdentity; acknowledged?: string };
-type Panel = { scope: string; page: PageIdentity; seen: number; pending?: Pending };
+type Panel = { scope: string; page?: PageIdentity; seen: number; pending?: Pending };
 
-const samePage = (left: PageIdentity, right: PageIdentity) =>
-  left.projectId === right.projectId && left.pageId === right.pageId;
+const samePage = (left: PageIdentity | undefined, right: PageIdentity) =>
+  left?.projectId === right.projectId && left.pageId === right.pageId;
 
 export class CodexWorkbenchNavigation {
   private readonly panels = new Map<string, Panel>();
-  constructor(private readonly key: string) {}
+  constructor(private readonly key: string, private readonly reuseSidePanel = false) {}
 
   scope(meta: Record<string, unknown> | undefined) {
-    const thread = meta?.threadId ?? meta?.["openai/session"];
+    const context = meta?.["com.qoder/turnContext"];
+    const qoderSession = context && typeof context === "object" && "sessionId" in context ? context.sessionId : undefined;
+    const thread = meta?.threadId ?? meta?.["openai/session"] ?? qoderSession;
     if (typeof thread === "string" && thread.length)
       return createHmac("sha256", this.key).update(thread).digest("hex");
   }
@@ -34,16 +36,17 @@ export class CodexWorkbenchNavigation {
     }
     const id = `${scope}:${client}`;
     let panel = this.panels.get(id);
-    if (!visible || !page) {
+    if (!visible || (!page && !this.reuseSidePanel)) {
       panel?.pending?.finish("unavailable");
       this.panels.delete(id);
       return;
     }
-    if (!panel || !samePage(panel.page, page)) {
+    if (!panel || (!this.reuseSidePanel && page && !samePage(panel.page, page))) {
       panel?.pending?.finish("unavailable");
       panel = { scope, page, seen: now };
       this.panels.set(id, panel);
     }
+    panel.page = page;
     panel.seen = now;
     const pending = panel.pending;
     if (!pending) return;
@@ -59,8 +62,9 @@ export class CodexWorkbenchNavigation {
     const cutoff = Date.now() - 5000;
     let panel: Panel | undefined;
     for (const candidate of this.panels.values()) {
-      if (candidate.scope === scope && candidate.seen >= cutoff && samePage(candidate.page, target) &&
-          (!panel || candidate.seen > panel.seen)) panel = candidate;
+      if (candidate.scope !== scope || candidate.seen < cutoff) continue;
+      if (!this.reuseSidePanel && !samePage(candidate.page, target)) continue;
+      if (!panel || candidate.seen > panel.seen) panel = candidate;
     }
     if (!panel) return "unavailable";
     const selected = panel;

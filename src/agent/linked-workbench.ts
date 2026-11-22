@@ -20,7 +20,7 @@ import { codexWorkbenchHtml } from "./codex-workbench-ui";
 import { mcpFailure, mcpSuccess } from "./presentation-tools";
 import type { AgentService } from "./service";
 
-const cardUri = "ui://showai/saved-page-card-v1.html";
+const cardUri = "ui://showai/saved-page-card-v2.html";
 const mimeType = "text/html;profile=mcp-app";
 const icon = "data:image/svg+xml;base64," + Buffer.from(lightLogo).toString("base64");
 const readOnly = { readOnlyHint: true, destructiveHint: false, openWorldHint: false };
@@ -43,7 +43,7 @@ async function cardFiles(
       <div class="showai-card-content"><h2 class="showai-card-title">${escapeHtml(card.title)}</h2>
       <p class="showai-card-path">${escapeHtml(card.breadcrumb.join(" / "))}</p>
       ${detail ? `<p class="showai-card-body">${escapeHtml(detail)}</p>` : ""}</div>
-      <div class="showai-card-actions"><a class="showai-button showai-card-open" href="${escapeHtml(href)}">${label}</a></div></article>`;
+      <a class="showai-card-open" href="${escapeHtml(href)}" aria-label="${escapeHtml(label + " · " + card.title)}" title="${escapeHtml(label)}"></a></article>`;
   }).join("\n");
   const fragment = `<style>${cardStyles}</style><section class="showai-card-list" aria-label="ShowAI">${rows}</section>`;
   await mkdir(root, { recursive: true });
@@ -78,14 +78,19 @@ export function linkedWorkbenchConnection(
         if (target.blockId) url.searchParams.set("blocks", target.blockId);
         return url.href;
       }
-      if (!fileCards) server.registerResource("saved_page_card", cardUri, { mimeType }, async () => ({
-        contents: [{
-          uri: cardUri,
-          mimeType,
-          text: codexWorkbenchHtml("thread", "card", icon, cursorEditor, "linked"),
-          _meta: { ui: { prefersBorder: false, permissions: { clipboardWrite: {} } } },
-        }],
-      }));
+      if (!fileCards) for (const [name, uri] of [
+        ["saved_page_card", cardUri],
+        ["saved_page_card_v1", "ui://showai/saved-page-card-v1.html"],
+      ]) {
+        server.registerResource(name, uri, { mimeType }, async () => ({
+          contents: [{
+            uri,
+            mimeType,
+            text: codexWorkbenchHtml("thread", "card", icon, cursorEditor, "linked"),
+            _meta: { ui: { prefersBorder: false, permissions: { clipboardWrite: {} } } },
+          }],
+        }));
+      }
 
       server.registerTool("card_present", {
         title: "Show saved ShowAI cards",

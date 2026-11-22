@@ -25,6 +25,7 @@
 .showai-card-list[hidden], .showai-card-list [hidden] { display: none }
 .showai-card-list .showai-card {
   box-sizing: border-box;
+  position: relative;
   display: grid;
   grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
@@ -57,8 +58,28 @@
   white-space: pre-line;
 }
 .showai-card-error { color: var(--color-text-danger, light-dark(#9d2828, #ffaba4)) }
+.showai-card-error[data-kind="info"] { color: var(--card-muted) }
+.showai-card-error :is(a, input) { position: relative; z-index: 1 }
+.showai-card-error input { box-sizing: border-box; width: 100%; font: inherit }
+.showai-card-open {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  border: 0;
+  border-radius: inherit;
+  background: transparent;
+  padding: 0;
+  cursor: pointer;
+}
+.showai-card-open:disabled { cursor: default }
+.showai-card-open:focus-visible { outline: 2px solid var(--card-focus); outline-offset: -2px }
+.showai-card-list .showai-card:has(> .showai-card-open:active:not(:disabled)) { background: var(--card-hover) }
+@media (hover: hover) {
+  .showai-card-list .showai-card:has(> .showai-card-open:hover:not(:disabled)) { background: var(--card-hover) }
+}
 .showai-card-actions {
   position: relative;
+  z-index: 1;
   display: inline-flex;
   align-items: stretch;
   margin-inline-start: var(--showai-card-actions-gap);
@@ -80,22 +101,14 @@
   -webkit-tap-highlight-color: transparent;
 }
 .showai-card-actions > button { height: 30px }
-.showai-card-actions > .showai-card-open {
-  padding: 0 9px;
-  border-radius: 9px 0 0 9px;
-  white-space: nowrap;
-}
 .showai-card-actions > .showai-card-toggle {
   display: grid;
   width: 27px;
   padding: 0;
   place-items: center;
   color: var(--card-muted);
-  border-radius: 0 9px 9px 0;
+  border-radius: 9px;
 }
-.showai-card-actions > .showai-card-toggle[hidden] { display: none }
-.showai-card-actions > .showai-card-open:only-of-type,
-.showai-card-actions > .showai-card-open:has(+ .showai-card-toggle[hidden]) { border-radius: 9px }
 .showai-card-toggle::after {
   content: "";
   width: 5px;
@@ -167,7 +180,7 @@
   .showai-card-actions > .showai-card-toggle { width: 44px }
 }
 @media (forced-colors: active) {
-  .showai-card-actions > button:focus-visible, .showai-card-menu button:focus-visible { outline: 2px solid Highlight }
+  .showai-card-open:focus-visible, .showai-card-actions > button:focus-visible, .showai-card-menu button:focus-visible { outline: 2px solid Highlight }
 }
 
 .showai-spacing-editor {

@@ -10,7 +10,7 @@
 
 Cursor 会根据插件名称区分 MCP 服务。已有多个 ShowAI 连接时，使用本次选定的插件，确认内容库后再操作。仅有工具成功回执不能证明用户已看到视图；预览、保存和同步分别核对。
 
-Cursor Agents 的原页卡片可打开系统浏览器，还可以从菜单复制编辑链接。将这个链接放到 Cursor Browser，就能在宿主窗口编辑同一份原页。正常打开浏览器链接时，宿主决定浏览器打开位置。Cursor IDE 的独立工作台扩展自带 Agent 插件，卡片主按钮打开 IDE 内编辑器。可从命令面板选 **ShowAI: Open Workbench** 浏览项目，或用 `workbench_page_reference` 生成 `.showai-ref`，在 IDE 打开对应页面或组件。
+点击 Cursor Agents 的原页卡片可取得编辑链接，将它放到 Cursor Browser，就能在宿主窗口编辑同一份原页。Cursor IDE 的独立工作台扩展自带 Agent 插件，点击卡片本身可在 IDE 分栏打开编辑器。可从命令面板选 **ShowAI: Open Workbench** 浏览项目，或用 `workbench_page_reference` 生成 `.showai-ref`，在 IDE 打开对应页面或组件。
 
 页面预览出现 `inlineError` 或超过对话预算时，按[页面展示](authoring.md)选择关键块重新展示，并提供可用的整页入口。
 

@@ -17,7 +17,7 @@ import {
 } from "../agent/codex-page-reference";
 import {
   codexWorkbenchHtml, codexWorkbenchUri, codexWorkbenchThreadUri,
-  codexWorkbenchCardUri, codexWorkbenchTargetUri,
+  codexWorkbenchCardUri, codexWorkbenchTargetUri, previousWorkbenchCardUri,
 } from "../agent/codex-workbench-ui";
 import { mcpFailure, mcpSuccess } from "../agent/presentation-tools";
 import { AgentService } from "../agent/service";
@@ -114,6 +114,7 @@ function registerRemoteWorkbench(
     { name: "showai_remote_workbench", uri: codexWorkbenchUri, mode: "global" },
     { name: "showai_remote_page", uri: codexWorkbenchThreadUri, mode: "thread" },
     { name: "showai_remote_cards", uri: codexWorkbenchCardUri, mode: "thread", entrypoint: "card" },
+    { name: "showai_remote_cards_v10", uri: previousWorkbenchCardUri, mode: "thread", entrypoint: "card" },
     { name: "showai_remote_target", uri: codexWorkbenchTargetUri, mode: "thread", entrypoint: "open" },
   ];
   for (const { name, uri, mode, entrypoint } of resources) {

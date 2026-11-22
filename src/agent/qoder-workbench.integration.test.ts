@@ -48,8 +48,8 @@ it("opens Qoder workbench entries and saves a large page through its MCP transpo
     });
     expect(resource.contents[0]._meta?.ui).not.toHaveProperty("csp");
 
-    async function call(name: string, args: Record<string, unknown>) {
-      const result = await client.callTool({ name, arguments: args });
+    async function call(name: string, args: Record<string, unknown>, meta?: Record<string, unknown>) {
+      const result = await client.callTool({ name, arguments: args, _meta: meta });
       expect(result.isError, JSON.stringify(result.content)).not.toBe(true);
       return result;
     }
@@ -70,9 +70,29 @@ it("opens Qoder workbench entries and saves a large page through its MCP transpo
     })).structuredContent as { data: { document: any; hash: string; revision: string } };
     const page = created.data;
     const pageId = page.document.id;
-    expect((await call("card_present", { projectId, pageId })).structuredContent)
+    const task = { "com.qoder/turnContext": { sessionId: "qoder-test-task" } };
+    const card = await call("card_present", { projectId, pageId }, task);
+    expect(card.structuredContent)
       .toMatchObject({ data: { projectId, pageId, title: "Large page" } });
     await call("card_open", { projectId, pageId });
+
+    const panel = { visible: true, scope: card._meta?.showaiNavigationScope };
+    expect(panel.scope).toMatch(/^[a-f0-9]{64}$/);
+    const changes = (state: Record<string, unknown>) =>
+      appData("workbench_changes", { after: -1, client: "qoder-side", panel: state });
+    await changes(panel);
+    const foreignTask = { "com.qoder/turnContext": { sessionId: "different-task" } };
+    expect((await call("card_navigate", { projectId, pageId }, foreignTask)).structuredContent)
+      .toMatchObject({ data: { status: "unavailable" } });
+    const navigation = call("card_navigate", { projectId, pageId }, task);
+    let location: { id: string; target: { projectId: string; pageId: string } } | undefined;
+    await expect.poll(async () => {
+      const result = await changes(panel) as { navigation?: typeof location };
+      location = result.navigation;
+      return location;
+    }).toMatchObject({ target: { projectId, pageId } });
+    await changes({ ...panel, page: { projectId, pageId }, acknowledged: location!.id });
+    expect((await navigation).structuredContent).toMatchObject({ data: { status: "accepted" } });
 
     const text = "Qoder 片段 ".repeat(90_000);
     page.document.content.content[0].content[0].content[0].text = text;

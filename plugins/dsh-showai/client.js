@@ -6,7 +6,8 @@ window.__ModuleLoader__.load({
 
     const NS = "showai-page";
     const ROUTE = "/showai-page-preview";
-    const TOOLS = ["mcp__showai__page_present", "mcp__showai__render_document", "mcp__showai__show_component"];
+    const CARD_TOOL = "mcp__showai__card_present";
+    const TOOLS = ["mcp__showai__page_present", "mcp__showai__render_document", "mcp__showai__show_component", CARD_TOOL];
     const COLLAPSED_HEIGHT = 420;
     const TAIL_HEIGHT = 460;
     const EXPANDED_HEIGHT = "76vh";
@@ -91,6 +92,16 @@ body[data-ds-dark-theme] .showai-workbench-logo{background-image:url("assets/log
 .showai-page-tailHead{border-bottom:1px solid var(--dsw-alias-border-l1);align-items:center;gap:6px;min-width:0;padding:6px 10px;display:flex}
 .showai-page-tailTitle{color:var(--dsw-alias-label-secondary);text-overflow:ellipsis;white-space:nowrap;min-width:0;flex:auto;font-size:13px;line-height:24px;overflow:hidden}
 .showai-page-tailFrame{display:block;width:100%;border:0;background:#fff}
+.showai-page-tailHead{position:relative}
+.showai-page-row .showai-page-actions,.showai-page-tailHead .showai-page-actions{position:relative;z-index:1}
+.showai-page-sideClick{position:absolute;inset:0;width:100%;padding:0;border:0;border-radius:inherit;background:transparent;cursor:pointer}
+.showai-saved-pages{display:grid;gap:5px;padding:3px 2px}
+.showai-saved-page{display:flex;align-items:center;gap:16px;min-width:0;width:100%;padding:9px 16px;border:1px solid var(--dsw-alias-border-l1);border-radius:12px;background:var(--dsw-alias-bg-base);color:inherit;text-align:start;font:inherit;cursor:pointer;text-decoration:none}
+.showai-saved-page:hover,.showai-page-row:has(.showai-page-sideClick:hover),.showai-page-tailHead:has(.showai-page-sideClick:hover){background:var(--dsw-alias-interactive-bg-hover-solid)}
+.showai-saved-page:focus-visible,.showai-page-sideClick:focus-visible{outline:2px solid currentColor;outline-offset:-2px}
+.showai-saved-page span{min-width:0;overflow-wrap:anywhere}
+.showai-saved-pageText{display:grid}
+.showai-saved-pagePath{font-size:12px;color:var(--dsw-alias-label-tertiary)}
 @media (prefers-reduced-motion:reduce){.showai-page-card[data-state=running] .showai-page-row:after{animation:none;display:none}}
 `;
     const tagId = "@showai/dsh-showai/preview.css";
@@ -107,8 +118,31 @@ body[data-ds-dark-theme] .showai-workbench-logo{background-image:url("assets/log
     const validId = value => typeof value === "string" && /^[a-zA-Z0-9][a-zA-Z0-9_-]{0,127}$/.test(value);
 
     function savedPage(data) {
-      return validId(data?.pageId) && validId(data?.projectId) && data.persistence?.savedToProject !== false
-        ? PAGE_RESOURCE + data.projectId + "/" + data.pageId : undefined;
+      if (!validId(data?.pageId) || !validId(data?.projectId) || data.persistence?.savedToProject === false) return;
+      const blocks = validId(data.blockId) ? data.blockId : "";
+      return PAGE_RESOURCE + data.projectId + "/" + data.pageId + (blocks ? "?" + new URLSearchParams({ blocks }) : "");
+    }
+
+    function sidebarTarget(address) {
+      if (!address?.startsWith(PAGE_RESOURCE)) return;
+      const url = new URL(address);
+      const [, project, page] = url.pathname.split("/");
+      const block = url.searchParams.get("blocks");
+      if (validId(project) && validId(page)) return { project, page, blocks: validId(block) ? block : undefined };
+    }
+
+    function originalPageLink({ project, page, blocks }) {
+      return "showai://project/" + project + "/page/" + page + (blocks ? "?" + new URLSearchParams({ blocks }) : "");
+    }
+
+    function savedCards(data) {
+      const targets = Array.isArray(data?.cards) ? data.cards : [data];
+      return targets.flatMap(card => {
+        const address = savedPage(card);
+        if (!address || typeof card.title !== "string") return [];
+        return [{ address, title: card.title, path: Array.isArray(card.breadcrumb) ? card.breadcrumb.join(" / ") : "",
+          description: card.description || card.blockTitle }];
+      });
     }
 
     function WorkbenchIcon({ size = 20 }) {
@@ -138,12 +172,11 @@ body[data-ds-dark-theme] .showai-workbench-logo{background-image:url("assets/log
           if (editor.protocol !== "http:" || editor.hostname !== "127.0.0.1") throw new Error(t("workbench.failed"));
           if (session) editor.searchParams.set("dshSession", "1");
           editor.searchParams.set("dshInstance", instance);
-          if (address?.startsWith(PAGE_RESOURCE)) {
-            const [project, page] = address.slice(PAGE_RESOURCE.length).split("/");
-            if (validId(project) && validId(page)) {
-              editor.searchParams.set("project", project);
-              editor.searchParams.set("page", page);
-            }
+          const target = sidebarTarget(address);
+          if (target) {
+            editor.searchParams.set("project", target.project);
+            editor.searchParams.set("page", target.page);
+            if (target.blocks) editor.searchParams.set("blocks", target.blocks);
           }
           if (!controller.signal.aborted) setUrl(editor.href);
         }
@@ -171,10 +204,10 @@ body[data-ds-dark-theme] .showai-workbench-logo{background-image:url("assets/log
       React.useEffect(() => {
         if (!ready || !url || !address?.startsWith(PAGE_RESOURCE) || handled.current === navigation?.revision) return;
         handled.current = navigation.revision;
-        const [project, page] = address.slice(PAGE_RESOURCE.length).split("/");
-        if (validId(project) && validId(page))
+        const target = sidebarTarget(address);
+        if (target)
           frame.current?.contentWindow?.postMessage({ type: "showai:open-page",
-            href: "showai://project/" + project + "/page/" + page }, new URL(url).origin);
+            href: originalPageLink(target) }, new URL(url).origin);
       }, [ready, url, address, navigation?.revision]);
       return h("section", { "aria-label": t("workbench.title"), className: global ? "showai-workbench-main" : undefined,
         style: { height: "100%", minHeight: 0, boxSizing: "border-box", display: "flex", flexDirection: "column" } },
@@ -281,12 +314,40 @@ body[data-ds-dark-theme] .showai-workbench-logo{background-image:url("assets/log
         path,
         fullPath: htmlPath ?? inlinePath,
         address: savedPage(data),
+        savedCards: savedCards(data),
         title: typeof data?.title === "string" ? data.title : undefined,
         partial: requestedSelection(block),
         inlineAvailable: data?.display?.inlineAvailable === true,
         hasPage: state === "ok" && path !== undefined,
         errorMessage,
       };
+    }
+
+    function SavedPages({ cards, openInSidebar, tr }) {
+      return h("div", { className: "showai-saved-pages" }, cards.map((card, index) => {
+        const label = openInSidebar ? tr("action.sidebar") + " · " + card.title : card.title;
+        const action = openInSidebar ? { type: "button", onClick: () => openInSidebar(card.address, card.title) }
+          : { href: originalPageLink(sidebarTarget(card.address)) };
+        return h(openInSidebar ? "button" : "a", { ...action, key: index, className: "showai-saved-page",
+          title: label, "aria-label": label },
+          h(WorkbenchIcon, { size: 24 }),
+          h("span", { className: "showai-saved-pageText" }, h("strong", null, card.title),
+            card.path && h("span", { className: "showai-saved-pagePath" }, card.path),
+            card.description && h("span", null, card.description)));
+      }));
+    }
+
+    function ShowAISavedPageCards(props) {
+      const model = previewModel(props.block);
+      return model.savedCards.length ? h(SavedPages, { cards: model.savedCards, openInSidebar: props.openInSidebar,
+        tr: props.t ?? (key => key) }) : h(ShowAIPageCard, props);
+    }
+
+    function sidebarButton(address, title, openInSidebar, tr) {
+      if (!address || !openInSidebar) return null;
+      const label = tr("action.sidebar") + " · " + title;
+      return h("button", { type: "button", className: "showai-page-sideClick", title: label, "aria-label": label,
+        onClick: () => openInSidebar(address, title) });
     }
 
     function ShowAIPageCard(props) {
@@ -356,6 +417,7 @@ body[data-ds-dark-theme] .showai-workbench-logo{background-image:url("assets/log
       const expandable = model.state === "ok";
       const frameHeight = expanded ? EXPANDED_HEIGHT : `${COLLAPSED_HEIGHT}px`;
       const toggle = () => setOpen((value) => !value);
+      const primary = sidebarButton(model.address, model.title ?? tr("row.title"), props.openInSidebar, tr);
 
       return h(
         "div",
@@ -365,7 +427,7 @@ body[data-ds-dark-theme] .showai-workbench-logo{background-image:url("assets/log
           {
             className: "showai-page-row",
             "data-expandable": expandable || undefined,
-            ...(expandable
+            ...(expandable && !primary
               ? {
                   role: "button",
                   tabIndex: 0,
@@ -401,11 +463,12 @@ body[data-ds-dark-theme] .showai-workbench-logo{background-image:url("assets/log
                 model.partial ? tr("row.fragment") : tr("row.page"),
               )
             : null,
+          primary,
           h(
             "span",
             { className: "showai-page-actions", onClick: (event) => event.stopPropagation() },
-            model.address && props.openInSidebar && h("button", { type: "button", className: "showai-page-button",
-              onClick: () => props.openInSidebar(model.address, model.title) }, tr("action.sidebar")),
+            primary && h("button", { type: "button", className: "showai-page-button", onClick: toggle,
+              "aria-expanded": open }, open ? tr("action.hide") : tr("action.show")),
             model.hasPage
               ? h(
                   "button",
@@ -490,7 +553,7 @@ body[data-ds-dark-theme] .showai-workbench-logo{background-image:url("assets/log
     }
 
 
-    function presentationOf(message) {
+    function presentationOf(message, tool) {
       if (message === null || typeof message !== "object" || message.isError === true) return undefined;
       if (!Array.isArray(message.content)) return undefined;
       for (const block of message.content) {
@@ -502,6 +565,11 @@ body[data-ds-dark-theme] .showai-workbench-logo{background-image:url("assets/log
           continue;
         }
         const data = body?.ok === true ? body.data : undefined;
+        if (tool === CARD_TOOL) {
+          const cards = savedCards(data);
+          if (cards.length) return { cards };
+          continue;
+        }
         const delivery = data?.delivery;
         if (delivery === null || typeof delivery !== "object") continue;
         if (typeof delivery.inline !== "string" && typeof delivery.html !== "string") continue;
@@ -535,8 +603,9 @@ body[data-ds-dark-theme] .showai-workbench-logo{background-image:url("assets/log
         const message = match.event.data.message;
         const callId = message === null || typeof message !== "object" ? "" : String(message.source?.callId ?? "");
         if (callId === "") return context.state;
-        if (!TOOLS.includes(context.state.calls.get(callId))) return context.state;
-        const presentation = presentationOf(message);
+        const tool = context.state.calls.get(callId);
+        if (!TOOLS.includes(tool)) return context.state;
+        const presentation = presentationOf(message, tool);
         if (presentation === undefined) return context.state;
         const pages = context.state.pages.filter((page) => page.callId !== callId);
         pages.push({ callId, ...presentation, seq: match.event.seq });
@@ -571,7 +640,9 @@ body[data-ds-dark-theme] .showai-workbench-logo{background-image:url("assets/log
         : h(
             "div",
             { className: "showai-page-tail" },
-            pages.map((page) => h(ShowAIPageTailCard, { key: page.callId, page, openFile, openInSidebar: props.openInSidebar, tr })),
+            pages.map(page => page.cards
+              ? h(SavedPages, { key: page.callId, cards: page.cards, openInSidebar: props.openInSidebar, tr })
+              : h(ShowAIPageTailCard, { key: page.callId, page, openFile, openInSidebar: props.openInSidebar, tr })),
           );
     }
 
@@ -589,11 +660,10 @@ body[data-ds-dark-theme] .showai-workbench-logo{background-image:url("assets/log
           { className: "showai-page-tailHead" },
           h("span", { className: "showai-page-dot", "aria-hidden": true }),
           h("span", { className: "showai-page-tailTitle", title }, title),
+          sidebarButton(page.address, title, openInSidebar, tr),
           h(
             "span",
             { className: "showai-page-actions", style: { opacity: "1" } },
-            page.address && openInSidebar && h("button", { type: "button", className: "showai-page-button",
-              onClick: () => openInSidebar(page.address, page.title) }, tr("action.sidebar")),
             open
               ? h(
                   "button",
@@ -698,7 +768,8 @@ body[data-ds-dark-theme] .showai-workbench-logo{background-image:url("assets/log
         }
         for (const key of TOOLS) {
           ctx.slots.inject("tool.call.toolview", () =>
-            ctx.slots.register({ name: "tool.call.toolview", key, locale: NS, inject: sidebarActions }, ShowAIPageCard),
+            ctx.slots.register({ name: "tool.call.toolview", key, locale: NS, inject: sidebarActions },
+              key === CARD_TOOL ? ShowAISavedPageCards : ShowAIPageCard),
           );
         }
       },

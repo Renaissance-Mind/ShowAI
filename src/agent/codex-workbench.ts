@@ -28,6 +28,7 @@ import {
   codexWorkbenchUri,
   codexWorkbenchFileUri,
   codexWorkbenchCardUri,
+  previousWorkbenchCardUri,
   codexWorkbenchTargetUri,
   codexWorkbenchThreadUri,
   type CodexWorkbenchMode,
@@ -81,7 +82,7 @@ function registerCodexWorkbench(
 ) {
   const qoder = host === "qoder";
   const key = randomBytes(32).toString("hex");
-  const navigation = new CodexWorkbenchNavigation(key);
+  const navigation = new CodexWorkbenchNavigation(key, qoder);
   // Cached v1–v6 card views use this choice when the host remounts them in fullscreen.
   const cardChoices = new Map<string, { index: number; expires: number }>();
   const uploads = new Map<string, {
@@ -130,6 +131,7 @@ function registerCodexWorkbench(
     ...views,
     { mode: "thread", name: "workbench_file", uri: codexWorkbenchFileUri, entrypoint: "file" },
     { mode: "thread", name: "workbench_page_card", uri: codexWorkbenchCardUri, entrypoint: "card" },
+    { mode: "thread", name: "workbench_page_card_v10", uri: previousWorkbenchCardUri, entrypoint: "card" },
     { mode: "thread", name: "workbench_page_card_v9", uri: "ui://showai/workbench-card-v9.html", entrypoint: "card" },
     { mode: "thread", name: "workbench_page_card_v8", uri: "ui://showai/workbench-card-v8.html", entrypoint: "card" },
     { mode: "thread", name: "workbench_page_card_v7", uri: "ui://showai/workbench-card-v7.html", entrypoint: "card" },
@@ -308,12 +310,14 @@ function registerCodexWorkbench(
       : "Open a saved Page or component directly in a new expanded editor. Try card_navigate first to reuse the current conversation's open editor.",
     _meta: { ui: { resourceUri: codexWorkbenchTargetUri, visibility: ["model", "app"] } },
   }, (target, extra) => presentPageCard([target], extra._meta));
-  if (!qoder) server.registerTool("card_navigate", {
+  server.registerTool("card_navigate", {
     title: "Navigate the current ShowAI editor",
-    description: "Locate a saved Page or its blockId in a visible ShowAI tab already showing that Page in this conversation. If status is unavailable, call card_open with the same target to open a separate Codex tab.",
+    description: qoder
+      ? "Locate a saved Page or component in the visible ShowAI editor beside the current Qoder task."
+      : "Locate a saved Page or its blockId in a visible ShowAI tab already showing that Page in this conversation. If status is unavailable, call card_open with the same target to open a separate Codex tab.",
     inputSchema: codexPageTarget,
     annotations: readOnly,
-    _meta: { ui: { visibility: ["model", "app"] } },
+    _meta: { ui: { visibility: qoder ? ["app"] : ["model", "app"] } },
   }, async (target, extra) => {
     try {
       await readCodexPageTarget(service, target);
