@@ -168,7 +168,8 @@ export function StudioTopbar({
     catalogScrollRef,
     selectedRef,
   } = route;
-  const codexPage = view === "page" && codexWorkbench()?.mode === "thread";
+  const singlePage = view === "page" && capabilities.singlePage;
+  const codexPage = singlePage && codexWorkbench()?.mode === "thread";
   const {
     showTemplateVersions,
     setShowTemplateVersions,
@@ -229,7 +230,7 @@ export function StudioTopbar({
       /^projects\/([^/]+)\/pages\/([^/]+)\.json$/,
     );
     if (match) {
-      if (codexPage)
+      if (singlePage)
         await locateAssistantTarget(match[2], result.blockId ? [result.blockId] : [], match[1]);
       else if (await openPage(match[2], match[1])) setRevealNode(result.blockId);
     } else if (result.kind === "project" && result.projectId) {
@@ -304,7 +305,7 @@ export function StudioTopbar({
         </h1>
       ) : (
         <div className="studio-breadcrumb">
-          {!codexPage && selectedProject && (
+          {!singlePage && selectedProject && (
             <button
               onClick={(event) =>
                 project && openTargetClick(projectTarget(project), event)
@@ -326,7 +327,7 @@ export function StudioTopbar({
               )}
             </button>
           )}
-          {!codexPage && breadcrumbFolders.map((item) => (
+          {!singlePage && breadcrumbFolders.map((item) => (
             <span className="studio-breadcrumb-folder" key={item.id}>
               <ChevronRight size={13} />
               <button
@@ -377,7 +378,7 @@ export function StudioTopbar({
                 >
                   <img src={appIconForTheme(theme)} alt="" draggable={false} />
                 </button>
-              ) : (
+              ) : !singlePage && (
                 <ChevronRight size={13} />
               )}
               <PageIcon value={page.draft?.icon} size={18} />

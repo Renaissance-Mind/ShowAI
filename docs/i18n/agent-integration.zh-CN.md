@@ -95,6 +95,8 @@ OAuth 提供发现、DCR、S256 PKCE、resource 绑定、过期访问 token、�
 
 ## 已保存页面的展示约定
 
+从 Antigravity 的辅助面板或 DeepSeek Harness 的会话右侧栏打开原页时，ShowAI 默认显示单页编辑器和页面操作。编辑时隐藏 ShowAI 自己的标签栏和项目树，外层标签由宿主管理。在 DeepSeek Harness 左侧导航点 ShowAI，可打开带工作区标签的完整内容库。
+
 从 ShowAI「设置 → 插件」安装或更新 Codex 插件。临时图表和组件用 `show_component` 在聊天里交互展示。当前连接提供 `card_present` 时，新建或编辑页面并保存成功后，默认在同一轮交付原页卡片。传入已保存页面的 `projectId` 和 `pageId`，卡片会显示标题及完整路径。可用 `description` 简述新内容或本次改动，最多 1000 个字符。要指向某个组件，再传入保存后大纲里的 `blockId`。明确要求在对话里阅读正文时使用 `page_present`。
 
 一次发多张时，首张照常传参，其余目标按顺序放入同一次调用的 `additionalTargets`。每张卡片都可以有自己的组件和说明。「侧边打开」在聊天右侧打开原页，已有同页标签时会直接跳转。侧栏打开或关闭时，卡片都会留在聊天里。需要调间距时在顶层传 `adjustSpacing:true`，拖动滑块预览，点击「采用这组间距」把数值送回对话。旁边的小箭头提供「从工作台打开」和「从 ShowAI App 打开」，都带上这张卡片指向的组件位置。需要直接跳转时，先调用 `card_navigate`，返回 `unavailable` 时再调用 `card_open`。交付本机引用文件时使用 `workbench_page_reference`。
