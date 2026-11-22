@@ -18,6 +18,7 @@ import {
 } from "../agent/antigravity-workbench";
 import { createLibraryMcpServer } from "../agent/mcp-library";
 import { AgentService } from "../agent/service";
+import { startBrowserServer } from "../browser/server";
 import { openLibrary } from "../core/open-library";
 import { syncManager } from "../sync/manager";
 
@@ -837,6 +838,165 @@ for await (const line of createInterface({ input: process.stdin })) {
       expect(reply.cwd).toContain("home");
     } finally {
       child.kill("SIGTERM");
+    }
+  });
+
+  test("tracks visible .showai-ref page tabs via startBrowserServer to avoid duplicate toggle-aux-pane flashes", async () => {
+    const home = await makeTempDir("showai-ag-tab-vis-");
+    const webRoot = await makeTempDir("showai-ag-web-");
+    await writeFile(
+      join(webRoot, "index.html"),
+      "<!doctype html><html><head></head><body><div id='root'></div></body></html>",
+      "utf8",
+    );
+    await openLibrary(home);
+    const service = new AgentService({ root: home });
+    const workbench = antigravityWorkbenchConnection(service, async (key) =>
+      startBrowserServer({
+        home,
+        webRoot,
+        cliEntry: resolve("scripts/cli.mjs"),
+        settingsPath: join(home, "local", "ag-wb", "settings.json"),
+        agentWorkspaceRoot: join(home, "local", "ag-wb", "workspaces"),
+        antigravityWorkbench: { key },
+      }),
+    );
+    const server = createLibraryMcpServer({
+      root: home,
+      icons: workbench.icons,
+    });
+    workbench.configure(server);
+    const [left, right] = InMemoryTransport.createLinkedPair();
+    const client = new Client({ name: "antigravity-tab-test", version: "1" });
+    await server.connect(right);
+    await client.connect(left);
+
+    const abort = new AbortController();
+    try {
+      const createdProject = await client.callTool({
+        name: "project_create",
+        arguments: { name: "防闪烁测试" },
+      });
+      const projectId = (createdProject.structuredContent as any).data.id as string;
+      const createdPage = await client.callTool({
+        name: "page_create",
+        arguments: { projectId, title: "首屏直达页面" },
+      });
+      const pageData = (createdPage.structuredContent as any).data;
+      const pageId = pageData.document.id as string;
+      await client.callTool({
+        name: "page_apply",
+        arguments: {
+          projectId,
+          pageId,
+          baseHash: pageData.hash,
+          baseRevision: pageData.revision,
+          operations: [
+            {
+              type: "block.insert",
+              node: {
+                type: "heading",
+                attrs: { id: "blk-target", level: 2 },
+                content: [{ type: "text", text: "跳转目标" }],
+              },
+            },
+          ],
+        },
+      });
+
+      // 1. First click when closed -> queued + launchUrl
+      const firstOpen = await client.callTool({
+        name: "workbench_open_destination",
+        arguments: { projectId, pageId, destination: "workbench" },
+      });
+      const firstData = (firstOpen._meta as any).showaiWorkbenchData;
+      expect(firstData.status).toBe("queued");
+      expect(firstData.launchUrl).toContain("agWorkbench=");
+
+      // 2. Embedded HTML injects Antigravity host bridge, pre-paint theme sync, and showai:ag-page-ready
+      const pageUrl = new URL(firstData.launchUrl);
+      pageUrl.searchParams.set("project", projectId);
+      pageUrl.searchParams.set("page", pageId);
+      pageUrl.searchParams.set("theme", "dark");
+      const htmlRes = await fetch(pageUrl.href);
+      expect(htmlRes.status).toBe(200);
+      const html = await htmlRes.text();
+      expect(html).toContain("__SHOWAI_ANTIGRAVITY_HOST__");
+      expect(html).toContain("showai:ag-page-ready");
+      const configMatch = /window\.__SHOWAI_LOCAL__=(\{[^<]+\})<\/script>/.exec(html);
+      expect(configMatch).toBeTruthy();
+      const localToken = JSON.parse(configMatch![1]).token as string;
+
+      // 3. File viewer waits for showai:ag-page-ready (no hidden display:none 0x0 reflow)
+      const fileViewer = await client.readResource({ uri: antigravityFileUri });
+      const fvHtml = (fileViewer.contents[0] as any).text as string;
+      expect(fvHtml).not.toContain('<iframe id="showai-frame" title="ShowAI" hidden>');
+      expect(fvHtml).toContain('data?.type === "showai:ag-page-ready"');
+
+      // 4. Connect visible .showai-ref tab SSE stream -> second click returns accepted & streams blockId jump!
+      const sseUrl = new URL("/api/antigravity-tab-events", pageUrl.origin);
+      sseUrl.searchParams.set("token", localToken);
+      sseUrl.searchParams.set("tabId", "tab-1");
+      sseUrl.searchParams.set("project", projectId);
+      sseUrl.searchParams.set("page", pageId);
+      sseUrl.searchParams.set("visible", "1");
+      const sseRes = await fetch(sseUrl.href, { signal: abort.signal });
+      expect(sseRes.status).toBe(200);
+      const reader = sseRes.body!.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+      const nextTabEvent = async () => {
+        while (true) {
+          const match = /data:\s*(\{[^\n]+\})\n\n/.exec(buffer);
+          if (match) {
+            buffer = buffer.slice(match.index + match[0].length);
+            return JSON.parse(match[1]);
+          }
+          const { value, done } = await reader.read();
+          if (done) throw new Error("Tab SSE closed early");
+          buffer += decoder.decode(value, { stream: true });
+        }
+      };
+
+      const secondClick = await client.callTool({
+        name: "workbench_open_destination",
+        arguments: {
+          projectId,
+          pageId,
+          blockId: "blk-target",
+          destination: "workbench",
+        },
+      });
+      expect((secondClick._meta as any).showaiWorkbenchData.status).toBe("accepted");
+      expect(await nextTabEvent()).toEqual({
+        projectId,
+        pageId,
+        blockId: "blk-target",
+      });
+
+      // 5. Mark tab hidden (collapsed side pane) -> returns queued again so toggle-aux-pane re-expands pane
+      const hideRes = await fetch(new URL("/api/antigravity-tab-visibility", pageUrl.origin), {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${localToken}`,
+        },
+        body: JSON.stringify({ tabId: "tab-1", visible: false }),
+      });
+      expect(hideRes.status).toBe(200);
+      const afterCollapse = await client.callTool({
+        name: "workbench_open_destination",
+        arguments: { projectId, pageId, destination: "workbench" },
+      });
+      expect((afterCollapse._meta as any).showaiWorkbenchData.status).toBe("queued");
+
+      abort.abort();
+      await reader.cancel().catch(() => {});
+    } finally {
+      abort.abort();
+      await client.close();
+      await server.close();
+      await syncManager(home).stop();
     }
   });
 });

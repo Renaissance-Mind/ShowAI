@@ -38,6 +38,7 @@ export type OpenAntigravityWorkbench = (key: string) => Promise<{
   url: string;
   localUrl: string;
   close(): Promise<void>;
+  navigateAntigravityTab?: (target: CodexPageTarget) => boolean;
 }>;
 
 const antigravityIcons = ([
@@ -191,7 +192,7 @@ ${cardStyles}
   let locale = navigator.language.startsWith("zh") ? "zh-CN" : "en";
   let initialized = false, serverTools = false, messageSupported = false;
   let toolPrefix = "";
-  let pageCards = [], cardGroup, adjustSpacing = false, spacingEditor, openingCard = false;
+  let pageCards = [], cardGroup, adjustSpacing = false, spacingEditor, openingCard = false, showBusy = false;
   let sequence = 0;
   const pending = new Map();
   const t = key => translations[locale][key];
@@ -280,7 +281,7 @@ ${cardStyles}
   function updateCardControls() {
     if (!pageCards.length) return;
     cards.updateActions(t, {
-      busy: !initialized || openingCard,
+      busy: !initialized || showBusy,
       workbench: serverTools,
       desktop: serverTools,
     });
@@ -314,7 +315,10 @@ ${cardStyles}
       noteNode.removeAttribute("data-kind");
     }
     openingCard = true;
-    updateCardControls();
+    const busyTimer = setTimeout(() => {
+      showBusy = true;
+      updateCardControls();
+    }, 180);
     try {
       const targetDest = destination === "desktop" ? "desktop" : "workbench";
       const data = await callServerTool("workbench_open_destination", {
@@ -343,8 +347,12 @@ ${cardStyles}
         noteNode.hidden = false;
       }
     } finally {
+      clearTimeout(busyTimer);
       openingCard = false;
-      updateCardControls();
+      if (showBusy) {
+        showBusy = false;
+        updateCardControls();
+      }
     }
   }
 
@@ -445,12 +453,14 @@ export function antigravityFileHtml() {
 <style>
 :root { color-scheme: light dark; font: 14px system-ui, sans-serif }
 html, body { margin: 0; width: 100%; height: 100%; overflow: hidden; background: var(--color-background-primary, Canvas); color: var(--color-text-primary, CanvasText) }
-#showai-status { display: flex; align-items: center; gap: 10px; padding: 18px; font-size: 13px; color: var(--color-text-secondary, CanvasText) }
-#showai-status[hidden], #showai-frame[hidden] { display: none }
-#showai-frame { display: block; width: 100%; height: 100%; border: 0 }
+@keyframes showai-status-in { to { opacity: 1 } }
+#showai-status { position: relative; z-index: 1; display: flex; align-items: center; gap: 10px; padding: 18px; font-size: 13px; color: var(--color-text-secondary, CanvasText); opacity: 0; animation: showai-status-in .16s ease .22s forwards }
+#showai-status[hidden] { display: none }
+#showai-frame { position: fixed; inset: 0; display: block; width: 100%; height: 100%; border: 0; opacity: 0; pointer-events: none; transition: opacity .14s ease-out }
+#showai-frame[data-ready="1"] { opacity: 1; pointer-events: auto }
 </style></head><body>
 <div id="showai-status" role="status"><span id="showai-msg"></span></div>
-<iframe id="showai-frame" title="ShowAI" hidden></iframe>
+<iframe id="showai-frame" title="ShowAI"></iframe>
 <script>
 (() => {
   const translations = ${JSON.stringify(messages.catalogs)};
@@ -460,10 +470,27 @@ html, body { margin: 0; width: 100%; height: 100%; overflow: hidden; background:
   const frame = document.getElementById("showai-frame");
   let locale = navigator.language.startsWith("zh") ? "zh-CN" : "en";
   let initialized = false, contextSupported = false, hostTheme = "", toolPrefix = "";
-  let fileInput = null, readingFile = false, mountedPage = null, frameOrigin = "";
+  let fileInput = null, readingFile = false, mountedPage = null, frameOrigin = "", revealTimer = 0;
   let sequence = 0;
   const pending = new Map();
   const t = key => translations[locale][key];
+
+  function revealFrame() {
+    if (revealTimer) {
+      clearTimeout(revealTimer);
+      revealTimer = 0;
+    }
+    frame.dataset.ready = "1";
+    statusEl.hidden = true;
+  }
+
+  function sendHostVisibility(overrideVisible) {
+    if (!frameOrigin || !frame.contentWindow) return;
+    const visible = typeof overrideVisible === "boolean"
+      ? overrideVisible
+      : document.visibilityState === "visible" && window.innerWidth > 40 && window.innerHeight > 40;
+    frame.contentWindow.postMessage({ type: "showai:ag-host-visibility", visible }, frameOrigin);
+  }
 
   function request(method, params) {
     const id = ++sequence;
@@ -572,6 +599,7 @@ html, body { margin: 0; width: 100%; height: 100%; overflow: hidden; background:
       targetUrl.searchParams.set("project", resolved.projectId);
       targetUrl.searchParams.set("page", resolved.pageId);
       if (resolved.blockId) targetUrl.searchParams.set("block", resolved.blockId);
+      if (hostTheme) targetUrl.searchParams.set("theme", hostTheme);
       if (
         mountedPage &&
         mountedPage.projectId === resolved.projectId &&
@@ -588,16 +616,27 @@ html, body { margin: 0; width: 100%; height: 100%; overflow: hidden; background:
         return;
       }
       mountedPage = resolved;
+      delete frame.dataset.ready;
+      if (revealTimer) {
+        clearTimeout(revealTimer);
+        revealTimer = 0;
+      }
       frame.onload = () => {
-        statusEl.hidden = true;
-        frame.hidden = false;
+        if (frame.dataset.ready !== "1") {
+          revealTimer = setTimeout(revealFrame, 1600);
+        }
         if (hostTheme && frame.contentWindow) {
           frame.contentWindow.postMessage({ type: "showai:ag-host-theme", theme: hostTheme }, frameOrigin);
         }
+        sendHostVisibility();
       };
       frame.src = targetUrl.href;
     } catch (err) {
-      if (!mountedPage) showStatus([t("failed"), err.message].filter(Boolean).join(" · "));
+      if (!mountedPage) {
+        statusEl.style.opacity = "1";
+        statusEl.style.animation = "none";
+        showStatus([t("failed"), err.message].filter(Boolean).join(" · "));
+      }
     } finally {
       readingFile = false;
     }
@@ -606,6 +645,11 @@ html, body { margin: 0; width: 100%; height: 100%; overflow: hidden; background:
   window.addEventListener("message", async event => {
     if (event.source === frame.contentWindow && frameOrigin && event.origin === frameOrigin) {
       const data = event.data;
+      if (data?.type === "showai:ag-page-ready") {
+        revealFrame();
+        sendHostVisibility();
+        return;
+      }
       if (data?.type === "showai:ag-file-reference") {
         try {
           if (!contextSupported) throw new Error(t("unavailable"));
@@ -652,7 +696,11 @@ html, body { margin: 0; width: 100%; height: 100%; overflow: hidden; background:
     }
   });
 
+  document.addEventListener("visibilitychange", () => sendHostVisibility());
+  window.addEventListener("resize", () => sendHostVisibility());
+  window.addEventListener("pagehide", () => sendHostVisibility(false));
   window.addEventListener("focus", () => {
+    sendHostVisibility();
     if (initialized && fileInput && mountedPage) void readReferenceFile(true);
   });
 
@@ -683,15 +731,26 @@ export function antigravityWorkbenchConnection(
     configure(server: McpServer) {
       const key = randomBytes(32).toString("hex");
       let runtime: ReturnType<OpenAntigravityWorkbench> | undefined;
+      let activeWorkbench:
+        | Awaited<ReturnType<OpenAntigravityWorkbench>>
+        | undefined;
       const ensureWorkbench = open
         ? () =>
-            (runtime ??= open(key).catch((err) => {
-              runtime = undefined;
-              throw err;
-            }))
+            (runtime ??= open(key).then(
+              (instance) => {
+                activeWorkbench = instance;
+                return instance;
+              },
+              (err) => {
+                runtime = undefined;
+                activeWorkbench = undefined;
+                throw err;
+              },
+            ))
         : undefined;
 
       const closeRuntime = () => {
+        activeWorkbench = undefined;
         void runtime?.then(
           (instance) => instance.close(),
           () => undefined,
@@ -872,6 +931,17 @@ export function antigravityWorkbenchConnection(
           presentCards([first, ...additionalTargets], adjustSpacing),
       );
 
+      async function navigateTarget(target: CodexPageTarget) {
+        const nav = await writeAntigravityNavTarget(service.store.root, target);
+        if (
+          nav.status === "queued" &&
+          activeWorkbench?.navigateAntigravityTab?.(target)
+        ) {
+          return { ...nav, status: "accepted" as const };
+        }
+        return nav;
+      }
+
       server.registerTool(
         "card_navigate",
         {
@@ -885,10 +955,7 @@ export function antigravityWorkbenchConnection(
         async (target) => {
           try {
             await readCodexPageTarget(service, target);
-            const result = await writeAntigravityNavTarget(
-              service.store.root,
-              target,
-            );
+            const result = await navigateTarget(target);
             return mcpSuccess(result);
           } catch (error) {
             return mcpFailure(error);
@@ -917,10 +984,7 @@ export function antigravityWorkbenchConnection(
           try {
             await readCodexPageTarget(service, target);
             if (destination === "workbench") {
-              const nav = await writeAntigravityNavTarget(
-                service.store.root,
-                target,
-              );
+              const nav = await navigateTarget(target);
               if (nav.status === "queued") {
                 const tabRef = await writeAntigravityTabReference(service, target);
                 const wb = await workbenchLaunchUrl();
