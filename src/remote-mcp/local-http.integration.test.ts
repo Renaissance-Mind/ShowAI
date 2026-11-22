@@ -13,6 +13,7 @@ import { localLibraryPolicy } from "./local-library";
 import { parameterComponent } from "../test/parameter-component";
 import { chromium } from "playwright-core";
 import { readingBrowserExecutable } from "../agent/reading-renderer";
+import { remoteMcpWorkbench } from "../workbench/remote-mcp";
 
 let directory: string;
 let service: AgentService;
@@ -151,7 +152,7 @@ beforeAll(async () => {
   http = await startMcpHttpServer({
     port: 0,
     stateDirectory: join(directory, "state"),
-    workbenchAssetsDirectory: join(process.cwd(), "dist-agent/codex-workbench-assets"),
+    workbench: remoteMcpWorkbench(join(process.cwd(), "dist-agent/codex-workbench-assets")),
     local: authorizationOptions(),
   });
   expect(REMOTE_FETCH.publicAddressesOnly).toBe(original);

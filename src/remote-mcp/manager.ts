@@ -7,7 +7,7 @@ import { access, mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { constants } from "node:fs";
 import { isAbsolute, join } from "node:path";
 import { execute, findExecutable } from "../agent-host/process";
-import { startMcpHttpServer } from "../agent/mcp-http";
+import { startMcpHttpServer, type McpWorkbench } from "../agent/mcp-http";
 import { FileStore, assertId } from "../core/store";
 import {
   defaultRemoteMcpConfig,
@@ -139,7 +139,7 @@ export class RemoteMcpManager {
       decrypt: (value: string) => string;
       provider?: RemoteMcpProvider;
       toolsDirectory?: string;
-      workbenchAssetsDirectory?: string;
+      workbench?: () => McpWorkbench;
       onApprovalRequest?(name: string): void;
       reserveHttpsPort?: (
         config: Parameters<typeof tailscalePort>[0],
@@ -360,7 +360,7 @@ export class RemoteMcpManager {
   private serverOptions(c: RemoteMcpConfig, origin?: string) {
     return {
       local: this.localPolicy(c),
-      workbenchAssetsDirectory: this.options.workbenchAssetsDirectory,
+      workbench: this.options.workbench?.(),
       instanceId: this.instanceId,
       stateDirectory: join(
         this.options.directory,

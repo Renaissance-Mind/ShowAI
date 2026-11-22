@@ -20,6 +20,7 @@ import { randomBytes, randomUUID } from "node:crypto";
 import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js";
 import { isLanAddress } from "../remote-mcp/network";
 import {
+  type McpServer,
   type RegisteredTool,
   type ToolCallback,
 } from "@modelcontextprotocol/sdk/server/mcp.js";
@@ -50,7 +51,6 @@ import { serverBaseUrl } from "../sync/server-url";
 import { FileStore } from "../core/store";
 import type { CloudBrowserCheck } from "./cloud-browser-check";
 import { McpCallLog, type McpLogResponse } from "./mcp-call-log";
-import { registerRemoteWorkbench, remoteWorkbenchGlobalCall } from "./remote-workbench";
 
 const writeTools = new Set([
   ...organizationWriteTools,
@@ -120,12 +120,21 @@ const json = (
   return response;
 };
 
+export interface McpWorkbench {
+  isGlobalCall(name: string, args?: Record<string, unknown>): boolean;
+  register(server: McpServer, options: {
+    origin: string;
+    local: LocalMcpAuthorization & { root: string };
+    grant?: ProjectGrant;
+  }): void;
+}
+
 export interface McpHttpOptions {
   stateDirectory: string;
   publicUrl: string;
   syncServers?: string[];
   widgetDomain?: string;
-  workbenchAssetsDirectory?: string;
+  workbench?: McpWorkbench;
   allowedHosts?: string[];
   instanceId?: string;
   local?: LocalMcpAuthorization & {
@@ -161,7 +170,6 @@ export async function createMcpHttpApp(options: McpHttpOptions) {
     );
   const origin = url.origin,
     state = resolve(options.stateDirectory);
-  const workbenchChoices = new Map<string, { index: number; expires: number }>();
   const callLog = new McpCallLog({
     transport: "http",
     directory: options.local
@@ -738,10 +746,7 @@ export async function createMcpHttpApp(options: McpHttpOptions) {
           }
         },
       );
-    if (options.local && options.workbenchAssetsDirectory)
-      registerRemoteWorkbench(server, {
-        origin, assetsDirectory: options.workbenchAssetsDirectory, local: options.local, grant, choices: workbenchChoices,
-      });
+    if (options.local) options.workbench?.register(server, { origin, local: options.local, grant });
     const transport = new WebStandardStreamableHTTPServerTransport({
       sessionIdGenerator: undefined,
       enableJsonResponse: true,
@@ -1099,8 +1104,7 @@ export async function createMcpHttpApp(options: McpHttpOptions) {
                 if (name === "projects_list" || name === "project_create")
                   return execute(request, body, undefined, grant);
                 if (
-                  options.local && options.workbenchAssetsDirectory &&
-                  remoteWorkbenchGlobalCall(name, params?.arguments)
+                  options.local && options.workbench?.isGlobalCall(name, params?.arguments)
                 )
                   return execute(request, body, undefined, grant);
                 if (

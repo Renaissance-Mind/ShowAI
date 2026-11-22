@@ -131,7 +131,7 @@ Qoder 的工作台入口需要本机插件和支持 Qoder 工作台的已登记 
 
 ### Kimi Code 和 TRAE
 
-在 ShowAI「设置 → Agent 插件」准备关联当前内容库的安装包。在 **Kimi Code** 打开「设置 → 插件 → 安装自定义插件」，输入本地插件目录，也可以把复制的 MCP 配置合并到 `~/.kimi-code/mcp.json`。桌面版能在文件预览打开 HTML，并在任务右侧的 Browser 编辑原页。CLI 会交付文件和编辑链接。[Kimi Code 插件说明](https://www.kimi.com/code/docs/kimi-code-cli/customization/plugins.html)
+在 ShowAI「设置 → Agent 插件」准备关联当前内容库的安装包。在 **Kimi Code** 在插件设置页选择「安装自定义插件」，输入本地插件目录，也可以把复制的 MCP 配置合并到 `~/.kimi-code/mcp.json`。桌面版能在文件预览打开 HTML，并在任务右侧的 Browser 编辑原页。CLI 会交付文件和编辑链接。[Kimi Code 插件说明](https://www.kimi.com/code/docs/kimi-code-cli/customization/plugins.html)
 
 **TRAE IDE** 在扩展市场导入 VSIX，在 MCP 设置中加入复制的本机配置。用命令面板的「ShowAI：打开工作台」浏览项目，或打开 `.showai-ref` 在 IDE 中编辑原页。从源码生成 VSIX 的命令为 `npm run package:cursor -- --host trae --out showai-trae.vsix`。[TRAE 扩展市场](https://docs.trae.cn/ide_manage-extensions) · [TRAE MCP 配置](https://docs.trae.cn/ide_add-mcp-servers)
 

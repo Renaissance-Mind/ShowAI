@@ -4,23 +4,23 @@ import { z } from "zod";
 import { version } from "../../package.json";
 import lightLogo from "../../plugins/showai/assets/logo.svg?raw";
 import { workbenchAssets } from "../browser/workbench-assets";
-import { createWorkbench } from "../workbench/actions";
+import { createWorkbench } from "./actions";
 import type { DesktopInfo } from "../host/protocol";
 import { CoreError } from "../core/model";
 import type { PageReferences } from "../core/library-index";
 import { EditorDrafts, type EditorDraftInput } from "../core/editor-drafts";
 import { withChangeContext } from "../core/history-context";
-import type { ProjectGrant, LocalMcpAuthorization } from "./mcp-auth";
+import type { McpWorkbench } from "../agent/mcp-http";
 import {
   codexCardTarget, codexPageTarget, readCodexPageCards,
   type CodexCardTarget,
-} from "./codex-page-reference";
+} from "../agent/codex-page-reference";
 import {
   codexWorkbenchHtml, codexWorkbenchUri, codexWorkbenchThreadUri,
   codexWorkbenchCardUri, codexWorkbenchTargetUri,
-} from "./codex-workbench-ui";
-import { mcpFailure, mcpSuccess } from "./presentation-tools";
-import { AgentService } from "./service";
+} from "../agent/codex-workbench-ui";
+import { mcpFailure, mcpSuccess } from "../agent/presentation-tools";
+import { AgentService } from "../agent/service";
 
 const mimeType = "text/html;profile=mcp-app";
 const icon = "data:image/svg+xml;base64," + Buffer.from(lightLogo).toString("base64");
@@ -48,27 +48,32 @@ const projectWrites = [
 const globalToolNames = new Set([
   "workbench_open_global", "workbench_open_page", "workbench_refresh", "workbench_asset", "workbench_card_choice",
 ]);
-export function remoteWorkbenchGlobalCall(name: string, args: Record<string, unknown> | undefined) {
+function isGlobalCall(name: string, args: Record<string, unknown> | undefined) {
   return globalToolNames.has(name) || (name === "workbench_remote_read" &&
     ([...aggregateReads, ...storedDraftReads].some(action => action === args?.action) ||
       (args?.projectId === undefined && catalogReads.some(action => action === args?.action)))) ||
     (name === "workbench_remote_write" && storedDraftWrites.some(action => action === args?.action));
 }
 
-interface Options {
-  origin: string;
-  assetsDirectory: string;
-  local: LocalMcpAuthorization & { root: string };
-  grant?: ProjectGrant;
-  choices: Map<string, { index: number; expires: number }>;
+export function remoteMcpWorkbench(assetsDirectory: string): McpWorkbench {
+  const choices = new Map<string, { index: number; expires: number }>();
+  const assets = workbenchAssets(assetsDirectory);
+  return {
+    isGlobalCall,
+    register: (server, options) => registerRemoteWorkbench(server, options, assets, choices),
+  };
 }
 
-export function registerRemoteWorkbench(server: McpServer, options: Options) {
+function registerRemoteWorkbench(
+  server: McpServer,
+  options: Parameters<McpWorkbench["register"]>[1],
+  assets: ReturnType<typeof workbenchAssets>,
+  choices: Map<string, { index: number; expires: number }>,
+) {
   const { grant, local, origin } = options;
   const service = new AgentService({ root: local.root });
   const drafts = new EditorDrafts(local.root);
   const draftPrefix = grant ? `mcp-${createHash("sha256").update(grant.id).digest("hex").slice(0, 32)}-` : undefined;
-  const assets = workbenchAssets(options.assetsDirectory);
   const info: DesktopInfo = {
     home: "showai:connected-projects", version, packaged: true, mode: "browser",
     platform: "web", builtinDocs: false, cli: { command: "", args: [], env: {} },
@@ -169,16 +174,16 @@ export function registerRemoteWorkbench(server: McpServer, options: Options) {
   }, ({ groupId, index }) => safe(async () => {
     await projects();
     const now = Date.now();
-    for (const [key, choice] of options.choices) {
-      if (choice.expires <= now) options.choices.delete(key);
+    for (const [key, choice] of choices) {
+      if (choice.expires <= now) choices.delete(key);
     }
     const key = `${grant!.id}:${groupId}`;
     if (index !== undefined) {
-      options.choices.set(key, { index, expires: now + 2 * 60_000 });
-      if (options.choices.size > 512)
-        options.choices.delete(options.choices.keys().next().value!);
+      choices.set(key, { index, expires: now + 2 * 60_000 });
+      if (choices.size > 512)
+        choices.delete(choices.keys().next().value!);
     }
-    return options.choices.get(key)?.index ?? null;
+    return choices.get(key)?.index ?? null;
   }));
 
   async function cardsFor(targets: CodexCardTarget[]) {

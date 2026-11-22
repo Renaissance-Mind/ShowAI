@@ -99,6 +99,7 @@ import {
   projectId,
   text,
 } from "../workbench/actions";
+import { remoteMcpWorkbench } from "../workbench/remote-mcp";
 import {
   getLocale,
   isLanguagePreference,
@@ -2010,7 +2011,7 @@ else {
       remoteConnector = new RemoteMacConnector(agentHost, () => store.root);
       remoteMcp = new RemoteMcpConnections({
         directory: join(app.getPath("userData"), "remote-mcp"),
-        workbenchAssetsDirectory: join(runtimePath(), "scripts/codex-workbench-assets"),
+        workbench: () => remoteMcpWorkbench(join(runtimePath(), "scripts/codex-workbench-assets")),
         onApprovalRequest(name) {
           if (presentation.background || BrowserWindow.getFocusedWindow() || !Notification.isSupported())
             return;

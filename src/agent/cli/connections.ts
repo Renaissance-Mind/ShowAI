@@ -4,6 +4,7 @@ import { syncManager } from "../../sync/manager";
 import {
   flag,
   hiddenText,
+  hiddenFlag,
   option,
   requireCount,
   text,
@@ -41,7 +42,7 @@ const sync = (
 export const connectionCommands: CommandDeclaration[] = [
   {
     command: "serve",
-    options: { port: text, "no-open": flag, "dsh-origin": hiddenText, "linked-workbench": hiddenText, "detach-workbench": flag },
+    options: { port: text, "no-open": flag, "dsh-origin": hiddenText, "linked-workbench": hiddenText, "detach-workbench": hiddenFlag },
     help: ["serve [--home PATH] [--port PORT] [--no-open]"],
     async run(args) {
       requireCount(args, 1);

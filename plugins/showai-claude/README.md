@@ -84,7 +84,7 @@ Qoder's workbench entry points require the local package and a registered ShowAI
 
 ### Kimi Code and TRAE
 
-In ShowAI **Settings → Agent plugins**, prepare the package bound to your library. In **Kimi Code**, open **Settings → Plugins → Install custom plugin** and enter the folder path. You can also merge the copied MCP configuration into `~/.kimi-code/mcp.json`. Kimi Code Desktop can open HTML in its file preview and a live ShowAI editor in its right-side browser. The CLI gives you the file and editor link. [Kimi Code plugins](https://www.kimi.com/code/docs/en/kimi-code-cli/customization/plugins.html)
+In ShowAI **Settings → Agent plugins**, prepare the package bound to your library. In **Kimi Code**, choose **Install custom plugin** on the **Plugins** settings page and enter the folder path. You can also merge the copied MCP configuration into `~/.kimi-code/mcp.json`. Kimi Code Desktop can open HTML in its file preview and a live ShowAI editor in its right-side browser. The CLI gives you the file and editor link. [Kimi Code plugins](https://www.kimi.com/code/docs/en/kimi-code-cli/customization/plugins.html)
 
 In **TRAE IDE**, import the VSIX from Extensions and add the copied local MCP configuration in Settings. Use **ShowAI: Open Workbench** to browse projects or open a `.showai-ref` in the editor. To build the VSIX from source, run `npm run package:cursor -- --host trae --out showai-trae.vsix`. [TRAE extensions](https://docs.trae.cn/ide_manage-extensions) · [TRAE MCP setup](https://docs.trae.cn/ide_add-mcp-servers)
 
