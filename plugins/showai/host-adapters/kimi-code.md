@@ -2,7 +2,7 @@
 
 <!-- showai-host-delivery:start -->
 
-- 临时可视化用 `show_component` 的 `delivery:"auto"`。交付返回的完整 HTML 文件，Kimi Code Desktop 有文件预览时可在宿主里打开。
+- 临时可视化用 `show_component` 的 `delivery:"auto"`。交付返回的完整 HTML 文件，Kimi Code Desktop 有文件预览时可在宿主里打开。用户限定在聊天里直接交互时，核对会话能否呈现视图。仅有文件预览时，说明需要在文件预览中打开才能交互。
 - 新建和续改保存成功后用 `card_present` 取得原页卡片文件，同时给出 `targets` 里的原页入口。用户要求读正文时用 `page_present`。
 - 用户要在 Kimi Code Desktop 任务右侧编辑时，用 `workbench_page_url` 取得地址，再用会话可用的内置 Browser 打开。CLI 可以交付同一编辑链接供浏览器打开。
 

@@ -22,7 +22,7 @@ Antigravity App 的插件区提供 **ShowAI Workbench** 全局入口，用来浏
 | 明确要在消息里阅读已保存页面的正文或片段 | 用 `page_present` 的 MCP Apps 阅读器，看指定片段时传对应的 `blockIds`。用户同时要卡片和预览时再交付两者。 |
 | 只要文件 | 导出已保存的作品用 `page_export`；直接生成完整独立文件且无需入库时用 `render_document`。 |
 
-**避免重复展示**：Antigravity 原生渲染附带 `ui://` 资源的 MCP 工具调用（`show_component`、`card_present`、`page_present`、`render_document`）。当回执 `delivery.mode === "mcp-app"` 时，视图已经在工具调用步骤显示，**禁止再把 `.inline.html` 复制到 Artifact 目录，也禁止再输出 `<agent-embed>`**，否则同一视图会在消息前后出现两次。
+当回执的 `delivery.mode` 为 `mcp-app` 时，视图资源已经随工具结果交给宿主。根据宿主状态或用户反馈确认是否显示。显示成功时沿用工具调用中的视图；加载失败时按完整宿主适配选择一个可用的交付入口。
 
 连接缺少 `card_present`（例如旧版运行时）时，给出项目名称与可用的 `openUrl`。已确认宿主侧栏工作台可用时，可以用实际页面身份构造 `[在 ShowAI 工作台打开《页面标题》](sidecar://showai/workbench/?project=<projectId>&page=<pageId>)`。
 

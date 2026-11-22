@@ -45,6 +45,8 @@ description: 在聊天中用原创 HTML 直接展示一至五个可交互的图�
 
 用户要保留 HTML 成品时，沿用这次的源码和交互，按请求交付文件。已展示的目录组件可以用原有数据[保存到页面](references/catalog.md#保存到页面)。用户明确要写入 ShowAI Page 时，按 show-document 核对页面身份、使用当前运行时支持的页面内容格式并验证保存回执。只有生成 HTML 文件时，报告交付的是文件。
 
+用户要求在 Page 内保留原有 HTML 交互时，核对页面组件能否承载这份源码，并验证原控件在保存后仍能操作。当前连接只能保存静态内容时，保留并交付原始可交互 HTML，说明 Page 里实际编辑了什么。用户明确要求注册可复用组件时走下面的注册流程。
+
 用户明确要“注册”“做成组件以后换数据用”时，取回选中那一项的原始 HTML。本机读回回执的 source 文件；HTTP 可以按 artifactId 用 presentation_source 分块读回。缓存过期时沿用本次聊天中相同的工具输入。跨聊天且无法取回源码时，请用户提供原片段或含源码的展示回执。保留图形、样式和交互，把需要替换的业务数据提成参数，由 HTML 读取 `window.showaiData`。原始数据作为 defaultData，准备一组有真实含义且能观察出差异的替代数据。
 
 用 `show_component({html:[{html,data:original},{html,data:alternate}]})` 对照同一份参数化 HTML 的两次渲染。核对原图的数值、标注与交互，操作替代数据的关键控件，验证图形或读数随新数据变化。注册时沿用明确的目标项目，需要选择时用 projects_list 确定归属。两组都通过后才按 [create-component](../create-component/SKILL.md) 补齐正式组件的名称、参数 schema 和使用说明。manifest.entry 使用 `visual.html`，source 使用刚验证的 HTML，manifest.examples 记录替代数据。调用 component_save 注册精确版本，再用保存回执的版本和两组数据复核。验证失败时修正同一份源码，保留原展示。
