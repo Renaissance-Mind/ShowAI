@@ -80,7 +80,7 @@ Start a new local task and check `projects_list` to confirm the active library. 
 | Qoder | Interactive MCP Apps in chat | The local package adds a ShowAI global workbench under **More** and a workbench in the task's app panel. Ask the agent to open a saved Page in the side editor, or select the workbench yourself. |
 | WorkBuddy | Interactive MCP Apps in chat | The agent can read and edit a saved Page through MCP. Open the Page in ShowAI to edit it directly. |
 
-Qoder's workbench entry points require the local package and its registered runtime. Remote MCP connections use the display capabilities provided by that connection. WorkBuddy uses its native plugin manifest and MCP configuration; verify the tools in a new task as well as in the plugin manager.
+Qoder's workbench entry points require the local package and a registered ShowAI runtime that includes Qoder workbench support. An older runtime can still provide basic MCP tools but will not expose those entry points; build and register the current source runtime or update the installed runtime before using them. Remote MCP connections use the display capabilities provided by that connection. WorkBuddy uses its native plugin manifest and MCP configuration; verify the tools in a new task as well as in the plugin manager.
 
 ## Host packages and shared source
 

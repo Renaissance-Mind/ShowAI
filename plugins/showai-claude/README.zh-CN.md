@@ -127,7 +127,7 @@ CODEBUDDY_CONFIG_DIR="$HOME/.workbuddy" node "$workbuddy_cli" plugin install sho
 | Qoder | 对话中展示可交互的 MCP App | 本机插件在「更多」中提供 ShowAI 全局工作台，在任务的应用面板提供工作台。可以让 Agent 在右侧编辑器打开原页，也可以自行选择工作台。 |
 | WorkBuddy | 对话中展示可交互的 MCP App | Agent 可通过 MCP 读取和续改原页；用户可在 ShowAI 中直接编辑。 |
 
-Qoder 的工作台入口需要本机插件与已登记的运行时；远程 MCP 连接以实际提供的展示能力为准。WorkBuddy 使用其原生插件清单和 MCP 配置，除检查插件管理页外，也需要在新任务中确认工具可用。
+Qoder 的工作台入口需要本机插件和支持 Qoder 工作台的已登记 ShowAI 运行时。旧运行时可能仍提供基础 MCP 工具，但不会出现工作台入口；使用前需构建并登记当前源码运行时，或更新已安装的运行时。远程 MCP 连接以实际提供的展示能力为准。WorkBuddy 使用其原生插件清单和 MCP 配置，除检查插件管理页外，也需要在新任务中确认工具可用。
 
 ## 宿主包与公共源码
 
