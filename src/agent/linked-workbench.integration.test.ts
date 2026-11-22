@@ -5,7 +5,7 @@ import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
 import { expect, test } from "vitest";
 
-test.each(["mcp-app", "model-html", "fragment-file"])(
+test.each(["mcp-app", "model-html", "fragment-file", "t3-html"])(
   "delivers a real saved Page in %s and opens its attached workbench",
   async display => {
     const home = await mkdtemp(join(tmpdir(), "showai-linked-workbench-"));
@@ -26,9 +26,19 @@ test.each(["mcp-app", "model-html", "fragment-file"])(
       };
       const projectId = project.data.id;
       const title = 'Saved Page <&>';
-      const cardPage = (await call("page_create", { projectId, title, blocks: [] }))
+      const blocks = display === "t3-html"
+        ? [{ kind: "chart", data: { labels: ["A", "B"], series: [{ name: "Count", values: [1, 2] }] } }]
+        : [];
+      const cardPage = (await call("page_create", { projectId, title, blocks }))
         .structuredContent as { data: { document: { id: string } } };
       const target = { projectId, pageId: cardPage.data.document.id };
+      if (display === "t3-html") {
+        const body = (await call("page_present", target)).structuredContent as { data: { conversation: { path: string } } };
+        const html = await readFile(body.data.conversation.path, "utf8");
+        expect(html).toMatch(/^<!doctype html>/i);
+        expect(html).toContain("data-showai-inline-root");
+        expect(html).not.toContain('data-showai-packed-data="gzip"');
+      }
       const { tools } = await client.listTools();
       const cardTool = tools.find(tool => tool.name === "card_present")!;
       const shown = await call("card_present", target);
@@ -40,10 +50,11 @@ test.each(["mcp-app", "model-html", "fragment-file"])(
           .toBe("text/html;profile=mcp-app");
       } else {
         expect(cardTool._meta?.ui).toBeUndefined();
-        const output = shown.structuredContent as { data: { delivery: { html: string } } };
-        const html = await readFile(output.data.delivery.html, "utf8");
+        const output = shown.structuredContent as { data: { delivery: { html: string; path: string } } };
+        const html = await readFile(display === "t3-html" ? output.data.delivery.path : output.data.delivery.html, "utf8");
         expect(html).toContain("Saved Page &lt;&amp;&gt;");
-        expect(html).toContain(`showai://project/${target.projectId}/page/${target.pageId}`);
+        if (display === "t3-html") expect(html).toContain(`page=${target.pageId}&amp;t3Page=1`);
+        else expect(html).toContain(`showai://project/${target.projectId}/page/${target.pageId}`);
       }
       const missing = await client.callTool({
         name: "workbench_page_url",
@@ -55,6 +66,18 @@ test.each(["mcp-app", "model-html", "fragment-file"])(
       expect(new URL(url).hostname).toBe("127.0.0.1");
       expect(new URL(url).searchParams.get("page")).toBe(target.pageId);
       if (display === "mcp-app") expect(shown._meta?.showaiPageCard).toMatchObject({ editorUrl: url });
+      const t3 = (await call("workbench_page_url", { ...target, surface: "t3-code" })).structuredContent as {
+        data: { previewTarget: { kind: string; port: number; path: string } };
+      };
+      const { previewTarget } = t3.data;
+      expect(previewTarget.kind).toBe("environment-port");
+      const t3Url = new URL(previewTarget.path, `http://localhost:${previewTarget.port}`);
+      const t3Page = await fetch(t3Url, { headers: { Origin: t3Url.origin } });
+      expect(t3Page.status).toBe(200);
+      expect(await t3Page.text()).toContain('"t3Page":true');
+      const mismatchedOrigin = await fetch(t3Url, { headers: { Origin: new URL(url).origin } });
+      expect(mismatchedOrigin.status).toBe(403);
+      await mismatchedOrigin.body?.cancel();
       await client.close();
       const page = await fetch(url);
       expect(page.status).toBe(200);

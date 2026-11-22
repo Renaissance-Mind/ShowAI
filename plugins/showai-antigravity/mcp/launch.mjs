@@ -266,6 +266,8 @@ async function prepare() {
     SHOWAI_HOME: home,
     ...(version ? { SHOWAI_PLUGIN_VERSION: version } : {}),
   };
+  if (env.T3CODE_THREAD_ID && env.SHOWAI_LINKED_WORKBENCH === "1" && env.SHOWAI_HOST_DISPLAY === "model-html")
+    env.SHOWAI_HOST_DISPLAY = "mcp-app";
   const info = await probe(config, text, env);
   const capabilities = info.data?.capabilities ?? {};
   const outdated = (detail) => {

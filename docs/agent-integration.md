@@ -15,6 +15,12 @@ ShowAI 0.9 provides independent presentations and shared-project work. **Display
 
 The page model, component compiler, authoring service, revision checks, export reader and sync protocol are shared. Hosts adapt how they invoke tools and show results. Supporting MCP alone does not imply HTML display support. Claude, pi, dsh and other hosts can use the documented CLI or MCP interfaces according to their actual capabilities; host-specific live acceptance is recorded separately.
 
+## T3 Code
+
+T3 uses its selected provider’s MCP configuration on the thread’s environment. A shared Codex or Claude profile can use its existing ShowAI plugin. For a separate profile, select the provider under **Settings → Agent plugins → T3 Code** in ShowAI, apply the configuration on that machine and choose **Restart agent session** in T3. The selector offers Codex TOML, Claude CLI, OpenCode and MCP JSON.
+
+Codex and Claude Code 2.1.301 or later support interactive MCP Apps in T3 Code 0.1.11. Other providers can request `delivery:"t3-html"` and pass the returned path or HTML to `html_preview` and `html_render`. A saved Page card can request its editor in T3’s Browser. The local `workbench_page_url` and `workbench_url` tools accept `surface:"t3-code"` and return an environment-port target for that thread. Each Page can open in its own host tab. [T3 visual replies](https://github.com/pingdotgg/t3code/blob/v0.1.11/docs/user/html-renders.md)
+
 ## Local use
 
 Find the actual runtime under **Settings → MCP** (**Local runtime** and **Local launch configuration**) or in the selected library's `agent-runtime.json`. `showai` below abbreviates that executable and its arguments. Inspect `runtime info --json` and `guide integration --json`.

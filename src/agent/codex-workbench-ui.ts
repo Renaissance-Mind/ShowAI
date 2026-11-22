@@ -12,7 +12,7 @@ export const codexWorkbenchUri = "ui://showai/workbench-v3.html";
 export const codexWorkbenchThreadUri = "ui://showai/workbench-thread-v5.html";
 export const codexWorkbenchFileUri = "ui://showai/workbench-file-v3.html";
 
-export const codexWorkbenchCardUri = "ui://showai/workbench-card-v11.html";
+export const codexWorkbenchCardUri = "ui://showai/workbench-card-v12.html";
 export const previousWorkbenchCardUri = "ui://showai/workbench-card-v10.html";
 export const codexWorkbenchTargetUri = "ui://showai/workbench-target-v3.html";
 
@@ -80,6 +80,7 @@ ${card}
   let locale = navigator.language.startsWith("zh") ? "zh-CN" : "en";
   let context = {};
   let capabilities = {};
+  let t3Browser = false;
   let launch, launchUrl, bundle, launchTimer, initialized = false;
   let ready = false, refreshing = false, sequence = 0;
   let fileInput, referencePage, readingFile = false;
@@ -103,7 +104,7 @@ ${card}
   function request(method, params) {
     const id = ++sequence;
     return new Promise((resolve, reject) => {
-      const timeout = setTimeout(() => {
+      const timeout = method === "ui/message" && t3Browser ? undefined : setTimeout(() => {
         pending.delete(id);
         reject(new Error(t("timedOut")));
       }, 8000);
@@ -377,6 +378,7 @@ ${card}
         openLabel: t(hasGlobalEntrypoint ? "cardCursor" : "cardEditorLink"),
         workbenchLabel: t("copyEditorLink"),
       }),
+      ...(t3Browser && { openLabel: t("openT3Page"), showOptions: false }),
     });
     card.hidden = false;
     if (initialized && adjustSpacing && !spacingEditor) {
@@ -461,10 +463,17 @@ ${card}
     showPageCard();
     status.hidden = true;
     try {
+      if (t3Browser) {
+        await request("ui/message", {
+          role: "user",
+          content: [{ type: "text", text: t("openT3Request") + " " + JSON.stringify({ ...target, surface: "t3-code" }) }],
+        });
+        return;
+      }
       if (remote) {
         if (cardGroup) await callWorkbench("workbench_card_choice", { groupId: cardGroup, index });
         const reply = await request(${JSON.stringify(host === "remote" ? "ui/request-display-mode" : "")}, { mode: "fullscreen" });
-        if (reply?.displayMode !== "fullscreen" && context.displayMode !== "fullscreen")
+        if (reply?.mode !== "fullscreen" && reply?.displayMode !== "fullscreen" && context.displayMode !== "fullscreen")
           throw new Error(t("cannotOpenTarget"));
         await showCardEditor(target);
         return;
@@ -751,6 +760,7 @@ ${card}
     protocolVersion: "2026-01-26",
   }).then(result => {
     capabilities = result?.hostCapabilities || {};
+    t3Browser = ${host === "codex" || host === "linked"} && result?.hostInfo?.name === "t3-code" && !!capabilities.message?.text;
     configure(result?.hostContext);
     initialized = true;
     if (!ready && !pageCards.length) show("loading");

@@ -89,6 +89,14 @@ test("direct HTML stays selectable, isolated and interactive, then registers and
     expect(inline).not.toContain('id="showai-data"');
     await page.goto(pathToFileURL(receipt.delivery.inline).href);
     await readStatus(page, 1, "Ready");
+    const t3 = await call("show_component", { html: oneOff, delivery: "t3-html" });
+    const t3File = (t3.data as { delivery: { mode: string; path: string } }).delivery;
+    expect(t3File.mode).toBe("t3-html");
+    expect(await readFile(t3File.path, "utf8")).toMatch(/^<!doctype html>/i);
+    const t3Page = await browser.newPage();
+    await t3Page.goto(pathToFileURL(t3File.path).href);
+    await readStatus(t3Page, 0, "Ready");
+    await t3Page.close();
     expect(await page.locator("showai-html-visual iframe").count()).toBe(2);
     expect(
       await page
@@ -203,6 +211,15 @@ test("direct HTML stays selectable, isolated and interactive, then registers and
       data: alternate,
       delivery: "mcp-app",
     });
+    const t3Resource = join(root, "t3-component.html");
+    const native = app._meta?.showai as { inline: string };
+    await writeFile(t3Resource, `<!doctype html><html data-showai-mcp-host="t3-code"><head>
+      <meta http-equiv="Content-Security-Policy" content="default-src 'none'; frame-src blob:; script-src 'unsafe-inline'; style-src 'unsafe-inline'">
+      </head><body>${native.inline}</body></html>`);
+    await page.goto(pathToFileURL(t3Resource).href);
+    await readStatus(page, 0, alternate.label);
+    expect(await page.locator("showai-html-visual iframe").getAttribute("src")).toMatch(/^blob:/);
+    expect(await page.locator("showai-html-visual iframe").getAttribute("sandbox")).toBe("allow-scripts");
     const resource = await client.readResource({
       uri: componentResourceUri,
     });

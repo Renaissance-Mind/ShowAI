@@ -1,5 +1,7 @@
 # Codex 展示适配
 
+在 T3 Code 的 Codex 会话中使用 [T3 Code 展示与浏览器](host-display.md#t3-code)。
+
 <!-- showai-host-delivery:start -->
 
 - 临时组件用 `show_component` 的 `delivery:"auto"` 在 MCP Apps 视图显示。默认只需发现 `show_component`，将原创 HTML 直接传给它。

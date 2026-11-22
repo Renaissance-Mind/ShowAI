@@ -221,7 +221,7 @@ export async function describePublicResource(
   });
 }
 
-export async function renderPresentation(raw: PresentationInput) {
+export async function renderPresentation(raw: PresentationInput, t3File = false) {
   const input = z.object(presentationSchema).parse(raw);
   if (input.document && input.templateId)
     throw new Error("Provide document or templateId, not both.");
@@ -263,6 +263,7 @@ export async function renderPresentation(raw: PresentationInput) {
     title: rendered.title,
     document: rendered.document,
     html: rendered.html,
+    ...(t3File ? { t3ReaderHtml: rendered.inlineHtml } : {}),
     ...preview,
     ...(online ? { online } : {}),
     ...(compact ? { compact } : {}),
@@ -390,6 +391,7 @@ export const SHOW_COMPONENT_LIMIT = 5;
 export const SHOW_DELIVERIES = [
   "auto",
   "mcp-app",
+  "t3-html",
   "fragment-file",
   "compact",
   "image",

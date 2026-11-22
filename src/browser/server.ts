@@ -593,6 +593,9 @@ export async function startBrowserServer(options: BrowserServerOptions) {
       response.setHeader("X-Frame-Options", "DENY");
       response.setHeader("Referrer-Policy", "no-referrer");
       const requestOrigin = request.headers.origin;
+      const workbenchOrigin = new URL(origin);
+      if (options.linkedWorkbench && request.headers.host === `localhost:${workbenchOrigin.port}`)
+        workbenchOrigin.hostname = "localhost";
       const codexOrigin = requestOrigin && options.codexWorkbench && allowsCodexOrigin(requestOrigin);
       const agPreflight =
         requestOrigin &&
@@ -600,8 +603,8 @@ export async function startBrowserServer(options: BrowserServerOptions) {
         request.method === "OPTIONS" &&
         request.headers["access-control-request-private-network"] === "true";
       if (
-        request.headers.host !== new URL(origin).host ||
-        (requestOrigin && requestOrigin !== origin && !codexOrigin && !agPreflight)
+        request.headers.host !== workbenchOrigin.host ||
+        (requestOrigin && requestOrigin !== workbenchOrigin.origin && !codexOrigin && !agPreflight)
       ) {
         response.writeHead(403);
         response.end("Forbidden origin");
@@ -868,6 +871,8 @@ export async function startBrowserServer(options: BrowserServerOptions) {
             : preview ? "'self'" : "'none'";
         const config = JSON.stringify({
           token,
+          ...(options.linkedWorkbench && !preview && url.searchParams.get("t3Page") === "1" &&
+            url.searchParams.has("project") && url.searchParams.has("page") && { t3Page: true }),
           ...(codexOrigin && embedded ? { apiOrigin: origin, search: url.search } : {}),
           ...(embedded && dsh && !preview ? {
             dshWorkbench: {

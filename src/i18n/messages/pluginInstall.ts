@@ -118,6 +118,9 @@ export default defineMessages("pluginInstall", {
     "setup.kimi-code": "安装本地插件，或将 MCP 配置合并到 ~/.kimi-code/mcp.json。",
     "setup.gemini": "将 ShowAI 配置加入 ~/.gemini/settings.json。",
     "setup.opencode": "将复制的 mcp 配置合并到 opencode.json。",
+    "setup.t3-code": "默认 Codex、Claude Code 可复用上方插件。独立实例使用对应提供方的 MCP 配置，然后在 T3 命令面板选择「重启智能体会话」。",
+    t3Provider: "T3 Code 提供方",
+    t3OtherProvider: "其他提供方（JSON）",
   },
   en: {
     "rescanHost": "Check {host} again",
@@ -237,5 +240,8 @@ export default defineMessages("pluginInstall", {
     "setup.kimi-code": "Add a local plugin source in Kimi Code or add ShowAI to ~/.kimi-code/mcp.json.",
     "setup.gemini": "Add the ShowAI entry to ~/.gemini/settings.json.",
     "setup.opencode": "Merge the copied mcp configuration into opencode.json.",
+    "setup.t3-code": "Default Codex and Claude Code profiles can use the plugins above. For a separate instance, add its provider’s MCP configuration and restart the session from T3’s command palette.",
+    t3Provider: "T3 Code provider",
+    t3OtherProvider: "Other (MCP JSON)",
   },
 });

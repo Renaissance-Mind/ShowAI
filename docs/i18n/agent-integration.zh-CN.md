@@ -26,6 +26,12 @@ showai mcp --project PROJECT_ID
 
 library MCP 增加 projects_list/project_resolve/project_create；绑定项目连接也可查询公共资源。--public 仅提供公共查询、指南与渲染。私有项目渲染位置在 local/agent-previews 等非同步区域。项目同步使用 project_sync/project_sync_status；明确项目的同步只处理该项目。
 
+## T3 Code
+
+T3 在线程所在的环境加载提供方的 MCP 配置。共用配置目录的 Codex、Claude Code 可以直接复用已有 ShowAI 插件。独立配置目录可在 ShowAI「设置 → Agent 插件 → T3 Code」选择 Codex TOML、Claude CLI、OpenCode 或 MCP JSON，在目标机器应用后，从 T3 命令面板选择 **重启智能体会话**。
+
+T3 Code 0.1.11 的 Codex 和 Claude Code 2.1.301 及以上支持交互式 MCP App。其他提供方可传 `delivery:"t3-html"`，用 T3 的 `html_preview` 检查返回的路径或 HTML，再用 `html_render` 放进对话。已保存页面的卡片可以请求在 T3 浏览器中编辑原件。本机 `workbench_page_url` 和 `workbench_url` 接受 `surface:"t3-code"`，返回线程执行环境的端口目标，每个原页可独立占用一个宿主标签。[T3 展示协议](https://github.com/pingdotgg/t3code/blob/v0.1.11/docs/user/html-renders.md)
+
 ## 远程 MCP 服务
 
 桌面 App 在「设置 → 远程 MCP」提供局域网 HTTP 与访问密钥、Tailscale Serve 私网，以及 Cloudflare 或 Tailscale Funnel 公网连接。HTTPS 连接通过 OAuth 和桌面确认授权；所有模式直接保存本机内容。逐步操作见[设备与客户端接入](chatgpt.zh-CN.md)。下文的 `mcp serve` 是连接同步服务器的托管网关；仅传 `--home` 不会开放该库的私有项目。

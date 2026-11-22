@@ -6,7 +6,7 @@ import { join } from "node:path";
 import { promisify } from "node:util";
 import type { PluginInstallation } from "../plugin/desktop-install";
 import type { AgentConnectionRecord } from "../agent/mcp-connections";
-import { launchSnippet, runtimeMcpLaunch } from "../plugin/launch-snippets";
+import { launchSnippet, runtimeMcpLaunch, t3CodeLaunchSnippet } from "../plugin/launch-snippets";
 import { PluginInstallError } from "../plugin/plugin-errors";
 import { errorResult } from "../agent/service";
 import { verifyState } from "./PluginInstallSettings";
@@ -149,6 +149,12 @@ test("per-host launch configuration is accepted by the Claude Code CLI", async (
     env: { ELECTRON_RUN_AS_NODE: "1", SHOWAI_HOME: "/Users/me/My Library" },
   };
   const codex = launchSnippet("codex", server);
+  expect(t3CodeLaunchSnippet("codex", server)).toContain('SHOWAI_HOST_DISPLAY = "mcp-app"');
+  expect(t3CodeLaunchSnippet("claude", server)).toContain("SHOWAI_HOST_DISPLAY=mcp-app");
+  expect(t3CodeLaunchSnippet("claude-legacy", server)).toContain("SHOWAI_HOST_DISPLAY=t3-html");
+  expect(JSON.parse(t3CodeLaunchSnippet("opencode", server)).mcp.showai.environment).toMatchObject({
+    ...server.env, SHOWAI_HOST_DISPLAY: "t3-html", SHOWAI_LINKED_WORKBENCH: "1",
+  });
   expect(codex).toContain("[mcp_servers.showai]");
   expect(codex).toContain('SHOWAI_HOME = "/Users/me/My Library"');
   expect(JSON.parse(launchSnippet("json", server)).mcpServers.showai.args).toEqual(

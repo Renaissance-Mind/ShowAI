@@ -50,6 +50,7 @@ declare global {
   interface Window {
     __SHOWAI_LOCAL__?: {
       token: string;
+      t3Page?: boolean;
       codexWorkbench?: CodexWorkbenchConnection;
       dshWorkbench?: { parentOrigin: string; session: boolean; instance: string };
       apiOrigin?: string;

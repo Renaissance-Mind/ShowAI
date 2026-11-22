@@ -92,6 +92,11 @@ if (!customElements.get("showai-html-visual")) {
     }
     disconnectedCallback() {
       window.removeEventListener("message", this.resize);
+      if (this.frameUrl) {
+        URL.revokeObjectURL(this.frameUrl);
+        this.frameUrl = undefined;
+        this.source = undefined;
+      }
     }
     show(input) {
       this.frame.title = input.title || "Visualization";
@@ -101,7 +106,12 @@ if (!customElements.get("showai-html-visual")) {
         this.source = source;
         this.revision++;
         this.setAttribute("data-preview-pending", "true");
-        this.frame.srcdoc = '<!doctype html><html data-showai-measuring data-showai-revision="' + this.revision + '">' + source;
+        const documentHtml = '<!doctype html><html data-showai-measuring data-showai-revision="' + this.revision + '">' + source;
+        if (document.documentElement.dataset.showaiMcpHost === "t3-code") {
+          if (this.frameUrl) URL.revokeObjectURL(this.frameUrl);
+          this.frameUrl = URL.createObjectURL(new Blob([documentHtml], { type: "text/html" }));
+          this.frame.src = this.frameUrl;
+        } else this.frame.srcdoc = documentHtml;
       }
     }
   });

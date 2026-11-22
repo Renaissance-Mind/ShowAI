@@ -64,6 +64,7 @@ export function isSinglePageWorkbench() {
   if (typeof window === "undefined") return false;
   const antigravity = antigravityWorkbench();
   return codexWorkbench()?.mode === "thread" ||
+    window.__SHOWAI_LOCAL__?.t3Page === true ||
     window.__SHOWAI_LOCAL__?.dshWorkbench?.session === true ||
     (!!antigravity && !antigravity.global);
 }

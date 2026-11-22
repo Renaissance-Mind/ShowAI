@@ -114,6 +114,7 @@ function registerRemoteWorkbench(
     { name: "showai_remote_workbench", uri: codexWorkbenchUri, mode: "global" },
     { name: "showai_remote_page", uri: codexWorkbenchThreadUri, mode: "thread" },
     { name: "showai_remote_cards", uri: codexWorkbenchCardUri, mode: "thread", entrypoint: "card" },
+    { name: "showai_remote_cards_v11", uri: "ui://showai/workbench-card-v11.html", mode: "thread", entrypoint: "card" },
     { name: "showai_remote_cards_v10", uri: previousWorkbenchCardUri, mode: "thread", entrypoint: "card" },
     { name: "showai_remote_target", uri: codexWorkbenchTargetUri, mode: "thread", entrypoint: "open" },
   ];

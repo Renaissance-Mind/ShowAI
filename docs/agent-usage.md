@@ -188,6 +188,8 @@ showai_capabilities  template_apply  template_context  template_save
 
 ## Choose a usage path
 
+In T3 Code, use the native MCP App on supported providers. A `t3-html` delivery returns a document for `html_preview` and `html_render`. Open an editable original Page using the environment target from `workbench_page_url`. [Provider setup and delivery](agent-integration.md#t3-code)
+
 The [use-showai entry skill](../plugins/showai/skills/use-showai/SKILL.md) explains the content model, runtime discovery, object ownership and which specialist skill to read for each task. Read it on first use or when those foundations are unclear. `show-document` handles concrete page creation and presentation; component and template workflows have their own skills. The [runtime reference](../plugins/showai/skills/use-showai/references/runtime.md) explains how to invoke the registered command. Detailed operation instructions come from the executable:
 
 ```sh

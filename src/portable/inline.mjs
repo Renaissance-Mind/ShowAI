@@ -46,7 +46,7 @@ export function assertInlineArtifact(artifact) {
   }
 }
 
-export function toInlineFragment(html, id = `showai-${randomUUID()}`) {
+export function toInlineFragment(html, id = `showai-${randomUUID()}`, host) {
   if (!/^showai-[a-z0-9-]+$/.test(id))
     throw new Error("Invalid inline page id.");
   const body = html
@@ -101,12 +101,20 @@ export function toInlineFragment(html, id = `showai-${randomUUID()}`) {
       return `<script type="module">${script}</script>`;
     })
     .join("\n");
+  let sheet = inlineStyleSheet(id, css);
+  if (host === "t3-html") {
+    // T3 sizes the frame from its content. Dialogs can use the device's screen height.
+    sheet = sheet.replace(/(?<![\w.+/])(-?(?:\d+(?:\.\d+)?|\.\d+))[sld]?vh\b/gi,
+      (_, value) => `calc(var(--showai-screen-unit, 6.4px) * ${value})`);
+  }
   let fragment = `<section id="${id}" data-showai-inline-root${langAttribute}>${markup}</section>
 <style>
-${inlineStyleSheet(id, css)}
+${sheet}
 </style>
 ${code}
 `;
+  // The native preview measures after the first paints. Load the bundled modules with the document.
+  if (host === "t3-html") return fragment;
   if (Buffer.byteLength(fragment) >= 128_000) {
     const buildTransport = (inlineOnly) => {
       const packedData = artifactSource

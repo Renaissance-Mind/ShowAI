@@ -12,6 +12,8 @@ html,body{margin:0;padding:0;font-family:system-ui;color-scheme:light dark}
 #status code{font:12px ui-monospace,monospace;user-select:all}
 #status .spinner{flex:none;width:12px;height:12px;border-radius:50%;border:2px solid light-dark(#d5dbe0,#3b4650);border-top-color:currentColor;animation:showai-spin .8s linear infinite}
 #reader{min-width:0}
+#expand{display:block;margin:2px 2px 4px auto;border:1px solid currentColor;border-radius:5px;background:transparent;color:inherit;padding:3px 8px;cursor:pointer}
+#expand[hidden]{display:none}
 a{color:inherit}
 [data-showai-reveal]{transition:opacity .36s ease}
 [data-showai-reveal=pending]{opacity:0!important}
@@ -19,7 +21,7 @@ a{color:inherit}
 @media (prefers-reduced-motion:reduce){#status .spinner{animation:none}}
 @media print{[data-showai-reveal]{opacity:1!important}}
 </style></head>
-<body><div id="status" role="status">正在载入 ShowAI 页面…</div><div id="reader"></div>
+<body><button type="button" id="expand" hidden></button><div id="status" role="status">正在载入 ShowAI 页面…</div><div id="reader"></div>
 <script>
 (() => {
  const root=document.getElementById('reader'),status=document.getElementById('status');
@@ -58,6 +60,14 @@ a{color:inherit}
  });
  window.addEventListener('pagehide',()=>{clearTimeout(liveTimer);readerControl?.();readerControl=null;});
  const pending=new Map();
+ const expand=document.getElementById('expand');
+ let t3=false,hostContext={};
+ function displayContext(change){
+  hostContext={...hostContext,...change};
+  expand.hidden=!t3||hostContext.displayMode==='fullscreen'||!hostContext.availableDisplayModes?.includes('fullscreen');
+  expand.textContent=(hostContext.locale||navigator.language).startsWith('zh')?'全屏':'Full screen';
+ }
+ expand.onclick=()=>send('ui/request-display-mode',{mode:'fullscreen'}).then(reply=>displayContext({displayMode:reply.mode})).catch(error=>showStatus(error.message,'error'));
  function send(method,params){const id=sequence++;parent.postMessage({jsonrpc:'2.0',id,method,params},'*');return new Promise((resolve,reject)=>{pending.set(id,{resolve,reject});setTimeout(()=>{if(pending.delete(id))reject(new Error('Host request timed out'));},10000);});}
  function notify(method,params){parent.postMessage({jsonrpc:'2.0',method,params},'*');}
  function openLink(url){send('ui/open-link',{url}).catch(()=>window.open(url,'_blank','noopener,noreferrer'));}
@@ -175,6 +185,24 @@ a{color:inherit}
  // Each update replaces the previous one, so the reference, handed-over component
  // states and control values always travel together, newest components kept first.
  const handed=new Map();let referenced=null;
+ function modelContext(text,showai){
+  const blocks=value=>value?[{type:'text',text:value}]:[];
+  const structuredContent={showai};
+  if(!t3)return {content:blocks(text),structuredContent};
+  const encoder=new TextEncoder(),limit=16*1024;
+  const dataBytes=encoder.encode(JSON.stringify(structuredContent)).length;
+  if(dataBytes<=limit){
+   const fits=encoder.encode(text).length+(text?1:0)+dataBytes<=limit;
+   return {content:fits?blocks(text):[],structuredContent};
+  }
+  // T3 counts text and serialized data together. Keep the page identity with a bounded summary.
+  const target=showai.reference||page;
+  const identity={projectId:target.projectId,pageId:target.pageId,hash:target.hash,revision:target.revision};
+  const short={showai:{page:identity,truncated:true}};
+  const budget=limit-encoder.encode(JSON.stringify(short)).length-1;
+  const summary=new TextDecoder().decode(encoder.encode(text).subarray(0,budget),{stream:true});
+  return {content:blocks(summary),structuredContent:short};
+ }
  function publishContext(){
   const controls=controlLines(),components=[...handed.values()];
   const compose=()=>{const parts=[],showai={};
@@ -186,7 +214,10 @@ a{color:inherit}
   while(context.text.length>24000&&components.length>1){components.shift();context=compose();}
   if(context.text===lastContext)return Promise.resolve();
   lastContext=context.text;
-  return send('ui/update-model-context',{content:context.text?[{type:'text',text:context.text}]:[],structuredContent:{showai:context.showai}});
+  return send('ui/update-model-context',modelContext(context.text,context.showai)).catch(error=>{
+   if(lastContext===context.text)lastContext=null;
+   throw error;
+  });
  }
  function publishState(){publishContext().catch(error=>console.warn('ShowAI reader state:',error.message));}
  root.addEventListener('showai:conversation-reference',event=>{if(!conversational()||!event.detail)return;const detail=event.detail;referenced=detail.reference?{reference:detail.reference,text:String(detail.text||'')}:null;detail.result=publishContext();});
@@ -200,12 +231,25 @@ a{color:inherit}
   if(msg.method==='ui/notifications/tool-input')waiting(msg.params?.arguments);
   if(msg.method==='ui/notifications/tool-result')render(msg.params);
   if(msg.method==='ui/notifications/tool-cancelled'&&!current){settled=true;showStatus('页面生成已取消'+(msg.params?.reason?'：'+msg.params.reason:'。'),'error');}
-  if(msg.method==='ui/notifications/host-context-changed')theme(msg.params?.theme);});
+  if(msg.method==='ui/notifications/host-context-changed'){theme(msg.params?.theme);displayContext(msg.params);}});
  // ChatGPT compatibility globals: toolOutput is structuredContent, toolResponseMetadata is _meta.
  function fromOpenAI(globals){if(!globals)return;theme(globals.theme);if(globals.toolOutput||globals.toolResponseMetadata)render({structuredContent:globals.toolOutput,_meta:globals.toolResponseMetadata,isError:globals.toolOutput?.ok===false});else waiting(globals.toolInput);}
  window.addEventListener('openai:set_globals',event=>fromOpenAI(event.detail?.globals));
  fromOpenAI(window.openai);
- send('ui/initialize',{appInfo:{name:'ShowAI',version:'1.0.0'},appCapabilities:{},protocolVersion:'2026-01-26'}).then(result=>{initialized=true;serverTools=!!result?.hostCapabilities?.serverTools;const toolName=result?.hostContext?.toolInfo?.tool?.name;if(typeof toolName==='string'&&toolName.endsWith('show_component'))readTool=toolName.slice(0,-'show_component'.length)+'show_component_read';theme(result?.hostContext?.theme);contextSupported=!!result?.hostCapabilities?.updateModelContext;notify('ui/notifications/initialized');if(conversational()&&current&&lastResult&&!live){current='';render(lastResult);}pollLive();}).catch(error=>{if(!current&&!settled)showStatus('等待宿主提供页面。');console.warn(error.message);});
+ send('ui/initialize',{appInfo:{name:'ShowAI',version:'1.0.0'},appCapabilities:{},protocolVersion:'2026-01-26'}).then(result=>{
+  initialized=true;
+  t3=result?.hostInfo?.name==='t3-code';
+  if(t3)document.documentElement.dataset.showaiMcpHost='t3-code';
+  displayContext(result?.hostContext);
+  serverTools=!!result?.hostCapabilities?.serverTools;
+  const toolName=result?.hostContext?.toolInfo?.tool?.name;
+  if(typeof toolName==='string'&&toolName.endsWith('show_component'))readTool=toolName.slice(0,-'show_component'.length)+'show_component_read';
+  theme(result?.hostContext?.theme);
+  contextSupported=!!result?.hostCapabilities?.updateModelContext;
+  notify('ui/notifications/initialized');
+  if(conversational()&&current&&lastResult&&!live){current='';render(lastResult);}
+  pollLive();
+ }).catch(error=>{if(!current&&!settled)showStatus('等待宿主提供页面。');console.warn(error.message);});
  // Measure the whole body so status changes and shrinking content both resize the frame.
  new ResizeObserver(()=>notify('ui/notifications/size-changed',{height:Math.ceil(Math.max(document.body.getBoundingClientRect().height,document.body.scrollHeight))})).observe(document.body);
 })();

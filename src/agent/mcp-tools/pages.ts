@@ -1,4 +1,5 @@
 import { readFile, writeFile } from "node:fs/promises";
+import { join } from "node:path";
 import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 import { z } from "zod";
 import { CAPACITY, CapacityError } from "../../portable/capacity.mjs";
@@ -9,6 +10,7 @@ import {
   mcpFailure,
   mcpSuccess,
   readerToolMeta,
+  t3HtmlPreview,
   withConversation,
 } from "../presentation-tools";
 import { presentPage } from "../page-presentation";
@@ -486,14 +488,19 @@ export const pagePresentTool: ToolDeclaration = {
   input: () => ({
     pageId: z.string().min(1),
     blockIds: z.array(z.string().min(1)).min(1).optional(),
+    delivery: z.literal("t3-html").optional(),
   }),
-  async run({ service, projectId, options, withOpenLink }, { pageId, blockIds }) {
+  async run({ service, projectId, options, withOpenLink }, { pageId, blockIds, delivery: requested }) {
     try {
+      const display = options.presentation?.hostDisplay ?? hostDisplay();
+      const t3 = requested === "t3-html" || display === "t3-html";
+      const local = options.presentation?.transport !== "http";
       const value = await presentPage({
         root: service.store.root,
         projectId,
         pageId,
         blockIds,
+        t3File: t3 && local,
       });
       const delivery = options.storeProjectPresentation
         ? await options.storeProjectPresentation(value)
@@ -508,6 +515,12 @@ export const pagePresentTool: ToolDeclaration = {
         projectName?: string;
         openUrl?: string;
       };
+      const previewDirectory = local
+        ? options.presentationDirectory ?? join(service.store.root, "local", "agent-previews")
+        : undefined;
+      const conversation = t3
+        ? await t3HtmlPreview(value.inline, previewDirectory, value.t3ReaderHtml)
+        : conversationHandoff(value.compact, blockIds, display, "page_present", !!value.online);
       return {
         ...mcpSuccess({
           title: value.title,
@@ -530,15 +543,7 @@ export const pagePresentTool: ToolDeclaration = {
             ...(blockIds ? { blockIds } : {}),
           },
           ...(value.inlineError ? { inlineError: value.inlineError } : {}),
-          ...withConversation(
-            conversationHandoff(
-              value.compact,
-              blockIds,
-              options.presentation?.hostDisplay ?? hostDisplay(),
-              "page_present",
-              !!value.online,
-            ),
-          ),
+          ...withConversation(conversation),
           ...(value.externalSnapshots
             ? { externalSnapshots: value.externalSnapshots }
             : {}),

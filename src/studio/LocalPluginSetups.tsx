@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { desktop, errorMessage } from "../host/bridge";
 import { useTranslator } from "../i18n/react";
 import messages from "../i18n/messages/pluginInstall";
-import { launchSnippet, type McpLaunch } from "../plugin/launch-snippets";
+import { launchSnippet, t3CodeLaunchSnippet, type McpLaunch, type T3CodeProvider } from "../plugin/launch-snippets";
 import type { PluginInstallation } from "../plugin/desktop-install";
 import type {
   LocalInstallHost,
@@ -14,6 +14,7 @@ import AgentBrandIcon from "./AgentBrandIcon";
 import { SettingsPath } from "./SettingsPath";
 
 const hosts = [
+  { id: "t3-code", name: "T3 Code", brand: "t3-code", method: "provider" },
   { id: "kimi", name: "Kimi Work", brand: "kimi-work", method: "package" },
   {
     id: "cursor",
@@ -65,6 +66,7 @@ export default function LocalPluginSetups({
   const t = useTranslator(messages);
   const notify = useNotify();
   const [pending, setPending] = useState<Host["id"]>();
+  const [t3Provider, setT3Provider] = useState<T3CodeProvider>("codex");
   const [prepared, setPrepared] = useState<{ host: Host; path: string }>();
   const [error, setError] = useState<{ host: Host["id"]; message: string }>();
   const [localHosts, setLocalHosts] = useState<LocalInstallHost[]>();
@@ -88,6 +90,12 @@ export default function LocalPluginSetups({
 
   async function copyConfig(host: Host) {
     const launch = await desktop.invoke<McpLaunch>("plugins:launchConfig");
+    if (host.id === "t3-code") {
+      const info = await desktop.invoke<{ platform: string }>("app:info");
+      await desktop.invoke("clipboard:write", { text: t3CodeLaunchSnippet(t3Provider, launch, info.platform) });
+      notify(t("copied"));
+      return;
+    }
     const method = host.method === "opencode" ? "opencode" : "json";
     const env = {
       ...launch.env,
@@ -180,6 +188,16 @@ export default function LocalPluginSetups({
               )}
             </div>
             <div className="plugin-host-actions">
+              {host.id === "t3-code" && (
+                <select className="showai-select" aria-label={t("t3Provider")} value={t3Provider}
+                  onChange={event => setT3Provider(event.target.value as T3CodeProvider)}>
+                  <option value="codex">Codex</option>
+                  <option value="claude">Claude Code ≥ 2.1.301</option>
+                  <option value="claude-legacy">Claude Code &lt; 2.1.301</option>
+                  <option value="opencode">OpenCode</option>
+                  <option value="json">{t("t3OtherProvider")}</option>
+                </select>
+              )}
               <button
                 className={
                   installer

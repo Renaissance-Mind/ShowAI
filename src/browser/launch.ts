@@ -67,14 +67,15 @@ export async function startAntigravityWorkbenchBrowser(options: {
   });
 }
 
-interface LinkedWorkbenchSession { id: string; url: string; home: string; pid: number }
+interface LinkedWorkbenchSession { protocol: 2; id: string; url: string; home: string; pid: number }
 const linkedWorkbenchArgs = (cliEntry: string, home: string, id: string) =>
   [cliEntry, "serve", "--home", home, "--linked-workbench", id, "--no-open", "--json"];
 
 async function linkedWorkbenchSession(home: string, id?: string) {
   try {
     const session = JSON.parse(await readFile(join(home, "local", "linked-workbench", "session.json"), "utf8")) as LinkedWorkbenchSession;
-    if (session.home !== home || (id && session.id !== id) || !/^[a-f0-9-]{36}$/.test(session.id) ||
+    // Older servers only accept the numeric loopback host. Their open tabs can finish on the old port.
+    if (session.protocol !== 2 || session.home !== home || (id && session.id !== id) || !/^[a-f0-9-]{36}$/.test(session.id) ||
       !Number.isInteger(session.pid) || session.pid < 1) return;
     const url = new URL(session.url);
     if (url.hostname !== "127.0.0.1" || url.protocol !== "http:" || !url.port || url.username || url.password) return;
@@ -130,7 +131,7 @@ async function runLinkedWorkbench(home: string, id: string) {
   const temporary = join(profile, `${id}.json`);
   try {
     await mkdir(profile, { recursive: true });
-    await writeFile(temporary, JSON.stringify({ id, url: server.url, home: server.home, pid: process.pid }), { mode: 0o600 });
+    await writeFile(temporary, JSON.stringify({ protocol: 2, id, url: server.url, home: server.home, pid: process.pid }), { mode: 0o600 });
     await rename(temporary, receipt);
   } catch (error) {
     await server.close();

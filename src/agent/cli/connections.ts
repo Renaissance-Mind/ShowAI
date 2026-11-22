@@ -104,6 +104,7 @@ export const connectionCommands: CommandDeclaration[] = [
       if (!option(args, "project")) {
         const { startLibraryMcp } = await import("../mcp-library");
         const home = service.store.root;
+        const openBrowser = async () => (await loadBrowser()).startLinkedWorkbenchBrowser(home);
         const cursor = process.env.SHOWAI_CURSOR_IDE_WORKBENCH === "1";
         const profile = cursor ? join(home, "local", "cursor-workbench")
           : process.env.SHOWAI_CODEX_WORKBENCH_PROFILE;
@@ -119,6 +120,7 @@ export const connectionCommands: CommandDeclaration[] = [
               service,
               presentationDirectory,
               cursor ? "cursor" : profile ? "codex" : "qoder",
+              profile && !cursor ? openBrowser : undefined,
             )
           : process.env.SHOWAI_ANTIGRAVITY_WORKBENCH === "1"
             ? (await import("../antigravity-workbench")).antigravityWorkbenchConnection(
@@ -133,7 +135,7 @@ export const connectionCommands: CommandDeclaration[] = [
             : process.env.SHOWAI_LINKED_WORKBENCH === "1"
               ? (await import("../linked-workbench")).linkedWorkbenchConnection(
                   service,
-                  async () => (await loadBrowser()).startLinkedWorkbenchBrowser(home),
+                  openBrowser,
                   presentationDirectory,
                 )
               : undefined;

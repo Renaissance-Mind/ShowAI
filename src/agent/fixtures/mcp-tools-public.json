@@ -225,6 +225,10 @@
             "type": "string",
             "minLength": 1
           }
+        },
+        "delivery": {
+          "type": "string",
+          "const": "t3-html"
         }
       },
       "$schema": "http://json-schema.org/draft-07/schema#",
@@ -368,6 +372,7 @@
           "enum": [
             "auto",
             "mcp-app",
+            "t3-html",
             "fragment-file",
             "compact",
             "image"

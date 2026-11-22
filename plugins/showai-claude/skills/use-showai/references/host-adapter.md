@@ -1,5 +1,7 @@
 # Claude Code 展示适配
 
+在 T3 Code 的 Claude Code 会话中使用 [T3 Code 展示与浏览器](host-display.md#t3-code)。
+
 <!-- showai-host-delivery:start -->
 
 - 原创 HTML 的展示工具标记为预加载。若用户的 Claude Code 设置启用了强制延迟加载，可用 ToolSearch 一次选择所需工具。按当前 HTML 展示工具的调用要求，将 `show_component` 以 `delivery:"auto"` 返回的 `delivery.compact` 原样交给它。

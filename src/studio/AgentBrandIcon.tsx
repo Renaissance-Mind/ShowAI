@@ -14,6 +14,7 @@ import cursor from "./assets/agent-brands/cursor.png";
 import qoder from "./assets/agent-brands/qoder.png";
 import workbuddy from "./assets/agent-brands/workbuddy.png";
 import trae from "./assets/agent-brands/trae.png";
+import t3Code from "./assets/agent-brands/t3-code.png";
 import deepseekHarness from "./assets/agent-brands/deepseek-harness.png";
 
 const icons = new Map([
@@ -22,6 +23,7 @@ const icons = new Map([
   ["qoder", qoder],
   ["workbuddy", workbuddy],
   ["trae", trae],
+  ["t3-code", t3Code],
   ["deepseek-harness", deepseekHarness],
   ["codex", codex],
   ["kimi", kimiCli],

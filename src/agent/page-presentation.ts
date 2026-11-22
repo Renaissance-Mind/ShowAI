@@ -14,6 +14,7 @@ export async function presentPage(input: {
   projectId: string;
   pageId: string;
   blockIds?: string[];
+  t3File?: boolean;
 }) {
   const directory = join(
     input.root,
@@ -64,6 +65,7 @@ export async function presentPage(input: {
         hash: record.hash,
         revision: record.revision,
         html,
+        ...(input.t3File ? { t3ReaderHtml: previewHtml } : {}),
         source,
         ...preview,
         ...(online ? { online } : {}),

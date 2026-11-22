@@ -21,3 +21,7 @@ letter drawn in black so it remains visible on the light icon tile. It
 identifies Moonshot model sources.
 
 Brand names and marks belong to their respective owners.
+
+The T3 Code icon comes from the v0.1.11 distribution of T3 Code.
+https://github.com/pingdotgg/t3code/blob/v0.1.11/assets/prod/t3-black-web-apple-touch-180.png
+The accompanying MIT license is in LICENSE.t3-code.txt.

@@ -9,6 +9,7 @@ import { CAPACITY } from "../portable/capacity.mjs";
 import { TRANSFORM_LIMITS } from "../core/dataset-transform";
 import { TEMPLATE_WORKFLOW_CAPABILITIES } from "../portable/template-bundle.mjs";
 import { INLINE_READER_OVERRIDES } from "../portable/inline-style.mjs";
+import { toInlineFragment } from "../portable/inline.mjs";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { CATALOG_VIEWS } from "./disclosure";
@@ -73,6 +74,7 @@ const componentToolMeta = {
 
 export const HOST_DISPLAYS = {
   "mcp-app": "mcp-app",
+  "t3-html": "t3-html",
   "codex-visualize": "fragment-file",
   "fragment-file": "fragment-file",
   "model-html": "compact",
@@ -121,11 +123,34 @@ export function conversationHandoff(
   };
 }
 export function withConversation(
-  conversation: ReturnType<typeof conversationHandoff>,
+  conversation: ReturnType<typeof conversationHandoff> | Awaited<ReturnType<typeof t3HtmlPreview>>,
 ) {
   return conversation ? { conversation } : {};
 }
 const KEPT_FRAGMENTS = 20;
+
+export async function t3HtmlPreview(inline: string | undefined, directory?: string, readerHtml?: string) {
+  if (readerHtml && directory) inline = toInlineFragment(readerHtml, undefined, "t3-html");
+  if (!inline)
+    return { mode: "unavailable" as const, next: "Select fewer blocks or deliver the full HTML file." };
+  const screenUnit = readerHtml ? '<script>document.documentElement.style.setProperty("--showai-screen-unit",screen.availHeight/100+"px")</script>' : "";
+  const html = '<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">' + screenUnit + '</head><body>' + inline + '</body></html>';
+  const bytes = Buffer.byteLength(html);
+  if (bytes > 25 * 1024 * 1024)
+    return { mode: "too-large" as const, next: "Select fewer blocks or deliver the complete HTML file." };
+  const next = "Pass the same path or html to T3 Code html_preview, then html_render once with the measured contentHeight (80 to 2000).";
+  if (!directory) {
+    if (bytes > COMPACT_BYTES)
+      return { mode: "too-large" as const, next: "Use the attached MCP App, select fewer blocks, or deliver the full HTML link." };
+    return { mode: "t3-html" as const, html, next };
+  }
+  const previews = join(directory, "t3-html");
+  await mkdir(previews, { recursive: true });
+  const path = join(await mkdtemp(join(previews, "view-")), "view.html");
+  await writeFile(path, html, { flag: "wx", mode: 0o600 });
+  await keepRecentFragments(previews);
+  return { mode: "t3-html" as const, path, next };
+}
 
 async function keepRecentFragments(directory: string) {
   const entries = await readdir(directory, { withFileTypes: true }).catch(
@@ -627,14 +652,18 @@ export function registerPresentationTools(
     {
       description:
         "Render standalone content without saving.",
-      inputSchema: presentationSchema,
+      inputSchema: { ...presentationSchema, delivery: z.literal("t3-html").optional() },
       annotations: readOnly,
       _meta: { securitySchemes: noAuth, ...readerToolMeta },
     },
-    async (input) => {
+    async ({ delivery: requested, ...input }) => {
       try {
-        const presentation = await renderPresentation(input);
+        const t3 = requested === "t3-html" || declaredDisplay === "t3-html";
+        const presentation = await renderPresentation(input, t3 && options.transport === "stdio");
         const delivery = await options.storePresentation?.(presentation);
+        const conversation = t3
+          ? await t3HtmlPreview(presentation.inline, options.transport === "stdio" ? options.previewDirectory : undefined, presentation.t3ReaderHtml)
+          : conversationHandoff(presentation.compact, input.blockIds, declaredDisplay, "render_document", !!presentation.online);
         return publishAppResult({
           ...mcpSuccess({
             title: presentation.title,
@@ -651,15 +680,7 @@ export function registerPresentationTools(
             ...(presentation.inlineError
               ? { inlineError: presentation.inlineError }
               : {}),
-            ...withConversation(
-              conversationHandoff(
-                presentation.compact,
-                input.blockIds,
-                declaredDisplay,
-                "render_document",
-                !!presentation.online,
-              ),
-            ),
+            ...withConversation(conversation),
             delivery: delivery ?? {
               mode: "mcp-resource",
               note: "Use the attached MCP Apps reader; use the delivery returned by the configured host adapter.",
@@ -719,11 +740,14 @@ export function registerPresentationTools(
           warnings.push(
             "The plugin declared no host display. The MCP Apps view is attached; if this host shows nothing, call again with delivery image, compact or fragment-file according to the host's actual display.",
           );
-        if (inlineError && mode !== "image") {
+        if (inlineError && mode !== "image" && mode !== "t3-html") {
           warnings.push(inlineError);
           mode = "image";
         }
         let delivery: Record<string, unknown> = { mode };
+        if (mode === "t3-html") {
+          delivery = await t3HtmlPreview(shown.inline, options.transport === "stdio" ? options.previewDirectory : undefined, authored ? undefined : shown.html);
+        }
         if (mode === "compact") {
           const compact = authored ? authored.inline : await compactPresentation(shown.html);
           if (compact && Buffer.byteLength(compact) <= COMPACT_BYTES)

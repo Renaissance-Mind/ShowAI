@@ -23,6 +23,7 @@ import {
   writeCodexPageReference,
 } from "./codex-page-reference";
 import { CodexWorkbenchNavigation } from "./codex-workbench-navigation";
+import { registerBrowserWorkbenchTools } from "./linked-workbench";
 import {
   codexWorkbenchHtml,
   codexWorkbenchUri,
@@ -61,11 +62,13 @@ export function codexWorkbenchConnection(
   service: AgentService,
   presentationDirectory?: string,
   host: "codex" | "qoder" | "cursor" = "codex",
+  openBrowser?: () => Promise<{ url: string }>,
 ) {
   return {
     icons: codexWorkbenchIcons,
     configure(server: McpServer) {
       registerCodexWorkbench(server, open, service, presentationDirectory, host);
+      if (openBrowser) registerBrowserWorkbenchTools(server, service, openBrowser);
       process.stdin.once("end", () =>
         void server.close().catch((error) => console.error("ShowAI MCP shutdown:", error)),
       );
@@ -131,6 +134,7 @@ function registerCodexWorkbench(
     ...views,
     { mode: "thread", name: "workbench_file", uri: codexWorkbenchFileUri, entrypoint: "file" },
     { mode: "thread", name: "workbench_page_card", uri: codexWorkbenchCardUri, entrypoint: "card" },
+    { mode: "thread", name: "workbench_page_card_v11", uri: "ui://showai/workbench-card-v11.html", entrypoint: "card" },
     { mode: "thread", name: "workbench_page_card_v10", uri: previousWorkbenchCardUri, entrypoint: "card" },
     { mode: "thread", name: "workbench_page_card_v9", uri: "ui://showai/workbench-card-v9.html", entrypoint: "card" },
     { mode: "thread", name: "workbench_page_card_v8", uri: "ui://showai/workbench-card-v8.html", entrypoint: "card" },

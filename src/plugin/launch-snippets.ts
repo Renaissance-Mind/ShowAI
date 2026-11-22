@@ -6,6 +6,19 @@ export interface McpLaunch {
 
 export type LaunchSnippetKind = "claude" | "codex" | "json" | "opencode";
 
+export type T3CodeProvider = LaunchSnippetKind | "claude-legacy";
+
+export function t3CodeLaunchSnippet(provider: T3CodeProvider, launch: McpLaunch, platform?: string) {
+  return launchSnippet(provider === "claude-legacy" ? "claude" : provider, {
+    ...launch,
+    env: {
+      ...launch.env,
+      SHOWAI_LINKED_WORKBENCH: "1",
+      SHOWAI_HOST_DISPLAY: provider === "codex" || provider === "claude" ? "mcp-app" : "t3-html",
+    },
+  }, platform);
+}
+
 function shellQuote(value: string, platform?: string) {
   if (platform === "win32")
     return /^[\w./:\\-]+$/.test(value) ? value : `"${value.replace(/"/g, '\\"')}"`;
