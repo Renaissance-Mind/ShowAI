@@ -1,12 +1,11 @@
-import { readSessionDraft, writeSessionDraft } from "./session-draft";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { pluginNeedsUpdate, usePluginHosts } from "./usePluginHosts";
 import {
   Bot,
-  ChevronLeft,
   Cloud,
   Puzzle,
   Folder,
+  HardDrive,
   Info,
   Keyboard,
   Monitor,
@@ -27,6 +26,7 @@ import {
   setLanguagePreference,
 } from "../i18n";
 import { useLanguagePreference, useTranslator } from "../i18n/react";
+import libraryMessages from "../i18n/messages/library";
 import messages from "../i18n/messages/settings";
 import "./settings.css";
 import { SettingsPath } from "./SettingsPath";
@@ -40,9 +40,6 @@ import ShortcutsPanel from "./ShortcutsPanel";
 import remoteMcpMessages from "../i18n/messages/remoteMcp";
 import { workbenchCapabilities } from "./capabilities";
 import { AboutFeedback, type FeedbackRequest } from "./feedback/AboutFeedback";
-
-const SHORTCUTS_EVENT = "showai:settings-shortcuts";
-const SHORTCUTS_DRAFT_KEY = "settings.subpage";
 
 const sections = [
   {
@@ -68,6 +65,18 @@ const sections = [
     group: "workspace",
     label: "section.projects",
     icon: Folder,
+  },
+  {
+    id: "storage",
+    group: "workspace",
+    label: "section.storage",
+    icon: HardDrive,
+  },
+  {
+    id: "shortcuts",
+    group: "workspace",
+    label: "section.shortcuts",
+    icon: Keyboard,
   },
   {
     id: "agent",
@@ -105,32 +114,38 @@ export type SettingsSection = (typeof sections)[number]["id"];
 
 export function availableSettingsSection(
   section: SettingsSection,
-  platform?: string,
+  info: Pick<DesktopInfo, "platform" | "libraryVersion"> | null,
 ): SettingsSection {
-  const capabilities = workbenchCapabilities(platform);
-  return (section === "general" && !capabilities.manageLibrary) ||
+  const capabilities = workbenchCapabilities(info?.platform);
+  if (
+    ((section === "general" || section === "storage") &&
+      !capabilities.manageLibrary) ||
     ((section === "plugins" || section === "remote") &&
       !capabilities.localPlugins)
-    ? "sync"
+  )
+    return "sync";
+  return section === "storage" && info?.libraryVersion !== 2
+    ? "general"
     : section;
 }
 
 export function SettingsNavigation({
   section,
   onSelect,
-  platform,
+  info,
   pluginHome,
 }: {
   section: SettingsSection;
   onSelect: (section: SettingsSection) => void;
-  platform?: string;
+  info: DesktopInfo | null;
   pluginHome?: string;
 }) {
   const t = useTranslator(messages);
   const { hosts } = usePluginHosts(pluginHome ?? null);
   const updates = hosts.filter(pluginNeedsUpdate).length;
+  const active = availableSettingsSection(section, info);
   const visible = sections.filter(
-    ({ id }) => availableSettingsSection(id, platform) === id,
+    ({ id }) => availableSettingsSection(id, info) === id,
   );
   return (
     <div className="settings-category-sidebar">
@@ -152,12 +167,8 @@ export function SettingsNavigation({
                         ? t("pluginUpdates", { count: updates })
                         : undefined
                     }
-                    aria-current={section === id ? "page" : undefined}
-                    onClick={() => {
-                      writeSessionDraft(SHORTCUTS_DRAFT_KEY, "");
-                      window.dispatchEvent(new Event(SHORTCUTS_EVENT));
-                      onSelect(id);
-                    }}
+                    aria-current={active === id ? "page" : undefined}
+                    onClick={() => onSelect(id)}
                   >
                     <Icon size={16} strokeWidth={1.75} aria-hidden="true" />
                     <span>{t(label)}</span>
@@ -178,29 +189,35 @@ export function SettingsNavigation({
 }
 
 export function SettingsSearch({
-  platform,
+  info,
   onSelect,
 }: {
-  platform?: string;
+  info: DesktopInfo | null;
   onSelect: (section: SettingsSection) => void;
-  onShortcuts?: () => void;
 }) {
   const t = useTranslator(messages);
+  const tl = useTranslator(libraryMessages);
   const [query, setQuery] = useState("");
   const [searching, setSearching] = useState(false);
-  const hasGeneral = availableSettingsSection("general", platform) === "general";
   const options: Array<{
     id: SettingsSection;
     name: string;
     category: string;
     target: string;
+    alias?: string;
   }> = sections
-    .filter(({ id }) => availableSettingsSection(id, platform) === id)
+    .filter(({ id }) => availableSettingsSection(id, info) === id)
     .map(({ id, label }) => ({
       id,
       name: t(label),
       category: "",
       target: "",
+      alias:
+        id === "storage"
+          ? tl("spaceManagement")
+          : id === "shortcuts"
+            ? t("keyboardShortcuts")
+            : undefined,
     }));
   options.push(
     {
@@ -214,12 +231,6 @@ export function SettingsSearch({
       name: t("language"),
       category: t("section.appearance"),
       target: "settings-language",
-    },
-    {
-      id: hasGeneral ? "general" : "appearance",
-      name: t("keyboardShortcuts"),
-      category: t(hasGeneral ? "section.general" : "section.appearance"),
-      target: "shortcuts",
     },
     {
       id: "projects",
@@ -276,7 +287,7 @@ export function SettingsSearch({
       target: "feedback-help-title",
     },
   );
-  if (hasGeneral)
+  if (availableSettingsSection("general", info) === "general")
     options.push(
       {
         id: "general",
@@ -290,30 +301,23 @@ export function SettingsSearch({
         category: t("section.general"),
         target: "settings-work-records-title",
       },
-      {
-        id: "general",
-        name: t("searchBackup"),
-        category: t("section.general"),
-        target: "settings-backup-title",
-      },
     );
+  if (availableSettingsSection("storage", info) === "storage")
+    options.push({
+      id: "storage",
+      name: tl("fullArchive"),
+      category: t("section.storage"),
+      target: "settings-backup-title",
+    });
   const normalized = query.trim().toLocaleLowerCase();
-  const matches = options.filter(
-    ({ name, category }) =>
-      name.toLocaleLowerCase().includes(normalized) ||
-      category.toLocaleLowerCase().includes(normalized),
+  const matches = options.filter(({ name, category, alias = "" }) =>
+    [name, category, alias].some((text) =>
+      text.toLocaleLowerCase().includes(normalized),
+    ),
   );
   function select(option: (typeof options)[number]) {
     setQuery("");
     setSearching(false);
-    if (option.target === "shortcuts") {
-      writeSessionDraft(SHORTCUTS_DRAFT_KEY, "shortcuts");
-      onSelect(option.id);
-      window.dispatchEvent(new Event(SHORTCUTS_EVENT));
-      return;
-    }
-    writeSessionDraft(SHORTCUTS_DRAFT_KEY, "");
-    window.dispatchEvent(new Event(SHORTCUTS_EVENT));
     onSelect(option.id);
     requestAnimationFrame(() => {
       const target =
@@ -419,34 +423,6 @@ function ThemePreview({ theme }: { theme: "light" | "dark" }) {
   );
 }
 
-function ShortcutsSection({ onOpenShortcuts }: { onOpenShortcuts: () => void }) {
-  const t = useTranslator(messages);
-  return (
-    <section
-      className="settings-group"
-      aria-labelledby="settings-shortcuts-title"
-    >
-      <h2 id="settings-shortcuts-title">{t("keyboardShortcuts")}</h2>
-      <div className="settings-card">
-        <div className="settings-row">
-          <div className="settings-row-text">
-            <h3>{t("keyboardShortcuts")}</h3>
-            <p>{t("keyboardShortcutsDetail")}</p>
-          </div>
-          <button
-            type="button"
-            className="settings-button"
-            onClick={onOpenShortcuts}
-          >
-            <Keyboard size={14} aria-hidden="true" />
-            {t("showShortcuts")}
-          </button>
-        </div>
-      </div>
-    </section>
-  );
-}
-
 export function SettingsPanel({
   syncRequest,
   onOpenProject,
@@ -459,7 +435,6 @@ export function SettingsPanel({
   onChooseHome,
   onCopyHome,
   onMigrate,
-  onOpenShortcuts,
   feedbackRequest,
   onOpenDocs,
   onOpenFaq,
@@ -476,7 +451,6 @@ export function SettingsPanel({
   onCopyHome: () => void;
   onCopyConfig?: () => void;
   onMigrate: () => void;
-  onOpenShortcuts?: () => void;
   feedbackRequest?: FeedbackRequest;
   onOpenDocs?: () => void;
   onOpenFaq?: () => void;
@@ -485,51 +459,14 @@ export function SettingsPanel({
   const language = useLanguagePreference();
   const tr = useTranslator(remoteMcpMessages);
   const capabilities = workbenchCapabilities(info?.platform);
-  const hasGeneral =
-    availableSettingsSection("general", info?.platform) === "general";
-  section = availableSettingsSection(section, info?.platform);
-  const [subpage, setSubpage] = useState<"shortcuts" | null>(() =>
-    readSessionDraft<string>(SHORTCUTS_DRAFT_KEY, "") === "shortcuts"
-      ? "shortcuts"
-      : null,
-  );
-  useEffect(() => {
-    const sync = () => {
-      setSubpage(
-        readSessionDraft<string>(SHORTCUTS_DRAFT_KEY, "") === "shortcuts"
-          ? "shortcuts"
-          : null,
-      );
-    };
-    window.addEventListener(SHORTCUTS_EVENT, sync);
-    return () => window.removeEventListener(SHORTCUTS_EVENT, sync);
-  }, []);
-  useEffect(() => {
-    if (section !== "general" && section !== "appearance") {
-      if (subpage) {
-        writeSessionDraft(SHORTCUTS_DRAFT_KEY, "");
-        setSubpage(null);
-      }
-    }
-  }, [section, subpage]);
-  const openShortcutsSubpage = () => {
-    writeSessionDraft(SHORTCUTS_DRAFT_KEY, "shortcuts");
-    setSubpage("shortcuts");
-  };
-  const closeShortcutsSubpage = () => {
-    writeSessionDraft(SHORTCUTS_DRAFT_KEY, "");
-    setSubpage(null);
-  };
-  const showShortcutsSubpage =
-    subpage === "shortcuts" &&
-    (section === "general" || section === "appearance");
-  void onOpenShortcuts;
+  section = availableSettingsSection(section, info);
   return (
     <div
       className="studio-settings"
-      key={section === "sync" || section === "projects" ? "sync-family" : section}
+      key={
+        section === "sync" || section === "projects" ? "sync-family" : section
+      }
       data-settings-section={section}
-      data-settings-subpage={showShortcutsSubpage ? "shortcuts" : undefined}
     >
       {(section === "sync" || section === "projects") && (
         <SyncSettings
@@ -540,200 +477,168 @@ export function SettingsPanel({
           home={info?.home}
         />
       )}
-      {section === "general" &&
-        (showShortcutsSubpage ? (
-          <>
-            <div className="settings-subpage-bar">
-              <button
-                type="button"
-                className="settings-button settings-back-button"
-                onClick={closeShortcutsSubpage}
-              >
-                <ChevronLeft size={15} aria-hidden="true" />
-                {t("backToGeneral")}
-              </button>
-            </div>
-            <ShortcutsPanel
-              browser={info?.mode === "browser"}
-              tabs={capabilities.tabs}
-              windows={capabilities.windows}
-            />
-          </>
-        ) : (
-          <>
-            <section
-              className="settings-group"
-              aria-labelledby="settings-library-title"
-            >
-              <h2 id="settings-library-title">{t("library")}</h2>
-              <div className="settings-card">
-                <div className="settings-card-section">
-                  <div className="settings-row-head">
-                    <div className="settings-row-text">
-                      <h3>{t("storageLocation")}</h3>
-                      <p>{t("storageLocationDetail")}</p>
-                    </div>
-                    <div className="settings-row-actions">
-                      <button
-                        type="button"
-                        className="settings-button"
-                        disabled={!info}
-                        onClick={onChooseHome}
-                      >
-                        {t("switchLibrary")}
-                      </button>
-                    </div>
+      {section === "general" && (
+        <>
+          <section
+            className="settings-group"
+            aria-labelledby="settings-library-title"
+          >
+            <h2 id="settings-library-title">{t("library")}</h2>
+            <div className="settings-card">
+              <div className="settings-card-section">
+                <div className="settings-row-head">
+                  <div className="settings-row-text">
+                    <h3>{t("storageLocation")}</h3>
+                    <p>{t("storageLocationDetail")}</p>
                   </div>
-                  <SettingsPath
-                    value={info?.home ?? t("readingLibrary")}
-                    copyLabel={t("copyLibraryPath")}
-                    copiedLabel={t("directoryCopied")}
-                    disabled={!info}
-                    onCopy={onCopyHome}
-                  />
-                </div>
-                {info?.libraryVersion === 1 && (
-                  <div className="settings-row">
-                    <div className="settings-row-text">
-                      <h3>{t("upgradeLibrary")}</h3>
-                      <p>{t("upgradeLibraryDetail")}</p>
-                    </div>
+                  <div className="settings-row-actions">
                     <button
                       type="button"
-                      className="settings-button settings-primary-button"
-                      onClick={onMigrate}
+                      className="settings-button"
+                      disabled={!info}
+                      onClick={onChooseHome}
                     >
-                      {t("upgradeLibrary")}
+                      {t("switchLibrary")}
                     </button>
                   </div>
-                )}
+                </div>
+                <SettingsPath
+                  value={info?.home ?? t("readingLibrary")}
+                  copyLabel={t("copyLibraryPath")}
+                  copiedLabel={t("directoryCopied")}
+                  disabled={!info}
+                  onCopy={onCopyHome}
+                />
               </div>
-            </section>
-            {info && <WorkRecordsSettings key={`records:${info.home}`} />}
-            {info?.libraryVersion === 2 && (
-              <LibrarySpace key={`space:${info.home}`} home={info.home} />
-            )}
-            <ShortcutsSection onOpenShortcuts={openShortcutsSubpage} />
-          </>
-        ))}
-      {section === "appearance" &&
-        (showShortcutsSubpage && !hasGeneral ? (
-          <>
-            <div className="settings-subpage-bar">
-              <button
-                type="button"
-                className="settings-button settings-back-button"
-                onClick={closeShortcutsSubpage}
-              >
-                <ChevronLeft size={15} aria-hidden="true" />
-                {t("backToAppearance")}
-              </button>
-            </div>
-            <ShortcutsPanel
-              browser={info?.mode === "browser"}
-              tabs={capabilities.tabs}
-              windows={capabilities.windows}
-            />
-          </>
-        ) : (
-          <>
-            <section
-              className="settings-group settings-theme-group"
-              aria-labelledby="settings-theme-title"
-            >
-              <h2 id="settings-theme-title">{t("theme")}</h2>
-              <div
-                className="settings-theme-options"
-                role="radiogroup"
-                aria-labelledby="settings-theme-title"
-              >
-                {(["system", "light", "dark"] as const).map((option) => {
-                  const selected = appearance === option;
-                  const Icon =
-                    option === "system"
-                      ? Monitor
-                      : option === "light"
-                        ? Sun
-                        : Moon;
-                  return (
-                    <label
-                      className={`settings-theme-option ${selected ? "selected" : ""}`}
-                      key={option}
-                    >
-                      <input
-                        type="radio"
-                        name="settings-theme"
-                        value={option}
-                        aria-label={t(
-                          option === "system" ? "themeSystem" : option,
-                        )}
-                        aria-describedby={
-                          option === "system"
-                            ? "settings-system-effective"
-                            : undefined
-                        }
-                        checked={selected}
-                        onChange={() => onAppearanceChange(option)}
-                      />
-                      <ThemePreview
-                        theme={option === "system" ? currentTheme : option}
-                      />
-                      <span className="settings-theme-label">
-                        <Icon size={16} strokeWidth={1.7} aria-hidden="true" />
-                        <span>
-                          {t(option === "system" ? "themeSystem" : option)}
-                          {option === "system" && (
-                            <small
-                              id="settings-system-effective"
-                              className="settings-theme-effective"
-                            >
-                              {t("effectiveTheme", { theme: t(currentTheme) })}
-                            </small>
-                          )}
-                        </span>
-                        <span className="settings-radio-mark" aria-hidden="true" />
-                      </span>
-                    </label>
-                  );
-                })}
-              </div>
-            </section>
-            <section
-              className="settings-group"
-              aria-labelledby="settings-interface-title"
-            >
-              <h2 id="settings-interface-title">{t("interface")}</h2>
-              <div className="settings-card">
+              {info?.libraryVersion === 1 && (
                 <div className="settings-row">
                   <div className="settings-row-text">
-                    <label htmlFor="settings-language">{t("language")}</label>
-                    <p>{t("languageDetail")}</p>
+                    <h3>{t("upgradeLibrary")}</h3>
+                    <p>{t("upgradeLibraryDetail")}</p>
                   </div>
-                  <div className="settings-select">
-                    <Select
-                      id="settings-language"
-                      value={language}
-                      onChange={(event) => {
-                        if (isLanguagePreference(event.target.value))
-                          setLanguagePreference(event.target.value);
-                      }}
-                    >
-                      <option value="system">{t("languageSystem")}</option>
-                      {LOCALES.map((locale) => (
-                        <option key={locale} value={locale} lang={locale}>
-                          {LOCALE_NAMES[locale]}
-                        </option>
-                      ))}
-                    </Select>
-                  </div>
+                  <button
+                    type="button"
+                    className="settings-button settings-primary-button"
+                    onClick={onMigrate}
+                  >
+                    {t("upgradeLibrary")}
+                  </button>
+                </div>
+              )}
+            </div>
+          </section>
+          {info && <WorkRecordsSettings key={`records:${info.home}`} />}
+        </>
+      )}
+      {section === "storage" && info && (
+        <LibrarySpace key={info.home} home={info.home} />
+      )}
+      {section === "shortcuts" && (
+        <ShortcutsPanel
+          browser={info?.mode === "browser"}
+          tabs={capabilities.tabs}
+          windows={capabilities.windows}
+        />
+      )}
+      {section === "appearance" && (
+        <>
+          <section
+            className="settings-group settings-theme-group"
+            aria-labelledby="settings-theme-title"
+          >
+            <h2 id="settings-theme-title">{t("theme")}</h2>
+            <div
+              className="settings-theme-options"
+              role="radiogroup"
+              aria-labelledby="settings-theme-title"
+            >
+              {(["system", "light", "dark"] as const).map((option) => {
+                const selected = appearance === option;
+                const Icon =
+                  option === "system"
+                    ? Monitor
+                    : option === "light"
+                      ? Sun
+                      : Moon;
+                return (
+                  <label
+                    className={`settings-theme-option ${selected ? "selected" : ""}`}
+                    key={option}
+                  >
+                    <input
+                      type="radio"
+                      name="settings-theme"
+                      value={option}
+                      aria-label={t(
+                        option === "system" ? "themeSystem" : option,
+                      )}
+                      aria-describedby={
+                        option === "system"
+                          ? "settings-system-effective"
+                          : undefined
+                      }
+                      checked={selected}
+                      onChange={() => onAppearanceChange(option)}
+                    />
+                    <ThemePreview
+                      theme={option === "system" ? currentTheme : option}
+                    />
+                    <span className="settings-theme-label">
+                      <Icon size={16} strokeWidth={1.7} aria-hidden="true" />
+                      <span>
+                        {t(option === "system" ? "themeSystem" : option)}
+                        {option === "system" && (
+                          <small
+                            id="settings-system-effective"
+                            className="settings-theme-effective"
+                          >
+                            {t("effectiveTheme", { theme: t(currentTheme) })}
+                          </small>
+                        )}
+                      </span>
+                      <span
+                        className="settings-radio-mark"
+                        aria-hidden="true"
+                      />
+                    </span>
+                  </label>
+                );
+              })}
+            </div>
+          </section>
+          <section
+            className="settings-group"
+            aria-labelledby="settings-interface-title"
+          >
+            <h2 id="settings-interface-title">{t("interface")}</h2>
+            <div className="settings-card">
+              <div className="settings-row">
+                <div className="settings-row-text">
+                  <label htmlFor="settings-language">{t("language")}</label>
+                  <p>{t("languageDetail")}</p>
+                </div>
+                <div className="settings-select">
+                  <Select
+                    id="settings-language"
+                    value={language}
+                    onChange={(event) => {
+                      if (isLanguagePreference(event.target.value))
+                        setLanguagePreference(event.target.value);
+                    }}
+                  >
+                    <option value="system">{t("languageSystem")}</option>
+                    {LOCALES.map((locale) => (
+                      <option key={locale} value={locale} lang={locale}>
+                        {LOCALE_NAMES[locale]}
+                      </option>
+                    ))}
+                  </Select>
                 </div>
               </div>
-            </section>
-            {!hasGeneral && (
-              <ShortcutsSection onOpenShortcuts={openShortcutsSubpage} />
-            )}
-          </>
-        ))}
+            </div>
+          </section>
+        </>
+      )}
       {section === "agent" && (
         <AgentSettings
           onAccounts={() => {
@@ -759,7 +664,7 @@ export function SettingsPanel({
           onOpenDocs={onOpenDocs}
           onOpenFaq={onOpenFaq}
           onOpenPlugins={
-            availableSettingsSection("plugins", info?.platform) === "plugins"
+            availableSettingsSection("plugins", info) === "plugins"
               ? () => onSelectSection("plugins")
               : undefined
           }

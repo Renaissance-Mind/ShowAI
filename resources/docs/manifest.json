@@ -150,6 +150,20 @@
     }
    ],
    "pages": {
+    "bd1ef961-f5d1-50a1-aded-0895dc63ebc7": {
+     "title": "内容库与版本",
+     "icon": "🗂️",
+     "file": "zh-CN/pages/bd1ef961-f5d1-50a1-aded-0895dc63ebc7.json",
+     "sha256": "f25929365fb5b90195c00e700d2f560b9b3fecd247f9bf457b81d691d0f8ce40",
+     "components": [
+      "zh-CN/components/doc-hero@1.0.0-7c2bbe84b003.json",
+      "zh-CN/components/doc-tree@1.0.0-74d9519ab11b.json",
+      "zh-CN/components/doc-sequence@1.0.0-54ea7e21b2eb.json",
+      "zh-CN/components/doc-steps@1.0.0-660edad476b2.json",
+      "zh-CN/components/doc-commands@1.0.0-f2cb922c18c3.json",
+      "zh-CN/components/doc-cards@1.0.0-96ea3af150bd.json"
+     ]
+    },
     "e8c001a7-4e9f-5515-a2e4-8ed6085ef46d": {
      "title": "在 Agent 中使用",
      "icon": "🤝",
@@ -375,20 +389,6 @@
       "zh-CN/components/doc-cards@1.0.0-96ea3af150bd.json"
      ]
     },
-    "bd1ef961-f5d1-50a1-aded-0895dc63ebc7": {
-     "title": "内容库与版本",
-     "icon": "🗂️",
-     "file": "zh-CN/pages/bd1ef961-f5d1-50a1-aded-0895dc63ebc7.json",
-     "sha256": "c1f1d9a279b735ad9941205993e05b365b2e301464bfd3bffd36e622a4672338",
-     "components": [
-      "zh-CN/components/doc-hero@1.0.0-7c2bbe84b003.json",
-      "zh-CN/components/doc-tree@1.0.0-74d9519ab11b.json",
-      "zh-CN/components/doc-sequence@1.0.0-54ea7e21b2eb.json",
-      "zh-CN/components/doc-steps@1.0.0-660edad476b2.json",
-      "zh-CN/components/doc-commands@1.0.0-f2cb922c18c3.json",
-      "zh-CN/components/doc-cards@1.0.0-96ea3af150bd.json"
-     ]
-    },
     "c51ee747-5e00-5bda-8c27-7465ace0566a": {
      "title": "项目服务器与团队协作",
      "icon": "👥",
@@ -551,6 +551,20 @@
     }
    ],
    "pages": {
+    "bd1ef961-f5d1-50a1-aded-0895dc63ebc7": {
+     "title": "Content Library & Versions",
+     "icon": "🗂️",
+     "file": "en/pages/bd1ef961-f5d1-50a1-aded-0895dc63ebc7.json",
+     "sha256": "372b6bf0937209837c64bb7a6d9afe128ffdf6037d70341b7ea4ff885fd5bfac",
+     "components": [
+      "en/components/doc-hero@1.0.0-6aa1b6a2a0e9.json",
+      "en/components/doc-tree@1.0.0-5ff06117c9a5.json",
+      "en/components/doc-sequence@1.0.0-a540b813aa99.json",
+      "en/components/doc-steps@1.0.0-0c4f6546ba7a.json",
+      "en/components/doc-commands@1.0.0-9832e342e037.json",
+      "en/components/doc-cards@1.0.0-25e52118b12f.json"
+     ]
+    },
     "e8c001a7-4e9f-5515-a2e4-8ed6085ef46d": {
      "title": "Use with an Agent",
      "icon": "🤝",
@@ -773,20 +787,6 @@
       "en/components/doc-tree@1.0.0-5ff06117c9a5.json",
       "en/components/doc-commands@1.0.0-9832e342e037.json",
       "en/components/doc-sequence@1.0.0-a540b813aa99.json",
-      "en/components/doc-cards@1.0.0-25e52118b12f.json"
-     ]
-    },
-    "bd1ef961-f5d1-50a1-aded-0895dc63ebc7": {
-     "title": "Content Library & Versions",
-     "icon": "🗂️",
-     "file": "en/pages/bd1ef961-f5d1-50a1-aded-0895dc63ebc7.json",
-     "sha256": "6cb9301182fff40d787c511a33d15c0856cc2510a9cf99dfea3e296d82ed3694",
-     "components": [
-      "en/components/doc-hero@1.0.0-6aa1b6a2a0e9.json",
-      "en/components/doc-tree@1.0.0-5ff06117c9a5.json",
-      "en/components/doc-sequence@1.0.0-a540b813aa99.json",
-      "en/components/doc-steps@1.0.0-0c4f6546ba7a.json",
-      "en/components/doc-commands@1.0.0-9832e342e037.json",
       "en/components/doc-cards@1.0.0-25e52118b12f.json"
      ]
     },

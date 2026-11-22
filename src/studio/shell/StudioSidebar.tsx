@@ -375,7 +375,7 @@ export function StudioSidebar({
         <SettingsNavigation
           section={settingsSection}
           onSelect={setSettingsSection}
-          platform={info?.platform}
+          info={info}
           pluginHome={
             info?.mode !== "browser" && capabilities.localPlugins
               ? info?.home

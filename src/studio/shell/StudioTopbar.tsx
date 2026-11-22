@@ -551,9 +551,8 @@ export function StudioTopbar({
         )}
         {view === "settings" && (
           <SettingsSearch
-            platform={info?.platform}
+            info={info}
             onSelect={setSettingsSection}
-            onShortcuts={() => setDialog({ type: "shortcuts" })}
           />
         )}
         {(view === "projects" ||

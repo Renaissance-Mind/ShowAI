@@ -328,7 +328,6 @@ export function StudioViews({
           onAppearanceChange={appearance.setPreference}
           onSelectSection={setSettingsSection}
           onMigrate={() => setDialog({ type: "migration" })}
-          onOpenShortcuts={() => setDialog({ type: "shortcuts" })}
           feedbackRequest={feedbackRequest}
           onOpenDocs={() => void helpDoc("").catch(report)}
           onOpenFaq={() => void helpDoc("agent-troubleshooting").catch(report)}

@@ -10,6 +10,7 @@ export type UiRole =
   | "menuitem"
   | "option"
   | "radio"
+  | "searchbox"
   | "slider"
   | "spinbutton"
   | "switch"

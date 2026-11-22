@@ -102,6 +102,12 @@ export function StudioNotices({
   const t = useTranslator(studioMessages);
   const ts = useTranslator(syncMessages);
   const tps = useTranslator(pageSessionMessages);
+  const openLibrarySpace = capabilities.manageLibrary
+    ? () => {
+        setSettingsSection("storage");
+        void navigate("settings").catch(report);
+      }
+    : undefined;
   return (
     <>
       <NoticeStack>
@@ -125,12 +131,7 @@ export function StudioNotices({
                   ]),
               ),
               reload: () => window.location.reload(),
-              librarySpace: capabilities.manageLibrary
-                ? () => {
-                    setSettingsSection("general");
-                    void navigate("settings").catch(report);
-                  }
-                : undefined,
+              librarySpace: openLibrarySpace,
             })}
             onDismiss={() => problemQueue.dismiss(entry.id)}
           />
@@ -301,14 +302,7 @@ export function StudioNotices({
             platform={info?.platform}
             onRetry={action(page.retry)}
             onKeepCopy={action(keepDraftAsCopy)}
-            onLibrarySpace={
-              capabilities.manageLibrary
-                ? () => {
-                    setSettingsSection("general");
-                    void navigate("settings").catch(report);
-                  }
-                : undefined
-            }
+            onLibrarySpace={openLibrarySpace}
             onReveal={(path) =>
               void desktop.invoke("library:reveal", { path }).catch(report)
             }

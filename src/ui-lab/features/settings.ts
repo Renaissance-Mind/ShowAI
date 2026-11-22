@@ -9,6 +9,7 @@ import pluginMessages from "../../i18n/messages/pluginInstall";
 import remoteMessages from "../../i18n/messages/remoteConnections";
 import feedbackMessages from "../../i18n/messages/feedback";
 import commonMessages from "../../i18n/messages/common";
+import type { SettingsSection } from "../../studio/Settings";
 import { messages } from "../messages";
 import type {
   FlowAction,
@@ -48,19 +49,13 @@ export function settingsAcceptance(locale: Locale = "zh-CN"): {
     target: UiTarget,
     to?: string,
   ): FlowAction => ({ id, title, target, to });
-  const nav = (
-    id:
-      | "general"
-      | "appearance"
-      | "sync"
-      | "projects"
-      | "agent"
-      | "plugins"
-      | "remote"
-      | "about",
-    to: string = id,
-  ): FlowAction =>
-    action(`nav-${id}`, s(`section.${id}`), button(s(`section.${id}`), sidebar), to);
+  const nav = (id: SettingsSection, to: string = id): FlowAction =>
+    action(
+      `nav-${id}`,
+      s(`section.${id}`),
+      button(s(`section.${id}`), sidebar),
+      to,
+    );
 
   const openSettings = async ({ ui }: SceneContext) => {
     await ui.click(button(u("settings")));
@@ -68,17 +63,7 @@ export function settingsAcceptance(locale: Locale = "zh-CN"): {
   };
 
   const openSection =
-    (
-      id:
-        | "general"
-        | "appearance"
-        | "sync"
-        | "projects"
-        | "agent"
-        | "plugins"
-        | "remote"
-        | "about",
-    ) =>
+    (id: SettingsSection) =>
     async (ctx: SceneContext) => {
       await openSettings(ctx);
       if (id !== "general") {
@@ -109,21 +94,11 @@ export function settingsAcceptance(locale: Locale = "zh-CN"): {
     enter: openSection("general"),
     checks: [zeroDetailsCheck],
     actions: [
-      action(
-        "find-cleanup",
-        lib("findCleanup"),
-        button(lib("findCleanup")),
-        "general.cleanup",
-      ),
-      action(
-        "show-shortcuts",
-        s("showShortcuts"),
-        button(s("showShortcuts")),
-        "general.shortcuts",
-      ),
       nav("appearance"),
       nav("sync"),
       nav("projects"),
+      nav("storage"),
+      nav("shortcuts"),
       nav("agent"),
       nav("plugins"),
       nav("remote"),
@@ -132,10 +107,37 @@ export function settingsAcceptance(locale: Locale = "zh-CN"): {
   });
 
   nodes.push({
-    id: "general.cleanup",
-    title: lib("findCleanup"),
+    id: "storage",
+    title: s("section.storage"),
     parent: "general",
-    screen: "general.cleanup",
+    screen: "storage",
+    screenTitle: s("section.storage"),
+    scene: "overview",
+    matches: [
+      {
+        target: selector(
+          '.studio-settings[data-settings-section="storage"] .library-space',
+        ),
+      },
+    ],
+    enter: openSection("storage"),
+    checks: [zeroDetailsCheck],
+    actions: [
+      action(
+        "find-cleanup",
+        lib("findCleanup"),
+        button(lib("findCleanup")),
+        "storage.cleanup",
+      ),
+      nav("shortcuts"),
+    ],
+  });
+
+  nodes.push({
+    id: "storage.cleanup",
+    title: lib("findCleanup"),
+    parent: "storage",
+    screen: "storage.cleanup",
     screenTitle: lib("findCleanupTitle"),
     scene: "overview",
     priority: 10,
@@ -143,7 +145,7 @@ export function settingsAcceptance(locale: Locale = "zh-CN"): {
       { target: { role: "dialog", name: lib("findCleanupTitle") } },
     ],
     enter: async (ctx) => {
-      await openSection("general")(ctx);
+      await openSection("storage")(ctx);
       await ctx.ui.click(button(lib("findCleanup")));
       await ctx.ui.expect({ role: "dialog", name: lib("findCleanupTitle") });
     },
@@ -153,44 +155,28 @@ export function settingsAcceptance(locale: Locale = "zh-CN"): {
         "dismiss-cleanup",
         lib("dismissCleanupPlan"),
         button(lib("dismissCleanupPlan")),
-        "general",
+        "storage",
       ),
     ],
   });
 
   nodes.push({
-    id: "general.shortcuts",
-    title: s("keyboardShortcuts"),
+    id: "shortcuts",
+    title: s("section.shortcuts"),
     parent: "general",
-    screen: "general.shortcuts",
-    screenTitle: s("keyboardShortcuts"),
+    screen: "shortcuts",
+    screenTitle: s("section.shortcuts"),
     scene: "overview",
-    priority: 10,
     matches: [
       {
         target: selector(
-          '.studio-settings[data-settings-section="general"] .settings-shortcuts-grid',
+          '.studio-settings[data-settings-section="shortcuts"] .settings-shortcuts-grid',
         ),
       },
     ],
-    enter: async (ctx) => {
-      await openSection("general")(ctx);
-      await ctx.ui.click(button(s("showShortcuts")));
-      await ctx.ui.expect(
-        selector(
-          '.studio-settings[data-settings-section="general"] .settings-shortcuts-grid',
-        ),
-      );
-    },
+    enter: openSection("shortcuts"),
     checks: [zeroDetailsCheck],
-    actions: [
-      action(
-        "back",
-        s("backToGeneral"),
-        button(s("backToGeneral")),
-        "general",
-      ),
-    ],
+    actions: [nav("agent")],
   });
 
   nodes.push({
@@ -733,6 +719,8 @@ export function settingsAcceptance(locale: Locale = "zh-CN"): {
                 selector('.studio-settings[data-settings-section="general"]'),
               );
               await ui.expect(selector(".studio-settings details"), "hidden");
+              await ui.expect(selector(".library-space"), "hidden");
+              await ui.expect(selector("#settings-shortcuts-title"), "hidden");
             },
           },
           {
@@ -764,6 +752,46 @@ export function settingsAcceptance(locale: Locale = "zh-CN"): {
             run: async ({ ui }) => {
               await ui.click(button(s("section.projects"), sidebar));
               await ui.expect(selector(".sync-default-location-card"));
+            },
+          },
+          {
+            id: "storage",
+            title: s("section.storage"),
+            run: async ({ ui }) => {
+              await ui.click(button(s("section.storage"), sidebar));
+              await ui.expect(selector(".library-space-metrics"));
+              await ui.expect(button(lib("createBackup")));
+            },
+          },
+          {
+            id: "shortcuts",
+            title: s("section.shortcuts"),
+            run: async ({ ui }) => {
+              await ui.click(button(s("section.shortcuts"), sidebar));
+              await ui.expect(
+                selector(".settings-shortcuts-grid:has(.is-editable)"),
+              );
+            },
+          },
+          {
+            id: "search",
+            title: s("searchSettings"),
+            run: async ({ ui }) => {
+              const search: UiTarget = {
+                role: "searchbox",
+                name: s("searchSettings"),
+              };
+              const result = selector(".settings-search-results > button");
+              await ui.fill(search, lib("fullArchive"));
+              await ui.click(result);
+              await ui.expect(
+                selector('.studio-settings[data-settings-section="storage"] #settings-backup-title'),
+              );
+              await ui.fill(search, s("keyboardShortcuts"));
+              await ui.click(result);
+              await ui.expect(
+                selector('.studio-settings[data-settings-section="shortcuts"] .settings-shortcuts-grid'),
+              );
             },
           },
           {
