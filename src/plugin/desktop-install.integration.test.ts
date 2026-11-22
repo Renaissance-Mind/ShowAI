@@ -266,7 +266,7 @@ describe.skipIf(!output || !config)(
           const tools = await client.listTools();
           expect(
             tools.tools.some((tool) => tool.name === "workbench_open_global"),
-          ).toBe(host === "codex");
+          ).toBe(host === "codex" || host === "antigravity");
           expect(
             tools.tools.some((tool) => tool.name === "workbench_open_page"),
           ).toBe(host === "codex");
