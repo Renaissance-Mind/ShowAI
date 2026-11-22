@@ -1,0 +1,291 @@
+{
+  "id": "doc-steps",
+  "version": "1.0.0",
+  "name": "文档步骤",
+  "description": "带编号竖轴的操作步骤：每步有说明、可复制的代码（可按平台切换）、提示与完成结果，读者可以逐步标记完成。",
+  "category": "flow",
+  "entry": "index.tsx",
+  "reader": "readData",
+  "scenarios": [
+    "安装、连接、部署等按顺序执行的操作",
+    "按平台（macOS / Windows / Linux）或宿主区分命令的步骤",
+    "从创建到发布的流程说明"
+  ],
+  "documentation": {
+    "version": 2,
+    "reuse": {
+      "kind": "domain",
+      "boundaries": [
+        "用于需要按顺序执行的操作；概念说明或无顺序的要点用正文列表。",
+        "代码只做展示和复制，不执行。"
+      ],
+      "owner": "ShowAI 文档站（doc kit）"
+    },
+    "usage": {
+      "purpose": "让读者按顺序完成一项操作，随时知道做到哪一步、每一步做完应该看到什么。",
+      "structure": [
+        "左侧编号竖轴，点击编号标记完成，竖轴随完成填充；顶部显示完成进度。",
+        "每步：标题、说明、代码面板（语言标签或平台标签页 + 复制按钮）、提示、带勾的结果行。"
+      ],
+      "inputs": [
+        {
+          "path": "steps",
+          "meaning": "按顺序执行的步骤，建议每组不超过 8 步。"
+        },
+        {
+          "path": "steps[]",
+          "meaning": "一个步骤。"
+        },
+        {
+          "path": "steps[].title",
+          "meaning": "步骤标题，写成动作，例如「启动本地工作台」。可用行内标记。"
+        },
+        {
+          "path": "steps[].body",
+          "meaning": "说明，按换行分段。行内标记：**粗体**、`代码`、[文字](链接)；链接可写 https://… 或 doc:slug#anchor。",
+          "omission": {
+            "behavior": "omit",
+            "description": "只显示标题。"
+          }
+        },
+        {
+          "path": "steps[].code",
+          "meaning": "要执行的命令或代码；以 # 或 // 开头的行显示为注释色。",
+          "omission": {
+            "behavior": "omit",
+            "description": "没有 variants 时不显示代码面板。"
+          }
+        },
+        {
+          "path": "steps[].lang",
+          "meaning": "代码面板左上角的语言标签。",
+          "omission": {
+            "behavior": "fallback",
+            "description": "显示 shell。",
+            "value": "shell"
+          }
+        },
+        {
+          "path": "steps[].variants",
+          "meaning": "按平台或宿主切换的代码，存在时替代 code。建议 2–4 个。",
+          "omission": {
+            "behavior": "omit",
+            "description": "使用 code。"
+          }
+        },
+        {
+          "path": "steps[].variants[]",
+          "meaning": "一个标签页：标签与对应代码。"
+        },
+        {
+          "path": "steps[].variants[].label",
+          "meaning": "标签页名称，例如 macOS、Windows、Codex。"
+        },
+        {
+          "path": "steps[].variants[].code",
+          "meaning": "该标签页显示的代码。"
+        },
+        {
+          "path": "steps[].note",
+          "meaning": "补充提示或注意事项，弱化显示。可用行内标记。",
+          "omission": {
+            "behavior": "omit",
+            "description": "不显示提示。"
+          }
+        },
+        {
+          "path": "steps[].result",
+          "meaning": "完成后读者会看到什么，显示为带勾的结果行。可用行内标记。",
+          "omission": {
+            "behavior": "omit",
+            "description": "不显示结果行。"
+          }
+        },
+        {
+          "path": "start",
+          "meaning": "第一步的编号；把一个流程拆成多段时用来接续编号。",
+          "omission": {
+            "behavior": "fallback",
+            "description": "从 1 开始编号。",
+            "value": 1
+          }
+        }
+      ],
+      "recipes": [
+        {
+          "title": "写安装步骤",
+          "steps": [
+            "每步只做一件事，标题写动作。",
+            "命令放进 code；不同平台用 variants。",
+            "用 result 写读者应该看到的结果，便于自查。"
+          ],
+          "exampleIndex": 0
+        }
+      ],
+      "interactions": [
+        {
+          "action": "点击步骤编号",
+          "effect": "切换该步完成状态，竖轴与进度条更新；「重置」清除全部。",
+          "persistence": "view"
+        },
+        {
+          "action": "切换平台标签（方向键可切换）",
+          "effect": "代码面板显示对应平台的命令。",
+          "persistence": "view"
+        },
+        {
+          "action": "点击复制",
+          "effect": "复制当前代码，显示「已复制」；环境不允许复制时选中代码并提示按 ⌘C / Ctrl+C。",
+          "persistence": "none"
+        }
+      ],
+      "constraints": [
+        "阅读操作只改变本地视图状态，不修改页面数据。",
+        "建议每组不超过 8 步；长代码横向滚动，不折行。"
+      ],
+      "editing": {
+        "data": [
+          "增删步骤、修改命令与结果。"
+        ],
+        "implementation": [
+          "新增步骤字段时扩展 schema 并发布新版本。"
+        ]
+      }
+    },
+    "development": {
+      "entryPoints": [
+        {
+          "path": "index.tsx",
+          "purpose": "组件、CodePanel、复制逻辑、md() 与 readData。"
+        },
+        {
+          "path": "style.css",
+          "purpose": "令牌、竖轴、代码面板与窄屏规则。"
+        }
+      ],
+      "architecture": [
+        "完成状态是本地 boolean 数组；竖轴线段用 ::after 的 scaleY 填充。",
+        "复制先用隐藏 textarea + execCommand('copy')，失败时用 Range 选中代码并提示（沙箱禁止 Clipboard API）。"
+      ],
+      "extensionPoints": [
+        "isComment() 决定注释行着色。"
+      ],
+      "invariants": [
+        "组件不调用 onChange。",
+        "标签页使用 role=tab / tabpanel，复制按钮有中文 aria-label。"
+      ],
+      "verification": [
+        "在 1000px、390px 宽度与暗色主题下检查竖轴、代码面板与结果行。",
+        "点击编号切换完成状态；点击复制后显示「已复制」或选中提示。"
+      ]
+    }
+  },
+  "defaultData": {
+    "steps": [
+      {
+        "title": "准备 Node.js",
+        "body": "从源码运行需要 Git、**Node.js 22.12 或更高版本**和 npm。先确认版本：",
+        "variants": [
+          {
+            "label": "macOS",
+            "code": "brew install node@22\nnode --version"
+          },
+          {
+            "label": "Windows",
+            "code": "winget install OpenJS.NodeJS.LTS\nnode --version"
+          },
+          {
+            "label": "Linux",
+            "code": "# 使用 nvm 安装\nnvm install 22\nnode --version"
+          }
+        ],
+        "result": "终端输出 `v22.12.0` 或更高版本。"
+      },
+      {
+        "title": "获取源码并构建",
+        "code": "git clone https://github.com/Renaissance-Mind/ShowAI.git\ncd ShowAI\nnpm ci\nnpm run build:browser",
+        "lang": "sh"
+      },
+      {
+        "title": "启动本地工作台",
+        "body": "服务启动后会自动打开浏览器。**使用期间保持终端运行**。",
+        "code": "npm run browser",
+        "lang": "sh",
+        "note": "浏览器没有自动打开时，复制终端显示的地址；结束时按 `Ctrl+C` 停止服务。",
+        "result": "浏览器中出现工作台，左侧是项目列表。"
+      },
+      {
+        "title": "新建项目和第一个页面",
+        "body": "点击「新建项目」，再在项目中新建 Page。输入 `/` 插入图表、表格或组件，详见 [Page 与 Board](doc:page-board)。",
+        "result": "顶部保存状态显示「已保存」。"
+      }
+    ]
+  },
+  "examples": [
+    {
+      "name": "安装并启动本地工作台",
+      "data": {
+        "steps": [
+          {
+            "title": "准备 Node.js",
+            "body": "从源码运行需要 Git、**Node.js 22.12 或更高版本**和 npm。先确认版本：",
+            "variants": [
+              {
+                "label": "macOS",
+                "code": "brew install node@22\nnode --version"
+              },
+              {
+                "label": "Windows",
+                "code": "winget install OpenJS.NodeJS.LTS\nnode --version"
+              },
+              {
+                "label": "Linux",
+                "code": "# 使用 nvm 安装\nnvm install 22\nnode --version"
+              }
+            ],
+            "result": "终端输出 `v22.12.0` 或更高版本。"
+          },
+          {
+            "title": "获取源码并构建",
+            "code": "git clone https://github.com/Renaissance-Mind/ShowAI.git\ncd ShowAI\nnpm ci\nnpm run build:browser",
+            "lang": "sh"
+          },
+          {
+            "title": "启动本地工作台",
+            "body": "服务启动后会自动打开浏览器。**使用期间保持终端运行**。",
+            "code": "npm run browser",
+            "lang": "sh",
+            "note": "浏览器没有自动打开时，复制终端显示的地址；结束时按 `Ctrl+C` 停止服务。",
+            "result": "浏览器中出现工作台，左侧是项目列表。"
+          },
+          {
+            "title": "新建项目和第一个页面",
+            "body": "点击「新建项目」，再在项目中新建 Page。输入 `/` 插入图表、表格或组件，详见 [Page 与 Board](doc:page-board)。",
+            "result": "顶部保存状态显示「已保存」。"
+          }
+        ]
+      }
+    },
+    {
+      "name": "在 Claude Code 中安装插件",
+      "data": {
+        "start": 1,
+        "steps": [
+          {
+            "title": "添加插件市场并安装",
+            "body": "在 ShowAI 仓库目录中执行：",
+            "code": "claude plugin marketplace add ./\nclaude plugin install showai@renaissance-mind",
+            "lang": "sh"
+          },
+          {
+            "title": "注册运行时",
+            "body": "从源码构建的独立运行时需要注册一次；桌面版可在「设置 → 连接 Agent」中查看配置。",
+            "code": "npm run runtime:register",
+            "lang": "sh",
+            "result": "插件能找到内容库中的 ShowAI 运行时。"
+          }
+        ]
+      }
+    }
+  ]
+}

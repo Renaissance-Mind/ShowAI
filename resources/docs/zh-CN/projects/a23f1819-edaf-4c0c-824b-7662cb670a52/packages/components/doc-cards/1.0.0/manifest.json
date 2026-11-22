@@ -1,0 +1,288 @@
+{
+  "id": "doc-cards",
+  "version": "1.0.0",
+  "name": "文档卡片",
+  "description": "导航或选项卡片：图标、标题、说明与可选标签；整张卡片可链接。tile 为网格卡片，row 为紧凑列表行。",
+  "category": "other",
+  "entry": "index.tsx",
+  "reader": "readData",
+  "scenarios": [
+    "页面末尾的「接下来」推荐 2–3 个页面",
+    "按读者情况给出几条入口路径",
+    "列出一组并列的选项或资源"
+  ],
+  "documentation": {
+    "version": 2,
+    "reuse": {
+      "kind": "domain",
+      "boundaries": [
+        "用于导航与并列选项；需要逐项比较能力时用 doc-compare。",
+        "icon 只接受 emoji 或一两个字符，不能传入图片。"
+      ],
+      "owner": "ShowAI 文档站（doc kit）"
+    },
+    "usage": {
+      "purpose": "让读者在几条路径或几个页面中快速选择下一步。",
+      "structure": [
+        "tile：图标方块、标题、说明、右上角标签；有 href 时整张卡片是链接，悬停出现箭头。",
+        "row：一行一项，左图标、中间标题和说明、右侧箭头。",
+        "同一行卡片等高；640px 以下单列。"
+      ],
+      "inputs": [
+        {
+          "path": "columns",
+          "meaning": "列数 2、3 或 4；4 列在 820px 以下变 2 列，640px 以下一律单列。",
+          "omission": {
+            "behavior": "fallback",
+            "description": "tile：4 张卡片时 2 列，否则取卡片数与 3 的较小值；row：超过 3 项时 2 列，否则 1 列。",
+            "computedFrom": [
+              "cards",
+              "variant"
+            ]
+          }
+        },
+        {
+          "path": "variant",
+          "meaning": "tile 网格卡片或 row 紧凑列表行。",
+          "omission": {
+            "behavior": "fallback",
+            "description": "使用 tile。",
+            "value": "tile"
+          }
+        },
+        {
+          "path": "cards",
+          "meaning": "卡片列表，建议 2–6 张。"
+        },
+        {
+          "path": "cards[]",
+          "meaning": "一张卡片。"
+        },
+        {
+          "path": "cards[].icon",
+          "meaning": "emoji 图标，放在色调浅底方块中。",
+          "omission": {
+            "behavior": "omit",
+            "description": "不显示图标。"
+          }
+        },
+        {
+          "path": "cards[].title",
+          "meaning": "卡片标题，建议不超过 12 个汉字。"
+        },
+        {
+          "path": "cards[].body",
+          "meaning": "一两句说明，建议不超过 50 个汉字。行内标记：**粗体**、`代码`、[文字](链接)；链接可写 https://… 或 doc:slug#anchor。 卡片本身有 href 时，说明里的链接只显示文字。"
+        },
+        {
+          "path": "cards[].href",
+          "meaning": "整张卡片的链接：https://… 或 doc:slug#anchor。",
+          "omission": {
+            "behavior": "omit",
+            "description": "卡片不是链接，不显示箭头。"
+          }
+        },
+        {
+          "path": "cards[].tag",
+          "meaning": "短标签，例如「推荐」「新」，建议不超过 4 个汉字。",
+          "omission": {
+            "behavior": "omit",
+            "description": "不显示标签。"
+          }
+        },
+        {
+          "path": "cards[].tone",
+          "meaning": "图标底色、标签与悬停边框的色调：brand | teal | warm | violet | rose | slate。",
+          "omission": {
+            "behavior": "fallback",
+            "description": "使用 brand。",
+            "value": "brand"
+          }
+        }
+      ],
+      "recipes": [
+        {
+          "title": "页面末尾的「接下来」",
+          "steps": [
+            "选 2–3 个最可能的下一页。",
+            "用 variant row 或 3 列 tile。",
+            "说明写读者在那一页能完成什么。"
+          ],
+          "exampleIndex": 1
+        }
+      ],
+      "interactions": [
+        {
+          "action": "点击或回车打开卡片",
+          "effect": "打开链接；文档链接在站内打开。",
+          "persistence": "none"
+        }
+      ],
+      "constraints": [
+        "只读展示，不修改页面数据。",
+        "建议 2–6 张卡片；标题不超过 12 个汉字，说明不超过 50 个汉字。"
+      ],
+      "editing": {
+        "data": [
+          "增删卡片、修改文字与链接。"
+        ],
+        "implementation": [
+          "新增变体时扩展 variant 枚举并发布新版本。"
+        ]
+      }
+    },
+    "development": {
+      "entryPoints": [
+        {
+          "path": "index.tsx",
+          "purpose": "组件、列数推断、md() 与 readData。"
+        },
+        {
+          "path": "style.css",
+          "purpose": "令牌、tile/row 两种布局与窄屏规则。"
+        }
+      ],
+      "architecture": [
+        "网格列数写入 CSS 变量 --cols；色调通过 tone-* 类设置 --t/--ts。",
+        "有 href 的卡片渲染为 <a>，内部链接降级为文字，避免嵌套链接。"
+      ],
+      "extensionPoints": [
+        "columnsFor() 决定默认列数。"
+      ],
+      "invariants": [
+        "组件不调用 onChange。",
+        "悬停不改变高度。"
+      ],
+      "verification": [
+        "检查 2/3/4 列与 row 变体在 1000px、390px 宽度与暗色主题下的效果。",
+        "Tab 到卡片时可见焦点框。"
+      ]
+    }
+  },
+  "defaultData": {
+    "columns": 2,
+    "cards": [
+      {
+        "icon": "🖥️",
+        "title": "只用工作台",
+        "body": "在本地浏览器或桌面应用里写页面、画白板，导出 HTML 分享。",
+        "href": "doc:install",
+        "tone": "brand"
+      },
+      {
+        "icon": "🤝",
+        "title": "和 Agent 一起用",
+        "body": "安装插件后，让 Codex 或 Claude Code 创建、修改和检查页面。",
+        "href": "doc:agent-hosts",
+        "tag": "推荐",
+        "tone": "violet"
+      },
+      {
+        "icon": "🧱",
+        "title": "做组件和模板",
+        "body": "用 React 写可复用组件，把好用的页面结构提炼成模板。",
+        "href": "doc:component-dev",
+        "tone": "teal"
+      },
+      {
+        "icon": "👥",
+        "title": "部署给团队",
+        "body": "运行项目服务器，多人同步同一个项目，按项目分配权限。",
+        "href": "doc:project-server",
+        "tone": "warm"
+      }
+    ]
+  },
+  "examples": [
+    {
+      "name": "按你的情况开始（2×2 卡片）",
+      "data": {
+        "columns": 2,
+        "cards": [
+          {
+            "icon": "🖥️",
+            "title": "只用工作台",
+            "body": "在本地浏览器或桌面应用里写页面、画白板，导出 HTML 分享。",
+            "href": "doc:install",
+            "tone": "brand"
+          },
+          {
+            "icon": "🤝",
+            "title": "和 Agent 一起用",
+            "body": "安装插件后，让 Codex 或 Claude Code 创建、修改和检查页面。",
+            "href": "doc:agent-hosts",
+            "tag": "推荐",
+            "tone": "violet"
+          },
+          {
+            "icon": "🧱",
+            "title": "做组件和模板",
+            "body": "用 React 写可复用组件，把好用的页面结构提炼成模板。",
+            "href": "doc:component-dev",
+            "tone": "teal"
+          },
+          {
+            "icon": "👥",
+            "title": "部署给团队",
+            "body": "运行项目服务器，多人同步同一个项目，按项目分配权限。",
+            "href": "doc:project-server",
+            "tone": "warm"
+          }
+        ]
+      }
+    },
+    {
+      "name": "接下来（列表行）",
+      "data": {
+        "variant": "row",
+        "cards": [
+          {
+            "icon": "🧩",
+            "title": "Page 与 Board",
+            "body": "什么时候用按阅读顺序排版的 Page，什么时候用自由摆放的 Board。",
+            "href": "doc:page-board"
+          },
+          {
+            "icon": "📊",
+            "title": "图表、导图与图形",
+            "body": "按数据形状挑选图表，导图和流程图的写法。",
+            "href": "doc:visuals"
+          },
+          {
+            "icon": "📤",
+            "title": "导出与分享",
+            "body": "导出单个 HTML 或静态站点，离线也能交互。",
+            "href": "doc:export"
+          }
+        ]
+      }
+    },
+    {
+      "name": "三列图表家族",
+      "data": {
+        "columns": 3,
+        "cards": [
+          {
+            "icon": "📈",
+            "title": "趋势",
+            "body": "折线、面积图，看指标随时间变化。",
+            "tone": "brand"
+          },
+          {
+            "icon": "📊",
+            "title": "比较",
+            "body": "柱状、条形图，比较不同类别的数值。",
+            "tone": "teal"
+          },
+          {
+            "icon": "🧭",
+            "title": "关系",
+            "body": "导图、流程图和 Board，整理结构与依赖。",
+            "tag": "可编辑",
+            "tone": "violet"
+          }
+        ]
+      }
+    }
+  ]
+}

@@ -9,6 +9,7 @@ import {
   Info,
   Keyboard,
   Monitor,
+  Network,
   Moon,
   Search,
   Settings2,
@@ -36,6 +37,8 @@ import AgentSettings from "./AgentSettings";
 import WorkRecordsSettings from "./WorkRecordsSettings";
 import PluginInstallSettings from "./PluginInstallSettings";
 import RemoteMcpSettings from "./RemoteMcpSettings";
+import McpSettings from "./McpSettings";
+import mcpMessages from "../i18n/messages/mcpSettings";
 import ShortcutsPanel from "./ShortcutsPanel";
 import remoteMcpMessages from "../i18n/messages/remoteMcp";
 import { workbenchCapabilities } from "./capabilities";
@@ -91,6 +94,12 @@ const sections = [
     icon: Puzzle,
   },
   {
+    id: "mcp",
+    group: "agent",
+    label: "section.mcp",
+    icon: Network,
+  },
+  {
     id: "remote",
     group: "agent",
     label: "section.remote",
@@ -120,7 +129,7 @@ export function availableSettingsSection(
   if (
     ((section === "general" || section === "storage") &&
       !capabilities.manageLibrary) ||
-    ((section === "plugins" || section === "remote") &&
+    ((section === "plugins" || section === "mcp" || section === "remote") &&
       !capabilities.localPlugins)
   )
     return "sync";
@@ -199,6 +208,7 @@ export function SettingsSearch({
   const tl = useTranslator(libraryMessages);
   const [query, setQuery] = useState("");
   const [searching, setSearching] = useState(false);
+  const tm = useTranslator(mcpMessages);
   const options: Array<{
     id: SettingsSection;
     name: string;
@@ -219,6 +229,13 @@ export function SettingsSearch({
             ? t("keyboardShortcuts")
             : undefined,
     }));
+  if (availableSettingsSection("mcp", info) === "mcp")
+    options.push(
+      { id: "mcp", name: tm("status"), category: t("section.mcp"), target: "settings-mcp-status" },
+      { id: "mcp", name: tm("retention"), category: t("section.mcp"), target: "settings-mcp-basics" },
+      { id: "mcp", name: tm("launch"), category: t("section.mcp"), target: "settings-mcp-basics" },
+      { id: "mcp", name: tm("history"), category: t("section.mcp"), target: "settings-mcp-history" },
+    );
   options.push(
     {
       id: "appearance",
@@ -645,6 +662,9 @@ export function SettingsPanel({
             onSelectSection("sync");
           }}
         />
+      )}
+      {section === "mcp" && info && (
+        <McpSettings key={info.home} info={info} onRemote={() => onSelectSection("remote")} />
       )}
       {section === "remote" &&
         (info?.mode === "browser" ? (

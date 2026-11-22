@@ -42,12 +42,12 @@ The agent saves the interface in ShowAI and shows it in the conversation (or as 
 | Codex                                     | Supported    | ShowAI → **Settings → Plugins** → Install plugin                                                                                       |
 | Antigravity                               | Supported    | ShowAI → **Settings → Plugins** → Install plugin                                                                                       |
 | Built-in agent                            | Supported    | Inside ShowAI, using your local Codex or Claude Code sign-in, a model API key or Cloud                                                 |
-| DeepSeek Harness                          | Preview      | Quit DeepSeek Harness, then choose **Settings → External Agent plugins → Install plugin** in ShowAI ([steps](plugins/showai/README.md#deepseek-harness)) |
-| Kimi Work                                 | Preview      | Prepare the plugin directory in **Settings → External Agent plugins**, then [install it in Kimi Work](plugins/showai-kimi/README.md)                                              |
-| Cursor, Qoder, WorkBuddy                  | Preview      | Prepare the host package in **Settings → External Agent plugins**, then [import it in the host](plugins/showai/README.md#cursor-qoder-and-workbuddy)              |
+| DeepSeek Harness                          | Preview      | Quit DeepSeek Harness, then choose **Settings → Agent plugins → Install plugin** in ShowAI ([steps](plugins/showai/README.md#deepseek-harness)) |
+| Kimi Work                                 | Preview      | Prepare the plugin directory in **Settings → Agent plugins**, then [install it in Kimi Work](plugins/showai-kimi/README.md)                                              |
+| Cursor, Qoder, WorkBuddy                  | Preview      | Prepare the host package in **Settings → Agent plugins**, then [import it in the host](plugins/showai/README.md#cursor-qoder-and-workbuddy)              |
 | ChatGPT on the web                        | Self-hosted  | Enable Remote connection in the desktop App with your own Cloudflare or Tailscale account ([guide](docs/chatgpt.md))                   |
-| Kimi Code, TRAE IDE | Preview | Prepare the host package from **Settings → External Agent plugins**. [Kimi Code and TRAE setup](plugins/showai/README.md#kimi-code-and-trae) |
-| Gemini CLI, OpenCode | Experimental | Copy the host’s local MCP configuration from **Settings → External Agent plugins** ([Agent integration](docs/agent-integration.md)) |
+| Kimi Code, TRAE IDE | Preview | Prepare the host package from **Settings → Agent plugins**. [Kimi Code and TRAE setup](plugins/showai/README.md#kimi-code-and-trae) |
+| Gemini CLI, OpenCode | Experimental | Copy the host’s local MCP configuration from **Settings → Agent plugins** ([Agent integration](docs/agent-integration.md)) |
 
 ### Plugin paths by Agent host
 

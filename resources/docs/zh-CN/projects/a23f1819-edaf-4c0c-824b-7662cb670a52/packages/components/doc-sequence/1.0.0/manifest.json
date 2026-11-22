@@ -1,0 +1,388 @@
+{
+  "id": "doc-sequence",
+  "version": "1.0.0",
+  "name": "文档时序图",
+  "description": "文档用的可逐步播放的时序图：参与者生命线、调用（实线）、返回（虚线）和备注；上一步 / 下一步 / 播放 / 重来，未到达的步骤变淡，当前步骤的说明显示在图下方。窄屏改为纵向步骤列表。",
+  "category": "flow",
+  "entry": "index.tsx",
+  "reader": "readData",
+  "scenarios": [
+    "解释 Agent、MCP、内容库与工作台之间一次操作的往返",
+    "说明同步、发布、导出等多方参与的流程",
+    "教程里逐步讲解一次请求经过哪些部件"
+  ],
+  "documentation": {
+    "version": 2,
+    "reuse": {
+      "kind": "domain",
+      "boundaries": [
+        "适合 2–6 个参与者、3–14 步的交互；更长的流程拆成几张图。",
+        "只表达时间顺序上的消息往来，不表达分支和循环。",
+        "静态关系请用 doc-diagram；操作步骤请用 doc-steps。"
+      ],
+      "owner": "ShowAI 文档组件库（doc-*），用于 showai.renaissancemind.ai/doc 的页面"
+    },
+    "usage": {
+      "purpose": "让读者一步一步看清一次操作在几个参与者之间怎样往返，每一步的解释放在 detail 中。",
+      "structure": [
+        "顶部：title 与「第 n / N 步」。",
+        "中部：参与者卡片与生命线，每一步一行：调用为实线箭头，返回为虚线箭头，备注为跨越生命线的方框；自己调用自己画成回环。",
+        "下方：控制按钮与当前步骤的说明。",
+        "宽度小于 640px 时改为纵向步骤列表，每步显示「发起方 → 接收方」。"
+      ],
+      "inputs": [
+        {
+          "path": "actors",
+          "meaning": "参与者，从左到右排列，宽度等分。建议 2–6 个；为空时显示空状态提示。"
+        },
+        {
+          "path": "actors[].id",
+          "meaning": "参与者唯一 id，steps 用它引用。"
+        },
+        {
+          "path": "actors[].label",
+          "meaning": "参与者名称，建议不超过 8 个字符；放不下时截断。"
+        },
+        {
+          "path": "actors[].sub",
+          "meaning": "副标题，例如具体实现或位置；参与者多时会被截断。",
+          "omission": {
+            "behavior": "omit",
+            "description": "参与者卡片只显示名称；全都没有副标题时卡片更矮。"
+          }
+        },
+        {
+          "path": "actors[].icon",
+          "meaning": "图标：一个 emoji。",
+          "omission": {
+            "behavior": "omit",
+            "description": "不显示图标。"
+          }
+        },
+        {
+          "path": "actors[].tone",
+          "meaning": "参与者色调：brand | teal | warm | violet | rose | slate。当前步骤涉及的参与者用它高亮。",
+          "omission": {
+            "behavior": "fallback",
+            "description": "使用 brand。",
+            "value": "brand"
+          }
+        },
+        {
+          "path": "steps",
+          "meaning": "按时间顺序排列的步骤。引用不存在参与者的步骤会被跳过（readData 的 skipped 中列出）。为空时显示空状态提示。建议不超过 14 步。"
+        },
+        {
+          "path": "steps[].from",
+          "meaning": "发起方参与者 id。"
+        },
+        {
+          "path": "steps[].to",
+          "meaning": "接收方参与者 id；与 from 相同时画成自调用回环。"
+        },
+        {
+          "path": "steps[].label",
+          "meaning": "箭头上方的短标签，建议不超过 10 个汉字；超出时截断，下方说明显示全文。"
+        },
+        {
+          "path": "steps[].detail",
+          "meaning": "当前步骤的说明，显示在图下方。支持 **粗体**、`代码`、[链接](https://…) 与 [链接](doc:slug#anchor)；换行分段。",
+          "omission": {
+            "behavior": "omit",
+            "description": "只显示步骤标签与发起方 → 接收方。"
+          }
+        },
+        {
+          "path": "steps[].kind",
+          "meaning": "call：调用，实线实心箭头；reply：返回，虚线开放箭头；note：备注框，横跨 from 与 to 之间的生命线。",
+          "omission": {
+            "behavior": "fallback",
+            "description": "call。",
+            "value": "call"
+          }
+        },
+        {
+          "path": "title",
+          "meaning": "图的标题，显示在左上方。",
+          "omission": {
+            "behavior": "omit",
+            "description": "不显示标题。"
+          }
+        }
+      ],
+      "recipes": [
+        {
+          "title": "画一次 Agent 编辑的往返",
+          "steps": [
+            "列出参与者，按消息流向从左到右排。",
+            "每一步写一个动词短语作为 label，把参数和原因写进 detail。",
+            "返回用 reply，旁注用 note。",
+            "用 readData 检查 skipped 为空。"
+          ],
+          "exampleIndex": 0
+        }
+      ],
+      "interactions": [
+        {
+          "action": "上一步 / 下一步，或在图上按左右方向键",
+          "effect": "移动当前步骤；之后的步骤变淡。",
+          "persistence": "view"
+        },
+        {
+          "action": "播放 / 暂停",
+          "effect": "每 1.6 秒前进一步，到最后一步停止。",
+          "persistence": "view"
+        },
+        {
+          "action": "重来",
+          "effect": "回到第一步并停止播放。",
+          "persistence": "view"
+        },
+        {
+          "action": "点击某条箭头或列表中的某一步",
+          "effect": "跳到该步骤。",
+          "persistence": "view"
+        }
+      ],
+      "constraints": [
+        "阅读操作不修改页面数据。",
+        "系统开启「减少动态效果」时关闭过渡动画；播放只在读者点击后开始。"
+      ],
+      "editing": {
+        "data": [
+          "增删参与者时同步检查 steps 的引用。"
+        ],
+        "implementation": [
+          "需要分支、循环框或激活条时创建新版本。"
+        ]
+      }
+    },
+    "development": {
+      "entryPoints": [
+        {
+          "path": "index.tsx",
+          "purpose": "时序布局、播放状态、宽 / 窄视图与 readData。"
+        },
+        {
+          "path": "style.css",
+          "purpose": "令牌、亮暗主题与步骤状态样式。"
+        }
+      ],
+      "architecture": [
+        "参与者等分容器宽度（ResizeObserver 测量），SVG 与容器等宽，不缩放文字。",
+        "当前步骤 cur 是唯一的视图状态；播放用 setInterval 推进。"
+      ],
+      "extensionPoints": [
+        "ROW、NOTE_ROW、SELF_ROW 控制行高；PLAY_MS 控制播放间隔。"
+      ],
+      "invariants": [
+        "只导入 react；行内标记渲染为 React 元素。",
+        "阅读交互只改变本地状态。"
+      ],
+      "verification": [
+        "示例「Agent 修改一页内容的往返」应显示 5 个参与者、10 步，第 5 步为自调用回环，第 8 步为备注。",
+        "在亮色、暗色与 390px 宽度下检查标签不与箭头或卡片重叠。"
+      ]
+    }
+  },
+  "defaultData": {
+    "title": "导出一个网站",
+    "actors": [
+      {
+        "id": "user",
+        "label": "用户",
+        "icon": "🙋",
+        "tone": "slate"
+      },
+      {
+        "id": "wb",
+        "label": "工作台",
+        "icon": "🖥️",
+        "tone": "brand"
+      },
+      {
+        "id": "exp",
+        "label": "导出器",
+        "icon": "📦",
+        "tone": "teal"
+      }
+    ],
+    "steps": [
+      {
+        "from": "user",
+        "to": "wb",
+        "label": "选择导出为网站",
+        "detail": "在项目菜单中选择导出格式。"
+      },
+      {
+        "from": "wb",
+        "to": "exp",
+        "label": "收集页面与组件",
+        "detail": "只收集页面实际用到的组件版本。"
+      },
+      {
+        "from": "exp",
+        "to": "user",
+        "label": "静态网站目录",
+        "kind": "reply",
+        "detail": "目录可以直接部署到任意静态托管。"
+      }
+    ]
+  },
+  "examples": [
+    {
+      "name": "Agent 修改一页内容的往返",
+      "data": {
+        "title": "Agent 修改一页内容的往返",
+        "actors": [
+          {
+            "id": "user",
+            "label": "用户",
+            "icon": "🙋",
+            "tone": "slate"
+          },
+          {
+            "id": "agent",
+            "label": "Agent",
+            "sub": "Codex / Claude Code",
+            "icon": "🤖",
+            "tone": "brand"
+          },
+          {
+            "id": "mcp",
+            "label": "ShowAI MCP",
+            "sub": "stdio 适配器",
+            "icon": "🔌",
+            "tone": "teal"
+          },
+          {
+            "id": "lib",
+            "label": "内容库",
+            "sub": "~/.showai",
+            "icon": "🗂️",
+            "tone": "violet"
+          },
+          {
+            "id": "wb",
+            "label": "工作台",
+            "sub": "桌面版 / 浏览器",
+            "icon": "🖥️",
+            "tone": "warm"
+          }
+        ],
+        "steps": [
+          {
+            "from": "user",
+            "to": "agent",
+            "label": "把定价页改成三档",
+            "detail": "用户在 Agent 里用自然语言提出修改，不需要知道页面 id。"
+          },
+          {
+            "from": "agent",
+            "to": "mcp",
+            "label": "查找页面",
+            "detail": "Agent 调用 **pages_list** 或 **library_search**，按标题和项目找到要改的页面。"
+          },
+          {
+            "from": "mcp",
+            "to": "lib",
+            "label": "读取页面",
+            "detail": "**page_read** 返回完整页面源和它的 **hash**，之后保存要带上这个基准。"
+          },
+          {
+            "from": "lib",
+            "to": "agent",
+            "label": "页面源 + hash",
+            "kind": "reply",
+            "detail": "内容是结构化的区块树，每个区块有稳定 id，Agent 可以只改其中几块。"
+          },
+          {
+            "from": "agent",
+            "to": "agent",
+            "label": "修改区块",
+            "detail": "Agent 在本地改好内容，必要时先用 **page_diff** 预览改动。"
+          },
+          {
+            "from": "agent",
+            "to": "mcp",
+            "label": "保存（带基准 hash）",
+            "detail": "**page_save** 带上读取时的 hash。期间如果有人改过同一页，保存会被拒绝并给出差异，而不是覆盖别人的修改。"
+          },
+          {
+            "from": "mcp",
+            "to": "lib",
+            "label": "写入新修订",
+            "detail": "内容库写入新的页面文件并保留快照，可以回到之前的修订。"
+          },
+          {
+            "from": "lib",
+            "to": "wb",
+            "label": "文件变化",
+            "kind": "note",
+            "detail": "工作台监听内容库，打开着的页面会自动刷新。"
+          },
+          {
+            "from": "agent",
+            "to": "mcp",
+            "label": "展示页面",
+            "detail": "**page_present** 让用户在工作台或 Agent 宿主里直接看到保存后的页面。"
+          },
+          {
+            "from": "wb",
+            "to": "user",
+            "label": "看到新页面",
+            "kind": "reply",
+            "detail": "用户看到的是已经保存的版本，可以继续手动编辑或让 Agent 接着改。"
+          }
+        ]
+      }
+    },
+    {
+      "name": "导出一个网站",
+      "data": {
+        "title": "导出一个网站",
+        "actors": [
+          {
+            "id": "user",
+            "label": "用户",
+            "icon": "🙋",
+            "tone": "slate"
+          },
+          {
+            "id": "wb",
+            "label": "工作台",
+            "icon": "🖥️",
+            "tone": "brand"
+          },
+          {
+            "id": "exp",
+            "label": "导出器",
+            "icon": "📦",
+            "tone": "teal"
+          }
+        ],
+        "steps": [
+          {
+            "from": "user",
+            "to": "wb",
+            "label": "选择导出为网站",
+            "detail": "在项目菜单中选择导出格式。"
+          },
+          {
+            "from": "wb",
+            "to": "exp",
+            "label": "收集页面与组件",
+            "detail": "只收集页面实际用到的组件版本。"
+          },
+          {
+            "from": "exp",
+            "to": "user",
+            "label": "静态网站目录",
+            "kind": "reply",
+            "detail": "目录可以直接部署到任意静态托管。"
+          }
+        ]
+      }
+    }
+  ]
+}

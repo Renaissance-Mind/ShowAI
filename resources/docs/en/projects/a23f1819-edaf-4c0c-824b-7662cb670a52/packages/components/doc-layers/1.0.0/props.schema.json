@@ -1,0 +1,71 @@
+{
+  "type": "object",
+  "properties": {
+    "layers": {
+      "type": "array",
+      "maxItems": 8,
+      "items": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1
+          },
+          "sub": {
+            "type": "string"
+          },
+          "tone": {
+            "type": "string",
+            "enum": [
+              "brand",
+              "teal",
+              "warm",
+              "violet",
+              "rose",
+              "slate"
+            ]
+          },
+          "modules": {
+            "type": "array",
+            "maxItems": 12,
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "path": {
+                  "type": "string"
+                },
+                "detail": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "name",
+                "detail"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "name",
+          "modules"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "caption": {
+      "type": "string"
+    },
+    "initial": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "layers"
+  ],
+  "additionalProperties": false
+}

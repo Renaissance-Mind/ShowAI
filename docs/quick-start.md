@@ -23,11 +23,11 @@ ShowAI keeps itself up to date: it checks the latest release in the background, 
 
 ## 2. Connect your agent
 
-1. In ShowAI, open the plugin panel: the welcome screen shows it on first launch, and it is always available under **Settings → External Agent plugins**.
+1. In ShowAI, open the plugin panel: the welcome screen shows it on first launch, and it is always available under **Settings → Agent plugins**.
 2. ShowAI checks for Claude Code and Codex. Click **Install plugin** next to the agent you use and wait for **Installed and enabled**.
 3. Reload the agent: restart the Claude Code session, or refresh plugins or restart Codex. A conversation that was already open keeps its old tool list, so start a new one.
 
-To confirm the connection, **Settings → External Agent plugins** shows a test prompt, _Use ShowAI to list my projects_. Send it in the new conversation; when the agent reaches ShowAI, the status next to that agent changes from **Waiting for the first call** to **First call received**.
+After using ShowAI in your Agent, open **Settings → MCP → Call history** to see the tool, client, result and duration. The MCP section also shows the local runtime, lets you copy a launch configuration and sets how long this library keeps call records.
 
 The app supplies both the plugin and the runtime it talks to, so you need neither the source code nor a separate Node.js installation. The plugin connects to the app's current content library; click **Update and enable** after switching libraries or moving the app.
 
@@ -53,8 +53,8 @@ Two more to try:
 | **Installed, disabled**                             | Click **Update and enable**.                                                                                                                                     |
 | ShowAI is enabled from another source               | Disable that plugin in the agent, then click **Check again** and install the app version.                                                                        |
 | The agent answers in text and never mentions ShowAI | The conversation started before the plugin loaded. Restart the agent and open a new conversation; asking explicitly with "Use ShowAI to …" helps.                |
-| The agent reports that it cannot connect to ShowAI  | Open **Settings → External Agent plugins**. If **Registered runtime** shows a problem, click **Repair registration**; if the agent shows a failed connection or another library, click **Repair and reconnect** or **Update and enable**. Then restart the agent. |
-| A page was saved but you can't find it in the app   | The app and the plugin are using different content libraries. Compare **Settings → General → Content library** with **Plugin library** for that agent in **Settings → External Agent plugins**. |
+| The agent reports that it cannot connect to ShowAI  | Open **Settings → Agent plugins**. If **Registered runtime** shows a problem, click **Repair registration**; if the agent shows a failed connection or another library, click **Repair and reconnect** or **Update and enable**. Then restart the agent. |
+| A page was saved but you can't find it in the app   | The app and the plugin are using different content libraries. Compare **Settings → General → Content library** with **Plugin library** for that agent in **Settings → Agent plugins**. |
 
 Still stuck? [Open an issue](https://github.com/Renaissance-Mind/ShowAI/issues) with your agent and its version, the ShowAI version from **Settings → About & feedback**, and what the agent said.
 

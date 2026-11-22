@@ -1,5 +1,5 @@
 import { CAPACITY, assertContent } from "../portable/capacity.mjs";
-import { walk } from "../document/walk.mjs";
+import { walkComponentReferences } from "../document/walk.mjs";
 import { validateComponentContract } from "./component-contract.mjs";
 import type { ShowDocument } from "../types";
 import type {
@@ -120,31 +120,20 @@ export function collectCustomComponentRefs(
   document: ShowDocument,
 ): CustomComponentRef[] {
   const refs = new Map<string, CustomComponentRef>();
-  walk(document.content, (node) => {
-    if ((node.type === "widget" || node.type === "inlineWidget") && node.attrs?.kind === "custom") {
-      const { componentId, version, integrity, scope } = readCustomBlockData(
-        node.attrs.data,
-      );
+  walkComponentReferences(document.content, (data, node) => {
+    const ref = readCustomBlockData(data);
+    const { componentId, version, integrity, scope } = ref;
+    if (node.type === "surface") {
+      refs.set(`${componentKey(componentId, version)}:${integrity}`, ref);
+    } else {
       const key = `${componentKey(componentId, version)}:${integrity ?? scope ?? "unpinned"}`;
-      const previous = refs.get(key);
       refs.set(key, {
         componentId,
         version,
-        integrity: integrity ?? previous?.integrity,
+        integrity: integrity ?? refs.get(key)?.integrity,
         ...(scope ? { scope } : {}),
       });
     }
-    const renderer =
-      node.type === "surface" && node.attrs?.kind === "page"
-        ? node.attrs?.outline?.renderer
-        : undefined;
-    if (renderer) {
-      const ref = readCustomBlockData(renderer);
-      refs.set(
-        `${componentKey(ref.componentId, ref.version)}:${ref.integrity}`,
-        ref,
-      );
-    }
-  }, { scope: "content" });
+  });
   return [...refs.values()];
 }

@@ -1,0 +1,444 @@
+{
+  "id": "doc-compare",
+  "version": "1.0.0",
+  "name": "Document comparison matrix",
+  "description": "Comparison matrix in the document: columns are optional solutions, rows are capabilities or differences, supports four values ​​✓ / — / ◐ part / text, can be arranged by group, click on the column header to highlight a solution.",
+  "category": "table",
+  "entry": "index.tsx",
+  "reader": "readData",
+  "scenarios": [
+    "Compare installation methods such as desktop version, local browser version and source code running",
+    "Compare Page and Board, export format, Agent access method and other options",
+    "List the extent to which different solutions support a certain capability"
+  ],
+  "documentation": {
+    "version": 2,
+    "reuse": {
+      "kind": "domain",
+      "boundaries": [
+        "Used for qualitative comparison of 2–6 solutions in ShowAI documents in several dimensions; each box is yes / no / part / a short text.",
+        "It is not used for numerical data or large tables that require sorting and filtering; use charts or built-in tables for numerical comparison.",
+        "Read-only display: Clicking on the column header only changes the local view and does not modify the page data."
+      ]
+    },
+    "usage": {
+      "purpose": "Help readers choose between several solutions: see at a glance what each solution supports, what it does not support, and where it falls short.",
+      "structure": [
+        "Each column in the header has a solution: color point, name and a line of description; click on the column header to highlight the light color of the entire column, and click again to cancel.",
+        "The first column is the comparison item (name and small text prompt), which is fixed to the left when scrolling horizontally.",
+        "Rows with the same group are grouped together, with the group name as the group title; the groups are arranged in the order of first occurrence.",
+        "Grid: true displays the check mark of the scheme color, false displays a light-colored dash, \"partial\" displays a semicircle and \"partial\", and other strings are displayed as text according to inline markers.",
+        "There can be a line of notes below the table. When the screen is narrow, the table scrolls horizontally, and the right side fades to indicate that there are more columns."
+      ],
+      "inputs": [
+        {
+          "path": "columns",
+          "meaning": "Scheme columns, arranged in order of display. 2–4 columns are recommended, with a maximum of 8 columns; 3 columns and above require horizontal scrolling in the width of mobile phones."
+        },
+        {
+          "path": "columns[].id",
+          "meaning": "Column identifier, referenced in rows[].values ​​and highlight, unique within the same table."
+        },
+        {
+          "path": "columns[].label",
+          "meaning": "The plan name is displayed in the header and should be short (no more than 8 Chinese characters)."
+        },
+        {
+          "path": "columns[].sub",
+          "meaning": "A line of additional description for the scheme, shown below the name.",
+          "omission": {
+            "behavior": "omit",
+            "description": "No additional description is shown."
+          }
+        },
+        {
+          "path": "columns[].tone",
+          "meaning": "Column colors: color points, checkmarks, partial support icons, and highlight background colors. brand | teal | warm | violet | rose | slate.",
+          "omission": {
+            "behavior": "fallback",
+            "description": "Use brand.",
+            "value": "brand"
+          }
+        },
+        {
+          "path": "rows",
+          "meaning": "Contrasted items, displayed in order; rows in the same group converge to the first occurrence of the group. Maximum 80 lines, no more than 20 lines recommended."
+        },
+        {
+          "path": "rows[].label",
+          "meaning": "Comparison item name, supports **bold**,`代码`and [link](href)."
+        },
+        {
+          "path": "rows[].hint",
+          "meaning": "Small text description below the comparison item supports inline markup.",
+          "omission": {
+            "behavior": "omit",
+            "description": "No description is shown."
+          }
+        },
+        {
+          "path": "rows[].group",
+          "meaning": "Group name; rows with the same name are grouped under the same group heading.",
+          "omission": {
+            "behavior": "omit",
+            "description": "The row does not belong to any group and appears with other ungrouped rows without a group title."
+          }
+        },
+        {
+          "path": "rows[].values",
+          "meaning": "Values ​​with column id as the key: true = supported (check mark), false = not supported (dash), \"partial\" = partially supported, other strings = text description (inline mark supported). If a column's key is missing, the field is left blank (shows a shallow dot); keys that do not belong to any column are ignored and readData is listed in unknownColumnKeys.",
+          "opaque": true
+        },
+        {
+          "path": "highlight",
+          "meaning": "Initial highlighted column id. Readers can still click on the column header to switch or cancel.",
+          "omission": {
+            "behavior": "omit",
+            "description": "Initially no columns are highlighted."
+          }
+        },
+        {
+          "path": "note",
+          "meaning": "A line of description or source below the table, supporting inline markup and document links.",
+          "omission": {
+            "behavior": "omit",
+            "description": "No description is shown."
+          }
+        }
+      ],
+      "recipes": [
+        {
+          "title": "Write a plan comparison",
+          "steps": [
+            "First determine the choices the reader has to make, list 2–4 solutions as columns, and give each solution a tone.",
+            "Write a difference that the reader cares about in each line; use true/false if it can be expressed as yes/no, use \"partial\" if it is conditional and explain the condition in hint, and use a short sentence for the rest.",
+            "If there are more than 6 lines, use group to divide them into 2-4 groups; fill in the id of the recommended solution in highlight.",
+            "Checking with readData that unknownColumnKeys is empty and the supported/partial/unsupported counts for each column are as expected."
+          ],
+          "exampleIndex": 0
+        }
+      ],
+      "interactions": [
+        {
+          "action": "Click or use the keyboard to activate column headers",
+          "effect": "The entire column is highlighted with a light color of the column color; activating it again cancels it.",
+          "persistence": "view"
+        },
+        {
+          "action": "Horizontal scrolling of tables on narrow screens",
+          "effect": "The first column is fixed on the left and fades out on the right to indicate that there are more columns.",
+          "persistence": "view"
+        },
+        {
+          "action": "Click on a link in the grid or description",
+          "effect": "The link is opened by the host; the document site link is opened within the site.",
+          "persistence": "none"
+        }
+      ],
+      "constraints": [
+        "Reading operations do not modify page data.",
+        "The content of the grid should be short: within one sentence; long explanations should be placed in the text or notes outside the table.",
+        "When the width is less than 640px, the first column is narrowed to 116px, and each column is at least 112px: a 390px wide screen can fully display 2 columns, and 3 columns or more can be scrolled horizontally."
+      ],
+      "editing": {
+        "data": [
+          "When adding or deleting columns, the key and highlight of each row's values ​​are updated simultaneously.",
+          "To change the grouping, just modify rows[].group."
+        ],
+        "implementation": [
+          "New value types (such as numeric values ​​or ratings) require a new version and updated readData."
+        ]
+      },
+      "rules": [
+        {
+          "kind": "unique",
+          "path": "columns[].id"
+        },
+        {
+          "kind": "reference",
+          "path": "highlight",
+          "target": "columns[].id"
+        }
+      ]
+    },
+    "development": {
+      "entryPoints": [
+        {
+          "path": "index.tsx",
+          "purpose": "Components, grouping sections(), value mark Mark, inline mark md() and readData."
+        },
+        {
+          "path": "style.css",
+          "purpose": "Design tokens (including dark colors), tables, fixed first column, column protrusion, horizontal scrolling fade and narrow screen rules."
+        }
+      ],
+      "architecture": [
+        "Use semantic <table>: buttons in table header th[scope=col] switch highlighted columns, row header th[scope=row], one <tbody> for each group.",
+        "Highlighting a column is achieved by adding the is-on class to each cell of the column (including the space of the group header row), so the background color runs through the entire height of the column.",
+        "The scroll container monitors scroll and ResizeObserver, calculates whether it can still scroll to the right, and controls the fade-out prompt and the first column separator."
+      ],
+      "extensionPoints": [
+        "Color is mapped to the two variables --tc / --ts by tone; the new value types are expanded in kindOf and Mark."
+      ],
+      "invariants": [
+        "The component does not call onChange; all interactions only change local state.",
+        "Do not use dangerouslySetInnerHTML; inline markup is generated by md() React elements."
+      ],
+      "verification": [
+        "Example 0: 3 columns, 8 rows, 3 groups, the local browser version is initially highlighted; desktop supported=3, unsupported=3 in readData.",
+        "Check header, ticks, section support and horizontal scroll fade in 1000 px, 390 px width and dark theme."
+      ]
+    }
+  },
+  "defaultData": {
+    "columns": [
+      {
+        "id": "desktop",
+        "label": "Desktop version",
+        "sub": "Independent window desktop app",
+        "tone": "brand"
+      },
+      {
+        "id": "browser",
+        "label": "Local browser version",
+        "sub": "Unzip the distribution package and use it in the browser",
+        "tone": "teal"
+      },
+      {
+        "id": "source",
+        "label": "Source code run",
+        "sub": "Git + Node.js 22.12+ + npm",
+        "tone": "violet"
+      }
+    ],
+    "rows": [
+      {
+        "group": "Install",
+        "label": "You need to install Node.js yourself",
+        "values": {
+          "desktop": false,
+          "browser": false,
+          "source": true
+        },
+        "hint": "The browser distribution package comes with independent Node"
+      },
+      {
+        "group": "Install",
+        "label": "Start mode",
+        "values": {
+          "desktop": "Open App",
+          "browser": "`start.command` · `start.sh` · `start.cmd`",
+          "source": "`npm run browser` 或 `npm run desktop`"
+        }
+      },
+      {
+        "group": "use",
+        "label": "Complete workbench",
+        "values": {
+          "desktop": true,
+          "browser": true,
+          "source": true
+        }
+      },
+      {
+        "group": "use",
+        "label": "No cloud account required",
+        "values": {
+          "desktop": true,
+          "browser": true,
+          "source": true
+        },
+        "hint": "Content is saved in the local file library"
+      },
+      {
+        "group": "use",
+        "label": "Wait for the save to complete before closing",
+        "values": {
+          "desktop": true,
+          "browser": "partial",
+          "source": "取决于选择的入口"
+        },
+        "hint": "The browser can only prompt for exit confirmation and check the save status before leaving."
+      },
+      {
+        "group": "use",
+        "label": "Default content library",
+        "values": {
+          "desktop": "`~/.showai`",
+          "browser": "`~/.showai`",
+          "source": "开发入口用 `.showai-dev/library`"
+        }
+      },
+      {
+        "group": "develop",
+        "label": "Hot update development",
+        "hint": "`npm run dev:browser`",
+        "values": {
+          "desktop": false,
+          "browser": false,
+          "source": true
+        }
+      },
+      {
+        "group": "develop",
+        "label": "Modify local services and CLI",
+        "values": {
+          "desktop": false,
+          "browser": false,
+          "source": true
+        }
+      }
+    ],
+    "highlight": "browser",
+    "note": "All three methods use the same document format and content library; you see the same batch of projects when you point to the same directory. See [Installation and Operation] (https://showai.renaissancemind.ai/doc/install) for details."
+  },
+  "examples": [
+    {
+      "name": "Comparison of three operating modes (grouping, highlighting local browser version)",
+      "data": {
+        "columns": [
+          {
+            "id": "desktop",
+            "label": "Desktop version",
+            "sub": "Independent window desktop app",
+            "tone": "brand"
+          },
+          {
+            "id": "browser",
+            "label": "Local browser version",
+            "sub": "Unzip the distribution package and use it in the browser",
+            "tone": "teal"
+          },
+          {
+            "id": "source",
+            "label": "Source code run",
+            "sub": "Git + Node.js 22.12+ + npm",
+            "tone": "violet"
+          }
+        ],
+        "rows": [
+          {
+            "group": "Install",
+            "label": "You need to install Node.js yourself",
+            "values": {
+              "desktop": false,
+              "browser": false,
+              "source": true
+            },
+            "hint": "The browser distribution package comes with independent Node"
+          },
+          {
+            "group": "Install",
+            "label": "Start mode",
+            "values": {
+              "desktop": "Open App",
+              "browser": "`start.command` · `start.sh` · `start.cmd`",
+              "source": "`npm run browser` 或 `npm run desktop`"
+            }
+          },
+          {
+            "group": "use",
+            "label": "Complete workbench",
+            "values": {
+              "desktop": true,
+              "browser": true,
+              "source": true
+            }
+          },
+          {
+            "group": "use",
+            "label": "No cloud account required",
+            "values": {
+              "desktop": true,
+              "browser": true,
+              "source": true
+            },
+            "hint": "Content is saved in the local file library"
+          },
+          {
+            "group": "use",
+            "label": "Wait for the save to complete before closing",
+            "values": {
+              "desktop": true,
+              "browser": "partial",
+              "source": "取决于选择的入口"
+            },
+            "hint": "The browser can only prompt for exit confirmation and check the save status before leaving."
+          },
+          {
+            "group": "use",
+            "label": "Default content library",
+            "values": {
+              "desktop": "`~/.showai`",
+              "browser": "`~/.showai`",
+              "source": "开发入口用 `.showai-dev/library`"
+            }
+          },
+          {
+            "group": "develop",
+            "label": "Hot update development",
+            "hint": "`npm run dev:browser`",
+            "values": {
+              "desktop": false,
+              "browser": false,
+              "source": true
+            }
+          },
+          {
+            "group": "develop",
+            "label": "Modify local services and CLI",
+            "values": {
+              "desktop": false,
+              "browser": false,
+              "source": true
+            }
+          }
+        ],
+        "highlight": "browser",
+        "note": "All three methods use the same document format and content library; you see the same batch of projects when you point to the same directory. See [Installation and Operation] (https://showai.renaissancemind.ai/doc/install) for details."
+      }
+    },
+    {
+      "name": "Page and Board (two columns, no grouping)",
+      "data": {
+        "columns": [
+          {
+            "id": "page",
+            "label": "Page",
+            "sub": "Arrange in reading order",
+            "tone": "brand"
+          },
+          {
+            "id": "board",
+            "label": "Board",
+            "sub": "Free placement on canvas",
+            "tone": "warm"
+          }
+        ],
+        "rows": [
+          {
+            "label": "Suitable",
+            "values": {
+              "page": "Reports, explanations, documents",
+              "board": "Sketch, relationships, layout exploration"
+            }
+          },
+          {
+            "label": "Nest another container",
+            "values": {
+              "page": true,
+              "board": true
+            }
+          },
+          {
+            "label": "Export to HTML",
+            "values": {
+              "page": true,
+              "board": true
+            }
+          }
+        ]
+      }
+    }
+  ]
+}

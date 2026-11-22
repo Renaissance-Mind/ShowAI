@@ -38,7 +38,7 @@ Antigravity App 的插件区提供 **ShowAI Workbench** 全局入口，用来浏
 
 用户说「帮我在右侧打开这页」「跳到那个组件」时，调用 `card_navigate({projectId, pageId, blockId?})`（无需再额外调用 `card_present`）：
 
-- 返回 `status: "accepted"` 表示右侧已打开的 ShowAI 工作台已即时接收跳转，直接回复确认即可。
+- 返回 `status: "accepted"` 表示工作台已接收定位请求。能观察宿主时，进一步核对原页是否打开。
 - 返回 `status: "queued"` 表示右侧工作台面板当前未展开，跳转目标已暂存；此时在回复中附上侧栏胶囊 `[在 ShowAI 工作台打开《页面标题》](sidecar://showai/workbench/?project=<projectId>&page=<pageId>)`（定位块时附加 `&block=<blockId>`；未指定页面仅需打开工作台时用 `[打开 ShowAI 工作台](sidecar://showai/workbench/)`），用户点击胶囊展开侧栏后即自动落到目标位置。
 
 收到用户从右侧工作台点击「引用到 Antigravity 对话」发来的引用（Artifact Comment / `showai.reference`）时，按[用户引用](user-references.md)提取其中的 `projectId`、`pageId`、`blockIds` 与版本基线，调用 `page_read` 核对后再执行修改或回答。

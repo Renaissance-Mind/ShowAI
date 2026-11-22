@@ -3,6 +3,7 @@ import { homedir } from "node:os";
 import { fileURLToPath } from "node:url";
 import { access, mkdir, open, readFile, rename, writeFile } from "node:fs/promises";
 import { spawn } from "node:child_process";
+import { once } from "node:events";
 import { randomBytes, randomUUID } from "node:crypto";
 import { setTimeout as delay } from "node:timers/promises";
 import { withLibraryLock } from "../core/library-lock";
@@ -67,6 +68,8 @@ export async function startAntigravityWorkbenchBrowser(options: {
 }
 
 interface LinkedWorkbenchSession { id: string; url: string; home: string; pid: number }
+const linkedWorkbenchArgs = (cliEntry: string, home: string, id: string) =>
+  [cliEntry, "serve", "--home", home, "--linked-workbench", id, "--no-open", "--json"];
 
 async function linkedWorkbenchSession(home: string, id?: string) {
   try {
@@ -95,7 +98,7 @@ export async function startLinkedWorkbenchBrowser(home: string) {
     const id = randomUUID();
     const logPath = join(profile, "server.log");
     const log = await open(logPath, "a", 0o600);
-    const child = spawn(process.execPath, [cliEntry, "serve", "--home", home, "--linked-workbench", id, "--no-open", "--json"], {
+    const child = spawn(process.execPath, [...linkedWorkbenchArgs(cliEntry, home, id), "--detach-workbench"], {
       detached: true, windowsHide: true, stdio: ["ignore", log.fd, log.fd], cwd: home,
     });
     let failed: Error | undefined;
@@ -103,9 +106,9 @@ export async function startLinkedWorkbenchBrowser(home: string) {
     child.unref();
     await log.close();
     const deadline = Date.now() + 20_000;
-    while (Date.now() < deadline && !failed && child.exitCode === null) {
+    while (Date.now() < deadline && !failed && (child.exitCode === null || child.exitCode === 0)) {
       const session = await linkedWorkbenchSession(home, id);
-      if (session) return session;
+      if (session && child.exitCode === 0) return session;
       await delay(120);
     }
     if (child.exitCode === null && child.pid) child.kill("SIGTERM");
@@ -156,11 +159,20 @@ export async function runBrowser(options: {
   json: boolean;
   dshOrigin?: string;
   linkedWorkbench?: string;
+  detachWorkbench?: boolean;
 }) {
   if (options.linkedWorkbench) {
     if (!options.home || !isAbsolute(options.home) || options.open || options.dshOrigin ||
       !/^[a-f0-9-]{36}$/.test(options.linkedWorkbench)) throw new Error("Invalid local ShowAI workbench launch.");
-    return runLinkedWorkbench(options.home, options.linkedWorkbench);
+    if (!options.detachWorkbench) return runLinkedWorkbench(options.home, options.linkedWorkbench);
+    // The launcher exits before the tool returns. Some hosts terminate the MCP process tree after each turn.
+    const { cliEntry } = await browserRuntime();
+    const child = spawn(process.execPath, linkedWorkbenchArgs(cliEntry, options.home, options.linkedWorkbench), {
+      cwd: options.home, detached: true, windowsHide: true, stdio: "inherit",
+    });
+    await once(child, "spawn");
+    child.unref();
+    return;
   }
   const port = options.port === undefined ? 0 : Number(options.port);
   if (!Number.isInteger(port) || port < 0 || port > 65535)

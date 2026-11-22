@@ -1,0 +1,679 @@
+{
+  "id": "doc-tree",
+  "version": "1.0.0",
+  "name": "文档结构浏览器",
+  "description": "带说明的树形结构浏览器：左侧是可展开的文件夹 / 文件或 JSON 结构，右侧显示所选项的路径、类型、说明和可复制的示例。",
+  "category": "data",
+  "entry": "index.tsx",
+  "reader": "readData",
+  "scenarios": [
+    "讲解页面文件（.showai.json）的字段结构",
+    "说明组件包、模板文件夹或内容库的目录布局",
+    "逐项解释配置文件或 API 返回值中的字段"
+  ],
+  "documentation": {
+    "version": 2,
+    "reuse": {
+      "kind": "domain",
+      "boundaries": [
+        "用于 ShowAI 文档中需要逐项讲解的层级结构：文件夹布局、JSON 字段、配置项。",
+        "建议总项数不超过 60、层级不超过 6 层；更大的结构拆成几个树，或只展示读者需要的部分。",
+        "只读展示：展开、选中只改变本地视图，不修改页面数据。"
+      ]
+    },
+    "usage": {
+      "purpose": "让读者在结构中边看边查：左侧看到整体形状，选中任一项在右侧读到它是什么、类型是什么、怎么写。",
+      "structure": [
+        "左侧树：折叠箭头、按 kind 区分的图标（文件夹、文件、{} 对象、[ ] 数组、字段）、名称、等宽字体的类型和右侧徽标；层级之间有细引导线。",
+        "右侧详情：路径（可点击祖先返回）、名称与类型、所属种类与子项数、summary、detail（行内标记，空行分段，以 \"- \" 开头的行成为列表）、带复制按钮的示例代码，以及可点击的子项列表。",
+        "宽度小于 640px 时详情显示在树的下方。"
+      ],
+      "inputs": [
+        {
+          "path": "nodes",
+          "meaning": "顶层节点，按显示顺序排列。"
+        },
+        {
+          "path": "nodes[].name",
+          "meaning": "节点名称，例如文件名、文件夹名（可带结尾的 /）或字段名。路径由各级名称用 / 连接（去掉结尾的 /）。"
+        },
+        {
+          "path": "nodes[].kind",
+          "meaning": "节点种类，决定图标与详情中的种类文字：dir 文件夹、file 文件、object 对象、array 数组、field 字段。",
+          "omission": {
+            "behavior": "fallback",
+            "description": "有 children 时视为 dir，否则视为 file。",
+            "computedFrom": [
+              "nodes[].children"
+            ]
+          }
+        },
+        {
+          "path": "nodes[].type",
+          "meaning": "类型或格式，以等宽字体显示在名称后，例如 string、\"page\" | \"board\"、JSON。",
+          "omission": {
+            "behavior": "omit",
+            "description": "不显示类型。"
+          }
+        },
+        {
+          "path": "nodes[].badge",
+          "meaning": "短徽标，例如 必填、可选、入口。不超过 16 个字符，建议 2–4 个汉字。",
+          "omission": {
+            "behavior": "omit",
+            "description": "不显示徽标。"
+          }
+        },
+        {
+          "path": "nodes[].summary",
+          "meaning": "一句话说明，显示在详情顶部和父节点的子项列表中；支持行内标记。",
+          "omission": {
+            "behavior": "omit",
+            "description": "详情不显示摘要；子项列表只显示名称。"
+          }
+        },
+        {
+          "path": "nodes[].detail",
+          "meaning": "更多说明，支持 **粗体**、`代码`、[链接](href)；空行分段，每行以 \"- \" 开头的段落显示为列表。",
+          "omission": {
+            "behavior": "omit",
+            "description": "不显示更多说明。"
+          }
+        },
+        {
+          "path": "nodes[].example",
+          "meaning": "示例代码，原样显示在带复制按钮的代码面板中。",
+          "omission": {
+            "behavior": "omit",
+            "description": "不显示代码面板。"
+          }
+        },
+        {
+          "path": "nodes[].exampleLang",
+          "meaning": "示例语言标签，显示在代码面板左上角，例如 json、tsx、sh。",
+          "omission": {
+            "behavior": "fallback",
+            "description": "显示「示例」。",
+            "value": "示例"
+          }
+        },
+        {
+          "path": "nodes[].children",
+          "meaning": "子节点，结构与 nodes 相同，可以继续嵌套。",
+          "omission": {
+            "behavior": "omit",
+            "description": "叶子节点：没有折叠箭头，详情中不显示子项列表。"
+          }
+        },
+        {
+          "path": "nodes[].open",
+          "meaning": "初始是否展开（仅对有子节点的项有效）。读者可以随时展开或收起。",
+          "omission": {
+            "behavior": "fallback",
+            "description": "收起。initial 的祖先与 initial 本身总会展开；没有 initial 且没有任何 open 时展开第一个顶层节点。",
+            "value": false
+          }
+        },
+        {
+          "path": "initial",
+          "meaning": "初始选中项的路径：各级名称用 / 连接，例如 document/content。该项及其所有祖先会展开。",
+          "omission": {
+            "behavior": "fallback",
+            "description": "选中第一个顶层节点。路径不存在时也同样处理，readData 的 initialResolved 为 false。",
+            "from": {
+              "path": "nodes[].name",
+              "selection": "first"
+            }
+          }
+        },
+        {
+          "path": "caption",
+          "meaning": "树下方的一行说明，支持行内标记与文档链接。",
+          "omission": {
+            "behavior": "omit",
+            "description": "不显示说明。"
+          }
+        }
+      ],
+      "recipes": [
+        {
+          "title": "讲解一份 JSON 结构",
+          "steps": [
+            "只保留读者需要理解的字段；顶层字段写在 nodes，嵌套字段写在 children。",
+            "对象用 kind object，数组用 array，叶子字段用 field；type 写类型或可选值。",
+            "必填 / 可选写在 badge；每项写一句 summary，复杂的字段补 detail 和 example。",
+            "把最值得先看的字段路径写进 initial，用 readData 确认 initialResolved 为 true。"
+          ],
+          "exampleIndex": 0
+        },
+        {
+          "title": "说明一个文件夹布局",
+          "steps": [
+            "文件夹用 kind dir（名称可带结尾的 /），文件用 kind file，type 写格式。",
+            "需要读者先看到内容的文件夹设 open: true。"
+          ],
+          "exampleIndex": 1
+        }
+      ],
+      "interactions": [
+        {
+          "action": "点击树中的项",
+          "effect": "选中并在右侧显示说明；点击收起的文件夹 / 对象同时展开，再次点击已选中的项收起。",
+          "persistence": "view"
+        },
+        {
+          "action": "点击折叠箭头",
+          "effect": "只展开或收起，不改变选中项。",
+          "persistence": "view"
+        },
+        {
+          "action": "键盘 ↑ ↓ Home End",
+          "effect": "在可见项之间移动选中。",
+          "persistence": "view"
+        },
+        {
+          "action": "键盘 → / ←",
+          "effect": "展开或进入第一个子项 / 收起或回到父项。",
+          "persistence": "view"
+        },
+        {
+          "action": "键盘 Enter 或空格",
+          "effect": "展开或收起当前项。",
+          "persistence": "view"
+        },
+        {
+          "action": "点击路径中的祖先或子项列表中的项",
+          "effect": "选中该项并展开其祖先。",
+          "persistence": "view"
+        },
+        {
+          "action": "点击复制",
+          "effect": "复制示例；沙盒禁止复制时选中代码并提示按 ⌘C / Ctrl+C。",
+          "persistence": "none"
+        }
+      ],
+      "constraints": [
+        "阅读操作不修改页面数据。",
+        "同一父节点下名称应唯一；重名时后者的路径会加上 ~2、~3 后缀。",
+        "不使用内部滚动区域：树全部展开时高度随内容增长，宜控制规模。"
+      ],
+      "editing": {
+        "data": [
+          "增删节点只需修改 nodes / children；改名后同步更新 initial。"
+        ],
+        "implementation": [
+          "新增节点种类需要新版本，并在 KindIcon 与 KIND_LABEL 中加入图标和名称。"
+        ]
+      }
+    },
+    "development": {
+      "entryPoints": [
+        {
+          "path": "index.tsx",
+          "purpose": "组件、路径索引 index()、键盘导航、详情面板、CodePanel 复制、md() / mdBlock() 与 readData。"
+        },
+        {
+          "path": "style.css",
+          "purpose": "设计令牌（含深色）、树行与引导线、图标、详情与代码面板、窄屏堆叠。"
+        }
+      ],
+      "architecture": [
+        "index() 把嵌套节点展开为以路径为键的 Map，记录深度、父路径、种类和子项路径；可见列表由展开集合计算。",
+        "树采用 WAI-ARIA tree 模式：role=tree / treeitem、aria-level、aria-expanded、aria-selected，选中项是唯一的 Tab 停留点（roving tabindex），选中跟随焦点。",
+        "复制按钮先用隐藏 textarea 执行 execCommand('copy')，失败时选中代码文本并提示手动复制。"
+      ],
+      "extensionPoints": [
+        "种类图标在 KindIcon 中绘制；详情区的子项列表与空状态都在 DocTree 中。"
+      ],
+      "invariants": [
+        "组件不调用 onChange；所有交互只改变本地状态。",
+        "不使用 dangerouslySetInnerHTML；行内标记由 md() 生成 React 元素。"
+      ],
+      "verification": [
+        "示例 0：initial document/content 解析成功，document 与 content 展开，详情显示 JSON 示例和 3 个子项。",
+        "键盘：↓ 移到下一项，→ 展开，← 回到父项，Enter 收起；Tab 只停在选中项上。",
+        "在 1000 px、390 px 与深色主题下检查树、引导线、徽标和代码面板。"
+      ]
+    }
+  },
+  "defaultData": {
+    "nodes": [
+      {
+        "name": "format",
+        "kind": "field",
+        "type": "\"showai\"",
+        "badge": "必填",
+        "summary": "固定为 `showai`，表示这是 ShowAI 页面文件。"
+      },
+      {
+        "name": "version",
+        "kind": "field",
+        "type": "3",
+        "badge": "必填",
+        "summary": "文件格式版本。新文件写入 3；版本 1、2 的旧文件仍可读取，读取后按 Page / Board 适配。"
+      },
+      {
+        "name": "document",
+        "kind": "object",
+        "type": "object",
+        "badge": "必填",
+        "summary": "页面本身：元数据加一个根容器。",
+        "open": true,
+        "detail": "元数据包括 `title`、`icon`、`cover`、`parentId`（所在项目文件夹）、`createdAt` / `updatedAt` 等。标题属于元数据，不写在正文里。",
+        "children": [
+          {
+            "name": "id",
+            "kind": "field",
+            "type": "string",
+            "summary": "资源 ID，标识这个文件。与根容器的 `attrs.id` 不是同一个东西。"
+          },
+          {
+            "name": "title",
+            "kind": "field",
+            "type": "string",
+            "summary": "页面标题，显示在页面顶部和目录中。"
+          },
+          {
+            "name": "icon",
+            "kind": "field",
+            "type": "string",
+            "badge": "可选",
+            "summary": "页面图标，通常是一个 emoji。"
+          },
+          {
+            "name": "content",
+            "kind": "object",
+            "type": "surface",
+            "badge": "根容器",
+            "summary": "根容器：一个 Page 或一个 Board，正文都在它的 `content` 里。",
+            "detail": "`attrs.kind` 为 `page`（按顺序排列的内容）或 `board`（自由摆放的画布），**新资源默认是 Page**。\n\n所有非文本节点（包括容器）都有唯一且稳定的 `attrs.id`；容器可以嵌套，详见 [Page 与 Board](doc:page-board)。",
+            "example": "{\n  \"type\": \"surface\",\n  \"attrs\": { \"id\": \"root\", \"kind\": \"page\", \"name\": \"安装与运行\" },\n  \"content\": [\n    { \"type\": \"paragraph\", \"content\": [ … ] },\n    { \"type\": \"widget\", \"attrs\": { \"kind\": \"custom\", \"data\": { … } } }\n  ]\n}",
+            "exampleLang": "json",
+            "children": [
+              {
+                "name": "type",
+                "kind": "field",
+                "type": "\"surface\"",
+                "summary": "固定为 `surface`。"
+              },
+              {
+                "name": "attrs",
+                "kind": "object",
+                "type": "object",
+                "summary": "容器属性。",
+                "children": [
+                  {
+                    "name": "id",
+                    "kind": "field",
+                    "type": "string",
+                    "badge": "必填",
+                    "summary": "容器 ID，在整个文件内唯一且稳定。"
+                  },
+                  {
+                    "name": "kind",
+                    "kind": "field",
+                    "type": "\"page\" | \"board\"",
+                    "summary": "容器类型。"
+                  },
+                  {
+                    "name": "name",
+                    "kind": "field",
+                    "type": "string",
+                    "summary": "容器名称，嵌套时显示在模块标题上。"
+                  }
+                ]
+              },
+              {
+                "name": "content",
+                "kind": "array",
+                "type": "Block[]",
+                "summary": "容器中的内容块，按阅读顺序排列。",
+                "open": true,
+                "children": [
+                  {
+                    "name": "paragraph",
+                    "kind": "object",
+                    "type": "block",
+                    "summary": "段落：由 `text` 节点组成，文字可带 bold、code、link 等标记。",
+                    "detail": "空段落写 `content: []`；**空的 text 节点无效**。链接只接受 HTTP(S)、`mailto:`、`tel:` 或页内锚点。",
+                    "example": "{\n  \"type\": \"paragraph\",\n  \"content\": [\n    { \"type\": \"text\", \"text\": \"运行 \" },\n    { \"type\": \"text\", \"text\": \"npm run browser\", \"marks\": [{ \"type\": \"code\" }] }\n  ]\n}",
+                    "exampleLang": "json"
+                  },
+                  {
+                    "name": "widget",
+                    "kind": "object",
+                    "type": "block",
+                    "badge": "组件",
+                    "summary": "组件块：内置组件和自定义组件都用同一个外壳。",
+                    "detail": "`attrs.kind` 是组件种类；自定义 React 组件的种类固定为 `custom`，具体组件由 `attrs.data` 指定。",
+                    "children": [
+                      {
+                        "name": "attrs",
+                        "kind": "object",
+                        "type": "object",
+                        "summary": "组件块属性。",
+                        "children": [
+                          {
+                            "name": "id",
+                            "kind": "field",
+                            "type": "string",
+                            "summary": "块 ID，导出时 `--blocks` 用它选择内容。"
+                          },
+                          {
+                            "name": "kind",
+                            "kind": "field",
+                            "type": "\"custom\"",
+                            "summary": "组件种类。内置组件用各自的名称，例如 `mindmap`、`g2-bar`。"
+                          },
+                          {
+                            "name": "data",
+                            "kind": "object",
+                            "type": "object",
+                            "summary": "自定义组件引用：哪个组件、哪个版本、传入什么参数。",
+                            "example": "{\n  \"componentId\": \"doc-compare\",\n  \"version\": \"1.0.0\",\n  \"props\": {\n    \"columns\": [{ \"id\": \"desktop\", \"label\": \"桌面版\" }],\n    \"rows\": [{ \"label\": \"完整工作台\", \"values\": { \"desktop\": true } }]\n  }\n}",
+                            "exampleLang": "json",
+                            "children": [
+                              {
+                                "name": "componentId",
+                                "kind": "field",
+                                "type": "string",
+                                "summary": "组件 ID：小写字母、数字和连字符。"
+                              },
+                              {
+                                "name": "version",
+                                "kind": "field",
+                                "type": "semver",
+                                "summary": "**精确**的语义化版本，例如 `1.0.0`。"
+                              },
+                              {
+                                "name": "props",
+                                "kind": "field",
+                                "type": "object",
+                                "summary": "传给组件的数据，必须满足该版本的 `props.schema.json`。"
+                              },
+                              {
+                                "name": "integrity",
+                                "kind": "field",
+                                "type": "string",
+                                "badge": "可选",
+                                "summary": "期望的编译包哈希，保存时由服务写入。"
+                              }
+                            ]
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "name": "layout",
+        "kind": "object",
+        "type": "object",
+        "badge": "可选",
+        "summary": "父容器为子模块保存的框架：`x`、`y`、`width`，以及可选的 `height` 与 `heightMode`。"
+      },
+      {
+        "name": "surfaceViews",
+        "kind": "object",
+        "type": "object",
+        "badge": "可选",
+        "summary": "每个容器的已保存视图与阅读顺序；缺省时读取时自动补齐。"
+      }
+    ],
+    "initial": "document/content",
+    "caption": "点击左侧任一项查看说明；用 ↑ ↓ 移动，→ 展开，← 收起。完整规则见 [页面文件格式](doc:file-format)。"
+  },
+  "examples": [
+    {
+      "name": "ShowAI 页面文件结构（初始选中根容器）",
+      "data": {
+        "nodes": [
+          {
+            "name": "format",
+            "kind": "field",
+            "type": "\"showai\"",
+            "badge": "必填",
+            "summary": "固定为 `showai`，表示这是 ShowAI 页面文件。"
+          },
+          {
+            "name": "version",
+            "kind": "field",
+            "type": "3",
+            "badge": "必填",
+            "summary": "文件格式版本。新文件写入 3；版本 1、2 的旧文件仍可读取，读取后按 Page / Board 适配。"
+          },
+          {
+            "name": "document",
+            "kind": "object",
+            "type": "object",
+            "badge": "必填",
+            "summary": "页面本身：元数据加一个根容器。",
+            "open": true,
+            "detail": "元数据包括 `title`、`icon`、`cover`、`parentId`（所在项目文件夹）、`createdAt` / `updatedAt` 等。标题属于元数据，不写在正文里。",
+            "children": [
+              {
+                "name": "id",
+                "kind": "field",
+                "type": "string",
+                "summary": "资源 ID，标识这个文件。与根容器的 `attrs.id` 不是同一个东西。"
+              },
+              {
+                "name": "title",
+                "kind": "field",
+                "type": "string",
+                "summary": "页面标题，显示在页面顶部和目录中。"
+              },
+              {
+                "name": "icon",
+                "kind": "field",
+                "type": "string",
+                "badge": "可选",
+                "summary": "页面图标，通常是一个 emoji。"
+              },
+              {
+                "name": "content",
+                "kind": "object",
+                "type": "surface",
+                "badge": "根容器",
+                "summary": "根容器：一个 Page 或一个 Board，正文都在它的 `content` 里。",
+                "detail": "`attrs.kind` 为 `page`（按顺序排列的内容）或 `board`（自由摆放的画布），**新资源默认是 Page**。\n\n所有非文本节点（包括容器）都有唯一且稳定的 `attrs.id`；容器可以嵌套，详见 [Page 与 Board](doc:page-board)。",
+                "example": "{\n  \"type\": \"surface\",\n  \"attrs\": { \"id\": \"root\", \"kind\": \"page\", \"name\": \"安装与运行\" },\n  \"content\": [\n    { \"type\": \"paragraph\", \"content\": [ … ] },\n    { \"type\": \"widget\", \"attrs\": { \"kind\": \"custom\", \"data\": { … } } }\n  ]\n}",
+                "exampleLang": "json",
+                "children": [
+                  {
+                    "name": "type",
+                    "kind": "field",
+                    "type": "\"surface\"",
+                    "summary": "固定为 `surface`。"
+                  },
+                  {
+                    "name": "attrs",
+                    "kind": "object",
+                    "type": "object",
+                    "summary": "容器属性。",
+                    "children": [
+                      {
+                        "name": "id",
+                        "kind": "field",
+                        "type": "string",
+                        "badge": "必填",
+                        "summary": "容器 ID，在整个文件内唯一且稳定。"
+                      },
+                      {
+                        "name": "kind",
+                        "kind": "field",
+                        "type": "\"page\" | \"board\"",
+                        "summary": "容器类型。"
+                      },
+                      {
+                        "name": "name",
+                        "kind": "field",
+                        "type": "string",
+                        "summary": "容器名称，嵌套时显示在模块标题上。"
+                      }
+                    ]
+                  },
+                  {
+                    "name": "content",
+                    "kind": "array",
+                    "type": "Block[]",
+                    "summary": "容器中的内容块，按阅读顺序排列。",
+                    "open": true,
+                    "children": [
+                      {
+                        "name": "paragraph",
+                        "kind": "object",
+                        "type": "block",
+                        "summary": "段落：由 `text` 节点组成，文字可带 bold、code、link 等标记。",
+                        "detail": "空段落写 `content: []`；**空的 text 节点无效**。链接只接受 HTTP(S)、`mailto:`、`tel:` 或页内锚点。",
+                        "example": "{\n  \"type\": \"paragraph\",\n  \"content\": [\n    { \"type\": \"text\", \"text\": \"运行 \" },\n    { \"type\": \"text\", \"text\": \"npm run browser\", \"marks\": [{ \"type\": \"code\" }] }\n  ]\n}",
+                        "exampleLang": "json"
+                      },
+                      {
+                        "name": "widget",
+                        "kind": "object",
+                        "type": "block",
+                        "badge": "组件",
+                        "summary": "组件块：内置组件和自定义组件都用同一个外壳。",
+                        "detail": "`attrs.kind` 是组件种类；自定义 React 组件的种类固定为 `custom`，具体组件由 `attrs.data` 指定。",
+                        "children": [
+                          {
+                            "name": "attrs",
+                            "kind": "object",
+                            "type": "object",
+                            "summary": "组件块属性。",
+                            "children": [
+                              {
+                                "name": "id",
+                                "kind": "field",
+                                "type": "string",
+                                "summary": "块 ID，导出时 `--blocks` 用它选择内容。"
+                              },
+                              {
+                                "name": "kind",
+                                "kind": "field",
+                                "type": "\"custom\"",
+                                "summary": "组件种类。内置组件用各自的名称，例如 `mindmap`、`g2-bar`。"
+                              },
+                              {
+                                "name": "data",
+                                "kind": "object",
+                                "type": "object",
+                                "summary": "自定义组件引用：哪个组件、哪个版本、传入什么参数。",
+                                "example": "{\n  \"componentId\": \"doc-compare\",\n  \"version\": \"1.0.0\",\n  \"props\": {\n    \"columns\": [{ \"id\": \"desktop\", \"label\": \"桌面版\" }],\n    \"rows\": [{ \"label\": \"完整工作台\", \"values\": { \"desktop\": true } }]\n  }\n}",
+                                "exampleLang": "json",
+                                "children": [
+                                  {
+                                    "name": "componentId",
+                                    "kind": "field",
+                                    "type": "string",
+                                    "summary": "组件 ID：小写字母、数字和连字符。"
+                                  },
+                                  {
+                                    "name": "version",
+                                    "kind": "field",
+                                    "type": "semver",
+                                    "summary": "**精确**的语义化版本，例如 `1.0.0`。"
+                                  },
+                                  {
+                                    "name": "props",
+                                    "kind": "field",
+                                    "type": "object",
+                                    "summary": "传给组件的数据，必须满足该版本的 `props.schema.json`。"
+                                  },
+                                  {
+                                    "name": "integrity",
+                                    "kind": "field",
+                                    "type": "string",
+                                    "badge": "可选",
+                                    "summary": "期望的编译包哈希，保存时由服务写入。"
+                                  }
+                                ]
+                              }
+                            ]
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "name": "layout",
+            "kind": "object",
+            "type": "object",
+            "badge": "可选",
+            "summary": "父容器为子模块保存的框架：`x`、`y`、`width`，以及可选的 `height` 与 `heightMode`。"
+          },
+          {
+            "name": "surfaceViews",
+            "kind": "object",
+            "type": "object",
+            "badge": "可选",
+            "summary": "每个容器的已保存视图与阅读顺序；缺省时读取时自动补齐。"
+          }
+        ],
+        "initial": "document/content",
+        "caption": "点击左侧任一项查看说明；用 ↑ ↓ 移动，→ 展开，← 收起。完整规则见 [页面文件格式](doc:file-format)。"
+      }
+    },
+    {
+      "name": "组件包文件夹",
+      "data": {
+        "nodes": [
+          {
+            "name": "doc-compare/",
+            "kind": "dir",
+            "summary": "一个组件包就是一个文件夹，导入时整体读取。",
+            "open": true,
+            "detail": "用 `showai catalog import --input <文件夹>` 导入当前项目。同一 `id` 与 `version` 的包导入后**不可更改**；修改实现时提高版本号。",
+            "children": [
+              {
+                "name": "manifest.json",
+                "kind": "file",
+                "type": "JSON",
+                "badge": "必填",
+                "summary": "组件身份与说明：`id`、`name`、`version`、`entry`、默认数据、示例和文档。",
+                "detail": "- `id`：小写字母、数字和连字符\n- `version`：精确的语义化版本\n- `defaultData` 与每个 `examples[].data` 都必须通过 props.schema.json\n- 新组件提供 `documentation`（version 2）",
+                "example": "{\n  \"id\": \"doc-compare\",\n  \"name\": \"文档对比矩阵\",\n  \"version\": \"1.0.0\",\n  \"entry\": \"index.tsx\",\n  \"reader\": \"readData\"\n}",
+                "exampleLang": "json"
+              },
+              {
+                "name": "props.schema.json",
+                "kind": "file",
+                "type": "JSON Schema",
+                "badge": "必填",
+                "summary": "组件参数的 JSON Schema；页面中的 props 必须满足它。",
+                "detail": "使用 `additionalProperties: false` 关闭未声明的字段，让 Agent 与读者都能查到每个参数的含义。"
+              },
+              {
+                "name": "index.tsx",
+                "kind": "file",
+                "type": "React",
+                "badge": "入口",
+                "summary": "默认导出组件；可另外导出 `readData` 供 Agent 读取派生数据。",
+                "detail": "组件收到 `{ data, readOnly, onChange }`。只能导入 `react`、`react/jsx-runtime`、`react-dom/client` 和包内文件。",
+                "example": "import React from 'react';\nimport './style.css';\n\nexport default function DocCompare({ data }) {\n  return <div className=\"dk dk-compare\">…</div>;\n}",
+                "exampleLang": "tsx"
+              },
+              {
+                "name": "style.css",
+                "kind": "file",
+                "type": "CSS",
+                "summary": "组件样式，由 index.tsx 导入；同时提供浅色与深色。"
+              }
+            ]
+          }
+        ],
+        "caption": "组件包的最小结构。"
+      }
+    }
+  ]
+}

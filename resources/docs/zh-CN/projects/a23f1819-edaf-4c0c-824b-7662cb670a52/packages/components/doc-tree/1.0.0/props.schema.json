@@ -1,0 +1,94 @@
+{
+  "type": "object",
+  "$defs": {
+    "node": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 80
+        },
+        "kind": {
+          "type": "string",
+          "enum": [
+            "dir",
+            "file",
+            "object",
+            "array",
+            "field"
+          ]
+        },
+        "type": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 80
+        },
+        "badge": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 16
+        },
+        "summary": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 300
+        },
+        "detail": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 3000
+        },
+        "example": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 6000
+        },
+        "exampleLang": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 24
+        },
+        "children": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 60,
+          "items": {
+            "$ref": "#/$defs/node"
+          }
+        },
+        "open": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "properties": {
+    "nodes": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 60,
+      "items": {
+        "$ref": "#/$defs/node"
+      }
+    },
+    "initial": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 400
+    },
+    "caption": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 600
+    }
+  },
+  "required": [
+    "nodes"
+  ],
+  "additionalProperties": false
+}

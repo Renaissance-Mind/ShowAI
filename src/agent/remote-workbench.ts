@@ -2,6 +2,7 @@ import { createHash, randomUUID } from "node:crypto";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { version } from "../../package.json";
+import lightLogo from "../../plugins/showai/assets/logo.svg?raw";
 import { workbenchAssets } from "../browser/workbench-assets";
 import { createWorkbench } from "../workbench/actions";
 import type { DesktopInfo } from "../host/protocol";
@@ -22,6 +23,7 @@ import { mcpFailure, mcpSuccess } from "./presentation-tools";
 import { AgentService } from "./service";
 
 const mimeType = "text/html;profile=mcp-app";
+const icon = "data:image/svg+xml;base64," + Buffer.from(lightLogo).toString("base64");
 const viewOnly = { readOnlyHint: true, destructiveHint: false, openWorldHint: false };
 const security = (write: boolean) => [{
   type: "oauth2", scopes: write ? ["projects.read", "projects.write"] : ["projects.read"],
@@ -113,7 +115,7 @@ export function registerRemoteWorkbench(server: McpServer, options: Options) {
     server.registerResource(name, uri, { mimeType }, async () => ({
       contents: [{
         uri, mimeType,
-        text: codexWorkbenchHtml(mode, entrypoint, undefined, false, "remote"),
+        text: codexWorkbenchHtml(mode, entrypoint, icon, false, "remote"),
         _meta: {
           ui: { csp: { resourceDomains: ["blob:", "data:"], frameDomains: ["blob:", "data:"] }, prefersBorder: false },
           "openai/ui": {

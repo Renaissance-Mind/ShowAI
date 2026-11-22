@@ -28,8 +28,9 @@ export default defineMessages("settings", {
     "section.general": "通用",
     "section.appearance": "外观",
     "section.agent": "内置 Agent",
-    "section.plugins": "外部 Agent 插件",
-    "section.remote": "远程连接",
+    "section.plugins": "Agent 插件",
+    "section.mcp": "MCP",
+    "section.remote": "远程 MCP",
     "section.about": "关于与反馈",
     "subtitle.general": "管理本机内容库和制作记录的存放位置。",
     "subtitle.appearance": "调整工作台配色主题与界面显示语言。",
@@ -39,6 +40,7 @@ export default defineMessages("settings", {
       "选择页面内 Agent 的执行方式、模型来源与跨设备运行设置。",
     "subtitle.plugins":
       "为本机已安装的桌面或命令行 Agent 安装插件，启用画布工具与预览。",
+    "subtitle.mcp": "查看运行时、启动配置和工具调用记录。",
     "subtitle.remote":
       "通过局域网、Tailscale 或 Cloudflare 提供受控的远程 MCP 入口。",
     "subtitle.about":
@@ -73,7 +75,7 @@ export default defineMessages("settings", {
     languageDetail: "工作台菜单、对话框与提示使用的语言。",
     languageSystem: "跟随系统",
     localConnection: "本地连接",
-    pluginSummaryTitle: "本机 Agent 插件",
+    pluginSummaryTitle: "Agent 插件",
     pluginSummaryDetail:
       "检测到可用客户端时一键安装或更新，重启对应 Agent 后生效。",
     searchAccounts: "服务器账号",
@@ -118,8 +120,9 @@ export default defineMessages("settings", {
     "section.general": "General",
     "section.appearance": "Appearance",
     "section.agent": "Built-in Agent",
-    "section.plugins": "External Agent plugins",
-    "section.remote": "Remote connection",
+    "section.plugins": "Agent plugins",
+    "section.mcp": "MCP",
+    "section.remote": "Remote MCP",
     "section.about": "About & feedback",
     "subtitle.general":
       "Choose where to store the content library and work records.",
@@ -131,6 +134,7 @@ export default defineMessages("settings", {
       "Choose how the in-page Agent runs, manage model sources and configure cross-device execution.",
     "subtitle.plugins":
       "Install plugins for desktop or CLI Agents on this device to enable canvas tools and previews.",
+    "subtitle.mcp": "View runtime status, launch configuration and tool calls.",
     "subtitle.remote":
       "Expose controlled remote MCP endpoints over LAN, Tailscale or Cloudflare.",
     "subtitle.about":
@@ -167,7 +171,7 @@ export default defineMessages("settings", {
     languageDetail: "Language used by workbench menus, dialogs and messages.",
     languageSystem: "Follow system",
     localConnection: "Local connection",
-    pluginSummaryTitle: "Local Agent plugins",
+    pluginSummaryTitle: "Agent plugins",
     pluginSummaryDetail:
       "Install or update in one click when supported clients are found, then restart the Agent.",
     searchAccounts: "Server accounts",

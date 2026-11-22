@@ -673,40 +673,6 @@
   box-shadow: inset 0 0 0 3px var(--paper);
 }
 
-/* Code Config Blocks */
-.settings-config {
-  overflow: hidden;
-  border: 1px solid var(--line);
-  border-radius: 10px;
-  background: var(--paper);
-}
-.settings-config + .settings-config {
-  margin-top: 10px;
-}
-.settings-config > .settings-section-heading {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  margin: 0;
-  padding: 10px 14px;
-  border-bottom: 1px solid var(--line);
-  background: var(--surface);
-  font-size: 12.5px;
-  color: var(--muted);
-}
-.settings-config pre {
-  margin: 0;
-  padding: 14px 16px;
-  overflow: auto;
-  font-size: 12px;
-  line-height: 1.65;
-  tab-size: 2;
-}
-.settings-config code {
-  font-family: ui-monospace, "SFMono-Regular", Consolas, monospace;
-}
-
 /* About Product Card & Definition Lists */
 .settings-product {
   display: flex;
@@ -1048,29 +1014,6 @@
 .plugin-runtime {
   margin-bottom: 12px;
 }
-.plugin-verify-prompt {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  padding: 12px 14px;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  background: var(--surface);
-  font-size: 12px;
-  color: var(--muted);
-}
-.plugin-verify-prompt .plugin-install-path code {
-  flex: 1 1 200px;
-  padding: 5px 9px;
-  border-radius: 6px;
-  border: 1px solid var(--line);
-  background: var(--paper);
-  color: var(--text);
-  font-size: 12px;
-}
-.plugin-verify-prompt .plugin-install-path > span {
-  flex-shrink: 0;
-}
 .plugin-install-settings .settings-button {
   flex-shrink: 0;
 }
@@ -1091,27 +1034,6 @@
   min-width: 0;
   overflow-wrap: anywhere;
   font-size: 11.5px;
-}
-.plugin-verify-hosts {
-  list-style: none;
-  margin: 8px 0;
-  padding: 0;
-  font-size: 12px;
-}
-.plugin-verify-hosts li {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px 10px;
-  padding: 3px 0;
-}
-.plugin-verify-hosts li span {
-  color: var(--muted);
-}
-.plugin-verify-hosts li[data-state="called"] span {
-  color: var(--success);
-}
-.plugin-verify-hosts li[data-state="failed"] span {
-  color: var(--danger, #c43d3d);
 }
 .plugin-verify-detail {
   flex-basis: 100%;
@@ -1182,20 +1104,6 @@
   font-family: ui-monospace, "SFMono-Regular", Consolas, monospace;
   font-size: 12px;
 }
-.plugin-launch-config .settings-config .settings-section-heading > span {
-  flex: 1;
-  min-width: 0;
-}
-.plugin-verify a,
-.plugin-verify-prompt a {
-  display: inline-flex;
-  align-items: center;
-  width: fit-content;
-  gap: 5px;
-  font-size: 12px;
-  color: var(--accent);
-}
-
 /* Topbar Settings Search */
 .settings-search {
   width: min(230px, 42vw);
@@ -1467,4 +1375,63 @@ button.settings-shortcut-combo.is-custom .settings-kbd {
   .plugin-host-actions {
     margin-left: 50px;
   }
+}
+
+.mcp-history {
+  overflow: hidden;
+}
+.mcp-history > p {
+  padding: 16px 18px;
+  margin: 0;
+  color: var(--muted);
+}
+.mcp-history-scroll {
+  overflow-x: auto;
+}
+.mcp-history table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12.5px;
+  font-variant-numeric: tabular-nums;
+}
+.mcp-history :is(th, td) {
+  padding: 9px 12px;
+  text-align: start;
+  vertical-align: top;
+}
+.mcp-history th {
+  font-weight: 500;
+  color: var(--muted);
+  white-space: nowrap;
+}
+.mcp-history td {
+  border-top: 1px solid var(--line);
+}
+.mcp-history :is(th, td):last-child {
+  text-align: end;
+  white-space: nowrap;
+}
+.mcp-history code,
+.mcp-history small {
+  overflow-wrap: anywhere;
+}
+.mcp-history small {
+  display: block;
+  margin-top: 2px;
+  color: var(--muted);
+}
+.mcp-call-result {
+  white-space: nowrap;
+}
+.mcp-call-result[data-status="success"] {
+  color: var(--success);
+}
+.mcp-call-result:is([data-status="error"], [data-status="transport_error"]) {
+  color: var(--danger);
+}
+.mcp-history-pages {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 8px;
 }

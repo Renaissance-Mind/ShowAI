@@ -193,7 +193,7 @@ export async function registerRuntimeOnStartup(
     (status.reason === "newer" || status.reason === "same-version")
   ) {
     process.stderr.write(
-      `ShowAI kept the registered runtime ${status.registered!.version} (${status.registered!.entry}). Use Settings → External Agent plugins → Repair registration to register this App.\n`,
+      `ShowAI kept the registered runtime ${status.registered!.version} (${status.registered!.entry}). Use Settings → Agent plugins → Repair registration to register this App.\n`,
     );
     return { ...status, written: false };
   }

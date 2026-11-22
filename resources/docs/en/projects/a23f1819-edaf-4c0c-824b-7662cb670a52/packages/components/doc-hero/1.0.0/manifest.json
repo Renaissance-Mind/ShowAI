@@ -1,0 +1,271 @@
+{
+  "id": "doc-hero",
+  "version": "1.0.0",
+  "name": "Document top",
+  "description": "The beginning of the document page: header, title, one or two sentences of introduction, key facts and action buttons. On the right side are abstract illustrations selected by topic.",
+  "category": "text",
+  "entry": "index.tsx",
+  "reader": "readData",
+  "scenarios": [
+    "The first section of each document page explains what this page can help the reader accomplish.",
+    "Provide key facts such as prerequisites, time, and next steps at the top of the page."
+  ],
+  "documentation": {
+    "version": 2,
+    "reuse": {
+      "kind": "domain",
+      "boundaries": [
+        "Only used at the beginning of document pages, one per page; not used for section headings in the main text.",
+        "Illustrations are six fixed abstract themes, and images cannot be passed in; when screenshots are needed, use image components in the text."
+      ],
+      "owner": "ShowAI Document Station (doc kit)"
+    },
+    "usage": {
+      "purpose": "Let readers know on the first screen what task this page solves, what prerequisites are required, and where to go next.",
+      "structure": [
+        "Left side: header, title (28px), introduction, action button; right side: 220×150 abstract illustration; bottom side: a line of key facts separated by thin lines.",
+        "Single column below 640px, with the illustration scaled down and placed above the title."
+      ],
+      "inputs": [
+        {
+          "path": "eyebrow",
+          "meaning": "The short label above the title, usually the column.",
+          "omission": {
+            "behavior": "omit",
+            "description": "Eyebrows are not displayed."
+          }
+        },
+        {
+          "path": "title",
+          "meaning": "The title of the page is written as what the reader wants to accomplish. It is recommended not to exceed 20 Chinese characters."
+        },
+        {
+          "path": "lead",
+          "meaning": "One or two sentences of introduction, no more than 80 Chinese characters recommended. Inline tags: **bold**,`代码`, [text] (link); links can be written ashttps://…or doc:slug#anchor."
+        },
+        {
+          "path": "facts",
+          "meaning": "Key facts, up to 4 groups, such as need, when, for whom.",
+          "omission": {
+            "behavior": "omit",
+            "description": "Fact rows are not displayed."
+          }
+        },
+        {
+          "path": "facts[]",
+          "meaning": "A set of facts: labels in small print at the top, numerical values ​​at the bottom."
+        },
+        {
+          "path": "facts[].label",
+          "meaning": "Fact label, 2–4 Chinese characters recommended."
+        },
+        {
+          "path": "facts[].value",
+          "meaning": "For factual content, it is recommended not to exceed 14 Chinese characters; inline markup is available."
+        },
+        {
+          "path": "actions",
+          "meaning": "Up to 3 link buttons.",
+          "omission": {
+            "behavior": "omit",
+            "description": "No button is shown."
+          }
+        },
+        {
+          "path": "actions[]",
+          "meaning": "A link button."
+        },
+        {
+          "path": "actions[].label",
+          "meaning": "Button text is recommended to be no more than 8 Chinese characters."
+        },
+        {
+          "path": "actions[].href",
+          "meaning": "Link address:https://…or doc:slug#anchor (convert to document site address and open in the site)."
+        },
+        {
+          "path": "actions[].primary",
+          "meaning": "When true, a solid main button is displayed; it is recommended that only one be set at the top of each page.",
+          "omission": {
+            "behavior": "fallback",
+            "description": "Appears as a stroked button.",
+            "value": false
+          }
+        },
+        {
+          "path": "art",
+          "meaning": "Illustration themes: start stacked pages, concepts nodes and connections, workbench workbench window, agent dialogue turned into pages, collab multi-terminal synchronization, dev code and components; none does not display illustrations, and the text fills the width.",
+          "omission": {
+            "behavior": "fallback",
+            "description": "Use start illustration.",
+            "value": "start"
+          }
+        }
+      ],
+      "recipes": [
+        {
+          "title": "write a header",
+          "steps": [
+            "Use one sentence to describe what the page wants the reader to accomplish as a title.",
+            "The introduction supplements the scope and results without repeating the title.",
+            "facts Only include facts that readers need to know before starting.",
+            "actions point to the most common next steps."
+          ],
+          "exampleIndex": 0
+        }
+      ],
+      "interactions": [
+        {
+          "action": "Click the action button",
+          "effect": "Open the link; the document link opens within the site.",
+          "persistence": "none"
+        }
+      ],
+      "constraints": [
+        "Read-only display, page data will not be modified.",
+        "When there are more than 4 facts and 3 actions, the redundant items will not be displayed (the schema will also reject them)."
+      ],
+      "editing": {
+        "data": [
+          "Modify text, facts, buttons and illustration themes."
+        ],
+        "implementation": [
+          "To add a new illustration theme, you need to add drawing functions to ARTS and expand the schema's art enumeration, and release a new version."
+        ]
+      }
+    },
+    "development": {
+      "entryPoints": [
+        {
+          "path": "index.tsx",
+          "purpose": "Components, six illustrations, md() inline tags and readData."
+        },
+        {
+          "path": "style.css",
+          "purpose": "Tokens, layout, illustration color and narrow screen rules."
+        }
+      ],
+      "architecture": [
+        "The illustrations are code-drawn SVGs, and the colors are all from CSS token classes (p/l/k/f-*/s-*/c-*), switching with light and dark themes.",
+        "md() converts inline tags into React elements without injecting HTML; doc: links are converted into site addresses."
+      ],
+      "extensionPoints": [
+        "ARTS maps illustration themes to drawing functions."
+      ],
+      "invariants": [
+        "The component does not call onChange.",
+        "The link is a normal <a href>, which is intercepted and opened by the host."
+      ],
+      "verification": [
+        "Check out the six illustrations and fact rows at 1000px, 390px width, and light and dark themes.",
+        "The focus box is visible when keyboard Tab to the button."
+      ]
+    }
+  },
+  "defaultData": {
+    "eyebrow": "Quick Start",
+    "title": "Create your first shareable page in ten minutes",
+    "lead": "Start the local workbench, create a new project and page, use `/`to insert charts and components, and finally export an HTML that can be opened offline.",
+    "facts": [
+      {
+        "label": "need",
+        "value": "Node.js 22.12+"
+      },
+      {
+        "label": "time",
+        "value": "about 10 minutes"
+      },
+      {
+        "label": "Content Library",
+        "value": "`~/.showai`"
+      }
+    ],
+    "actions": [
+      {
+        "label": "Start installation",
+        "href": "doc:install",
+        "primary": true
+      },
+      {
+        "label": "Use with an Agent",
+        "href": "doc:agent-hosts"
+      }
+    ],
+    "art": "start"
+  },
+  "examples": [
+    {
+      "name": "Quick Start Home Page",
+      "data": {
+        "eyebrow": "Quick Start",
+        "title": "Create your first shareable page in ten minutes",
+        "lead": "Start the local workbench, create a new project and page, use `/`to insert charts and components, and finally export an HTML that can be opened offline.",
+        "facts": [
+          {
+            "label": "need",
+            "value": "Node.js 22.12+"
+          },
+          {
+            "label": "time",
+            "value": "about 10 minutes"
+          },
+          {
+            "label": "Content Library",
+            "value": "`~/.showai`"
+          }
+        ],
+        "actions": [
+          {
+            "label": "Start installation",
+            "href": "doc:install",
+            "primary": true
+          },
+          {
+            "label": "Use with an Agent",
+            "href": "doc:agent-hosts"
+          }
+        ],
+        "art": "start"
+      }
+    },
+    {
+      "name": "Using headers in Agent",
+      "data": {
+        "eyebrow": "Working with Agents",
+        "title": "Let Agent directly write editable pages",
+        "lead": "Install the ShowAI plug-in in Codex or Claude Code, and the Agent reads and writes the same content library through MCP; what you see in the workbench is the page it just saved.",
+        "facts": [
+          {
+            "label": "support",
+            "value": "Codex · Claude Code"
+          },
+          {
+            "label": "Skill",
+            "value": "7"
+          }
+        ],
+        "actions": [
+          {
+            "label": "Install plugin",
+            "href": "doc:agent-hosts#install",
+            "primary": true
+          },
+          {
+            "label": "Understand the skills",
+            "href": "doc:skills"
+          }
+        ],
+        "art": "agent"
+      }
+    },
+    {
+      "name": "Unillustrated reference page top",
+      "data": {
+        "eyebrow": "Developer Reference",
+        "title": "CLI & MCP Reference",
+        "lead": "All commands read and write the same content library and exit after execution; they can also be used when the workbench is closed.",
+        "art": "none"
+      }
+    }
+  ]
+}

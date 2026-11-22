@@ -12,7 +12,7 @@ One Harness bundle supplies everything ShowAI needs in DeepSeek Harness:
 | `showai-skills` | `@showai/dsh-showai/skills` | The ShowAI agent Skills from [plugins/showai](../showai/README.md), published at the Harness bundled-skill rank. |
 | `showai-preview` | `@showai/dsh-showai` | Shows inline previews and opens the editable library in a session sidebar tab or the global ShowAI panel. |
 
-Open DeepSeek Harness Desktop once, then quit it completely. Choose **Settings → External Agent plugins → DeepSeek Harness → Install plugin** in ShowAI. ShowAI stages the runtime and library binding, calls the Harness desktop CLI and checks that the package is linked and enabled. Open Harness to load it. After an update or library change, use **Update and enable** in ShowAI and reopen Harness.
+Open DeepSeek Harness Desktop once, then quit it completely. Choose **Settings → Agent plugins → DeepSeek Harness → Install plugin** in ShowAI. ShowAI stages the runtime and library binding, calls the Harness desktop CLI and checks that the package is linked and enabled. Open Harness to load it. After an update or library change, use **Update and enable** in ShowAI and reopen Harness.
 
 For a source build, `npm run plugin:dsh` prepares this directory with the Skills, launcher and MCP configuration. Its default output is `$DSH_HOME/plugins/showai`. Use the path printed by the command with `dsh plugin --profile desktop add "link:/absolute/bundle/path"` while Harness is closed. For a manual install, use **Plugins → Add plugin → Enable now** in Harness. Remove earlier hand-made setups first: the
 `@showai/dsh-showai-preview` bundle (Harness Plugins → the bundle → Uninstall),
@@ -112,7 +112,7 @@ npm test
 
 此 Harness bundle 提供 ShowAI 在 DeepSeek Harness 中所需的全部内容：`showai-mcp` 行通过 bundle 内的启动器连接本机 ShowAI 运行时与内容库，提供 `mcp__showai__*` 工具；`showai-skills` 行以 Harness 内置 Skill 的优先级发布 [plugins/showai](../showai/README.md) 的 Skill；`showai-preview` 行在对话中显示页面。
 
-首次打开 DeepSeek Harness 后完全退出，在 ShowAI「设置 → 外部 Agent 插件 → DeepSeek Harness」点「安装插件」。ShowAI 准备绑定当前内容库的插件包，通过 Harness CLI 安装并核验启用状态。打开 Harness 即可使用。源码方式可以用 `npm run plugin:dsh` 准备目录，然后运行 `dsh plugin --profile desktop add "link:/插件包的绝对路径"`。使用图形界面手动安装时，在 Harness「插件 → 添加插件」选择该目录并点「立即启用」。
+首次打开 DeepSeek Harness 后完全退出，在 ShowAI「设置 → Agent 插件 → DeepSeek Harness」点「安装插件」。ShowAI 准备绑定当前内容库的插件包，通过 Harness CLI 安装并核验启用状态。打开 Harness 即可使用。源码方式可以用 `npm run plugin:dsh` 准备目录，然后运行 `dsh plugin --profile desktop add "link:/插件包的绝对路径"`。使用图形界面手动安装时，在 Harness「插件 → 添加插件」选择该目录并点「立即启用」。
 
 预览行将 show_component、page_present 和 render_document 的结果呈现在对话中，提供刷新、展开、新标签页与完整 HTML 操作。
 
@@ -120,7 +120,7 @@ ShowAI 返回 delivery.inline/html 文件路径与 MCP _meta.showai.inline。Har
 
 delivery.html 已是完整文件，按原字节保存；delivery.inline 通常是供宿主嵌入的阅读器片段，缓存会补上 doctype、head 与 body 外壳。直接以片段作为文档加载会进入 quirks mode，导致 KaTeX 停用并改变布局；旧缓存片段在读取时也会补外壳。client.js 为三个工具注册 tool.call.toolview，使用 sandbox iframe 显示；可用性探测会短暂重试，因为宿主在结果之后异步写入缓存。预览用 delivery.inline，而“打开完整 HTML”使用 delivery.html；“局部”标签只在调用确实带 blockIds 选择时出现。缓存保留最近 40 页，进程重启后旧对话仍可读取。
 
-插件包无需额外的构建依赖。Harness 内的 Agent 也可用 `plugin_manager install_bundle target=<路径>` 安装准备好的目录。准备时 MCP 行绑定一个 ShowAI 内容库与运行时命令，切换内容库、移动 App 或更换登记的运行时后，可先完全退出 Harness，再在 ShowAI「设置 → 外部 Agent 插件」点「更新并启用」，然后打开 Harness。预览需要 profile 的 webServer；超过 12 MiB 的预览不缓存，退回文件操作。Host 代码更新需新进程，client.js 可由 HMR 更新。
+插件包无需额外的构建依赖。Harness 内的 Agent 也可用 `plugin_manager install_bundle target=<路径>` 安装准备好的目录。准备时 MCP 行绑定一个 ShowAI 内容库与运行时命令，切换内容库、移动 App 或更换登记的运行时后，可先完全退出 Harness，再在 ShowAI「设置 → Agent 插件」点「更新并启用」，然后打开 Harness。预览需要 profile 的 webServer；超过 12 MiB 的预览不缓存，退回文件操作。Host 代码更新需新进程，client.js 可由 HMR 更新。
 
 ## Shared workflow source
 

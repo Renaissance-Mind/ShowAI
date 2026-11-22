@@ -560,6 +560,57 @@ describe.skipIf(!output || !config)(
         await client.close();
       }
     }, 120000);
+    test("MCP settings show real calls and persist the selected retention", async () => {
+      const library = join(root, "mcp-settings/library");
+      const browser = await chromium.launch({ headless: true });
+      const client = new Client({ name: "Settings QA", version: "1" });
+      let server: Awaited<ReturnType<typeof startBrowserServer>> | undefined;
+      try {
+        server = await startBrowserServer({
+          home: library, webRoot: resolve("dist-runtime/web"), cliEntry: resolve("dist-runtime/scripts/cli.mjs"),
+          settingsPath: join(root, "mcp-settings/settings.json"),
+        });
+        const context = await browser.newContext({
+          locale: "zh-CN", viewport: { width: 1180, height: 900 },
+          permissions: ["clipboard-read", "clipboard-write"],
+        });
+        const tab = await context.newPage();
+        await tab.goto(server.url);
+        await tab.getByRole("button", { name: /^(设置|Settings)$/ }).click();
+        await tab.getByRole("button", { name: "MCP", exact: true }).click();
+        await tab.getByText(/还没有工具调用记录|No tool calls recorded/i).waitFor();
+        await tab.getByText(/已就绪|^Ready$/i).first().waitFor();
+        await tab.getByRole("combobox", { name: /调用记录保留时间|Call log retention/i }).click();
+        await tab.getByRole("option", { name: /7 天|7 days/ }).click();
+        await tab.getByText(/已保存保留时间|Log retention saved/i).waitFor();
+        await tab.getByRole("button", { name: /复制配置|Copy configuration/i }).click();
+        await tab.getByText(/^(已复制|Copied)$/i).last().waitFor();
+        const config = JSON.parse(await tab.evaluate(() => navigator.clipboard.readText()));
+        expect(config.mcpServers.showai.env.SHOWAI_HOME).toBe(library);
+        await client.connect(new StdioClientTransport({ command: process.execPath, args: [
+          resolve("dist-runtime/scripts/cli.mjs"), "mcp", "--home", library,
+        ] }));
+        expect((await client.callTool({ name: "showai_capabilities", arguments: {} })).isError).not.toBe(true);
+        await tab.getByRole("button", { name: /^(刷新|Refresh)$/i }).click();
+        const row = tab.getByRole("row", { name: /showai_capabilities/ });
+        await row.waitFor();
+        expect(await row.innerText()).toContain("Settings QA");
+        await tab.screenshot({ path: join(output!, "mcp-settings-history.png") });
+        await tab.getByRole("combobox", { name: /传输方式|Transport/i }).click();
+        await tab.getByRole("option", { name: "HTTP", exact: true }).click();
+        await tab.getByText(/这种传输方式还没有调用记录|No calls recorded for this transport/i).waitFor();
+        await tab.getByRole("button", { name: /^(Agent 插件|Agent plugins)$/i }).click();
+        expect(await tab.locator(".plugin-verify-prompt").count()).toBe(0);
+        await tab.getByRole("button", { name: /^(远程 MCP|Remote MCP)$/i }).click();
+        await tab.getByRole("button", { name: "MCP", exact: true }).click();
+        await row.waitFor();
+        expect(await tab.getByRole("combobox", { name: /调用记录保留时间|Call log retention/i }).innerText()).toMatch(/7 天|7 days/);
+      } finally {
+        await client.close();
+        await server?.close();
+        await browser.close();
+      }
+    }, 120000);
     test("the DeepSeek settings button completes a real desktop-profile installation", async () => {
       const previous = process.env.DSH_HOME;
       process.env.DSH_HOME = join(root, "DSH settings acceptance");
@@ -574,7 +625,7 @@ describe.skipIf(!output || !config)(
         const tab = await browser.newPage({ locale: "zh-CN", viewport: { width: 1280, height: 900 } });
         await tab.goto(server.url);
         await tab.getByRole("button", { name: /^(设置|Settings)$/ }).click();
-        await tab.getByRole("button", { name: /外部 Agent 插件|External Agent plugins/i }).click();
+        await tab.getByRole("button", { name: /^(Agent 插件|Agent plugins)$/i }).click();
         const row = tab.locator('.plugin-host[data-host="deepseek"]');
         const installButton = row.getByRole("button", { name: /^(安装插件|Install plugin)$/i });
         const setupSteps = row.getByRole("button", { name: /查看安装步骤|Setup steps/i });

@@ -1,0 +1,111 @@
+{
+  "type": "object",
+  "properties": {
+    "columns": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 8,
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64
+          },
+          "label": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 40
+          },
+          "sub": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 80
+          },
+          "tone": {
+            "type": "string",
+            "enum": [
+              "brand",
+              "teal",
+              "warm",
+              "violet",
+              "rose",
+              "slate"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "label"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "rows": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 80,
+      "items": {
+        "type": "object",
+        "properties": {
+          "label": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          },
+          "hint": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 240
+          },
+          "group": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 40
+          },
+          "values": {
+            "type": "object",
+            "propertyNames": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64
+            },
+            "additionalProperties": {
+              "oneOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 240
+                }
+              ]
+            }
+          }
+        },
+        "required": [
+          "label",
+          "values"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "highlight": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 64
+    },
+    "note": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 600
+    }
+  },
+  "required": [
+    "columns",
+    "rows"
+  ],
+  "additionalProperties": false
+}

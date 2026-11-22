@@ -73,7 +73,11 @@ npm test        # Vitest 单元与集成测试
 
 Markdown 文件默认被忽略。新增公开 `.md` 文件需要把准确路径加入 `.gitignore` 的允许列表，否则 Git 会悄悄漏掉它。每份英文指南都有简体中文版本：`README.md` ↔ `docs/i18n/README.zh-CN.md`，`CONTRIBUTING.md` ↔ `docs/i18n/CONTRIBUTING.zh-CN.md`，`docs/TOPIC.md` ↔ `docs/i18n/TOPIC.zh-CN.md`。两种语言一起修改，新指南同时加入两个索引（`docs/README.md` 与 `docs/i18n/index.zh-CN.md`），并保持语言切换和相对链接有效。
 
-README、快速开始、横幅、应用欢迎文案和主页共用一套标语、一句话介绍和示例提示词，定义在 `scripts/release-entry.mjs`。修改后运行 `npm run release:check`。应用内置文档 `resources/docs` 是 showai.renaissancemind.ai/doc 页面的副本；请修改网站文档后运行 `npm run docs:sync -- --site <website>/site`，不要直接编辑副本。
+README、快速开始、横幅、应用欢迎文案和主页共用一套标语、一句话介绍和示例提示词，定义在 `scripts/release-entry.mjs`。修改后运行 `npm run release:check`。
+
+App 官方文档保存在 [resources/docs](../../resources/docs)。在桌面工作台打开「设置 → 通用 → 更换目录」，选择[中文库](../../resources/docs/zh-CN)或[英文库](../../resources/docs/en)，再从侧栏「项目」下打开文档项目即可编辑。保存会直接写回仓库里的页面 JSON，也可以用文本编辑器修改。每个项目都带有目录和组件源码。修改组件时，保存为新组件版本，再更新相关页面的组件引用。
+
+新增文档链接时，在 `resources/docs/routes.json` 登记页面 ID，中英文使用相同 ID。运行 `npm run docs:build` 更新侧栏索引，提交前用 `npm run docs:check` 核对。App 构建直接从本仓库读取页面及其引用的组件版本。
 
 文档中的每条命令都要对照实现它的代码核实，并写明描述的是哪个版本：源码、已安装的应用或插件、已部署的服务，还是已发布的版本。内部计划、凭据、本机路径、测试日志和验收证据不放进公开文档。
 

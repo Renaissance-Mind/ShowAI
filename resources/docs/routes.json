@@ -1,0 +1,28 @@
+{
+  "origin": "https://showai.renaissancemind.ai",
+  "projectId": "a23f1819-edaf-4c0c-824b-7662cb670a52",
+  "slugs": {
+    "": "2e9af66b-0a83-58f6-b3f5-a480f0f6abab",
+    "quick-start": "0b49bb7a-052c-5fe7-a05f-f647bb862a91",
+    "concepts": "c38eeda4-c709-5cae-bc63-2e4223ae0873",
+    "install": "35f9cd9f-42bc-56f3-a792-3961178925bb",
+    "page-board": "5130253b-e1ae-5e03-bf87-ec58d245de28",
+    "components": "e30c72da-65cb-5628-8d35-370c8ac92363",
+    "visuals": "6bd63230-60fc-561b-a445-2aea7c48e79e",
+    "export": "038265ef-4dcc-5b17-9003-83c716c14876",
+    "agent-hosts": "e8c001a7-4e9f-5515-a2e4-8ed6085ef46d",
+    "connect-mcp": "1c7a263c-bd9f-40ce-bc58-1870022f978b",
+    "agent-troubleshooting": "963599de-ed81-58ea-be92-5b68937966f8",
+    "chatgpt": "cf5d1ce9-369c-55de-923f-8da2ce92c74d",
+    "built-in-agent": "833d5f6c-651d-5abe-a8a4-542d6fe0be37",
+    "skills": "6e51cbfe-9394-571a-aa5a-5ff2fa96610e",
+    "library": "bd1ef961-f5d1-50a1-aded-0895dc63ebc7",
+    "project-server": "c51ee747-5e00-5bda-8c27-7465ace0566a",
+    "cloud": "56c95573-459b-54ae-9b0d-92c23b55fb88",
+    "operations": "c907d80d-f305-5558-bcbf-29ffd17d0f5d",
+    "architecture": "428dd837-61c9-5984-b3a5-0f577b6db22a",
+    "file-format": "d25297b7-5bfa-5283-ae6a-da5f8e524904",
+    "component-dev": "1b6dc3fc-a168-5ede-8cd2-fb3e22566de4",
+    "cli": "c207d0b8-8aa9-5290-95a5-2a6c4484456c"
+  }
+}

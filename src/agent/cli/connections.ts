@@ -41,7 +41,7 @@ const sync = (
 export const connectionCommands: CommandDeclaration[] = [
   {
     command: "serve",
-    options: { port: text, "no-open": flag, "dsh-origin": hiddenText, "linked-workbench": hiddenText },
+    options: { port: text, "no-open": flag, "dsh-origin": hiddenText, "linked-workbench": hiddenText, "detach-workbench": flag },
     help: ["serve [--home PATH] [--port PORT] [--no-open]"],
     async run(args) {
       requireCount(args, 1);
@@ -51,6 +51,7 @@ export const connectionCommands: CommandDeclaration[] = [
         port: option(args, "port"),
         dshOrigin: option(args, "dsh-origin"),
         linkedWorkbench: option(args, "linked-workbench"),
+        detachWorkbench: !!args.options["detach-workbench"],
         open: !args.options["no-open"],
         json: !!args.options.json,
       });

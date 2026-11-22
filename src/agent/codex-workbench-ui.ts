@@ -12,8 +12,8 @@ export const codexWorkbenchUri = "ui://showai/workbench-v3.html";
 export const codexWorkbenchThreadUri = "ui://showai/workbench-thread-v5.html";
 export const codexWorkbenchFileUri = "ui://showai/workbench-file-v3.html";
 
-export const codexWorkbenchCardUri = "ui://showai/workbench-card-v8.html";
-export const codexWorkbenchTargetUri = "ui://showai/workbench-target-v2.html";
+export const codexWorkbenchCardUri = "ui://showai/workbench-card-v10.html";
+export const codexWorkbenchTargetUri = "ui://showai/workbench-target-v3.html";
 
 export function codexWorkbenchHtml(
   mode?: CodexWorkbenchMode,
@@ -693,22 +693,8 @@ ${card}
     }
   }
 
-  if (card) {
-    let reportedHeight;
-    const observer = new ResizeObserver(() => {
-      if (!initialized || card.hidden || context.displayMode === "fullscreen") return;
-      const height = Math.ceil(card.getBoundingClientRect().height + spacingForm.getBoundingClientRect().height +
-        status.getBoundingClientRect().height);
-      if (height === reportedHeight) return;
-      reportedHeight = height;
-      send({ jsonrpc: "2.0", method: "ui/notifications/size-changed", params: {
-        height,
-      } });
-    });
-    observer.observe(card);
-    observer.observe(spacingForm);
-    observer.observe(status);
-  }
+  const reportCardSize = card && observeShowaiCardHeight([card, spacingForm, status],
+    () => initialized && root.hidden && context.displayMode !== "fullscreen");
   retry.addEventListener("click", () => {
     if (useFileEntrypoint) void readReferenceFile();
     else void refreshLaunch();
@@ -734,7 +720,10 @@ ${card}
     if (data.method === "ui/notifications/host-context-changed") {
       const previous = context[deepLinkExtension]?.url;
       configure({ ...context, ...data.params });
-      if (usePageCard && initialized && !openingCard) presentPageCard();
+      if (usePageCard && initialized && !openingCard) {
+        presentPageCard();
+        reportCardSize();
+      }
       if (ready && !useFileEntrypoint && !usePageCard && previous !== context[deepLinkExtension]?.url) {
         const target = currentUrl();
         const pageId = target.searchParams.get("page");
@@ -765,8 +754,10 @@ ${card}
     initialized = true;
     if (!ready && !pageCards.length) show("loading");
     send({ jsonrpc: "2.0", method: "ui/notifications/initialized" });
-    if (usePageCard) presentPageCard();
-    else if (useFileEntrypoint) {
+    if (usePageCard) {
+      presentPageCard();
+      reportCardSize();
+    } else if (useFileEntrypoint) {
       if (fileInput) void readReferenceFile();
       else launchTimer = setTimeout(() => show("failed", t("missingReferenceFile")), 8000);
     } else if (mode) void refreshLaunch();

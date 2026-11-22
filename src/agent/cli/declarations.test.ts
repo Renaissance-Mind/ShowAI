@@ -1,6 +1,7 @@
 import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { expect, test } from "vitest";
+import docsManifest from "../../../resources/docs/manifest.json";
 import { GLOBAL_OPTIONS, commandKey, type CommandDeclaration } from "./command";
 import {
   COMMANDS,
@@ -121,7 +122,11 @@ test("documented showai command lines use options their command takes", () => {
     join(repository, "src/agent/import-commands.ts"),
     ...textFiles(join(repository, "docs"), /\.md$/),
     ...textFiles(join(repository, "plugins"), /\.(md|mjs)$/),
-    ...textFiles(join(repository, "resources/docs"), /\.json$/),
+    ...new Set(Object.values(docsManifest.locales).flatMap((locale) =>
+      Object.values(locale.pages).flatMap((page) =>
+        [page.file, ...page.components].map((file) => join(repository, "resources/docs", file)),
+      ),
+    )),
     ...textFiles(join(repository, "resources/catalog"), /\.(md|json)$/),
   ];
   const rejected: string[] = [];

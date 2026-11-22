@@ -1,0 +1,589 @@
+{
+  "id": "doc-diagram",
+  "version": "1.0.0",
+  "name": "文档关系图",
+  "description": "文档用的交互式概念图 / 拓扑图：节点按网格摆放，连线自动走正交路径并带箭头和标签，可用分组底色归类；点选节点高亮它的连线和相邻节点，并在下方显示说明和文档链接。窄屏改为节点列表。",
+  "category": "flow",
+  "entry": "index.tsx",
+  "reader": "readData",
+  "scenarios": [
+    "解释产品概念之间的关系（内容库、项目、页面、组件……）",
+    "画系统拓扑或数据流向，并让读者逐个查看节点",
+    "文档首页的「文档地图」"
+  ],
+  "documentation": {
+    "version": 2,
+    "reuse": {
+      "kind": "domain",
+      "boundaries": [
+        "适合 3–16 个节点、3–5 列的概念图或拓扑图；节点位置由作者在网格上给出，不做自动布局。节点宽度随容器宽度计算（约 104–240px），放不下时整体改为列表。",
+        "不是流程图编辑器：读者只能查看和点选，不能拖动或修改。",
+        "需要时间顺序的交互请用 doc-sequence；分层架构请用 doc-layers。"
+      ],
+      "owner": "ShowAI 文档组件库（doc-*），用于 showai.renaissancemind.ai/doc 的页面"
+    },
+    "usage": {
+      "purpose": "用一张可点选的图解释几个概念或系统部件之间的关系，说明文字放在节点的 detail 里，而不是重复写在正文中。",
+      "structure": [
+        "顶部：caption 与操作提示。",
+        "中部：SVG 网格图，分组底色在最下层，其上是连线和标签，节点在最上层。",
+        "下方：所选节点的说明面板（标题、说明、关系列表、「打开文档 →」）。",
+        "宽度小于 640px（或列数太多放不下）时改为按分组排列的节点卡片列表，每张卡片列出「→ 连接到 X（标签）」。"
+      ],
+      "inputs": [
+        {
+          "path": "nodes",
+          "meaning": "节点列表。顺序不影响位置；Tab 键按行、再按列的阅读顺序在节点间移动。为空时显示空状态提示。"
+        },
+        {
+          "path": "nodes[].id",
+          "meaning": "节点唯一 id，edges 与 initial 用它引用节点。重复 id 的节点只保留第一个。"
+        },
+        {
+          "path": "nodes[].label",
+          "meaning": "节点标题。约 1000px 宽的页面中，4 列时 8 个汉字以内单行显示，5 列时约 5 个汉字；更长时折成两行，再长则在第二行末尾截断（说明面板与悬停提示显示全文）。"
+        },
+        {
+          "path": "nodes[].sub",
+          "meaning": "副标题，最多折成两行：4 列时约 16–18 个汉字、5 列时约 12 个汉字以内完整显示，更长时在第二行末尾截断。",
+          "omission": {
+            "behavior": "omit",
+            "description": "节点只显示标题；所有节点都没有副标题时节点更矮。"
+          }
+        },
+        {
+          "path": "nodes[].col",
+          "meaning": "网格列号，整数。坐标按所有节点与分组的最小值对齐，所以从 0 或 1 开始都可以。同一格只能放一个节点，后来的会被忽略。建议不超过 5 列。",
+          "units": "格（向右递增）"
+        },
+        {
+          "path": "nodes[].row",
+          "meaning": "网格行号，整数，向下递增。",
+          "units": "格（向下递增）"
+        },
+        {
+          "path": "nodes[].tone",
+          "meaning": "节点色调：brand | teal | warm | violet | rose | slate。用于图标底色、选中时的填充与相关连线的高亮。",
+          "omission": {
+            "behavior": "fallback",
+            "description": "使用 brand。",
+            "value": "brand"
+          }
+        },
+        {
+          "path": "nodes[].icon",
+          "meaning": "图标：一个 emoji 或 1–2 个字符。",
+          "omission": {
+            "behavior": "omit",
+            "description": "不显示图标，标题左对齐。"
+          }
+        },
+        {
+          "path": "nodes[].detail",
+          "meaning": "选中节点时显示在说明面板中的文字。支持 **粗体**、`代码`、[链接](https://…) 与 [链接](doc:slug#anchor)；换行分段。",
+          "omission": {
+            "behavior": "omit",
+            "description": "说明面板只显示标题、副标题与关系列表。"
+          }
+        },
+        {
+          "path": "nodes[].href",
+          "meaning": "相关文档链接，显示为「打开文档 →」。可以是 https://… 或 doc:slug#anchor。",
+          "omission": {
+            "behavior": "omit",
+            "description": "不显示文档链接。"
+          }
+        },
+        {
+          "path": "edges",
+          "meaning": "连线列表。引用不存在节点或首尾相同的连线会被跳过（readData 的 skipped.edges 中列出）。可以为空数组。"
+        },
+        {
+          "path": "edges[].from",
+          "meaning": "起点节点 id。"
+        },
+        {
+          "path": "edges[].to",
+          "meaning": "终点节点 id，箭头指向这里。"
+        },
+        {
+          "path": "edges[].label",
+          "meaning": "连线标签，显示在连线上的小底色标签中，建议 2–4 个汉字的动词（包含、插入、列出）。同一行相邻节点之间的标签会撑开列间距、让所有节点变窄，这类标签最好不超过 2–3 个汉字。",
+          "omission": {
+            "behavior": "omit",
+            "description": "连线不带标签。"
+          }
+        },
+        {
+          "path": "edges[].dashed",
+          "meaning": "是否画成虚线，用来表示可选、间接或异步的关系。",
+          "omission": {
+            "behavior": "fallback",
+            "description": "实线。",
+            "value": false
+          }
+        },
+        {
+          "path": "edges[].both",
+          "meaning": "是否双向：两端都画箭头。",
+          "omission": {
+            "behavior": "fallback",
+            "description": "单向，只有终点有箭头。",
+            "value": false
+          }
+        },
+        {
+          "path": "groups",
+          "meaning": "分组底色，画在节点下方，用来把同类节点框在一起。分组之间不要重叠。",
+          "omission": {
+            "behavior": "omit",
+            "description": "不画分组；窄屏列表也不分节。"
+          }
+        },
+        {
+          "path": "groups[].label",
+          "meaning": "分组名称，显示在分组左上角，建议不超过 8 个汉字。"
+        },
+        {
+          "path": "groups[].from",
+          "meaning": "分组矩形的一个角 [col, row]，与节点使用同一网格坐标。",
+          "units": "格"
+        },
+        {
+          "path": "groups[].to",
+          "meaning": "分组矩形的对角 [col, row]，包含该格。",
+          "units": "格"
+        },
+        {
+          "path": "groups[].tone",
+          "meaning": "分组色调：brand | teal | warm | violet | rose | slate。",
+          "omission": {
+            "behavior": "fallback",
+            "description": "使用 brand。",
+            "value": "brand"
+          }
+        },
+        {
+          "path": "initial",
+          "meaning": "初始选中的节点 id。",
+          "omission": {
+            "behavior": "omit",
+            "description": "初始不选中任何节点，说明面板显示提示；id 不存在时同样处理。"
+          }
+        },
+        {
+          "path": "caption",
+          "meaning": "图上方的一句说明，支持行内标记。",
+          "omission": {
+            "behavior": "omit",
+            "description": "不显示说明，只显示操作提示。"
+          }
+        }
+      ],
+      "recipes": [
+        {
+          "title": "画一张概念图",
+          "steps": [
+            "先在纸上把概念排进 3–4 列的网格，相关的放相邻格。",
+            "为每个节点写 label、一句 sub 和 2–3 句 detail，附上对应文档的 href。",
+            "只连真正需要说明的关系，标签用动词（包含、插入、列出）。",
+            "把同类节点用 groups 框起来，用 readData 检查 skipped 是否为空。"
+          ],
+          "exampleIndex": 0
+        }
+      ],
+      "interactions": [
+        {
+          "action": "点击节点，或 Tab 聚焦节点",
+          "effect": "选中该节点：高亮它的连线和相邻节点，其余变淡，下方显示说明。",
+          "persistence": "view"
+        },
+        {
+          "action": "方向键",
+          "effect": "移到该方向上最近的节点。",
+          "persistence": "view"
+        },
+        {
+          "action": "Esc 或点击空白处",
+          "effect": "取消选中。",
+          "persistence": "view"
+        },
+        {
+          "action": "点击说明面板中的关系",
+          "effect": "跳到另一端的节点。",
+          "persistence": "view"
+        },
+        {
+          "action": "窄屏点击节点卡片",
+          "effect": "展开或收起该节点的说明。",
+          "persistence": "view"
+        }
+      ],
+      "constraints": [
+        "阅读操作不修改页面数据。",
+        "节点文字不会被缩小到 12px 以下：容器变窄时重新计算格子尺寸，放不下时改为列表。"
+      ],
+      "editing": {
+        "data": [
+          "增删节点时同步检查 edges 与 groups 的引用。"
+        ],
+        "implementation": [
+          "增加自动布局或曲线连线时创建新版本。"
+        ]
+      }
+    },
+    "development": {
+      "entryPoints": [
+        {
+          "path": "index.tsx",
+          "purpose": "数据清洗 clean、网格布局与连线路由 layout、SVG 视图、列表视图与 readData。"
+        },
+        {
+          "path": "style.css",
+          "purpose": "令牌、亮暗主题、节点 / 连线 / 分组样式与窄屏列表。"
+        }
+      ],
+      "architecture": [
+        "clean() 丢弃无效或重复的节点、引用未知节点的连线，并把网格坐标对齐到 0。",
+        "layout() 按容器宽度（ResizeObserver 测量）计算格宽；连线按同行、同列或 Z 形三类选路，经过的格子有节点时改走相邻的行 / 列间隙。",
+        "同一条边上的多个端点按另一端的位置排开；共用同一间隙的连线分配不同的通道，标签彼此避让。",
+        "SVG 与容器等宽，不用 viewBox 缩放，所以文字始终是 12–14px；标题与副标题各自最多折成两行，所有节点取同一高度以保持行对齐。"
+      ],
+      "extensionPoints": [
+        "TONES 定义可用色调；pillW、gapX、gapY 控制标签与间距。"
+      ],
+      "invariants": [
+        "只导入 react；行内标记渲染为 React 元素，不注入 HTML。",
+        "阅读交互只改变本地状态，不调用 onChange。"
+      ],
+      "verification": [
+        "示例「核心概念图」在 1000px 宽度下应显示 4 列 3 行、3 个分组，节点宽约 165–185px，「内容库」副标题折成两行，「目录 → 组件」从上方的行间隙绕过「模板」。",
+        "在亮色、暗色和 390px 宽度下检查标签不重叠、列表视图显示连接。",
+        "readData 的 skipped 为空。"
+      ]
+    }
+  },
+  "defaultData": {
+    "caption": "Agent 通过 MCP 读写内容库，工作台显示同一份文件。",
+    "nodes": [
+      {
+        "id": "agent",
+        "label": "Agent",
+        "sub": "Codex / Claude Code",
+        "icon": "🤖",
+        "col": 0,
+        "row": 0,
+        "tone": "brand",
+        "detail": "在对话里理解需求，通过 MCP 工具读写页面。"
+      },
+      {
+        "id": "mcp",
+        "label": "ShowAI MCP",
+        "sub": "stdio 适配器",
+        "icon": "🔌",
+        "col": 1,
+        "row": 0,
+        "tone": "teal",
+        "detail": "提供 **page_read**、**page_save**、**page_present** 等工具。"
+      },
+      {
+        "id": "lib",
+        "label": "内容库",
+        "sub": "~/.showai",
+        "icon": "🗂️",
+        "col": 2,
+        "row": 0,
+        "tone": "violet",
+        "detail": "页面就是这里的 JSON 文件，带完整历史。",
+        "href": "https://showai.renaissancemind.ai/doc/library"
+      },
+      {
+        "id": "wb",
+        "label": "工作台",
+        "sub": "桌面版 / 浏览器",
+        "icon": "🖥️",
+        "col": 2,
+        "row": 1,
+        "tone": "warm",
+        "detail": "监听内容库，文件变化后自动刷新打开的页面。"
+      }
+    ],
+    "edges": [
+      {
+        "from": "agent",
+        "to": "mcp",
+        "label": "调用工具"
+      },
+      {
+        "from": "mcp",
+        "to": "lib",
+        "label": "读写",
+        "both": true
+      },
+      {
+        "from": "lib",
+        "to": "wb",
+        "label": "文件变化",
+        "dashed": true
+      }
+    ],
+    "initial": "mcp"
+  },
+  "examples": [
+    {
+      "name": "核心概念图：内容库、项目、Page、Board、组件、模板、目录",
+      "data": {
+        "caption": "内容库里的核心对象。点选一个概念，查看定义和它连到哪里。",
+        "initial": "page",
+        "groups": [
+          {
+            "label": "存放与组织",
+            "from": [
+              0,
+              0
+            ],
+            "to": [
+              2,
+              0
+            ],
+            "tone": "slate"
+          },
+          {
+            "label": "页面",
+            "from": [
+              1,
+              1
+            ],
+            "to": [
+              2,
+              1
+            ],
+            "tone": "brand"
+          },
+          {
+            "label": "复用",
+            "from": [
+              1,
+              2
+            ],
+            "to": [
+              3,
+              2
+            ],
+            "tone": "violet"
+          }
+        ],
+        "nodes": [
+          {
+            "id": "library",
+            "label": "内容库",
+            "sub": "默认 ~/.showai，可用 --home 指定",
+            "icon": "🗂️",
+            "col": 0,
+            "row": 0,
+            "tone": "slate",
+            "detail": "存放所有项目、页面、组件包和历史版本的目录。默认是用户主目录下的 `.showai`，也可以用 **SHOWAI_HOME** 或 CLI 的 `--home` 指定。桌面版、本地浏览器版和 CLI 共用同一个内容库。",
+            "href": "https://showai.renaissancemind.ai/doc/library"
+          },
+          {
+            "id": "project",
+            "label": "项目",
+            "sub": "一组相关页面",
+            "icon": "📁",
+            "col": 1,
+            "row": 0,
+            "tone": "slate",
+            "detail": "一组页面和项目级组件的容器，对应内容库里的 `projects/<project-id>/`。Agent 在同一个代码目录里工作时，会按这个目录找到同一个项目。",
+            "href": "https://showai.renaissancemind.ai/doc/library"
+          },
+          {
+            "id": "folder",
+            "label": "文件夹",
+            "sub": "项目内的层级",
+            "icon": "🗃️",
+            "col": 2,
+            "row": 0,
+            "tone": "slate",
+            "detail": "只是 `project.json` 里的层级信息：页面文件仍在 `pages/` 下，用 `parentId` 指向所属文件夹。归档文件夹会一起隐藏其中的页面。"
+          },
+          {
+            "id": "page",
+            "label": "Page",
+            "sub": "按阅读顺序排列",
+            "icon": "📄",
+            "col": 1,
+            "row": 1,
+            "tone": "brand",
+            "detail": "从上到下排列的文档流，适合说明、报告和讲解。区块有**稳定 id**，Agent 可以只改其中一块。Page 里可以放 Board，反之亦然。",
+            "href": "https://showai.renaissancemind.ai/doc/page-board"
+          },
+          {
+            "id": "board",
+            "label": "Board",
+            "sub": "自由画布",
+            "icon": "🧩",
+            "col": 2,
+            "row": 1,
+            "tone": "brand",
+            "detail": "可以自由摆放、绘制和对齐的画布，适合关系图、看板和演示。和 Page 一样能容纳组件，也能嵌在 Page 里。",
+            "href": "https://showai.renaissancemind.ai/doc/page-board"
+          },
+          {
+            "id": "component",
+            "label": "组件",
+            "sub": "内置 / 自定义",
+            "icon": "🧱",
+            "col": 1,
+            "row": 2,
+            "tone": "violet",
+            "detail": "插入到页面里的可交互区块。内置组件包括图表、导图和表格；自定义组件是 React 包，页面引用它的**精确版本**。",
+            "href": "https://showai.renaissancemind.ai/doc/components"
+          },
+          {
+            "id": "template",
+            "label": "模板",
+            "sub": "README + 阶段指南",
+            "icon": "📐",
+            "col": 2,
+            "row": 2,
+            "tone": "violet",
+            "detail": "可复用的创作方法：说明适用场景的 README、分阶段指南，以及可选的组件库。应用模板时 Agent 按阶段读取指南。",
+            "href": "https://showai.renaissancemind.ai/doc/components"
+          },
+          {
+            "id": "catalog",
+            "label": "目录",
+            "sub": "内置 · 全局 · 项目",
+            "icon": "📚",
+            "col": 3,
+            "row": 2,
+            "tone": "violet",
+            "detail": "查找组件和模板的地方，按作用范围分为内置、全局和项目三层。插入组件或应用模板前，先在目录里查到它和它的版本。",
+            "href": "https://showai.renaissancemind.ai/doc/components"
+          }
+        ],
+        "edges": [
+          {
+            "from": "library",
+            "to": "project",
+            "label": "包含"
+          },
+          {
+            "from": "project",
+            "to": "folder",
+            "label": "分层"
+          },
+          {
+            "from": "project",
+            "to": "page",
+            "label": "包含"
+          },
+          {
+            "from": "project",
+            "to": "board"
+          },
+          {
+            "from": "page",
+            "to": "board",
+            "label": "嵌套",
+            "both": true
+          },
+          {
+            "from": "page",
+            "to": "component",
+            "label": "插入"
+          },
+          {
+            "from": "board",
+            "to": "component"
+          },
+          {
+            "from": "template",
+            "to": "component",
+            "label": "附带",
+            "dashed": true
+          },
+          {
+            "from": "catalog",
+            "to": "template",
+            "label": "列出"
+          },
+          {
+            "from": "catalog",
+            "to": "component",
+            "label": "列出"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Agent、MCP、内容库与工作台",
+      "data": {
+        "caption": "Agent 通过 MCP 读写内容库，工作台显示同一份文件。",
+        "nodes": [
+          {
+            "id": "agent",
+            "label": "Agent",
+            "sub": "Codex / Claude Code",
+            "icon": "🤖",
+            "col": 0,
+            "row": 0,
+            "tone": "brand",
+            "detail": "在对话里理解需求，通过 MCP 工具读写页面。"
+          },
+          {
+            "id": "mcp",
+            "label": "ShowAI MCP",
+            "sub": "stdio 适配器",
+            "icon": "🔌",
+            "col": 1,
+            "row": 0,
+            "tone": "teal",
+            "detail": "提供 **page_read**、**page_save**、**page_present** 等工具。"
+          },
+          {
+            "id": "lib",
+            "label": "内容库",
+            "sub": "~/.showai",
+            "icon": "🗂️",
+            "col": 2,
+            "row": 0,
+            "tone": "violet",
+            "detail": "页面就是这里的 JSON 文件，带完整历史。",
+            "href": "https://showai.renaissancemind.ai/doc/library"
+          },
+          {
+            "id": "wb",
+            "label": "工作台",
+            "sub": "桌面版 / 浏览器",
+            "icon": "🖥️",
+            "col": 2,
+            "row": 1,
+            "tone": "warm",
+            "detail": "监听内容库，文件变化后自动刷新打开的页面。"
+          }
+        ],
+        "edges": [
+          {
+            "from": "agent",
+            "to": "mcp",
+            "label": "调用工具"
+          },
+          {
+            "from": "mcp",
+            "to": "lib",
+            "label": "读写",
+            "both": true
+          },
+          {
+            "from": "lib",
+            "to": "wb",
+            "label": "文件变化",
+            "dashed": true
+          }
+        ],
+        "initial": "mcp"
+      }
+    }
+  ]
+}

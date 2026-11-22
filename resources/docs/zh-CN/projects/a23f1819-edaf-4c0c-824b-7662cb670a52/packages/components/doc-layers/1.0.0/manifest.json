@@ -1,0 +1,333 @@
+{
+  "id": "doc-layers",
+  "version": "1.0.0",
+  "name": "文档分层架构图",
+  "description": "文档用的分层架构图：自上而下的横向分层，每层左侧是名称与说明，右侧是模块标签；点选模块在下方显示职责说明和源码路径。",
+  "category": "flow",
+  "entry": "index.tsx",
+  "reader": "readData",
+  "scenarios": [
+    "说明系统由哪几层组成、每层有哪些模块",
+    "架构文档中把模块和源码路径对应起来",
+    "解释请求从入口层一路到存储层"
+  ],
+  "documentation": {
+    "version": 2,
+    "reuse": {
+      "kind": "domain",
+      "boundaries": [
+        "适合 2–6 层、每层 1–8 个模块的分层结构；层与层之间默认是自上而下的依赖关系。",
+        "模块之间的具体连线请用 doc-diagram。",
+        "只读展示，不编辑数据。"
+      ],
+      "owner": "ShowAI 文档组件库（doc-*），用于 showai.renaissancemind.ai/doc 的页面"
+    },
+    "usage": {
+      "purpose": "用一张分层图说明架构，模块的职责和源码路径放进 detail / path，读者点选后查看。",
+      "structure": [
+        "顶部：caption 与操作提示。",
+        "中部：自上而下的分层，层与层之间有向下的细连接线。",
+        "下方：所选模块的说明面板（所属层 / 模块名、源码路径、说明）。",
+        "宽度小于 640px 时，每层的名称在上、模块标签在下。"
+      ],
+      "inputs": [
+        {
+          "path": "layers",
+          "meaning": "分层，自上而下排列（通常从入口到存储）。为空时显示空状态提示。"
+        },
+        {
+          "path": "layers[].name",
+          "meaning": "层名称，建议 2–6 个汉字。"
+        },
+        {
+          "path": "layers[].sub",
+          "meaning": "层的一句说明，显示在名称下方。",
+          "omission": {
+            "behavior": "omit",
+            "description": "只显示层名称。"
+          }
+        },
+        {
+          "path": "layers[].tone",
+          "meaning": "层色调：brand | teal | warm | violet | rose | slate。用于序号、模块圆点与选中状态。",
+          "omission": {
+            "behavior": "fallback",
+            "description": "按层的顺序依次使用 brand、teal、violet、warm、rose、slate。",
+            "computedFrom": [
+              "layers[].name"
+            ]
+          }
+        },
+        {
+          "path": "layers[].modules",
+          "meaning": "该层的模块，显示为可点选的标签。可以为空数组（显示「暂无模块」）。建议每层不超过 8 个。"
+        },
+        {
+          "path": "layers[].modules[].name",
+          "meaning": "模块名称，建议不超过 10 个字符。"
+        },
+        {
+          "path": "layers[].modules[].path",
+          "meaning": "源码路径或目录，以等宽字体显示在说明面板中。",
+          "omission": {
+            "behavior": "omit",
+            "description": "说明面板不显示路径。"
+          }
+        },
+        {
+          "path": "layers[].modules[].detail",
+          "meaning": "模块职责说明。支持 **粗体**、`代码`、[链接](https://…) 与 [链接](doc:slug#anchor)；换行分段。"
+        },
+        {
+          "path": "caption",
+          "meaning": "图上方的一句说明，支持行内标记。",
+          "omission": {
+            "behavior": "omit",
+            "description": "只显示操作提示。"
+          }
+        },
+        {
+          "path": "initial",
+          "meaning": "初始选中的模块：模块名，或「层名/模块名」（模块名在多个层中重复时使用）。",
+          "omission": {
+            "behavior": "omit",
+            "description": "初始不选中，说明面板显示提示；找不到时同样处理。"
+          }
+        }
+      ],
+      "recipes": [
+        {
+          "title": "画一张架构分层图",
+          "steps": [
+            "从用户入口到存储自上而下列出层。",
+            "每层只列读者需要知道的模块，写一句职责并核对源码路径。",
+            "用 initial 选中本节正文重点讲的模块。"
+          ],
+          "exampleIndex": 0
+        }
+      ],
+      "interactions": [
+        {
+          "action": "点击模块标签或用 Tab / Enter 选择",
+          "effect": "选中模块，在下方显示说明和路径；再次点击取消。",
+          "persistence": "view"
+        },
+        {
+          "action": "左右方向键",
+          "effect": "在同一层的模块间移动；上下方向键跨层。",
+          "persistence": "view"
+        }
+      ],
+      "constraints": [
+        "阅读操作不修改页面数据。"
+      ],
+      "editing": {
+        "data": [
+          "修改模块时核对 path 在仓库中存在。"
+        ],
+        "implementation": [
+          "需要横向分栏或层间具体连线时创建新版本。"
+        ]
+      }
+    },
+    "development": {
+      "entryPoints": [
+        {
+          "path": "index.tsx",
+          "purpose": "分层渲染、选择状态、键盘导航与 readData。"
+        },
+        {
+          "path": "style.css",
+          "purpose": "令牌、亮暗主题、分层与窄屏布局。"
+        }
+      ],
+      "architecture": [
+        "纯 HTML / CSS 布局：每层是两栏网格，窄屏变为单栏；层之间的连接线是装饰性的 SVG。"
+      ],
+      "extensionPoints": [
+        "未指定 tone 时按 ORDER 依次取色。"
+      ],
+      "invariants": [
+        "只导入 react；行内标记渲染为 React 元素。",
+        "阅读交互只改变本地状态。"
+      ],
+      "verification": [
+        "示例「ShowAI 架构」应显示 4 层，初始选中 MCP 并显示 src/agent/mcp.ts。",
+        "在亮色、暗色与 390px 宽度下检查模块换行与对齐。"
+      ]
+    }
+  },
+  "defaultData": {
+    "layers": [
+      {
+        "name": "页面",
+        "sub": "Page / Board",
+        "tone": "brand",
+        "modules": [
+          {
+            "name": "区块",
+            "detail": "文档流中的段落、标题、组件，每块有稳定 id。"
+          },
+          {
+            "name": "容器",
+            "detail": "Page 与 Board 可以互相嵌套。"
+          }
+        ]
+      },
+      {
+        "name": "组件",
+        "sub": "内置与自定义",
+        "tone": "violet",
+        "modules": [
+          {
+            "name": "内置组件",
+            "detail": "图表、导图、表格等，随应用提供。"
+          },
+          {
+            "name": "自定义组件",
+            "path": "packages/components/<id>/<version>/",
+            "detail": "React 包，页面引用它的精确版本。"
+          }
+        ]
+      }
+    ],
+    "initial": "自定义组件"
+  },
+  "examples": [
+    {
+      "name": "ShowAI 架构：入口层、工作台、核心、组件运行时",
+      "data": {
+        "caption": "从入口到文件：所有入口都调用同一套 TypeScript Core，内容最终是内容库里的普通文件。",
+        "initial": "MCP",
+        "layers": [
+          {
+            "name": "入口层",
+            "sub": "人和 Agent 从这里进入",
+            "tone": "brand",
+            "modules": [
+              {
+                "name": "桌面版",
+                "path": "src/desktop/main.ts",
+                "detail": "Electron App，自带运行时，窗口配置保存在系统应用数据目录。"
+              },
+              {
+                "name": "本地浏览器",
+                "path": "src/browser/server.ts",
+                "detail": "`showai serve` 启动的工作台，只监听回环地址，用 SSE 推送文件变化。"
+              },
+              {
+                "name": "CLI",
+                "path": "src/agent/cli.ts",
+                "detail": "按需执行的命令行，Agent 不依赖桌面窗口或常驻服务也能读写页面。"
+              },
+              {
+                "name": "MCP",
+                "path": "src/agent/mcp.ts",
+                "detail": "可选的 stdio MCP 适配器，给 Codex、Claude Code 等 Agent 提供 **page_read**、**page_save**、**page_present** 等工具。"
+              }
+            ]
+          },
+          {
+            "name": "工作台",
+            "sub": "编辑与阅读界面",
+            "tone": "teal",
+            "modules": [
+              {
+                "name": "共享工作台操作",
+                "path": "src/workbench/actions.ts",
+                "detail": "桌面版和本地服务调用同一份实现，保证两个入口行为一致。"
+              },
+              {
+                "name": "Page / Board 编辑器",
+                "path": "src/surface/",
+                "detail": "React 编辑器，和独立阅读器使用**同一份页面结构**。"
+              },
+              {
+                "name": "阅读器",
+                "detail": "导出后的页面使用的阅读视图，不需要工作台也能交互。"
+              }
+            ]
+          },
+          {
+            "name": "核心",
+            "sub": "TypeScript Core",
+            "tone": "violet",
+            "modules": [
+              {
+                "name": "存储",
+                "path": "src/core/content-library.ts",
+                "detail": "读写 `projects/<id>/pages/<page-id>.json`，并为每次保存留下快照。"
+              },
+              {
+                "name": "目录",
+                "path": "src/core/catalog.ts",
+                "detail": "解析内置、全局和项目三层的组件与模板，以及它们的版本。"
+              },
+              {
+                "name": "diff 与合并",
+                "path": "src/core/diff.ts",
+                "detail": "保存时比对基准 hash，内容已被别人改过时给出差异和合并预览，而不是直接覆盖。"
+              }
+            ]
+          },
+          {
+            "name": "组件运行时",
+            "sub": "沙箱中的自定义组件",
+            "tone": "warm",
+            "modules": [
+              {
+                "name": "沙箱 iframe",
+                "path": "src/components/custom/CustomBlock.tsx",
+                "detail": "自定义组件在 `allow-scripts` 沙箱里渲染，严格 CSP，不能访问网络。"
+              },
+              {
+                "name": "组件包",
+                "path": "packages/components/<id>/<version>/",
+                "detail": "编译后的组件按精确版本存放，导出时只收集页面用到的组件。"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "页面与组件两层",
+      "data": {
+        "layers": [
+          {
+            "name": "页面",
+            "sub": "Page / Board",
+            "tone": "brand",
+            "modules": [
+              {
+                "name": "区块",
+                "detail": "文档流中的段落、标题、组件，每块有稳定 id。"
+              },
+              {
+                "name": "容器",
+                "detail": "Page 与 Board 可以互相嵌套。"
+              }
+            ]
+          },
+          {
+            "name": "组件",
+            "sub": "内置与自定义",
+            "tone": "violet",
+            "modules": [
+              {
+                "name": "内置组件",
+                "detail": "图表、导图、表格等，随应用提供。"
+              },
+              {
+                "name": "自定义组件",
+                "path": "packages/components/<id>/<version>/",
+                "detail": "React 包，页面引用它的精确版本。"
+              }
+            ]
+          }
+        ],
+        "initial": "自定义组件"
+      }
+    }
+  ]
+}

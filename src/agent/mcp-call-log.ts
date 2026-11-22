@@ -7,12 +7,13 @@ import {
   rmSync,
   statSync,
 } from "node:fs";
-import { join, resolve } from "node:path";
+import { join } from "node:path";
 import { performance } from "node:perf_hooks";
 import type { Transport } from "@modelcontextprotocol/sdk/shared/transport.js";
 import type { JSONRPCMessage } from "@modelcontextprotocol/sdk/types.js";
 import packageMetadata from "../../package.json";
 import { redact } from "../core/redact";
+import { libraryMcpLogDirectory, mcpCallLogName, mcpLogDirectory, readMcpRetention } from "./mcp-log-settings";
 
 type ObjectValue = Record<string, unknown>;
 const object = (value: unknown): ObjectValue =>
@@ -71,12 +72,11 @@ export class McpCallLog {
       maxBytes?: number;
       files?: number;
       retentionMs?: number;
+      settingsDirectory?: string;
     },
   ) {
     this.enabled = options.enabled ?? process.env.SHOWAI_MCP_LOG !== "0";
-    this.directory = resolve(
-      process.env.SHOWAI_MCP_LOG_DIRECTORY || options.directory,
-    );
+    this.directory = mcpLogDirectory(options.directory);
     this.path = join(
       this.directory,
       `calls-${process.pid}-${this.instanceId}.jsonl`,
@@ -137,8 +137,10 @@ export class McpCallLog {
     return call;
   }
 
-  authorize(call: McpLoggedCall | undefined, grantId: string) {
-    if (call) call.fields.authorizationId = digest(grantId);
+  authorize(call: McpLoggedCall | undefined, grantId: string, clientName?: string) {
+    if (!call) return;
+    call.fields.authorizationId = digest(grantId);
+    if (clientName) call.fields.client = label(clientName);
   }
 
   finish(
@@ -210,9 +212,11 @@ export class McpCallLog {
         this.initialized = true;
       }
       if (Date.now() >= this.pruneAt) {
-        const cutoff = Date.now() - (this.options.retentionMs ?? 30 * 86400000);
+        const retention = this.options.retentionMs ??
+          readMcpRetention(this.options.settingsDirectory ?? this.directory) * 86400000;
+        const cutoff = Date.now() - retention;
         for (const name of readdirSync(this.directory)) {
-          if (!/^calls-\d+-[a-f0-9-]{36}(?:\.\d+)?\.jsonl$/.test(name))
+          if (!mcpCallLogName.test(name))
             continue;
           const path = join(this.directory, name);
           try {
@@ -267,6 +271,7 @@ export function recordMcpCalls(
 ) {
   const log = new McpCallLog({
     directory: directory ?? join(root, "local", "mcp-logs"),
+    settingsDirectory: libraryMcpLogDirectory(root),
     transport: "stdio",
     projectId,
   });

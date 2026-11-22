@@ -3,20 +3,13 @@ import { useEffect, useState } from "react";
 import type { PluginHost, PluginInstallation } from "../plugin/desktop-install";
 import type { RuntimeRegistrationStatus } from "../agent/runtime";
 import type { AgentConnectionRecord } from "../agent/mcp-connections";
-import type { DesktopInfo } from "../host/protocol";
-import {
-  launchSnippet,
-  runtimeMcpLaunch,
-  type LaunchSnippetKind,
-  type McpLaunch,
-} from "../plugin/launch-snippets";
 import { getLocale, type Translator } from "../i18n";
 import { useTranslator } from "../i18n/react";
 import messages from "../i18n/messages/pluginInstall";
 import onboardingMessages from "../i18n/messages/onboarding";
 import settingsMessages from "../i18n/messages/settings";
 import { PendingNotice } from "../ui/PendingNotice";
-import { CircleAlert, Copy, ExternalLink, FolderOpen, RefreshCw } from "../ui/icons";
+import { CircleAlert, FolderOpen, RefreshCw } from "../ui/icons";
 import Dialog from "../ui/Dialog";
 import { desktop, errorMessage } from "../host/bridge";
 import {
@@ -30,7 +23,7 @@ import {
   usePluginHosts,
   type PluginBatchResult,
 } from "./usePluginHosts";
-import { AGENT_TROUBLESHOOTING, connectionHost } from "./AgentReadiness";
+import { connectionHost } from "./AgentReadiness";
 import LocalPluginSetups from "./LocalPluginSetups";
 import AgentBrandIcon from "./AgentBrandIcon";
 import { SettingsPath } from "./SettingsPath";
@@ -197,130 +190,7 @@ export function useFailureReason() {
   };
 }
 
-function VerifyPrompt({ label }: { label: string }) {
-  const t = useTranslator(onboardingMessages);
-  const notify = useNotify();
-  const [error, setError] = useState("");
-  return (
-    <div className="plugin-verify-prompt">
-      <div className="plugin-install-path">
-        <span>{label}</span>
-        <code>{t("verify.prompt")}</code>
-        <button
-          type="button"
-          className="settings-button"
-          onClick={() =>
-            void desktop
-              .invoke("clipboard:write", { text: t("verify.prompt") })
-              .then(() => notify(t("verify.copied")))
-              .catch((reason) => setError(errorMessage(reason)))
-          }
-        >
-          <Copy size={14} aria-hidden="true" />
-          {t("verify.copy")}
-        </button>
-      </div>
-      <a href={AGENT_TROUBLESHOOTING} target="_blank" rel="noreferrer">
-        <ExternalLink size={12} aria-hidden="true" />
-        {t("verify.help")}
-      </a>
-      {error && (
-        <p role="alert" className="plugin-install-error">
-          {error}
-        </p>
-      )}
-    </div>
-  );
-}
-
-export function VerifyConnection({
-  hosts,
-  busy,
-  onRepair,
-}: {
-  hosts: PluginInstallation[];
-  busy: boolean;
-  onRepair: (host: PluginHost, failure: string) => Promise<boolean>;
-}) {
-  const t = useTranslator(onboardingMessages);
-  const { states, error } = useVerifyStates(hosts);
-  const reason = useFailureReason();
-  const notify = useNotify();
-  const [repaired, setRepaired] = useState<PluginHost[]>([]);
-  return (
-    <div className="settings-row plugin-verify">
-      <div className="settings-row-text">
-        <h3>{t("verify.title")}</h3>
-        <VerifyPrompt label={t("verify.detail")} />
-        <ul className="plugin-verify-hosts">
-          {hosts.map((host) => {
-            const state = states.get(host.host)!;
-            return (
-              <li key={host.host} data-state={state.kind}>
-                <strong>{pluginHostNames[host.host]}</strong>
-                <span role="status">
-                  {state.kind === "called"
-                    ? t("verify.called", { time: formatTime(state.at) })
-                    : state.kind === "connected"
-                      ? t("verify.connected", { time: formatTime(state.at) })
-                      : state.kind === "failed"
-                        ? t("verify.failed", {
-                            time: formatTime(state.at),
-                            reason: reason(state.code),
-                          })
-                        : state.kind === "notSinceInstall"
-                          ? t("verify.notSinceInstall")
-                          : t("verify.waiting")}
-                </span>
-                {state.kind === "failed" && (
-                  <>
-                    <button
-                      type="button"
-                      className="settings-button"
-                      disabled={busy}
-                      onClick={() =>
-                        void onRepair(host.host, state.code).then((done) => {
-                          if (done) {
-                            notify(t("verify.repaired"));
-                            setRepaired((items) =>
-                              items.includes(host.host)
-                                ? items
-                                : [...items, host.host],
-                            );
-                          }
-                        })
-                      }
-                    >
-                      {busy ? t("verify.repairing") : t("verify.repair")}
-                    </button>
-                    {state.detail && (
-                      <section className="plugin-verify-detail">
-                        <h3 className="settings-section-heading">
-                          {t("verify.details")}
-                        </h3>
-                        <pre className="plugin-install-details">
-                          {state.code}: {state.detail}
-                        </pre>
-                      </section>
-                    )}
-                  </>
-                )}
-              </li>
-            );
-          })}
-        </ul>
-        {repaired.length > 0 && <RestartHints hosts={repaired} />}
-        {error && (
-          <p role="alert" className="plugin-install-error">
-            {error}
-          </p>
-        )}
-      </div>
-    </div>
-  );
-}
-
-export const RUNTIME_FAILURES = new Set([
+const RUNTIME_FAILURES = new Set([
   "RUNTIME_MISSING",
   "RUNTIME_INVALID",
   "RUNTIME_UNAVAILABLE",
@@ -329,7 +199,7 @@ export const RUNTIME_FAILURES = new Set([
   "RUNTIME_START_FAILED",
 ]);
 
-function RuntimeRegistration({
+export function RuntimeRegistration({
   runtime,
   busy,
   onRepair,
@@ -484,105 +354,6 @@ function ManualPath({
         </div>
       )}
     </div>
-  );
-}
-
-export function LaunchConfigCopy({ info }: { info: DesktopInfo | null }) {
-  const t = useTranslator(messages);
-  const notify = useNotify();
-  const [exporting, setExporting] = useState(false);
-  const [launcher, setLauncher] = useState<McpLaunch | null>(null);
-  const [copied, setCopied] = useState<LaunchSnippetKind | null>(null);
-  const [error, setError] = useState("");
-  useEffect(() => {
-    if (!info) return;
-    let stopped = false;
-    void desktop
-      .invoke<McpLaunch>("plugins:launchConfig")
-      .then((value) => {
-        if (!stopped) setLauncher(value);
-      })
-      .catch((reason) => {
-        if (!stopped) setError(errorMessage(reason));
-      });
-    return () => {
-      stopped = true;
-    };
-  }, [info]);
-  if (!info) return null;
-  const server = launcher ?? runtimeMcpLaunch(info.cli);
-  const kinds = ["claude", "codex", "json"] as const;
-  async function exportUniversal() {
-    setError("");
-    setExporting(true);
-    try {
-      const result = await desktop.invoke<{ path: string } | null>(
-        "remoteMcp:exportPlugin", { universal: true },
-      );
-      if (result) notify(t("universalSaved", { path: result.path }));
-    } catch (reason) {
-      setError(errorMessage(reason));
-    } finally {
-      setExporting(false);
-    }
-  }
-  return (
-    <section
-      className="settings-group plugin-launch-config"
-      aria-labelledby="settings-launch-title"
-    >
-      <div className="settings-group-heading">
-        <div>
-          <h2 id="settings-launch-title">{t("launch.title")}</h2>
-          <p className="settings-group-desc">{t("launch.detail")}</p>
-        </div>
-        {info.mode === "desktop" && (
-          <button
-            type="button"
-            className="settings-button"
-            disabled={exporting}
-            onClick={exportUniversal}
-          >
-            {t("exportUniversal")}
-          </button>
-        )}
-      </div>
-      {kinds.map((kind) => {
-        const text = launchSnippet(kind, server, info.platform);
-        return (
-          <section key={kind} className="settings-config">
-            <h3 className="settings-section-heading">
-              <span>{t(`launch.${kind}Hint`)}</span>
-              <button
-                className="settings-button"
-                type="button"
-                onClick={() => {
-                  setError("");
-                  void desktop
-                    .invoke("clipboard:write", { text })
-                    .then(() => {
-                      setCopied(kind);
-                      notify(t("copied"));
-                    })
-                    .catch((reason) => setError(errorMessage(reason)));
-                }}
-              >
-                <Copy size={14} aria-hidden="true" />
-                {copied === kind ? t("copied") : t(`launch.${kind}`)}
-              </button>
-            </h3>
-            <pre>
-              <code>{text}</code>
-            </pre>
-          </section>
-        );
-      })}
-      {error && (
-        <p role="alert" className="plugin-install-error">
-          {error}
-        </p>
-      )}
-    </section>
   );
 }
 

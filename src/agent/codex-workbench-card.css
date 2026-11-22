@@ -14,6 +14,7 @@
   --card-focus: color-mix(in srgb, CanvasText 55%, Canvas);
   position: relative;
   display: grid;
+  min-height: 0;
   align-content: start;
   gap: var(--showai-card-stack-gap);
   padding: 3px 2px calc(3px + var(--showai-card-menu-room, 0px));

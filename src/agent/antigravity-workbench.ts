@@ -28,7 +28,7 @@ import cardMarkup from "./codex-workbench-card.html?raw";
 import cardView from "./codex-workbench-card-view.js?raw";
 import cardSpacingEditor from "./codex-workbench-card-spacing.js?raw";
 
-export const antigravityCardUri = "ui://showai/antigravity-card-v1.html";
+export const antigravityCardUri = "ui://showai/antigravity-card-v2.html";
 export const antigravityFileUri = "ui://showai/antigravity-file-v1.html";
 export const antigravityGlobalUri = "ui://showai/antigravity-workbench-v1.html";
 const NAV_FILE = "antigravity-workbench-nav.json";
@@ -383,14 +383,7 @@ ${cardStyles}
     updateCardControls();
   }
 
-  let lastHeight = 0;
-  function reportSize() {
-    const height = Math.ceil(document.body.getBoundingClientRect().height);
-    if (height > 0 && height !== lastHeight) {
-      lastHeight = height;
-      notify("ui/notifications/size-changed", { height });
-    }
-  }
+  const reportSize = observeShowaiCardHeight([card, spacingForm, status], () => initialized);
 
   window.addEventListener("message", event => {
     if (event.source !== parent || event.data?.jsonrpc !== "2.0") return;
@@ -425,6 +418,7 @@ ${cardStyles}
       applyHostContext(result?.hostContext);
       notify("ui/notifications/initialized");
       if (pageCards.length) updateCardControls();
+      else reportSize();
     })
     .catch(err => {
       if (!pageCards.length) {
@@ -433,13 +427,6 @@ ${cardStyles}
       }
     });
 
-  const ro = new ResizeObserver(reportSize);
-  ro.observe(document.body);
-  ro.observe(card);
-  new MutationObserver(reportSize).observe(card, {
-    attributes: true,
-    attributeFilter: ["style", "hidden"],
-  });
 })();
 </script></body></html>`;
 }
@@ -810,17 +797,21 @@ export function antigravityWorkbenchConnection(
       }
 
       const mimeType = "text/html;profile=mcp-app";
-      server.registerResource(
-        "antigravity_page_card",
-        antigravityCardUri,
+      for (const [name, uri] of [
+        ["antigravity_page_card", antigravityCardUri],
+        ["antigravity_page_card_v1", "ui://showai/antigravity-card-v1.html"],
+      ]) server.registerResource(
+        name,
+        uri,
         { mimeType },
         async () => ({
           contents: [
             {
-              uri: antigravityCardUri,
+              uri,
               mimeType,
               text: antigravityCardHtml(antigravityIcons[0].src),
               _meta: {
+                "openai/widgetMinFrameHeight": 0,
                 ui: {
                   prefersBorder: false,
                 },

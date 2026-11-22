@@ -1,0 +1,900 @@
+{
+  "id": "doc-commands",
+  "version": "1.0.0",
+  "name": "Documentation command reference",
+  "description": "Searchable command reference: Filter by group to search for commands, purposes, and parameters and highlight matches; expand a command to view descriptions, parameter tables, and reproducible examples.",
+  "category": "other",
+  "entry": "index.tsx",
+  "reader": "readData",
+  "scenarios": [
+    "CLI and MCP command reference",
+    "List keyboard shortcuts, scripts, or configuration commands",
+    "Find in long command lists by purpose and parameters"
+  ],
+  "documentation": {
+    "version": 2,
+    "reuse": {
+      "kind": "domain",
+      "boundaries": [
+        "List of commands, shortcuts, or scripts for use in ShowAI documentation: One line per command plus a sentence of purpose that expands descriptions, parameters, and examples.",
+        "Suitable for 10–150 items; not used for data tables that require sorting or multi-column numerical comparisons.",
+        "Read-only display: Search, filter and expand only change the local view and do not modify the page data."
+      ]
+    },
+    "usage": {
+      "purpose": "Allow readers to find commands by task: enter keywords or parameter names to immediately narrow the scope, and expand and directly copy the example.",
+      "structure": [
+        "Top search box: matches commands, purposes, and parameters (parameter names and descriptions) at the same time; multiple keywords are separated by spaces and all must be matched; matching text is highlighted. Esc to clear, ↓ to enter the list.",
+        "Group filtering: \"All\" and each group, the number is the number of matches under the current search; click the selected group again to return to \"All\".",
+        "The list is divided into groups: each line is a command in monospaced font (program name is faded, subcommands are bolded, placeholders are faded) and a sentence of purpose; only commands with matching parameters will list the matching parameters.",
+        "Expand a row to show detail, parameter table, and example with copy button. Commands without detail, flags, and example cannot be expanded.",
+        "If there is no match, an empty status is displayed. You can clear the search or return to all groups."
+      ],
+      "inputs": [
+        {
+          "path": "groups",
+          "meaning": "Group, in order of presentation; groups 3–7 recommended."
+        },
+        {
+          "path": "groups[].id",
+          "meaning": "Group ID, referenced by commands[].group, unique."
+        },
+        {
+          "path": "groups[].label",
+          "meaning": "Group name, displayed on filter buttons and section titles."
+        },
+        {
+          "path": "commands",
+          "meaning": "Commands are arranged in the order of display; commands in the same group are displayed in the original order under this group. Maximum of 200 entries, no more than 150 entries recommended."
+        },
+        {
+          "path": "commands[].group",
+          "meaning": "The id of the group it belongs to. Commands that do not match any group appear in the \"Other\" group at the end, and readData is listed in ungrouped."
+        },
+        {
+          "path": "commands[].command",
+          "meaning": "The command line is displayed as is in a fixed-width font. Program names such as showai, ./showai, npm, node, etc. at the beginning are diluted; the first word after them is the command name and is bolded, which can be a CLI subcommand or MCP tool name (such as page_read, showai_capabilities, including _ . -); consecutive lowercase words (such as pages read) after the CLI subcommand are bolded, and the tool name is no longer bolded. Those starting with - are parameters, and uppercase words (PAGE, PATH) are considered placeholders."
+        },
+        {
+          "path": "commands[].summary",
+          "meaning": "One sentence purpose, displayed below the command and involved in the search. Plain text."
+        },
+        {
+          "path": "commands[].detail",
+          "meaning": "The expanded description supports **bold**,`代码`, [link](href); blank lines are segmented, and lines starting with \"-\" become a list. Do not participate in the search.",
+          "omission": {
+            "behavior": "omit",
+            "description": "Expand without showing description."
+          }
+        },
+        {
+          "path": "commands[].flags",
+          "meaning": "Parameter table, displayed in order, participates in search.",
+          "omission": {
+            "behavior": "omit",
+            "description": "The parameter table is not displayed. When detail, flags, and example are all omitted, the line cannot be expanded."
+          }
+        },
+        {
+          "path": "commands[].flags[].flag",
+          "meaning": "Parameter writing method, such as --home PATH. Should be unique within the same command."
+        },
+        {
+          "path": "commands[].flags[].meaning",
+          "meaning": "Parameter description, supports inline tags."
+        },
+        {
+          "path": "commands[].example",
+          "meaning": "Ready-to-run examples, displayed as is in the code panel with a copy button; can be multiple lines.",
+          "omission": {
+            "behavior": "omit",
+            "description": "The sample panel is not displayed."
+          }
+        },
+        {
+          "path": "placeholder",
+          "meaning": "Placeholder text for the search box.",
+          "omission": {
+            "behavior": "fallback",
+            "description": "Displays \"Search for command, parameter or purpose\".",
+            "value": "Search for a command, parameter or purpose"
+          }
+        }
+      ],
+      "recipes": [
+        {
+          "title": "Put together a CLI reference",
+          "steps": [
+            "Divide into 3–7 groups by reader tasks (e.g. Run and Connect, Projects and Pages, Display and Export), not by source code module.",
+            "command writes the form in the help output (uppercase placeholders, square brackets indicate optional); summary writes what the reader uses it to do.",
+            "For commonly used commands, add flags and an example that can be run directly; for unpopular commands, just write a summary.",
+            "Use readData to check that ungrouped is empty and the number of each group is reasonable."
+          ],
+          "exampleIndex": 0
+        }
+      ],
+      "interactions": [
+        {
+          "action": "Enter in the search box",
+          "effect": "Filter commands and highlight matches; the numbers on the group buttons update. Esc clears, ↓ moves to the first command.",
+          "persistence": "view"
+        },
+        {
+          "action": "Click the group button",
+          "effect": "Show only this group; click again to return to all.",
+          "persistence": "view"
+        },
+        {
+          "action": "Click the command line or press Enter",
+          "effect": "Expand or collapse descriptions, parameters, and examples; ↑ ↓ moves between commands.",
+          "persistence": "view"
+        },
+        {
+          "action": "Click to copy",
+          "effect": "Copy the example; the sandbox prohibits copying when selecting code and prompting you to press ⌘C / Ctrl+C.",
+          "persistence": "none"
+        }
+      ],
+      "constraints": [
+        "Reading operations do not modify page data.",
+        "The search is not case-sensitive and matches commands, purposes, and parameters by substring; detail and example do not participate in the search.",
+        "The list has no internal scrolling and grows in height with the displayed command; commands often rely on grouping and searching to shorten the list."
+      ],
+      "editing": {
+        "data": [
+          "Commands[].group is updated synchronously when adding or deleting groups.",
+          "When the command writing method changes, the example is updated at the same time."
+        ],
+        "implementation": [
+          "A new version is required for detail to participate in searches or to support command aliases."
+        ]
+      },
+      "rules": [
+        {
+          "kind": "unique",
+          "path": "groups[].id"
+        },
+        {
+          "kind": "reference",
+          "path": "commands[].group",
+          "target": "groups[].id"
+        }
+      ]
+    },
+    "development": {
+      "entryPoints": [
+        {
+          "path": "index.tsx",
+          "purpose": "Components, search index prepare(), matching and highlighting ranges() / marked(), command coloring CommandLine, CodePanel, md() / mdBlock() and readData."
+        },
+        {
+          "path": "style.css",
+          "purpose": "Design tokens (including dark colors), search boxes, group buttons, lists, expanded details, parameter tables, code panels, empty states and narrow screen rules."
+        }
+      ],
+      "architecture": [
+        "prepare() pre-calculates the lowercase command, purpose and parameter text for each command; only substring comparison is performed for each input, and no anti-shaking is required for more than 100 inputs. Search terms are deferred filtered through useDeferredValue and input remains smooth.",
+        "Highlighting calculates the matching interval on the entire command text, and then segments and renders it by word unit, so keywords that span subcommands and parameters (such as \"pages read\") can also be fully highlighted.",
+        "The expanded state is saved in a local Set keyed by the command index, and searches and filters are not reset."
+      ],
+      "extensionPoints": [
+        "Classification rules for command tokens are in the CommandLine; suggestions for empty states are at the end of the component."
+      ],
+      "invariants": [
+        "The component does not call onChange; all interactions only change local state.",
+        "Do not use dangerouslySetInnerHTML; both highlighting and inline markup generate React elements."
+      ],
+      "verification": [
+        "Example 0: 5 groups of 40 items; search for theme and only pages read is left and list the matching parameters --theme dark in the line; search for \"pages read\" and highlight two words.",
+        "Searching for words that do not exist displays an empty state; when searching for other groups in a certain group, \"View in all groups\" is provided.",
+        "Check out the search box, grouping, expanded parameter table and code panel in 1000 px, 390 px and dark themes."
+      ]
+    }
+  },
+  "defaultData": {
+    "groups": [
+      {
+        "id": "run",
+        "label": "Run and connect"
+      },
+      {
+        "id": "project",
+        "label": "Projects and Pages"
+      }
+    ],
+    "commands": [
+      {
+        "group": "run",
+        "command": "serve [--home PATH] [--port PORT] [--no-open]",
+        "summary": "Start the browser workbench on this machine.",
+        "detail": "The service **only listens** to `127.0.0.1 `and generates new access credentials every time it is started. Keep the terminal open; press Ctrl+C to stop the service, close the browser tab and just close the interface.",
+        "flags": [
+          {
+            "flag": "--home PATH",
+            "meaning": "Use the specified content library directory; if not specified, use `SHOWAI_HOME `or the default `~/.showai `."
+          },
+          {
+            "flag": "--port PORT",
+            "meaning": "Fixed port; if not specified, an idle port will be selected."
+          },
+          {
+            "flag": "--no-open",
+            "meaning": "Only prints the address and does not automatically open the browser."
+          }
+        ],
+        "example": "showai serve --home ~/ShowAI --port 5175 --no-open"
+      },
+      {
+        "group": "run",
+        "command": "mcp [--project PROJECT] [--templates ID[@VERSION],ID]",
+        "summary": "Start the local MCP service in stdio mode for Agents such as Codex and Claude Code to connect.",
+        "detail": "One connection uses one content library. You can use `--project `to bind the project and `--templates `to preselect the template.",
+        "flags": [
+          {
+            "flag": "--project PROJECT",
+            "meaning": "Target project ID; if not specified, the project will be determined based on the Git root directory where the current directory is located."
+          },
+          {
+            "flag": "--templates ID[@VERSION],ID",
+            "meaning": "Pre-selected templates to specify exact versions."
+          },
+          {
+            "flag": "--presentation-directory PATH",
+            "meaning": "Directory to save presentation files."
+          }
+        ],
+        "example": "showai mcp --project 4f1c…"
+      },
+      {
+        "group": "run",
+        "command": "mcp --public",
+        "summary": "Start the read-only public directory MCP: browse public components and templates, no personal project required."
+      },
+      {
+        "group": "run",
+        "command": "mcp serve --state DIRECTORY --public-url HTTPS_ORIGIN",
+        "summary": "Run remote MCP service over HTTP.",
+        "detail": "For self-hosted remote MCP.`--public-url `must be an externally accessible HTTPS address.",
+        "flags": [
+          {
+            "flag": "--state DIRECTORY",
+            "meaning": "Service status directory."
+          },
+          {
+            "flag": "--public-url HTTPS_ORIGIN",
+            "meaning": "The public address where clients access this service."
+          },
+          {
+            "flag": "--sync-server SERVER_ORIGIN",
+            "meaning": "The project server address used for synchronization."
+          },
+          {
+            "flag": "--port 8789",
+            "meaning": "Listening port, default 8789."
+          }
+        ]
+      },
+      {
+        "group": "run",
+        "command": "runtime info",
+        "summary": "View the running environment and content library currently used by the CLI."
+      },
+      {
+        "group": "run",
+        "command": "runtime register",
+        "summary": "Register `agent-runtime.json `of the current content library to let the Agent find the correct content library and execution path.",
+        "detail": "After moving the distribution package, run it again to refresh the execution path in the configuration.",
+        "flags": [
+          {
+            "flag": "--home PATH",
+            "meaning": "Use the specified content library directory; if not specified, use `SHOWAI_HOME `or the default `~/.showai `."
+          },
+          {
+            "flag": "--json",
+            "meaning": "Output machine-readable JSON, used when calling the Agent."
+          }
+        ],
+        "example": "./showai runtime register --json"
+      }
+    ],
+    "placeholder": "Search for commands or parameters"
+  },
+  "examples": [
+    {
+      "name": "ShowAI CLI Command Reference (Group 5)",
+      "data": {
+        "groups": [
+          {
+            "id": "run",
+            "label": "Run and connect"
+          },
+          {
+            "id": "project",
+            "label": "Projects and Pages"
+          },
+          {
+            "id": "discover",
+            "label": "Components & Templates"
+          },
+          {
+            "id": "deliver",
+            "label": "Display and export"
+          },
+          {
+            "id": "library",
+            "label": "Content Library"
+          }
+        ],
+        "commands": [
+          {
+            "group": "run",
+            "command": "serve [--home PATH] [--port PORT] [--no-open]",
+            "summary": "Start the browser workbench on this machine.",
+            "detail": "The service **only listens** to `127.0.0.1 `and generates new access credentials every time it is started. Keep the terminal open; press Ctrl+C to stop the service, close the browser tab and just close the interface.",
+            "flags": [
+              {
+                "flag": "--home PATH",
+                "meaning": "Use the specified content library directory; if not specified, use `SHOWAI_HOME `or the default `~/.showai `."
+              },
+              {
+                "flag": "--port PORT",
+                "meaning": "Fixed port; if not specified, an idle port will be selected."
+              },
+              {
+                "flag": "--no-open",
+                "meaning": "Only prints the address and does not automatically open the browser."
+              }
+            ],
+            "example": "showai serve --home ~/ShowAI --port 5175 --no-open"
+          },
+          {
+            "group": "run",
+            "command": "mcp [--project PROJECT] [--templates ID[@VERSION],ID]",
+            "summary": "Start the local MCP service in stdio mode for Agents such as Codex and Claude Code to connect.",
+            "detail": "One connection uses one content library. You can use `--project `to bind the project and `--templates `to preselect the template.",
+            "flags": [
+              {
+                "flag": "--project PROJECT",
+                "meaning": "Target project ID; if not specified, the project will be determined based on the Git root directory where the current directory is located."
+              },
+              {
+                "flag": "--templates ID[@VERSION],ID",
+                "meaning": "Pre-selected templates to specify exact versions."
+              },
+              {
+                "flag": "--presentation-directory PATH",
+                "meaning": "Directory to save presentation files."
+              }
+            ],
+            "example": "showai mcp --project 4f1c…"
+          },
+          {
+            "group": "run",
+            "command": "mcp --public",
+            "summary": "Start the read-only public directory MCP: browse public components and templates, no personal project required."
+          },
+          {
+            "group": "run",
+            "command": "mcp serve --state DIRECTORY --public-url HTTPS_ORIGIN",
+            "summary": "Run remote MCP service over HTTP.",
+            "detail": "For self-hosted remote MCP.`--public-url `must be an externally accessible HTTPS address.",
+            "flags": [
+              {
+                "flag": "--state DIRECTORY",
+                "meaning": "Service status directory."
+              },
+              {
+                "flag": "--public-url HTTPS_ORIGIN",
+                "meaning": "The public address where clients access this service."
+              },
+              {
+                "flag": "--sync-server SERVER_ORIGIN",
+                "meaning": "The project server address used for synchronization."
+              },
+              {
+                "flag": "--port 8789",
+                "meaning": "Listening port, default 8789."
+              }
+            ]
+          },
+          {
+            "group": "run",
+            "command": "runtime info",
+            "summary": "View the running environment and content library currently used by the CLI."
+          },
+          {
+            "group": "run",
+            "command": "runtime register",
+            "summary": "Register `agent-runtime.json `of the current content library to let the Agent find the correct content library and execution path.",
+            "detail": "After moving the distribution package, run it again to refresh the execution path in the configuration.",
+            "flags": [
+              {
+                "flag": "--home PATH",
+                "meaning": "Use the specified content library directory; if not specified, use `SHOWAI_HOME `or the default `~/.showai `."
+              },
+              {
+                "flag": "--json",
+                "meaning": "Output machine-readable JSON, used when calling the Agent."
+              }
+            ],
+            "example": "./showai runtime register --json"
+          },
+          {
+            "group": "project",
+            "command": "projects list",
+            "summary": "List items in the content library.",
+            "flags": [
+              {
+                "flag": "--home PATH",
+                "meaning": "Use the specified content library directory; if not specified, use `SHOWAI_HOME `or the default `~/.showai `."
+              },
+              {
+                "flag": "--json",
+                "meaning": "Output machine-readable JSON, used when calling the Agent."
+              }
+            ],
+            "example": "showai projects list --json"
+          },
+          {
+            "group": "project",
+            "command": "projects create --name NAME",
+            "summary": "Create a new project and return the project ID.",
+            "flags": [
+              {
+                "flag": "--name NAME",
+                "meaning": "Project name."
+              },
+              {
+                "flag": "--harness HOST --session SESSION_ID",
+                "meaning": "At the same time, bind the project to a session of an Agent host."
+              },
+              {
+                "flag": "--home PATH",
+                "meaning": "Use the specified content library directory; if not specified, use `SHOWAI_HOME `or the default `~/.showai `."
+              },
+              {
+                "flag": "--json",
+                "meaning": "Output machine-readable JSON, used when calling the Agent."
+              }
+            ],
+            "example": "showai projects create --name \"model research\" --json"
+          },
+          {
+            "group": "project",
+            "command": "projects current [--source-directory PROJECT_DIRECTORY]",
+            "summary": "View the project corresponding to a source code directory.",
+            "detail": "When no parameters are passed, the project is determined by the Git root directory where the current directory is located.",
+            "flags": [
+              {
+                "flag": "--source-directory PROJECT_DIRECTORY",
+                "meaning": "Parse projects by this directory."
+              },
+              {
+                "flag": "--project PROJECT",
+                "meaning": "Target project ID; if not specified, the project will be determined based on the Git root directory where the current directory is located."
+              }
+            ]
+          },
+          {
+            "group": "project",
+            "command": "projects bind PROJECT --harness HOST --session SESSION_ID",
+            "summary": "Bind an existing project to a session of the Agent host."
+          },
+          {
+            "group": "project",
+            "command": "pages list --project PROJECT",
+            "summary": "List the pages in the project.",
+            "flags": [
+              {
+                "flag": "--project PROJECT",
+                "meaning": "Target project ID; if not specified, the project will be determined based on the Git root directory where the current directory is located."
+              },
+              {
+                "flag": "--json",
+                "meaning": "Output machine-readable JSON, used when calling the Agent."
+              }
+            ],
+            "example": "showai pages list --project 4f1c… --json"
+          },
+          {
+            "group": "project",
+            "command": "pages read PAGE --project PROJECT [--view structured|image|html]",
+            "summary": "Read a page: structured data, screenshot, or interactive HTML.",
+            "detail": "When changing content, read **structured** (default); when checking style and layout, read **image**; when checking interaction, read **html**. Screenshots require Chrome, Edge, or Chromium to be installed natively.",
+            "flags": [
+              {
+                "flag": "--view structured|image|html",
+                "meaning": "Reading form, default structured."
+              },
+              {
+                "flag": "--theme dark",
+                "meaning": "Screenshot in dark theme."
+              },
+              {
+                "flag": "--width N --height N",
+                "meaning": "Screenshot viewport size, maximum height is 2160."
+              },
+              {
+                "flag": "--out PATH",
+                "meaning": "The output path of images or HTML;`--overwrite `needs to be added when the file already exists."
+              },
+              {
+                "flag": "--blocks ID,ID",
+                "meaning": "Only read the specified node (`attrs.id `in the page)."
+              },
+              {
+                "flag": "--state OPTIONS.json",
+                "meaning": "Interaction steps for playback while HTML is being read."
+              }
+            ],
+            "example": "showai pages read PAGE --project PROJECT --view image --theme dark --width 1000 --height 900 --out ./preview.png --json"
+          },
+          {
+            "group": "project",
+            "command": "pages read PAGE --project PROJECT --format markdown [--detail full|outline]",
+            "summary": "Read page text and component data using Markdown.",
+            "detail": "`--detail outline `first returns the outline with a stable ID, and then uses `--blocks `to read the required part.",
+            "flags": [
+              {
+                "flag": "--detail full|outline",
+                "meaning": "Full content or just the synopsis."
+              },
+              {
+                "flag": "--blocks ID,ID",
+                "meaning": "Only read the specified node."
+              }
+            ],
+            "example": "showai pages read PAGE --project PROJECT --detail outline --json"
+          },
+          {
+            "group": "project",
+            "command": "boards read PAGE --project PROJECT [--board BOARD_NODE]",
+            "summary": "Read the whiteboard in the page.",
+            "flags": [
+              {
+                "flag": "--board BOARD_NODE",
+                "meaning": "The Board node ID to read."
+              },
+              {
+                "flag": "--state OPTIONS.json",
+                "meaning": "Read options."
+              }
+            ]
+          },
+          {
+            "group": "project",
+            "command": "search --query TEXT [--project ID] [--kind page|component|template|project|source]",
+            "summary": "Search the content library for pages, components, templates, or projects.",
+            "flags": [
+              {
+                "flag": "--query TEXT",
+                "meaning": "Search text."
+              },
+              {
+                "flag": "--kind …",
+                "meaning": "Searches for only one type of object: page, component, template, project, or source."
+              }
+            ],
+            "example": "showai search --query mortgage --kind page --json"
+          },
+          {
+            "group": "discover",
+            "command": "guide [TOPIC]",
+            "summary": "View precise commands for authoring, versioning and delivery by topic.",
+            "detail": "Topics: workspace, reading, authoring, containers, document, catalog, component, templates, versions, recovery, sync, export, publish.",
+            "example": "showai guide component"
+          },
+          {
+            "group": "discover",
+            "command": "catalog list [--kind component|template] [--scope SCOPE]",
+            "summary": "List available components or templates: name, description and applicable scenarios.",
+            "detail": "Scope includes builtin, global, published and project. If no scope is specified, all built-in components and components of the selected project are returned.",
+            "flags": [
+              {
+                "flag": "--kind component|template",
+                "meaning": "List components or templates."
+              },
+              {
+                "flag": "--scope SCOPE",
+                "meaning": "builtin, global, published or project."
+              },
+              {
+                "flag": "--query TEXT",
+                "meaning": "Filter by text."
+              },
+              {
+                "flag": "--limit N --cursor CURSOR",
+                "meaning": "Pagination."
+              }
+            ],
+            "example": "showai catalog list --kind component --project PROJECT --json"
+          },
+          {
+            "group": "discover",
+            "command": "catalog describe ID [--kind component|template] [--view VIEW]",
+            "summary": "View a component or template's description, parameters, examples, or source code.",
+            "detail": "Commonly used views: guide (usage convention), schema (parameters), examples (complete examples), source (source code), parameters (item-by-item parameter description, you can use `--parameter-path `to select fields).",
+            "flags": [
+              {
+                "flag": "--view guide|schema|examples|source|parameters",
+                "meaning": "The section to view, which defaults to the summary."
+              },
+              {
+                "flag": "--parameter-path PATH",
+                "meaning": "View only a certain field or subtree in the parameters view."
+              }
+            ],
+            "example": "showai catalog describe doc-compare --kind component --view schema --json"
+          },
+          {
+            "group": "discover",
+            "command": "catalog import --project PROJECT --input DIRECTORY",
+            "summary": "Import local component packages into the project.",
+            "detail": "The component package contains `manifest.json `,`props.schema.json `and React entries. The same id and version cannot be changed after import. When modifying the implementation, increase the version number.",
+            "flags": [
+              {
+                "flag": "--project PROJECT",
+                "meaning": "Target project ID; if not specified, the project will be determined based on the Git root directory where the current directory is located."
+              },
+              {
+                "flag": "--input DIRECTORY",
+                "meaning": "Component package folder."
+              }
+            ],
+            "example": "showai catalog import --project PROJECT --input ./components/doc-compare --json"
+          },
+          {
+            "group": "discover",
+            "command": "public list [--kind component|template] [--query TEXT]",
+            "summary": "Browse components and templates in the public catalog, no personal project required."
+          },
+          {
+            "group": "discover",
+            "command": "public describe ID [--view guide|schema|examples|source]",
+            "summary": "View the description, parameters, examples, or source code of a public component or template."
+          },
+          {
+            "group": "discover",
+            "command": "template import DIRECTORY --project PROJECT",
+            "summary": "Import the template folder into the project."
+          },
+          {
+            "group": "discover",
+            "command": "template export ID --project PROJECT --out NEW_DIRECTORY",
+            "summary": "Export the templates in the project as a folder."
+          },
+          {
+            "group": "discover",
+            "command": "template context --project PROJECT [--templates ID[@VERSION],ID]",
+            "summary": "View the authoring context of the selected template."
+          },
+          {
+            "group": "discover",
+            "command": "template guide STAGE --project PROJECT",
+            "summary": "Read guidelines for a template at a certain stage (e.g. planning, design)."
+          },
+          {
+            "group": "deliver",
+            "command": "export --project PROJECT --page PAGE --format html|inline --out PATH",
+            "summary": "Export entire pages or selected blocks as standalone HTML.",
+            "detail": "By default, the reader, content and component runtime are packaged and can be read offline. Add `--blocks `to export only selected blocks.",
+            "flags": [
+              {
+                "flag": "--format html|inline",
+                "meaning": "html is the complete page; inline is a fragment embedded in the host conversation."
+              },
+              {
+                "flag": "--blocks ID,ID",
+                "meaning": "Export only these nodes and necessary parent containers."
+              },
+              {
+                "flag": "--out PATH",
+                "meaning": "Output file; if it already exists, add `--overwrite `."
+              }
+            ],
+            "example": "showai export --project PROJECT --page PAGE --format html --out ./report.html --json"
+          },
+          {
+            "group": "deliver",
+            "command": "export --project PROJECT --format site --out DIRECTORY",
+            "summary": "Export the entire project as a static website.",
+            "example": "showai export --project PROJECT --format site --out ./site --json"
+          },
+          {
+            "group": "deliver",
+            "command": "render --input INPUT_JSON --out PAGE.html",
+            "summary": "Without going through a project, directly render a page JSON into HTML.",
+            "detail": "The source file is verified before generation and external link images are rejected, so the successfully rendered page is self-contained.",
+            "flags": [
+              {
+                "flag": "--overwrite",
+                "meaning": "Overwrite existing files."
+              }
+            ]
+          },
+          {
+            "group": "deliver",
+            "command": "render --template TEMPLATE_ID --title TITLE --out PAGE.html",
+            "summary": "Use a template to generate a standalone page."
+          },
+          {
+            "group": "library",
+            "command": "library init",
+            "summary": "Initialize the versioned content library."
+          },
+          {
+            "group": "library",
+            "command": "library verify",
+            "summary": "Verify the integrity of the content library."
+          },
+          {
+            "group": "library",
+            "command": "library stats",
+            "summary": "View the size and object statistics of the content library."
+          },
+          {
+            "group": "library",
+            "command": "library cleanup-plan [--older-than-days DAYS]",
+            "summary": "Generate a cleanup plan that lists old data that can be recycled.",
+            "detail": "First generate the plan, confirm it, and then use `library cleanup PLAN_ID `to execute it."
+          },
+          {
+            "group": "library",
+            "command": "library cleanup PLAN_ID",
+            "summary": "Implement a confirmed cleanup plan."
+          },
+          {
+            "group": "library",
+            "command": "library archive --out ABSOLUTE_NEW_DIRECTORY",
+            "summary": "Archive the content library to a new directory.",
+            "example": "showai library archive --out /Volumes/Backup/showai-2026-10 --json"
+          },
+          {
+            "group": "library",
+            "command": "library verify-archive ARCHIVE_DIRECTORY",
+            "summary": "Verify an archive."
+          },
+          {
+            "group": "library",
+            "command": "library import --source OLD_PATH --home NEW_OR_SAME_PATH",
+            "summary": "Import from old content library.",
+            "detail": "After importing, use `library activate IMPORT_ID `to enable it."
+          },
+          {
+            "group": "library",
+            "command": "library migrate --home PATH",
+            "summary": "Prepare, verify, and enable migrations in-place, preserving original files."
+          },
+          {
+            "group": "library",
+            "command": "workspace conflicts [--project ID]",
+            "summary": "Lists file conflicts caused by external modifications."
+          },
+          {
+            "group": "library",
+            "command": "workspace resolve CONFLICT_ID --resolution discard|import|merge",
+            "summary": "Handle a conflict: drop, import or merge.",
+            "flags": [
+              {
+                "flag": "--resolution discard|import|merge",
+                "meaning": "Processing; both inputs are retained until explicitly selected."
+              }
+            ]
+          }
+        ],
+        "placeholder": "Search commands, flags, or usage: export, --theme"
+      }
+    },
+    {
+      "name": "Run and project commands (lite)",
+      "data": {
+        "groups": [
+          {
+            "id": "run",
+            "label": "Run and connect"
+          },
+          {
+            "id": "project",
+            "label": "Projects and Pages"
+          }
+        ],
+        "commands": [
+          {
+            "group": "run",
+            "command": "serve [--home PATH] [--port PORT] [--no-open]",
+            "summary": "Start the browser workbench on this machine.",
+            "detail": "The service **only listens** to `127.0.0.1 `and generates new access credentials every time it is started. Keep the terminal open; press Ctrl+C to stop the service, close the browser tab and just close the interface.",
+            "flags": [
+              {
+                "flag": "--home PATH",
+                "meaning": "Use the specified content library directory; if not specified, use `SHOWAI_HOME `or the default `~/.showai `."
+              },
+              {
+                "flag": "--port PORT",
+                "meaning": "Fixed port; if not specified, an idle port will be selected."
+              },
+              {
+                "flag": "--no-open",
+                "meaning": "Only prints the address and does not automatically open the browser."
+              }
+            ],
+            "example": "showai serve --home ~/ShowAI --port 5175 --no-open"
+          },
+          {
+            "group": "run",
+            "command": "mcp [--project PROJECT] [--templates ID[@VERSION],ID]",
+            "summary": "Start the local MCP service in stdio mode for Agents such as Codex and Claude Code to connect.",
+            "detail": "One connection uses one content library. You can use `--project `to bind the project and `--templates `to preselect the template.",
+            "flags": [
+              {
+                "flag": "--project PROJECT",
+                "meaning": "Target project ID; if not specified, the project will be determined based on the Git root directory where the current directory is located."
+              },
+              {
+                "flag": "--templates ID[@VERSION],ID",
+                "meaning": "Pre-selected templates to specify exact versions."
+              },
+              {
+                "flag": "--presentation-directory PATH",
+                "meaning": "Directory to save presentation files."
+              }
+            ],
+            "example": "showai mcp --project 4f1c…"
+          },
+          {
+            "group": "run",
+            "command": "mcp --public",
+            "summary": "Start the read-only public directory MCP: browse public components and templates, no personal project required."
+          },
+          {
+            "group": "run",
+            "command": "mcp serve --state DIRECTORY --public-url HTTPS_ORIGIN",
+            "summary": "Run remote MCP service over HTTP.",
+            "detail": "For self-hosted remote MCP.`--public-url `must be an externally accessible HTTPS address.",
+            "flags": [
+              {
+                "flag": "--state DIRECTORY",
+                "meaning": "Service status directory."
+              },
+              {
+                "flag": "--public-url HTTPS_ORIGIN",
+                "meaning": "The public address where clients access this service."
+              },
+              {
+                "flag": "--sync-server SERVER_ORIGIN",
+                "meaning": "The project server address used for synchronization."
+              },
+              {
+                "flag": "--port 8789",
+                "meaning": "Listening port, default 8789."
+              }
+            ]
+          },
+          {
+            "group": "run",
+            "command": "runtime info",
+            "summary": "View the running environment and content library currently used by the CLI."
+          },
+          {
+            "group": "run",
+            "command": "runtime register",
+            "summary": "Register `agent-runtime.json `of the current content library to let the Agent find the correct content library and execution path.",
+            "detail": "After moving the distribution package, run it again to refresh the execution path in the configuration.",
+            "flags": [
+              {
+                "flag": "--home PATH",
+                "meaning": "Use the specified content library directory; if not specified, use `SHOWAI_HOME `or the default `~/.showai `."
+              },
+              {
+                "flag": "--json",
+                "meaning": "Output machine-readable JSON, used when calling the Agent."
+              }
+            ],
+            "example": "./showai runtime register --json"
+          }
+        ],
+        "placeholder": "Search for commands or parameters"
+      }
+    }
+  ]
+}

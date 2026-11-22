@@ -1,3 +1,20 @@
+function observeShowaiCardHeight(elements, isInline) {
+  let reportedHeight;
+  function reportSize() {
+    if (!isInline()) {
+      reportedHeight = undefined;
+      return;
+    }
+    const height = Math.ceil(elements.reduce((sum, element) => sum + element.getBoundingClientRect().height, 0));
+    if (height === reportedHeight) return;
+    reportedHeight = height;
+    parent.postMessage({ jsonrpc: "2.0", method: "ui/notifications/size-changed", params: { height } }, "*");
+  }
+  const observer = new ResizeObserver(reportSize);
+  for (const element of elements) observer.observe(element, { box: "border-box" });
+  return reportSize;
+}
+
 function createShowaiCardView(list, template, openTarget) {
   let active;
 

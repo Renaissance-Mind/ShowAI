@@ -1,0 +1,333 @@
+{
+  "id": "doc-layers",
+  "version": "1.0.0",
+  "name": "Document layered architecture diagram",
+  "description": "Layered architecture diagram for documentation: horizontal layering from top to bottom. The left side of each layer is the name and description, and the right side is the module label; click on the module to display the responsibility description and source code path below.",
+  "category": "flow",
+  "entry": "index.tsx",
+  "reader": "readData",
+  "scenarios": [
+    "Explain which layers the system consists of and what modules each layer has.",
+    "Match modules and source code paths in the architecture document",
+    "Explain the request from the entry layer all the way to the storage layer"
+  ],
+  "documentation": {
+    "version": 2,
+    "reuse": {
+      "kind": "domain",
+      "boundaries": [
+        "Suitable for hierarchical structures with 2–6 layers and 1–8 modules per layer; the default is top-down dependency between layers.",
+        "Please use doc-diagram for specific connections between modules.",
+        "Read-only display, no data editing."
+      ],
+      "owner": "ShowAI document component library (doc-*), used for pages in showai.renaissancemind.ai/doc"
+    },
+    "usage": {
+      "purpose": "Use a hierarchical diagram to illustrate the architecture, and put the module's responsibilities and source code path into detail / path, and readers can click to view it.",
+      "structure": [
+        "Top: caption and operation tips.",
+        "Middle part: layered from top to bottom, with thin downward connecting lines between layers.",
+        "Below: Description panel of the selected module (layer/module name, source code path, description).",
+        "When the width is less than 640px, the name of each layer is at the top and the module label is at the bottom."
+      ],
+      "inputs": [
+        {
+          "path": "layers",
+          "meaning": "Hierarchical, arranged from top to bottom (usually from entrance to storage). When empty, an empty status prompt is displayed."
+        },
+        {
+          "path": "layers[].name",
+          "meaning": "Layer name, 2–6 Chinese characters are recommended."
+        },
+        {
+          "path": "layers[].sub",
+          "meaning": "A description of the layer, displayed below the name.",
+          "omission": {
+            "behavior": "omit",
+            "description": "Only the layer name is displayed."
+          }
+        },
+        {
+          "path": "layers[].tone",
+          "meaning": "Layer tones: brand | teal | warm | violet | rose | slate. Used for serial numbers, module dots and selected status.",
+          "omission": {
+            "behavior": "fallback",
+            "description": "Use brand, teal, violet, warm, rose, slate in order of layers.",
+            "computedFrom": [
+              "layers[].name"
+            ]
+          }
+        },
+        {
+          "path": "layers[].modules",
+          "meaning": "Modules of this layer are displayed as clickable labels. It can be an empty array (displaying \"No module yet\"). No more than 8 per layer is recommended."
+        },
+        {
+          "path": "layers[].modules[].name",
+          "meaning": "Module name, it is recommended not to exceed 10 characters."
+        },
+        {
+          "path": "layers[].modules[].path",
+          "meaning": "The source code path or directory is displayed in the description panel in fixed-width font.",
+          "omission": {
+            "behavior": "omit",
+            "description": "The description panel does not display the path."
+          }
+        },
+        {
+          "path": "layers[].modules[].detail",
+          "meaning": "Module responsibilities description. Supports **bold**,`代码`, [Link](https://…) and [Link](doc:slug#anchor); line break segmentation."
+        },
+        {
+          "path": "caption",
+          "meaning": "A description above the figure supports inline markup.",
+          "omission": {
+            "behavior": "omit",
+            "description": "Only operation prompts are displayed."
+          }
+        },
+        {
+          "path": "initial",
+          "meaning": "Initial selected module: module name, or \"layer name/module name\" (used when the module name is repeated in multiple layers).",
+          "omission": {
+            "behavior": "omit",
+            "description": "If it is not selected initially, the description panel will display a prompt; if it cannot be found, the same process will be performed."
+          }
+        }
+      ],
+      "recipes": [
+        {
+          "title": "Draw an architecture layered diagram",
+          "steps": [
+            "List the layers from top to bottom from user portal to storage.",
+            "At each layer, only the modules that readers need to know are listed, write a sentence of responsibility and check the source code path.",
+            "Use initial to select the modules focused on in this section."
+          ],
+          "exampleIndex": 0
+        }
+      ],
+      "interactions": [
+        {
+          "action": "Click the module label or select with Tab / Enter",
+          "effect": "Select the module and display the description and path below; click Cancel again.",
+          "persistence": "view"
+        },
+        {
+          "action": "Left and right arrow keys",
+          "effect": "Move between modules on the same layer; use the up and down arrow keys to cross layers.",
+          "persistence": "view"
+        }
+      ],
+      "constraints": [
+        "Reading operations do not modify page data."
+      ],
+      "editing": {
+        "data": [
+          "When modifying the module, check that path exists in the repository."
+        ],
+        "implementation": [
+          "Create a new version when horizontal columns or specific connections between layers are needed."
+        ]
+      }
+    },
+    "development": {
+      "entryPoints": [
+        {
+          "path": "index.tsx",
+          "purpose": "Layered rendering, selection state, keyboard navigation and readData."
+        },
+        {
+          "path": "style.css",
+          "purpose": "Tokens, light and dark themes, layered and narrow screen layouts."
+        }
+      ],
+      "architecture": [
+        "Pure HTML / CSS layout: each layer is a two-column grid, which becomes a single column for narrow screens; the connecting lines between layers are decorative SVG."
+      ],
+      "extensionPoints": [
+        "When no tone is specified, press ORDER to select colors in sequence."
+      ],
+      "invariants": [
+        "Only react is imported; inline markup is rendered as React elements.",
+        "Reading interactions only change local state."
+      ],
+      "verification": [
+        "The example \"ShowAI Architecture\" should show 4 layers, with MCP initially selected and src/agent/mcp.ts displayed.",
+        "Check module wrapping and alignment in light, dark and 390px width."
+      ]
+    }
+  },
+  "defaultData": {
+    "layers": [
+      {
+        "name": "page",
+        "sub": "Page / Board",
+        "tone": "brand",
+        "modules": [
+          {
+            "name": "block",
+            "detail": "Paragraphs, headings, components in the document flow, each block has a stable id."
+          },
+          {
+            "name": "container",
+            "detail": "Page and Board can be nested within each other."
+          }
+        ]
+      },
+      {
+        "name": "components",
+        "sub": "Built-in vs. custom",
+        "tone": "violet",
+        "modules": [
+          {
+            "name": "Built-in components",
+            "detail": "Charts, maps, tables, etc. are provided with the application."
+          },
+          {
+            "name": "Custom component",
+            "path": "packages/components/<id>/<version>/",
+            "detail": "React package, the exact version of which the page refers to."
+          }
+        ]
+      }
+    ],
+    "initial": "Custom component"
+  },
+  "examples": [
+    {
+      "name": "ShowAI architecture: entry layer, workbench, core, component runtime",
+      "data": {
+        "caption": "From entry to file: All entries call the same set of TypeScript Core, and the content is ultimately an ordinary file in the content library.",
+        "initial": "MCP",
+        "layers": [
+          {
+            "name": "entrance level",
+            "sub": "People and Agents enter here",
+            "tone": "brand",
+            "modules": [
+              {
+                "name": "Desktop version",
+                "path": "src/desktop/main.ts",
+                "detail": "Electron App comes with its own runtime, and the window configuration is saved in the system application data directory."
+              },
+              {
+                "name": "local browser",
+                "path": "src/browser/server.ts",
+                "detail": "The workbench started by `showai serve `only listens to the loopback address and uses SSE to push file changes."
+              },
+              {
+                "name": "CLI",
+                "path": "src/agent/cli.ts",
+                "detail": "The command line is executed on demand. The Agent can read and write pages without relying on desktop windows or resident services."
+              },
+              {
+                "name": "MCP",
+                "path": "src/agent/mcp.ts",
+                "detail": "The optional stdio MCP adapter provides **page_read**, **page_save**, **page_present** and other tools for Agents such as Codex and Claude Code."
+              }
+            ]
+          },
+          {
+            "name": "Workbench",
+            "sub": "Editing and reading interface",
+            "tone": "teal",
+            "modules": [
+              {
+                "name": "Shared workbench operation",
+                "path": "src/workbench/actions.ts",
+                "detail": "The desktop version and the local service call the same implementation to ensure that the two entrances behave consistently."
+              },
+              {
+                "name": "Page/Board Editor",
+                "path": "src/surface/",
+                "detail": "The React editor uses the same page structure as the standalone reader."
+              },
+              {
+                "name": "reader",
+                "detail": "The exported page uses the reading view, which can be interacted with without a workbench."
+              }
+            ]
+          },
+          {
+            "name": "core",
+            "sub": "TypeScript Core",
+            "tone": "violet",
+            "modules": [
+              {
+                "name": "storage",
+                "path": "src/core/content-library.ts",
+                "detail": "Read and write `projects/<id>/pages/<page-id>.json `, leaving a snapshot for each save."
+              },
+              {
+                "name": "Table of contents",
+                "path": "src/core/catalog.ts",
+                "detail": "Analyze built-in, global and project-level components and templates, as well as their versions."
+              },
+              {
+                "name": "diff and merge",
+                "path": "src/core/diff.ts",
+                "detail": "The base hash is compared when saving. If the content has been modified by others, a difference and merge preview will be given instead of overwriting it directly."
+              }
+            ]
+          },
+          {
+            "name": "Component runtime",
+            "sub": "Custom components in the sandbox",
+            "tone": "warm",
+            "modules": [
+              {
+                "name": "sandbox iframe",
+                "path": "src/components/custom/CustomBlock.tsx",
+                "detail": "Custom components are rendered in the `allow-scripts `sandbox, strictly CSP, and cannot access the network."
+              },
+              {
+                "name": "component package",
+                "path": "packages/components/<id>/<version>/",
+                "detail": "Compiled components are stored in accurate versions, and only the components used on the page are collected during export."
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "Two layers of pages and components",
+      "data": {
+        "layers": [
+          {
+            "name": "page",
+            "sub": "Page / Board",
+            "tone": "brand",
+            "modules": [
+              {
+                "name": "block",
+                "detail": "Paragraphs, headings, components in the document flow, each block has a stable id."
+              },
+              {
+                "name": "container",
+                "detail": "Page and Board can be nested within each other."
+              }
+            ]
+          },
+          {
+            "name": "components",
+            "sub": "Built-in vs. custom",
+            "tone": "violet",
+            "modules": [
+              {
+                "name": "Built-in components",
+                "detail": "Charts, maps, tables, etc. are provided with the application."
+              },
+              {
+                "name": "Custom component",
+                "path": "packages/components/<id>/<version>/",
+                "detail": "React package, the exact version of which the page refers to."
+              }
+            ]
+          }
+        ],
+        "initial": "Custom component"
+      }
+    }
+  ]
+}

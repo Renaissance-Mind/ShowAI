@@ -1,5 +1,6 @@
 import type { Locale } from "../i18n";
 export const PROJECT_SCOPE_LIMIT = 1000;
+export const MCP_LOG_RETENTION_DAYS = [7, 30, 90] as const;
 
 export type TabCommand = "new" | "close" | "next" | "previous";
 
