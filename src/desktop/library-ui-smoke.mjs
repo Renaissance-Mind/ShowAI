@@ -216,25 +216,50 @@ try {
   );
   await page.getByRole("button", { name: "当前目录操作", exact: true }).focus();
   await emptyProjectHeading.hover();
-  await poll(
-    () =>
-      row(project.id)
-        .locator(".studio-row-menu")
-        .evaluate((element) => Number(getComputedStyle(element).opacity)),
-    (opacity) => opacity === 0,
-    "hidden row menu",
-  );
-  await row(project.id).hover();
-  await poll(
-    () =>
-      row(project.id)
-        .locator(".studio-row-menu")
-        .evaluate((element) => Number(getComputedStyle(element).opacity)),
-    (opacity) => opacity === 1,
-    "visible hover menu",
-  );
+  const projectRow = row(project.id);
+  const menuOpacity = () =>
+    projectRow
+      .locator(".studio-row-menu")
+      .evaluate((button) => Number(getComputedStyle(button).opacity));
+  await poll(menuOpacity, (value) => value === 0, "hidden row menu");
+  await projectRow.hover();
+  await poll(menuOpacity, (value) => value === 1, "visible hover menu");
   result.checks.push(
     "Sidebar has no new-page button, appended count or local-library footer; ellipsis appears on hover",
+  );
+
+  const fullSize = await page.evaluate(() => ({
+    width: innerWidth,
+    height: innerHeight,
+  }));
+  await page.setViewportSize({ width: fullSize.width, height: 260 });
+  const docsToggle = sidebar.locator(
+    '[data-docs-id="root"] .studio-tree-chevron',
+  );
+  await docsToggle.click();
+  await projectRow.hover();
+  await poll(menuOpacity, (value) => value === 1, "hover before scrolling");
+  const tree = sidebar.locator(".studio-sidebar-projects");
+  const start = await tree.evaluate((list) => list.scrollTop);
+  assert.ok(start >= 4);
+  await page.mouse.wheel(0, -4);
+  await poll(
+    () => tree.evaluate((list) => list.scrollTop),
+    (top) => top < start,
+    "sidebar wheel",
+  );
+  await page.waitForFunction((id) => {
+    const row = document.querySelector(
+      `.studio-tree-row[data-library-id="${id}"]:hover`,
+    );
+    const menu = row?.querySelector(".studio-row-menu");
+    return menu && Number(getComputedStyle(menu).opacity) < 0.9;
+  }, project.id);
+  await poll(menuOpacity, (value) => value === 1, "restored hover menu");
+  await docsToggle.click();
+  await page.setViewportSize(fullSize);
+  result.checks.push(
+    "Scrolling suspends row hover and restores the menu under a stationary pointer",
   );
 
   const firstMenu = await openMenu(project.id);
@@ -417,7 +442,8 @@ try {
   await expand(project.id);
   await expand(folderA.id);
   await expand(folderB.id);
-  await remove(nested.id);
+  await choose(nested.id, "删除");
+  await row(nested.id).waitFor({ state: "detached" });
   await poll(
     pageDocuments,
     (docs) => docs.some((doc) => doc.id === nested.id && doc.archived),
@@ -502,7 +528,11 @@ try {
   await row(descendant.id).waitFor({ state: "detached" });
   await remove(folderA.id);
   await remove(project.id);
-  assert.equal((await projectData()).archived, true);
+  await poll(
+    projectData,
+    (data) => data.archived === true,
+    "deleted project persistence",
+  );
   await assertNoAlerts("deleting folders and project A");
   await page.reload();
   await page

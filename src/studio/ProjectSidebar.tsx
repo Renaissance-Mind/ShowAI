@@ -18,6 +18,9 @@ import sidebarMessages from "../i18n/messages/sidebar";
 import navigationMessages from "../i18n/messages/navigation";
 import accountFlowMessages from "../i18n/messages/accountFlow";
 
+const hoverTargets =
+  ".studio-tree-row, .studio-sidebar-label, .studio-new-project";
+
 export default function ProjectSidebar({
   projects,
   organization,
@@ -51,6 +54,15 @@ export default function ProjectSidebar({
   const tn = useTranslator(navigationMessages);
   const accountFlow = useTranslator(accountFlowMessages);
   const drag = useLibraryDrag();
+  const hovered = useRef<Element | null>(null);
+  const hoverTimer = useRef(0);
+  useEffect(() => () => window.clearTimeout(hoverTimer.current), []);
+  const showHover = (element: Element | null) => {
+    if (hovered.current === element) return;
+    hovered.current?.removeAttribute("data-sidebar-hover");
+    hovered.current = element;
+    element?.setAttribute("data-sidebar-hover", "");
+  };
   projects = orderSidebarProjects(projects, organization.projectOrder);
   const selected = projects.find((item) => item.id === selectedProject);
   const selectedSection =
@@ -160,7 +172,26 @@ export default function ProjectSidebar({
     </section>
   );
   return (
-    <div className="studio-sidebar-projects">
+    <div
+      className="studio-sidebar-projects"
+      onPointerOver={({ target, pointerType }) => {
+        if (
+          !hoverTimer.current &&
+          pointerType !== "touch" &&
+          target instanceof Element
+        )
+          showHover(target.closest(hoverTargets));
+      }}
+      onPointerLeave={() => showHover(null)}
+      onScroll={({ currentTarget: list }) => {
+        showHover(null);
+        window.clearTimeout(hoverTimer.current);
+        hoverTimer.current = window.setTimeout(() => {
+          hoverTimer.current = 0;
+          showHover(list.querySelector(`:is(${hoverTargets}):hover`));
+        }, 150);
+      }}
+    >
       <button
         className="studio-new-project"
         type="button"

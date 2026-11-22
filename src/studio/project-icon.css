@@ -6,7 +6,7 @@
   vertical-align: middle;
   color: var(--muted);
 }
-.studio-tree-row:hover .studio-project-icon {
+.studio-tree-row[data-sidebar-hover] .studio-project-icon {
   --project-icon-backdrop: var(--hover);
 }
 .studio-tree-row.active .studio-project-icon {

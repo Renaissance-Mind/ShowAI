@@ -29,7 +29,8 @@
 }
 .studio-tree-unpin {
   position: absolute;
-  top: 50%;
+  inset-block: 0;
+  margin-block: auto;
   right: var(--row-menu-inset);
   display: grid;
   place-items: center;
@@ -39,50 +40,37 @@
   border-radius: 4px;
   color: var(--muted);
   cursor: pointer;
-  transform: translateY(-50%);
   transition: right var(--duration-base) var(--ease-out);
 }
-.studio-tree-unpin:hover {
+:where([data-sidebar-hover]) > .studio-tree-unpin:hover {
   color: var(--text);
   background: var(--line);
 }
-.studio-tree-row:is(
-    :hover,
-    :focus-within,
-    :has(> .studio-row-menu[aria-expanded="true"])
-  )
-  > .studio-tree-unpin {
-  right: calc(var(--row-menu-size) + 2 * var(--row-menu-inset));
-}
 .studio-tree-row > .studio-row-menu {
   position: absolute;
-  top: 50%;
+  inset-block: 0;
   right: var(--row-menu-inset);
   width: var(--row-menu-size);
-  margin: 0;
-  transform: translateY(-50%);
+  margin: auto 0;
   z-index: 1;
   transition:
     opacity var(--duration-fast) var(--ease-out),
     background var(--duration-fast) var(--ease-out);
 }
-.studio-tree-row:is(
-    :hover,
-    :focus-within,
-    :has(> .studio-row-menu[aria-expanded="true"])
-  )
-  > .studio-row-menu {
-  opacity: 1;
-  pointer-events: auto;
-  transition-delay: 40ms, 0ms;
-}
-.studio-tree-row[data-pinned="true"]:is(
-    :hover,
-    :focus-within,
-    :has(> .studio-row-menu[aria-expanded="true"])
-  )
-  > .studio-tree-main {
-  padding-right: calc(var(--row-menu-size) + 2 * var(--row-menu-inset));
+.studio-tree-row[data-sidebar-hover],
+.studio-tree-row:focus-within,
+.studio-tree-row:has(> .studio-row-menu[aria-expanded="true"]) {
+  & > .studio-row-menu {
+    opacity: 1;
+    pointer-events: auto;
+    transition-delay: 40ms, 0ms;
+  }
+  & > .studio-tree-unpin {
+    right: calc(var(--row-menu-size) + 2 * var(--row-menu-inset));
+  }
+  &[data-pinned="true"] > .studio-tree-main {
+    padding-right: calc(var(--row-menu-size) + 2 * var(--row-menu-inset));
+  }
 }
 @media (hover: none) {
   .studio-tree-row > .studio-tree-unpin {

@@ -146,7 +146,7 @@
   border-radius: 5px;
   color: var(--text);
 }
-.studio-tree-row:hover {
+.studio-tree-row[data-sidebar-hover] {
   background: var(--hover);
 }
 .studio-tree-row.active {
@@ -216,8 +216,6 @@
     opacity var(--duration-fast) var(--ease-out),
     background var(--duration-fast) var(--ease-out);
 }
-.studio-tree-row:hover .studio-row-menu,
-.studio-tree-row:focus-within .studio-row-menu,
 .studio-project-card:hover .studio-row-menu,
 .studio-project-card:focus-within .studio-row-menu,
 .studio-page-list-row:hover .studio-row-menu,
@@ -226,7 +224,7 @@
   opacity: 1;
 }
 .studio-row-menu:hover,
-button.studio-tree-chevron:hover {
+:where([data-sidebar-hover]) > button.studio-tree-chevron:hover {
   color: var(--text);
   background: var(--line);
 }
@@ -1339,7 +1337,7 @@ button.studio-tree-chevron:hover {
   color: var(--text);
   font-weight: 500;
 }
-.studio-new-project:hover {
+.studio-new-project[data-sidebar-hover] {
   background: var(--hover);
 }
 .studio-new-project:focus-visible {

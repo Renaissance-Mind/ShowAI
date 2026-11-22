@@ -100,7 +100,7 @@
   height: 24px;
   margin: 0;
 }
-.studio-sidebar-label:hover .studio-row-menu,
+.studio-sidebar-label[data-sidebar-hover] .studio-row-menu,
 .studio-sidebar-label:focus-within .studio-row-menu {
   opacity: 1;
 }
