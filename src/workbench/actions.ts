@@ -155,6 +155,7 @@ const tf = translator(fileMessages);
 
 export const workbenchActions = new Set([
   "sync:status",
+  "sync:checkAccountSession",
   "sync:connect",
   "sync:default",
   "sync:disconnect",
@@ -657,6 +658,8 @@ export function createWorkbench(
       const sync = syncManager(store.root);
       sync.start();
       switch (action) {
+        case "sync:checkAccountSession":
+          return sync.checkAccountSession(required(args, "connectionId"));
         case "sync:status":
           return sync.status();
         case "sync:serverInfo":

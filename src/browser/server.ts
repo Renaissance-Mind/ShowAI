@@ -341,18 +341,15 @@ export async function startBrowserServer(options: BrowserServerOptions) {
         ? join(process.cwd(), "plugins/showai")
         : resolve(dirname(options.cliEntry), "../assets/agent-plugin"),
   });
-  const assets = (name: string) =>
+  const assets = (name: string, source: string) =>
     options.development
-      ? join(
-          process.cwd(),
-          "plugins",
-          name === "agent-plugin" ? "showai" : "dsh-showai",
-        )
+      ? join(process.cwd(), "plugins", source)
       : resolve(dirname(options.cliEntry), "../assets", name);
   const pluginInstaller = new DesktopPluginInstaller({
     root: join(dirname(options.settingsPath), "external-plugins"),
-    pluginRoot: () => assets("agent-plugin"),
-    dshBundleRoot: () => assets("dsh-plugin"),
+    pluginRoot: () => assets("agent-plugin", "showai"),
+    dshBundleRoot: () => assets("dsh-plugin", "dsh-showai"),
+    kimiBundleRoot: () => assets("kimi-plugin", "showai-kimi"),
     runtime: () => info(),
     channel: options.development ? "development" : "packaged",
   });
@@ -382,6 +379,14 @@ export async function startBrowserServer(options: BrowserServerOptions) {
       if (desktopPluginActions.has(action) || remoteDeviceActions.has(action))
         throw new CoreError("INVALID_DATA", "Manage plugins and remote devices in the ShowAI app.");
     }
+    if (action === "appUpdate:state")
+      return {
+        supported: false,
+        unavailableReason: "browser",
+        automatic: false,
+        phase: "idle",
+        currentVersion: version,
+      };
     if (desktopPluginActions.has(action))
       return pluginInstallerAction(pluginInstaller, action, args);
     if (action === "agent:remoteDevice") return remoteConnector?.status();
@@ -784,6 +789,7 @@ export async function startBrowserServer(options: BrowserServerOptions) {
               !agentActions.has(action) &&
               !desktopPluginActions.has(action) &&
               !remoteDeviceActions.has(action) &&
+              action !== "appUpdate:state" &&
               !options.additionalActions?.has(action)) ||
             !args ||
             typeof args !== "object" ||

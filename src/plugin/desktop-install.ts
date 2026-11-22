@@ -10,6 +10,7 @@ import {
   rm,
   writeFile,
 } from "node:fs/promises";
+import { prepareLocalPlugin } from "./local-plugin-package";
 import { constants } from "node:fs";
 import { createHash } from "node:crypto";
 import { homedir } from "node:os";
@@ -105,6 +106,7 @@ export const desktopPluginActions = new Set([
   "plugins:repairRuntime",
   "plugins:setPath",
   "plugins:launchConfig",
+  "plugins:prepareLocal",
 ]);
 
 export function pluginInstallerAction(
@@ -125,6 +127,8 @@ export function pluginInstallerAction(
       return installer.repairRuntime();
     case "plugins:setPath":
       return installer.setPath(args);
+    case "plugins:prepareLocal":
+      return installer.prepareLocal(args.host);
     case "plugins:launchConfig":
       return installer.launchConfig();
     default:
@@ -311,6 +315,7 @@ export class DesktopPluginInstaller {
       root: string;
       pluginRoot: () => string;
       dshBundleRoot: () => string;
+      kimiBundleRoot: () => string;
       runtime: () => { home: string; cli: RuntimeLaunch };
       channel: RuntimeChannel;
     },
@@ -363,6 +368,10 @@ export class DesktopPluginInstaller {
     const runtime = this.options.runtime();
     await registerRuntime(runtime.home, runtime.cli, this.options.channel);
     return this.runtimeStatus();
+  }
+
+  prepareLocal(host: unknown) {
+    return prepareLocalPlugin(host, this.options);
   }
 
   launchConfig() {

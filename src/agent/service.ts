@@ -1,4 +1,5 @@
 import { AsyncLocalStorage } from "node:async_hooks";
+import { ServerSessionError } from "../sync/protocol";
 import type { PackagingDecisions } from "../core/packaging";
 import { CatalogService, type CatalogSelection } from "./catalog-service";
 export type { CatalogSelection } from "./catalog-service";
@@ -1303,6 +1304,7 @@ export function errorResult(
   operation: FailedOperation | undefined = failedOperation.getStore(),
 ) {
   const code =
+    error instanceof ServerSessionError ||
     error instanceof CoreError ||
     error instanceof CapacityError ||
     error instanceof PluginInstallError
@@ -1318,6 +1320,9 @@ export function errorResult(
     code,
     message,
     ...system,
+    ...(error instanceof ServerSessionError
+      ? { details: { connectionId: error.connectionId } }
+      : {}),
     ...(guidance ?? {}),
     ...(operation ? OPERATION_GUIDANCE[code]?.[operation] : undefined),
     ...(error instanceof PluginInstallError && error.details

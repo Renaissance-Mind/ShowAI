@@ -25,6 +25,10 @@ await cp(join(root, "plugins/showai"), join(runtime, "assets/agent-plugin"), {
   recursive: true,
   verbatimSymlinks: true,
 });
+await rm(join(runtime, "assets/kimi-plugin"), { recursive: true, force: true });
+await cp(join(root, "plugins/showai-kimi"), join(runtime, "assets/kimi-plugin"), {
+  recursive: true,
+});
 await rm(join(runtime, "assets/dsh-plugin"), { recursive: true, force: true });
 const dshBundle = join(root, "plugins/showai-deepseek");
 await cp(dshBundle, join(runtime, "assets/dsh-plugin"), {

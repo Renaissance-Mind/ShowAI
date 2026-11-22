@@ -78,6 +78,8 @@ export default defineMessages("accountFlow", {
     verifyToJoin: "验证身份后即可加入这个项目。",
     signOut: "退出此设备的账号",
     signOutHelp: "暂停此账号的同步，本机内容和项目显示选择保留。",
+    sessionRejected: "登录凭据已过期或被撤销",
+    sessionCheckFailed: "无法核对登录状态：{reason}",
     signedOut: "已退出登录",
     signIn: "重新登录",
     accounts: "账号",
@@ -216,6 +218,8 @@ export default defineMessages("accountFlow", {
     signOut: "Sign out on this device",
     signOutHelp:
       "Pause sync for this account and keep local content and project display choices.",
+    sessionRejected: "Sign-in token expired or revoked",
+    sessionCheckFailed: "Could not check sign-in status: {reason}",
     signedOut: "Signed out",
     signIn: "Sign in again",
     accounts: "Accounts",

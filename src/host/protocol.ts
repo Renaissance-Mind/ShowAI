@@ -37,6 +37,7 @@ export interface DesktopInfo {
 
 export interface AppUpdateState {
   supported: boolean;
+  unavailableReason?: "development" | "missingFeed" | "browser";
   automatic: boolean;
   currentVersion: string;
   phase:

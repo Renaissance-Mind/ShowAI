@@ -228,6 +228,39 @@ try {
   await button("配置局域网").click();
   await page.getByRole("spinbutton", { name: "本机端口", exact: true }).waitFor();
   assert.equal(await page.locator(".studio-settings details").count(), 0);
+  const lanLayout = await page.evaluate(() => {
+    const rect = (selector) =>
+      document.querySelector(selector).getBoundingClientRect();
+    const centerY = (r) => r.top + r.height / 2;
+    const address = rect(".rm-address-field .rm-select");
+    const refresh = rect(".rm-address-field .rm-button");
+    const port = rect("#remote-local-port");
+    const scope = rect(".rm-access-fields label");
+    const operations = rect(".rm-access-fields > :last-child label");
+    const title = rect("[data-remote-step='3'] .rm-step-title");
+    const start = rect("[data-remote-step='3'] .rm-button.primary");
+    return {
+      addressWidth: address.width,
+      portAfterRefresh: port.left >= refresh.right,
+      portAlignment: Math.abs(centerY(port) - centerY(address)),
+      permissionAlignment: Math.abs(scope.top - operations.top),
+      actionAlignment: Math.abs(centerY(start) - centerY(title)),
+    };
+  });
+  assert.ok(
+    lanLayout.addressWidth < 230 && lanLayout.portAfterRefresh,
+    JSON.stringify(lanLayout),
+  );
+  assert.ok(
+    lanLayout.portAlignment < 2 &&
+      lanLayout.permissionAlignment < 2 &&
+      lanLayout.actionAlignment < 2,
+    JSON.stringify(lanLayout),
+  );
+  await shot("lan-settings-layout");
+  result.checks.push(
+    "LAN address, refresh and port share a row; permissions and start actions align",
+  );
   await button("指定项目").click();
   await button("Remote flow verification：只读").click();
   await button("保存配置").click();

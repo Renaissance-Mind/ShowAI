@@ -43,10 +43,10 @@ Agent 会把界面保存到 ShowAI 并在对话中展示（不能内嵌显示的
 | Antigravity                                | 正式     | ShowAI「设置 → 外部 Agent 插件」→ 安装插件                                                                                                |
 | 内置 Agent                                 | 正式     | 在 ShowAI 中使用本机 Codex 或 Claude Code 的登录、模型 API Key 或 Cloud                                                        |
 | DeepSeek Harness                           | 预览     | 完全退出 DeepSeek Harness，在 ShowAI「设置 → 外部 Agent 插件」点「安装插件」（[步骤](../../plugins/showai/README.zh-CN.md#deepseek-harness)） |
-| Kimi Work                                  | 预览     | 在 Kimi Work 中添加 ShowAI 的 MCP 服务和 [Kimi 插件](../../plugins/showai-kimi/README.md)                                      |
-| Cursor、Qoder、WorkBuddy                   | 预览     | 为所用宿主生成并安装插件（[桌面宿主接入](../../plugins/showai/README.zh-CN.md#cursorqoder-和-workbuddy)）                      |
+| Kimi Work                                  | 预览     | 在「设置 → 外部 Agent 插件」准备插件目录，再[在 Kimi Work 中安装](../../plugins/showai-kimi/README.md)                                      |
+| Cursor、Qoder、WorkBuddy                   | 预览     | 在「设置 → 外部 Agent 插件」准备对应的安装包，再[在宿主中安装](../../plugins/showai/README.zh-CN.md#cursorqoder-和-workbuddy)                      |
 | 网页版 ChatGPT                             | 自行部署 | 在桌面 App 开启远程连接，使用自己的 Cloudflare 或 Tailscale 接入本机项目（[指南](chatgpt.zh-CN.md)）                           |
-| 其他 MCP 客户端（Gemini CLI、OpenCode 等） | 实验     | 手动配置 stdio MCP（[Agent 接入](agent-integration.zh-CN.md)）                                                                 |
+| Kimi Code CLI、Gemini CLI、OpenCode | 实验     | 从「设置 → 外部 Agent 插件」复制该宿主的本地 MCP 配置（[Agent 接入](agent-integration.zh-CN.md)）                                                                 |
 
 ### 按 Agent 宿主选择插件目录
 

@@ -258,7 +258,7 @@
   padding: 4px 34px 4px var(--field-pad);
 }
 .rm-short-field {
-  max-width: 210px;
+  flex: 0 1 9rem;
 }
 .rm-icon-button {
   display: inline-flex;
@@ -375,12 +375,45 @@
   color: var(--brand-accent);
 }
 .rm-network-fields,
+.rm-access-fields,
+.rm-step-heading {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 14px 24px;
+  min-width: 0;
+}
+.rm-address-field {
+  width: min(100%, 18rem);
+}
+.rm-address-field .rm-input-action {
+  flex-wrap: wrap;
+}
+.rm-address-field .rm-select {
+  flex: 1 1 16ch;
+}
+.rm-access-fields > .rm-field {
+  flex: 1 1 max-content;
+}
+.rm-access-fields .rm-permission-capabilities {
+  align-items: center;
+  min-height: var(--rm-control-height);
+}
+.rm-step-heading {
+  align-items: center;
+  justify-content: space-between;
+}
+.rm-route-config {
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 15rem), 1fr));
+  gap: 14px 18px;
+}
+.rm-route-config > :first-child {
+  grid-column: 1 / -1;
+}
 .rm-oauth-fields {
   display: grid;
   gap: 16px;
   min-width: 0;
-}
-.rm-oauth-fields {
   padding-top: 16px;
   border-top: 1px solid var(--line);
 }
@@ -480,7 +513,7 @@
   display: flex;
   align-items: center;
   gap: 14px;
-  min-height: 170px;
+  flex-wrap: wrap;
 }
 .rm-starting > span {
   flex: 1;
@@ -1198,6 +1231,7 @@
 .rm-step .rm-form-actions {
   justify-content: flex-start;
   margin-top: 0;
+  padding-top: 0;
 }
 .rm-route-guide {
   display: grid;

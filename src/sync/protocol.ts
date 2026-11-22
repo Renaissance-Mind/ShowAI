@@ -57,6 +57,15 @@ export class SyncError extends Error {
     super(message);
   }
 }
+export class ServerSessionError extends SyncError {
+  constructor(
+    readonly connectionId: string,
+    message: string,
+    details?: unknown,
+  ) {
+    super(401, "UNAUTHORIZED", message, details);
+  }
+}
 export const identifier = (value: unknown): string => {
   if (
     typeof value !== "string" ||
@@ -254,6 +263,7 @@ export async function snapshotRevision(
 }
 
 export interface ServerConnection {
+  sessionExpired?: boolean;
   signedOut?: boolean;
   id: string;
   serverId: string;

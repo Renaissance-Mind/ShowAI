@@ -20,7 +20,7 @@ import messages from "../i18n/messages/pluginInstall";
 import onboardingMessages from "../i18n/messages/onboarding";
 import settingsMessages from "../i18n/messages/settings";
 import { PendingNotice } from "../ui/PendingNotice";
-import { ChevronDown, CircleAlert, Copy, ExternalLink, FolderOpen, RefreshCw } from "../ui/icons";
+import { CircleAlert, Copy, ExternalLink, FolderOpen, RefreshCw } from "../ui/icons";
 import Dialog from "../ui/Dialog";
 import commonMessages from "../i18n/messages/common";
 import { desktop, errorMessage } from "../host/bridge";
@@ -35,6 +35,7 @@ import {
   type PluginBatchResult,
 } from "./usePluginHosts";
 import { AGENT_TROUBLESHOOTING, connectionHost } from "./AgentReadiness";
+import LocalPluginSetups from "./LocalPluginSetups";
 import AgentBrandIcon from "./AgentBrandIcon";
 import type { Onboarding } from "./sample-project";
 import "./agent-settings.css";
@@ -533,7 +534,7 @@ export function LaunchConfigCopy({ info }: { info: DesktopInfo | null }) {
   }, [info]);
   if (!info) return null;
   const server = launcher ?? runtimeMcpLaunch(info.cli);
-  const kinds: LaunchSnippetKind[] = ["claude", "codex", "json"];
+  const kinds = ["claude", "codex", "json"] as const;
   async function exportUniversal() {
     setError("");
     setExporting(true);
@@ -712,7 +713,6 @@ export default function PluginInstallSettings({ home }: { home: string }) {
   useEffect(() => {
     if (receipt?.dsh) setDshHost("deepseek");
   }, [receipt]);
-  const [showUndetected, setShowUndetected] = useState(false);
   const installed = hosts.filter(
     (host) =>
       host.installed &&
@@ -726,18 +726,6 @@ export default function PluginInstallSettings({ home }: { home: string }) {
   const restart = new Set<PluginHost>(
     receipt && !receipt.dsh ? [receipt.host] : (batch?.updated ?? []),
   );
-  const uncalled = installed.some(
-    (host) => verify.states.get(host.host)?.kind !== "called",
-  );
-  const detectedHosts = hosts.filter(
-    (host) =>
-      !!host.executable ||
-      host.installed ||
-      !!host.installedPath ||
-      !!host.manualPath ||
-      !!host.error,
-  );
-  const undetectedHosts = hosts.filter((host) => !detectedHosts.includes(host));
   const manualTarget = manualHost
     ? hosts.find((item) => item.host === manualHost)
     : undefined;
@@ -777,7 +765,7 @@ export default function PluginInstallSettings({ home }: { home: string }) {
         key={host.host}
         data-host={host.host}
       >
-        <AgentBrandIcon brand={host.host} />
+        <AgentBrandIcon brand={host.host === "deepseek" ? "deepseek-harness" : host.host} />
         <div className="settings-row-text">
           <h3>
             {pluginHostNames[host.host]}
@@ -955,58 +943,10 @@ export default function PluginInstallSettings({ home }: { home: string }) {
         lines={3}
         minHeight={200}
       />
-      {hosts.length > 0 && (
-        <div className="settings-card">
-          {detectedHosts.length > 0 ? (
-            detectedHosts.map(renderHostRow)
-          ) : (
-            <div className="settings-row">
-              <div className="settings-row-text">
-                <h3>{t("noDetectedAgents")}</h3>
-                <p>{t("noDetectedAgentsDetail")}</p>
-              </div>
-            </div>
-          )}
-          {undetectedHosts.length > 0 && (
-            <div className="plugin-undetected-section">
-              <button
-                type="button"
-                className="plugin-undetected-toggle"
-                aria-expanded={showUndetected}
-                onClick={() => setShowUndetected((value) => !value)}
-              >
-                <span>
-                  {showUndetected
-                    ? t("undetectedToggleHide")
-                    : t("undetectedToggleShow", {
-                        count: undetectedHosts.length,
-                      })}
-                </span>
-                <ChevronDown
-                  size={15}
-                  className={showUndetected ? "is-open" : undefined}
-                  aria-hidden="true"
-                />
-              </button>
-              {showUndetected && (
-                <div className="plugin-undetected-list">
-                  {undetectedHosts.map(renderHostRow)}
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-      )}
-      {uncalled && (
-        <div className="settings-card plugin-verify-card">
-          <div className="settings-card-section">
-            <div className="settings-row-text">
-              <h3>{t("verifySectionTitle")}</h3>
-            </div>
-            <VerifyPrompt label={t("verifyHint")} />
-          </div>
-        </div>
-      )}
+      <div className="settings-card">
+        {hosts.map(renderHostRow)}
+        <LocalPluginSetups key={home} />
+      </div>
       <PluginError message={error} details={errorDetails} />
       {verify.error && (
         <p role="alert" className="plugin-install-error">

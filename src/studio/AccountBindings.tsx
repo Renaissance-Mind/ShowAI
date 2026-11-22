@@ -2,7 +2,7 @@ import { useNotify } from "../problems/toast-context";
 import { useEffect, useState } from "react";
 import { CircleAlert, Link2 } from "../ui/icons";
 import Select from "../ui/Select";
-import { desktop, errorMessage } from "../host/bridge";
+import { desktop, errorCode, errorMessage } from "../host/bridge";
 import type { AccountProfile } from "../sync/accounts";
 import type { ServerConnection } from "../sync/protocol";
 import { useTranslator } from "../i18n/react";
@@ -19,11 +19,15 @@ export default function AccountBindings({
   const [source, setSource] = useState(""),
     [target, setTarget] = useState(""),
     [profile, setProfile] = useState<AccountProfile | null>(null);
+  const [revision, setRevision] = useState(0);
   const notify = useNotify();
   const [busy, setBusy] = useState(false),
     [error, setError] = useState("");
   const enabled = connections.filter(
-    (item) => !item.signedOut && item.capabilities?.includes("account-federation-v1"),
+    (item) =>
+      !item.signedOut &&
+      !item.sessionExpired &&
+      item.capabilities?.includes("account-federation-v1"),
   );
   const current = enabled.find((item) => item.id === source);
   const candidates = enabled.filter(
@@ -31,30 +35,49 @@ export default function AccountBindings({
   );
   const peers = profile?.peers.filter((item) => item.state === "active") ?? [];
   useEffect(() => {
-    if (!enabled.some((item) => item.id === source))
+    if (!enabled.some((item) => item.id === source)) {
       setSource(enabled[0]?.id ?? "");
-  }, [source, connections]);
-  async function load(id = source) {
-    setProfile(
-      id
-        ? await desktop.invoke<AccountProfile>("sync:accountProfile", {
-            connectionId: id,
-          })
-        : null,
-    );
-  }
+      setTarget("");
+    } else if (target && !candidates.some((item) => item.id === target)) {
+      setTarget("");
+    }
+  }, [source, target, connections]);
   useEffect(() => {
-    void load().catch((error) => setError(errorMessage(error)));
-  }, [source]);
+    let current = true;
+    setProfile(null);
+    setError("");
+    if (source) {
+      void desktop
+        .invoke<AccountProfile>("sync:accountProfile", { connectionId: source })
+        .then(
+          (value) => {
+            if (current) setProfile(value);
+          },
+          (reason) => {
+            if (!current) return;
+            if (errorCode(reason) === "UNAUTHORIZED") {
+              void refresh().catch((failure) => {
+                if (current) setError(errorMessage(failure));
+              });
+            } else setError(errorMessage(reason));
+          },
+        );
+    }
+    return () => {
+      current = false;
+    };
+  }, [source, revision, refresh]);
   async function run(action: () => Promise<unknown>) {
     setBusy(true);
     setError("");
     try {
       await action();
       await refresh();
-      await load();
+      setRevision((value) => value + 1);
     } catch (error) {
-      setError(errorMessage(error));
+      if (errorCode(error) === "UNAUTHORIZED")
+        await refresh().catch((reason) => setError(errorMessage(reason)));
+      else setError(errorMessage(error));
     } finally {
       setBusy(false);
     }
@@ -95,6 +118,8 @@ export default function AccountBindings({
               disabled={busy || enabled.length < 2}
               value={source}
               onChange={(event) => {
+                setProfile(null);
+                setError("");
                 setSource(event.target.value);
                 setTarget("");
               }}
@@ -142,7 +167,7 @@ export default function AccountBindings({
                   </button>
                 </li>
               ))}
-              {!peers.length && (
+              {profile && !peers.length && (
                 <li className="sync-binding-empty">{t("bindingsEmpty")}</li>
               )}
             </ul>

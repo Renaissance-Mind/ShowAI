@@ -12,18 +12,26 @@ import {
   restoreServerBackup,
   operationsRequest,
 } from "./node";
+import { errorResult } from "../agent/service";
 import { SyncManager } from "../sync/manager";
 import { accountRequest } from "../sync/account-manager";
 import type { SignedIdentity, SignedGrant } from "../sync/accounts";
 import type { ServerConnection } from "../sync/protocol";
 import { ModelResourceClient } from "../sync/model-resources";
 import { AgentHost } from "../agent-host/host";
+import { ContentLibrary } from "../core/content-library";
 import { FileStore } from "../core/store";
 import type { AccountResource } from "../sync/accounts";
 const cleanup: (() => Promise<unknown>)[] = [];
 afterEach(async () => {
   for (const action of cleanup.splice(0).reverse()) await action();
 });
+async function openDevice(home: string) {
+  await new ContentLibrary(home).initialize();
+  const manager = new SyncManager(home);
+  cleanup.push(() => manager.stop());
+  return manager;
+}
 async function setup() {
   const base = process.env.SHOWAI_TEST_ROOT ?? tmpdir();
   await mkdir(base, { recursive: true });
@@ -43,8 +51,7 @@ async function setup() {
       service.server.listening ? service.close() : Promise.resolve(),
     );
   }
-  const client = new SyncManager(join(root, "device-one"));
-  cleanup.push(() => client.stop());
+  const client = await openDevice(join(root, "device-one"));
   const connections = [];
   for (const service of services) {
     const added = await client.connect({
@@ -61,6 +68,43 @@ async function setup() {
   }
   return { root, services, client, connections };
 }
+test("a revoked target session is reported on that server account until sign-in", async () => {
+  const {
+    client,
+    connections: [first, second],
+  } = await setup();
+  await accountRequest(second, "/api/auth/logout", "POST");
+  await expect(
+    client.accounts.bind(first.id, second.id).catch((error) => {
+      throw errorResult(error);
+    }),
+  ).rejects.toMatchObject({
+    code: "UNAUTHORIZED",
+    details: { connectionId: second.id },
+  });
+  expect(await client.checkAccountSession(first.id)).toBe(true);
+  expect(await client.checkAccountSession(second.id)).toBe(false);
+  const accounts = (await client.status()).connections;
+  expect(
+    accounts.find((account) => account.id === first.id)?.sessionExpired,
+  ).toBeUndefined();
+  expect(accounts.find((account) => account.id === second.id)).toMatchObject({
+    sessionExpired: true,
+  });
+  const renewed = await client.connect({
+    url: second.url,
+    account: second.user.name,
+    password: "account-password",
+  });
+  expect(renewed.id).toBe(second.id);
+  expect(await client.checkAccountSession(renewed.id)).toBe(true);
+  expect(
+    (await client.status()).connections.find(
+      (account) => account.id === renewed.id,
+    )?.sessionExpired,
+  ).toBeUndefined();
+});
+
 test("three real services bind transitively and any login restores per-device sessions", async () => {
   const f = await setup(),
     [a, b, c] = f.connections;
@@ -73,8 +117,7 @@ test("three real services bind transitively and any login restores per-device se
     ).toHaveLength(2);
   }
   for (const original of f.connections) {
-    const device = new SyncManager(join(f.root, `new-${original.serverId}`));
-    cleanup.push(() => device.stop());
+    const device = await openDevice(join(f.root, `new-${original.serverId}`));
     await device.connect({ url: original.url, token: original.token });
     const config = await device.configuration();
     expect(config.connections).toHaveLength(3);
@@ -157,8 +200,7 @@ test("grants reject forgery, wrong audience, replay, unrelated users and removed
   await expect(
     accountRequest({ ...b, token: exchanged.token }, "/api/me"),
   ).rejects.toMatchObject({ status: 401 });
-  const stranger = new SyncManager(join(f.root, "stranger"));
-  cleanup.push(() => stranger.stop());
+  const stranger = await openDevice(join(f.root, "stranger"));
   const added = await stranger.connect({
     url: b.url,
     account: "Stranger",
@@ -227,8 +269,7 @@ test("a restored device unlinks a member from the full group before revoking its
     [a, b, c] = f.connections;
   await f.client.accounts.bind(a.id, b.id);
   await f.client.accounts.bind(b.id, c.id);
-  const device = new SyncManager(join(f.root, "unlink-device"));
-  cleanup.push(() => device.stop());
+  const device = await openDevice(join(f.root, "unlink-device"));
   await device.connect({ url: a.url, token: a.token });
   const restored = (await device.configuration()).connections;
   const source = restored.find((item) => item.serverId === a.serverId)!;
@@ -276,8 +317,7 @@ test("an initially unavailable bound service is automatically restored on a late
     [a, b] = f.connections;
   await f.client.accounts.bind(a.id, b.id);
   await f.services[1].close();
-  const device = new SyncManager(join(f.root, "offline-device"));
-  cleanup.push(() => device.stop());
+  const device = await openDevice(join(f.root, "offline-device"));
   await device.connect({ url: a.url, token: a.token });
   expect((await device.configuration()).connections).toHaveLength(1);
   expect(Object.keys((await device.accounts.status()).errors)).not.toHaveLength(
@@ -384,8 +424,7 @@ test("private personal tokens and device display choices remain independently re
   );
   expect(me.user.id).toBe(a.user.id);
   await f.client.setProjectVisibility("project-one", false);
-  const other = new SyncManager(join(f.root, "device-two"));
-  cleanup.push(() => other.stop());
+  const other = await openDevice(join(f.root, "device-two"));
   await other.connect({ url: a.url, token: generated.token });
   expect((await other.configuration()).hiddenProjectIds ?? []).toEqual([]);
   expect((await f.client.configuration()).hiddenProjectIds).toEqual([
@@ -464,8 +503,7 @@ test("resources stay encrypted, retain their origin and work after restoring a b
     JSON.stringify(await db.all("SELECT * FROM account_resources")),
   ).not.toContain(apiKey);
   db.close();
-  const device = new SyncManager(join(f.root, "resource-device"));
-  cleanup.push(() => device.stop());
+  const device = await openDevice(join(f.root, "resource-device"));
   await device.connect({ url: a.url, token: a.token });
   const resources = new ModelResourceClient(() => device.home),
     catalog = await resources.list();
@@ -507,8 +545,7 @@ test("resources stay encrypted, retain their origin and work after restoring a b
     { ...stale, version: saved.version },
   );
   expect(updated.model).toBe("new-model");
-  const stranger = new SyncManager(join(f.root, "resource-stranger"));
-  cleanup.push(() => stranger.stop());
+  const stranger = await openDevice(join(f.root, "resource-stranger"));
   await stranger.connect({
     url: b.url,
     account: "Resource stranger",

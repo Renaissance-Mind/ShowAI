@@ -1996,6 +1996,10 @@ else {
           process.env.SHOWAI_DEV_URL
             ? join(process.cwd(), "plugins/showai")
             : join(runtimePath(), "assets/agent-plugin"),
+        kimiBundleRoot: () =>
+          process.env.SHOWAI_DEV_URL
+            ? join(process.cwd(), "plugins/showai-kimi")
+            : join(runtimePath(), "assets/kimi-plugin"),
         dshBundleRoot: () =>
           process.env.SHOWAI_DEV_URL
             ? join(process.cwd(), "plugins/showai-deepseek")

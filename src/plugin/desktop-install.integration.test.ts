@@ -145,6 +145,7 @@ describe.skipIf(!output || !config)(
       installer = new DesktopPluginInstaller({
         root: join(root, "profile/external-plugins"),
         pluginRoot: () => bundle,
+        kimiBundleRoot: () => resolve("plugins/showai-kimi"),
         dshBundleRoot: () => join(root, "app-resources/dsh-plugin"),
         runtime: () => ({ home, cli }),
         channel: "packaged",
@@ -461,6 +462,7 @@ describe.skipIf(!output || !config)(
       const development = new DesktopPluginInstaller({
         root: join(root, "profile/development-plugins"),
         pluginRoot: () => bundle,
+        kimiBundleRoot: () => resolve("plugins/showai-kimi"),
         dshBundleRoot: () => resolve("plugins/showai-deepseek"),
         runtime: () => ({ home, cli }),
         channel: "development",

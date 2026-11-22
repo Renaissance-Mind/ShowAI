@@ -4,7 +4,7 @@ export interface McpLaunch {
   env: Record<string, string>;
 }
 
-export type LaunchSnippetKind = "claude" | "codex" | "json";
+export type LaunchSnippetKind = "claude" | "codex" | "json" | "opencode";
 
 function shellQuote(value: string, platform?: string) {
   if (platform === "win32")
@@ -41,6 +41,20 @@ export function launchSnippet(
           ]
         : []),
     ].join("\n");
+  if (kind === "opencode")
+    return JSON.stringify(
+      {
+        mcp: {
+          showai: {
+            type: "local",
+            command: [server.command, ...server.args],
+            environment: server.env,
+          },
+        },
+      },
+      null,
+      2,
+    );
   return JSON.stringify(
     {
       mcpServers: {

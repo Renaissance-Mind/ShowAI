@@ -107,21 +107,42 @@ function InfoRow({ label, value }: { label: string; value: string }) {
   );
 }
 
-function ProductUpdateControl() {
+function ProductUpdateControl({ info }: { info: DesktopInfo | null }) {
   const t = useTranslator(messages);
-  const { state, run } = useAppUpdate();
+  const { state, run, error } = useAppUpdate();
   const [failure, setFailure] = useState<string>();
   if (!state?.supported) {
+    const reason =
+      state?.unavailableReason ??
+      (info?.mode === "browser"
+        ? "browser"
+        : state && info
+          ? info.packaged
+            ? "missingFeed"
+            : "development"
+          : undefined);
     return (
       <div className="feedback-product-update">
-        <p className="feedback-update-status" role="status">
-          {state ? t("update.unsupported") : t("update.checking")}
+        <p
+          className="feedback-update-status"
+          role={error && !reason ? "alert" : "status"}
+        >
+          {reason
+            ? t(`update.${reason}`)
+            : error
+              ? t("update.failed", { message: error })
+              : t("update.checking")}
         </p>
-        <div className="feedback-product-update-actions">
-          <button type="button" className="settings-button" disabled>
-            {t("update.check")}
-          </button>
-        </div>
+        {reason === "missingFeed" && (
+          <a
+            className="settings-button"
+            href="https://github.com/Renaissance-Mind/ShowAI/releases/latest"
+            target="_blank"
+            rel="noreferrer"
+          >
+            {t("update.releases")} <ExternalLink size={13} aria-hidden="true" />
+          </a>
+        )}
       </div>
     );
   }
@@ -379,7 +400,7 @@ export function AboutFeedback({
             <p>{versionLine(info)}</p>
           </div>
         </div>
-        <ProductUpdateControl />
+        <ProductUpdateControl info={info} />
       </div>
 
       <section className="settings-group" aria-labelledby="feedback-help-title">

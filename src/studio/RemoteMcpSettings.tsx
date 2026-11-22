@@ -61,6 +61,7 @@ export default function RemoteMcpSettings({ home }: { home?: string }) {
   const notify = useNotify();
   const theme = useAppearanceTheme();
   const portErrorId = useId();
+  const addressErrorId = useId();
   const [copiedPrompt, setCopiedPrompt] = useState("");
   useEffect(() => {
     if (!copiedPrompt) return;
@@ -122,11 +123,12 @@ export default function RemoteMcpSettings({ home }: { home?: string }) {
     (!Number.isInteger(config.port) ||
       config.port < 1024 ||
       config.port > 65535);
+  const availableAddress = state?.addresses.some((item) => item.address === config?.bindAddress);
+  const missingAddress = !!config?.bindAddress && !availableAddress;
   const valid =
     !!config &&
     !invalidPort &&
-    (config.provider !== "lan" ||
-      !!state?.addresses.some((item) => item.address === config.bindAddress)) &&
+    (config.provider !== "lan" || !!availableAddress) &&
     (config.provider !== "cloudflare" ||
       (/^https:\/\/[^/]+\/?$/.test(config.publicUrl) &&
         (!!token || !!state?.tokenSaved))) &&
@@ -857,59 +859,6 @@ export default function RemoteMcpSettings({ home }: { home?: string }) {
                       )}
                     </div>
 
-                    {selected === "lan" && (
-                      <div className="rm-field">
-                        <label htmlFor="remote-bind-address">
-                          {t("address")}
-                        </label>
-                        <div className="rm-input-action">
-                          <RemoteSelect
-                            id="remote-bind-address"
-                            value={config.bindAddress ?? ""}
-                            disabled={busy}
-                            onChange={(event) =>
-                              change({ bindAddress: event.target.value })
-                            }
-                          >
-                            <option value="" disabled>
-                              {t("noAddress")}
-                            </option>
-                            {config.bindAddress &&
-                              !state.addresses.some(
-                                (address) =>
-                                  address.address === config.bindAddress,
-                              ) && (
-                                <option value={config.bindAddress} disabled>
-                                  {config.bindAddress} ·{" "}
-                                  {t("addressUnavailable")}
-                                </option>
-                              )}
-                            {state.addresses.map((address) => (
-                              <option
-                                key={address.address}
-                                value={address.address}
-                              >
-                                {address.address} · {address.name}
-                              </option>
-                            ))}
-                          </RemoteSelect>
-                          <button
-                            className="rm-button"
-                            type="button"
-                            aria-label={t("refresh")}
-                            disabled={busy}
-                            onClick={() => void run(() => refresh(true))}
-                          >
-                            <RefreshCw size={16} />
-                            {t("refresh")}
-                          </button>
-                        </div>
-                        {!state.addresses.length && (
-                          <p className="settings-help">{t("recoverAddress")}</p>
-                        )}
-                      </div>
-                    )}
-
                     {selected === "cloudflare" && (
                       <div className="rm-route-config">
                         {state.localUrl ||
@@ -972,58 +921,108 @@ export default function RemoteMcpSettings({ home }: { home?: string }) {
                       </div>
                     )}
 
-                    {isTailscaleProvider(selected) && (
-                      <div className="rm-network-fields">
-                        <div className="rm-field rm-short-field">
-                          <label htmlFor="remote-https-port">
-                            {t("httpsPort")}
+                    <div className="rm-network-fields">
+                      {selected === "lan" && (
+                        <div className="rm-field rm-address-field">
+                          <label htmlFor="remote-bind-address">
+                            {t("address")}
                           </label>
-                          <RemoteSelect
-                            id="remote-https-port"
-                            value={
-                              config.httpsPort ??
-                              (selected === "tailscale-private" ? 8443 : 443)
-                            }
-                            onChange={(event) =>
-                              change({
-                                httpsPort: Number(event.target.value),
-                              })
-                            }
-                          >
-                            {[443, 8443, 10000].map((port) => (
-                              <option key={port} value={port}>
-                                {port}
+                          <div className="rm-input-action">
+                            <RemoteSelect
+                              id="remote-bind-address"
+                              aria-invalid={missingAddress}
+                              aria-describedby={missingAddress || !state.addresses.length ? addressErrorId : undefined}
+                              value={config.bindAddress ?? ""}
+                              disabled={busy}
+                              onChange={(event) =>
+                                change({ bindAddress: event.target.value })
+                              }
+                            >
+                              <option value="" disabled>
+                                {t("noAddress")}
                               </option>
-                            ))}
-                          </RemoteSelect>
+                              {missingAddress && (
+                                <option value={config.bindAddress} disabled>
+                                  {config.bindAddress}
+                                </option>
+                              )}
+                              {state.addresses.map((address) => (
+                                <option
+                                  key={address.address}
+                                  value={address.address}
+                                >
+                                  {address.address}
+                                </option>
+                              ))}
+                            </RemoteSelect>
+                            <button
+                              className="rm-button"
+                              type="button"
+                              aria-label={t("refresh")}
+                              disabled={busy}
+                              onClick={() => void run(() => refresh(true))}
+                            >
+                              <RefreshCw size={16} />
+                              {t("refresh")}
+                            </button>
+                          </div>
+                          {(missingAddress || !state.addresses.length) && (
+                            <p className="settings-help" id={addressErrorId}>
+                              {t(state.addresses.length ? "addressUnavailable" : "recoverAddress")}
+                            </p>
+                          )}
                         </div>
-                        {selected === "tailscale-private" && (
+                      )}
+                      {isTailscaleProvider(selected) && (
+                        <>
                           <div className="rm-field rm-short-field">
-                            <label htmlFor="remote-private-auth">
-                              {t("authentication")}
+                            <label htmlFor="remote-https-port">
+                              {t("httpsPort")}
                             </label>
                             <RemoteSelect
-                              id="remote-private-auth"
-                              value={config.privateAuth ?? "oauth"}
+                              id="remote-https-port"
+                              value={
+                                config.httpsPort ??
+                                (selected === "tailscale-private" ? 8443 : 443)
+                              }
                               onChange={(event) =>
                                 change({
-                                  privateAuth: event.target.value as
-                                    | "device"
-                                    | "oauth",
+                                  httpsPort: Number(event.target.value),
                                 })
                               }
                             >
-                              <option value="device">
-                                {t("sharedDevice")}
-                              </option>
-                              <option value="oauth">OAuth</option>
+                              {[443, 8443, 10000].map((port) => (
+                                <option key={port} value={port}>
+                                  {port}
+                                </option>
+                              ))}
                             </RemoteSelect>
                           </div>
-                        )}
-                      </div>
-                    )}
-
-                    <div className="rm-network-fields">
+                          {selected === "tailscale-private" && (
+                            <div className="rm-field rm-short-field">
+                              <label htmlFor="remote-private-auth">
+                                {t("authentication")}
+                              </label>
+                              <RemoteSelect
+                                id="remote-private-auth"
+                                value={config.privateAuth ?? "oauth"}
+                                onChange={(event) =>
+                                  change({
+                                    privateAuth: event.target.value as
+                                      | "device"
+                                      | "oauth",
+                                  })
+                                }
+                              >
+                                <option value="device">
+                                  {t("sharedDevice")}
+                                </option>
+                                <option value="oauth">OAuth</option>
+                              </RemoteSelect>
+                            </div>
+                          )}
+                        </>
+                      )}
                       {(selected === "lan" || selected === "cloudflare") && (
                         <div className="rm-field rm-short-field">
                           <label htmlFor="remote-local-port">{t("port")}</label>
@@ -1106,7 +1105,9 @@ export default function RemoteMcpSettings({ home }: { home?: string }) {
                 </div>
                 <div className="rm-step-body">
                   <h3 className="rm-step-title">{t("step2Title")}</h3>
-                  <div className="rm-step-content">
+                  <div
+                    className={config.access === "selected" ? "rm-step-content" : "rm-access-fields"}
+                  >
                     <div className="rm-field">
                       <label>{t("scope")}</label>
                       <div className="rm-segmented">
@@ -1213,8 +1214,8 @@ export default function RemoteMcpSettings({ home }: { home?: string }) {
                   <span className="rm-step-line" />
                 </div>
                 <div className="rm-step-body">
-                  <h3 className="rm-step-title">{t("step3Title")}</h3>
-                  <div className="rm-step-content">
+                  <div className="rm-step-heading">
+                    <h3 className="rm-step-title">{t("step3Title")}</h3>
                     {state.phase === "starting" ? (
                       <div className="rm-starting" role="status">
                         <RefreshCw className="rm-spin" size={20} />
@@ -1275,14 +1276,14 @@ export default function RemoteMcpSettings({ home }: { home?: string }) {
                         )}
                       </div>
                     )}
-                    {ready && state.url && (
-                      <RemoteCopyField
-                        label={t("endpoint")}
-                        value={state.url}
-                        onCopy={copy}
-                      />
-                    )}
                   </div>
+                  {ready && state.url && (
+                    <RemoteCopyField
+                      label={t("endpoint")}
+                      value={state.url}
+                      onCopy={copy}
+                    />
+                  )}
                 </div>
               </li>
 

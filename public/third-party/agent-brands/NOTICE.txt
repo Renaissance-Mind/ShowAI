@@ -3,13 +3,21 @@ Agent brand icons
 The image files live in src/studio/assets/agent-brands/ and identify the
 Agent tools and model sources that ShowAI can connect to.
 
-codex.svg, claude-code.svg, gemini-cli.svg, opencode.svg, openai.svg,
-openrouter.svg, deepseek.svg and kimi.svg are from LobeHub Icons:
+Desktop app icons are taken from the vendors' distributed applications:
+Codex from the ChatGPT macOS app; Kimi Work, Cursor, Qoder, WorkBuddy,
+DeepSeek Harness and Antigravity from their respective macOS app bundles.
+
+Claude Code: https://code.claude.com/docs/en/overview (product favicon)
+Gemini CLI: https://geminicli.com/icon.png
+Kimi Code CLI: https://github.com/MoonshotAI/kimi-cli/blob/main/web/public/logo.png
+OpenCode: https://opencode.ai/brand/files/opencode-logo-light.svg
+
+openai.svg, openrouter.svg, deepseek.svg and kimi.svg are from LobeHub Icons:
 https://github.com/lobehub/lobe-icons
 They are distributed under the MIT license in LICENSE.lobe-icons.txt.
 
 kimi.svg is kimi-color.svg from @lobehub/icons-static-svg 1.95.1 with the
-letter drawn in black so it remains visible on the light icon tile. It also
+letter drawn in black so it remains visible on the light icon tile. It
 identifies Moonshot model sources.
 
 Brand names and marks belong to their respective owners.

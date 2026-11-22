@@ -42,16 +42,19 @@ export class AppUpdates {
       saveAutomatic: (automatic: boolean) => Promise<void>;
     },
   ) {
-    const supported =
-      app.isPackaged &&
-      existsSync(join(process.resourcesPath, "app-update.yml"));
+    const unavailableReason = !app.isPackaged
+      ? "development"
+      : existsSync(join(process.resourcesPath, "app-update.yml"))
+        ? undefined
+        : "missingFeed";
     this.state = {
-      supported,
+      supported: !unavailableReason,
+      unavailableReason,
       automatic: options.automatic,
       currentVersion: app.getVersion(),
       phase: "idle",
     };
-    if (!supported) return;
+    if (unavailableReason) return;
     const log = options.log;
     autoUpdater.logger = {
       info: (message?: unknown) => log("info", message),

@@ -18,7 +18,7 @@ import { cacheDownload, retainCachedObject } from "./object-cache";
 import { resumableUpload } from "./resumable-upload";
 import { retryUpload } from "./upload-retry";
 import { ProjectEventStream } from "./event-stream";
-import { AccountManager } from "./account-manager";
+import { AccountManager, type SessionEndpoint } from "./account-manager";
 import { serverFetch as fetch, closeServerTransport } from "./server-fetch";
 import { accountCapability } from "./accounts";
 import {
@@ -51,6 +51,7 @@ import { bundleHash, hasBundle, storeBundle } from "../core/dataset-bundles";
 import { refreshProjectBundles } from "../core/packaging";
 import {
   SyncError,
+  ServerSessionError,
   syncProtocol,
   identifier,
   validateSnapshot,
@@ -573,8 +574,56 @@ export class SyncManager {
       ? join(this.root, "current-objects", namespace, digest)
       : join(this.root, "objects", digest);
   }
+  async sessionError(connection: SessionEndpoint, error: unknown) {
+    if (
+      !connection.id ||
+      !connection.token ||
+      !(error instanceof SyncError) ||
+      error.status !== 401 ||
+      error.code !== "UNAUTHORIZED"
+    )
+      return error;
+    if (!connection.sessionExpired) {
+      await this.update((config) => {
+        const saved = config.connections.find(
+          (item) => item.id === connection.id,
+        );
+        if (saved?.token === connection.token) saved.sessionExpired = true;
+      });
+    }
+    return new ServerSessionError(
+      connection.id,
+      t("session.expired"),
+      error.details,
+    );
+  }
+  async checkAccountSession(id: string) {
+    const connection = await this.connection(id);
+    if (connection.signedOut) return false;
+    try {
+      const me = await this.request<{ serverId: string; user: { id: string } }>(
+        connection,
+        "/api/me",
+      );
+      if (
+        me.serverId !== connection.serverId ||
+        me.user.id !== connection.user.id
+      )
+        throw new CoreError("CONFLICT", t("account.identityMismatch"));
+      if (connection.sessionExpired) {
+        await this.update((config) => {
+          const saved = config.connections.find((item) => item.id === id);
+          if (saved?.token === connection.token) delete saved.sessionExpired;
+        });
+      }
+      return true;
+    } catch (error) {
+      if (error instanceof ServerSessionError) return false;
+      throw error;
+    }
+  }
   private async request<T>(
-    connection: Pick<ServerConnection, "url" | "token">,
+    connection: SessionEndpoint,
     path: string,
     method = "GET",
     data?: unknown,
@@ -611,11 +660,15 @@ export class SyncManager {
         );
         continue;
       }
-      throw new SyncError(
-        response.status,
-        value.error?.code ?? "SERVER_ERROR",
-        value.error?.message ?? t("server.status", { status: response.status }),
-        value.error?.details,
+      throw await this.sessionError(
+        connection,
+        new SyncError(
+          response.status,
+          value.error?.code ?? "SERVER_ERROR",
+          value.error?.message ??
+            t("server.status", { status: response.status }),
+          value.error?.details,
+        ),
       );
     }
   }

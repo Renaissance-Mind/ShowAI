@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import type { AppUpdateState } from "../host/protocol";
-import { desktop } from "../host/bridge";
+import { desktop, errorMessage } from "../host/bridge";
 
 export type AppUpdateAction =
   | "appUpdate:check"
@@ -10,6 +10,7 @@ export type AppUpdateAction =
 
 export function useAppUpdate() {
   const [state, setState] = useState<AppUpdateState | null>(null);
+  const [error, setError] = useState("");
   useEffect(() => {
     if (!window.showai) return;
     let stopped = false;
@@ -20,7 +21,9 @@ export function useAppUpdate() {
       (initial) => {
         if (!stopped) setState((current) => current ?? initial);
       },
-      (reason: unknown) => console.error("ShowAI update state", reason),
+      (reason: unknown) => {
+        if (!stopped) setError(errorMessage(reason));
+      },
     );
     return () => {
       stopped = true;
@@ -32,5 +35,5 @@ export function useAppUpdate() {
       desktop.invoke<AppUpdateState>(action, args).then(setState),
     [],
   );
-  return { state, run };
+  return { state, run, error };
 }

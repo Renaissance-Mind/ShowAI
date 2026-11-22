@@ -28,7 +28,11 @@ import syncEngineMessages from "../i18n/messages/syncEngine";
 
 const t = translator(syncEngineMessages);
 
+export type SessionEndpoint = Pick<ServerConnection, "url" | "token"> &
+  Partial<Pick<ServerConnection, "id" | "sessionExpired">>;
+
 interface Adapter {
+  sessionError(connection: SessionEndpoint, error: unknown): Promise<unknown>;
   home: string;
   configuration(): Promise<SyncConfiguration>;
   connect(input: {
@@ -141,8 +145,20 @@ export class AccountManager {
       throw new CoreError("INVALID_DATA", t("account.bindingDisabled"));
     return connection;
   }
+  private request<T>(
+    connection: SessionEndpoint,
+    path: string,
+    method = "GET",
+    input?: unknown,
+  ): Promise<T> {
+    return accountRequest<T>(connection, path, method, input).catch(
+      async (error) => {
+        throw await this.adapter.sessionError(connection, error);
+      },
+    );
+  }
   private async own(connection: ServerConnection) {
-    const descriptor = await accountRequest<SignedIdentity>(
+    const descriptor = await this.request<SignedIdentity>(
       connection,
       "/api/account/identity",
       "POST",
@@ -162,7 +178,7 @@ export class AccountManager {
   }
   async profile(connectionId: string) {
     const connection = await this.connection(connectionId);
-    const profile = await accountRequest<AccountProfile>(
+    const profile = await this.request<AccountProfile>(
       connection,
       "/api/account/federation",
     );
@@ -208,7 +224,7 @@ export class AccountManager {
           const unique = new Map(
             batch.map((item) => [item.descriptor.identity.serverId, item]),
           );
-          await accountRequest(connection, "/api/account/bindings", "PUT", {
+          await this.request(connection, "/api/account/bindings", "PUT", {
             bindings: [...unique.values()].map((item) => ({
               descriptor: item.descriptor,
               state: "removed",
@@ -217,7 +233,7 @@ export class AccountManager {
             })),
           });
         } else {
-          await accountRequest(connection, "/api/account/bindings", "POST", {
+          await this.request(connection, "/api/account/bindings", "POST", {
             descriptor: first.descriptor,
           });
         }
@@ -356,7 +372,7 @@ export class AccountManager {
               item.user.id === identity.user.id,
           );
           if (existing) {
-            const me = await accountRequest<{
+            const me = await this.request<{
               serverId: string;
               user: { id: string };
             }>(existing, "/api/me").catch((error: unknown) => {
@@ -374,13 +390,13 @@ export class AccountManager {
             if (!me) existing = undefined;
           }
           if (!existing) {
-            const info = await accountRequest<{ serverId: string }>(
+            const info = await this.request<{ serverId: string }>(
               { url: identity.url, token: "" },
               "/api/info",
             );
             if (info.serverId !== identity.serverId)
               throw new Error(t("account.boundIdentityChanged"));
-            const grant = await accountRequest<SignedGrant>(
+            const grant = await this.request<SignedGrant>(
               source,
               "/api/account/grants",
               "POST",
@@ -390,7 +406,7 @@ export class AccountManager {
                 device: label(),
               },
             );
-            const session = await accountRequest<{
+            const session = await this.request<{
               token: string;
               serverId: string;
               user: { id: string };
@@ -503,7 +519,7 @@ export class AccountManager {
       records.delete(ownServer);
       if (!records.size) continue;
       try {
-        await accountRequest(connection, "/api/account/bindings", "PUT", {
+        await this.request(connection, "/api/account/bindings", "PUT", {
           bindings: [...records.values()],
         });
       } catch (error) {
@@ -586,7 +602,7 @@ export class AccountManager {
       item.capabilities?.includes(accountCapability),
     )) {
       try {
-        for (const resource of await accountRequest<AccountResource[]>(
+        for (const resource of await this.request<AccountResource[]>(
           connection,
           "/api/account/resources",
         )) {

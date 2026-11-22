@@ -12,13 +12,10 @@ import {
   ChevronLeft,
   CircleAlert,
   Cloud,
-  Database,
-  FolderOpen,
   Folder,
   Plus,
-  RefreshCw,
 } from "../ui/icons";
-import { desktop, errorMessage } from "../host/bridge";
+import { desktop, errorCode, errorMessage } from "../host/bridge";
 import { coalescedTask } from "../lib/coalesced-task";
 import { retainEqual } from "./navigation-refresh";
 import Dialog from "../ui/Dialog";
@@ -28,6 +25,7 @@ import SyncDashboard, {
   type SyncInvite,
 } from "./SyncDashboard";
 import AccountBindings from "./AccountBindings";
+import ServerAccountRow from "./ServerAccountRow";
 import AccountLogin from "./AccountLogin";
 import ProjectManager, { type ManagedSyncStatus } from "./ProjectManager";
 import SyncAccountPanel, { IssuedToken } from "./SyncAccountPanel";
@@ -360,6 +358,10 @@ export default function SyncSettings({
       await refresh();
       return true;
     } catch (error) {
+      if (managedAccountId && !showConnect && errorCode(error) === "UNAUTHORIZED") {
+        await refresh().catch((reason) => reportFailure(errorMessage(reason)));
+        return false;
+      }
       const detail = errorMessage(error);
       if (panel || showJoin) setError(detail);
       else reportFailure(detail);
@@ -557,11 +559,12 @@ export default function SyncSettings({
   const activeConnections = status.connections.filter(
     (connection) => !connection.signedOut,
   );
-  const federatedActive = activeConnections.filter((item) =>
-    item.capabilities?.includes("account-federation-v1"),
+  const federatedAccounts = activeConnections.filter(
+    (item) => item.capabilities?.includes("account-federation-v1"),
   );
   const showAccountBindings =
-    new Set(federatedActive.map((item) => item.serverId)).size >= 2;
+    federatedAccounts.some((item) => !item.sessionExpired) &&
+    new Set(federatedAccounts.map((item) => item.serverId)).size >= 2;
   const managedAccount = status.connections.find(
     (connection) => connection.id === managedAccountId && !connection.signedOut,
   );
@@ -685,6 +688,14 @@ export default function SyncSettings({
               <span>· {managedAccount.name}</span>
             </div>
           </header>
+          {managedAccount.sessionExpired && (
+            <div className="settings-callout" data-tone="warn">
+              <span>{f("sessionRejected")}</span>
+              <button type="button" className="settings-button" onClick={() =>
+                openConnect({ url: managedAccount.url, account: managedAccount.user.name })
+              }>{f("signIn")}</button>
+            </div>
+          )}
           <SyncAccountPanel
             key={managedAccount.id}
             connection={managedAccount}
@@ -841,89 +852,26 @@ export default function SyncSettings({
         </section>
       ) : activeView === "accounts" ? (
         (() => {
-          const accountRows = status.connections.map((connection) => {
-            const syncedCount = projectsOn(connection.id);
-            return (
-              <article
-                key={connection.id}
-                className="settings-row sync-account-row"
-              >
-                <div className="sync-account-lead">
-                  <Database size={18} aria-hidden="true" />
-                  <div className="settings-row-text">
-                    <div className="settings-title-inline">
-                      <h3>{connection.user.name}</h3>
-                      {connection.signedOut ? (
-                        <span className="settings-badge" data-tone="warn">
-                          {f("signedOut")}
-                        </span>
-                      ) : (
-                        <span
-                          className="settings-badge"
-                          data-tone={syncedCount > 0 ? "ok" : undefined}
-                        >
-                          {syncedCount > 0
-                            ? t("accountSummaryProjects", {
-                                count: syncedCount,
-                              })
-                            : t("noProjectsSyncing")}
-                        </span>
-                      )}
-                    </div>
-                    <p>
-                      {connection.name} · {connection.url}
-                    </p>
-                  </div>
-                </div>
-                <div className="settings-row-actions">
-                  {connection.signedOut ? (
-                    <button
-                      type="button"
-                      className="settings-button settings-primary-button"
-                      onClick={() =>
-                        openConnect({
-                          url: connection.url,
-                          account: connection.user.name,
-                        })
-                      }
-                    >
-                      <RefreshCw size={15} aria-hidden="true" />
-                      {f("signIn")}
-                    </button>
-                  ) : (
-                    <>
-                      <button
-                        type="button"
-                        className="settings-button"
-                        onClick={() => {
-                          setProjectFilter(connection.id);
-                          switchView("projects");
-                        }}
-                      >
-                        <FolderOpen size={15} aria-hidden="true" />
-                        {f("viewProjects")}
-                      </button>
-                      <button
-                        id={`${viewId}-manage-account-${connection.id}`}
-                        type="button"
-                        className="settings-button"
-                        onClick={() => {
-                          setManagedAccountId(connection.id);
-                          requestAnimationFrame(() =>
-                            document
-                              .getElementById(`${viewId}-accounts-title`)
-                              ?.focus(),
-                          );
-                        }}
-                      >
-                        {f("manageAccount")}
-                      </button>
-                    </>
-                  )}
-                </div>
-              </article>
-            );
-          });
+          const accountRows = status.connections.map((connection) => (
+            <ServerAccountRow
+              key={connection.id}
+              connection={connection}
+              syncedCount={projectsOn(connection.id)}
+              manageId={`${viewId}-manage-account-${connection.id}`}
+              refresh={refresh}
+              onSignIn={() => openConnect({ url: connection.url, account: connection.user.name })}
+              onProjects={() => {
+                setProjectFilter(connection.id);
+                switchView("projects");
+              }}
+              onManage={() => {
+                setManagedAccountId(connection.id);
+                requestAnimationFrame(() =>
+                  document.getElementById(`${viewId}-accounts-title`)?.focus(),
+                );
+              }}
+            />
+          ));
 
           const emptyCard = (
             <div className="settings-card">
@@ -1005,7 +953,7 @@ export default function SyncSettings({
               </section>
 
               <AccountBindings
-                connections={activeConnections}
+                connections={federatedAccounts}
                 refresh={refresh}
               />
             </section>

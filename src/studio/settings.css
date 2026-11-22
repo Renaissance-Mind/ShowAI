@@ -434,31 +434,33 @@
   color: var(--danger);
 }
 .settings-path {
-  display: flex;
-  align-items: flex-start;
+  --path-action-size: 28px;
+  --path-line-height: 20px;
+  display: grid;
+  grid-template-columns: 15px minmax(0, 1fr) var(--path-action-size);
+  align-items: start;
   gap: 10px;
-  padding: 9px 10px 9px 12px;
+  padding: 6px 8px 6px 12px;
   background: var(--surface);
   border: 1px solid var(--line);
   border-radius: 8px;
   color: var(--muted);
 }
 .settings-path > svg {
-  flex-shrink: 0;
-  margin-top: 2px;
+  margin-block-start: calc((var(--path-action-size) - 15px) / 2);
 }
 .settings-path code {
-  flex: 1 1 200px;
   min-width: 0;
+  padding-block: calc((var(--path-action-size) - var(--path-line-height)) / 2);
   font-family: ui-monospace, "SFMono-Regular", Consolas, monospace;
   font-size: 12px;
-  line-height: 1.6;
+  line-height: var(--path-line-height);
   overflow-wrap: anywhere;
   color: var(--text);
 }
-.settings-path-copy {
-  align-self: flex-end;
-  margin: 0 -2px -2px 4px;
+.settings-path .settings-path-copy {
+  width: var(--path-action-size);
+  height: var(--path-action-size);
 }
 .settings-path-copy[data-copied="true"] {
   color: var(--success);
@@ -992,36 +994,8 @@
   gap: 14px;
   padding: 16px 18px;
 }
-.plugin-host + .plugin-host,
-.plugin-undetected-section,
-.plugin-undetected-list > .plugin-host {
+.plugin-host + .plugin-host {
   border-top: 1px solid var(--line);
-}
-.plugin-undetected-toggle {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  width: 100%;
-  padding: 12px 18px;
-  border: 0;
-  background: var(--surface);
-  color: var(--muted);
-  font-size: 12.5px;
-  font-weight: 500;
-  text-align: left;
-  cursor: pointer;
-}
-.plugin-undetected-toggle:hover {
-  color: var(--text);
-  background: var(--hover);
-}
-.plugin-undetected-toggle svg {
-  flex-shrink: 0;
-  transition: transform var(--duration-fast) var(--ease-out);
-}
-.plugin-undetected-toggle svg.is-open {
-  transform: rotate(180deg);
 }
 .studio-modal .plugin-manual-path {
   margin-top: 0;
@@ -1072,9 +1046,6 @@
 }
 .plugin-runtime {
   margin-bottom: 12px;
-}
-.plugin-verify-card {
-  margin-top: 12px;
 }
 .plugin-verify-prompt {
   display: flex;
