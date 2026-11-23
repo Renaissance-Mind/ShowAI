@@ -15,7 +15,6 @@
 .studio-sidebar {
   width: 240px;
   padding: 8px 16px 6px;
-  background: var(--paper);
 }
 .studio-brand {
   font-size: 20px;

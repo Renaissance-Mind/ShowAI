@@ -69,7 +69,7 @@
 .studio-sidebar {
   width: 226px;
   flex-shrink: 0;
-  background: var(--paper);
+  background: var(--surface);
   border-right: 1px solid var(--line);
   display: flex;
   flex-direction: column;
