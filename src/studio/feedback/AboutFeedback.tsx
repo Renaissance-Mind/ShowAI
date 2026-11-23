@@ -26,6 +26,7 @@ import { useFailureReason, verifyState } from "../PluginInstallSettings";
 import type { ReportProblemDetail } from "../../problems/report-event";
 import { pluginHostNames, usePluginHosts } from "../usePluginHosts";
 import { useAppUpdate } from "../useAppUpdate";
+import { UpdateOffer } from "./UpdateOffer";
 import { AGENT_TROUBLESHOOTING } from "../AgentReadiness";
 import {
   modeLine,
@@ -153,34 +154,44 @@ function ProductUpdateControl({ info }: { info: DesktopInfo | null }) {
     );
   };
   const busy = state.phase === "checking" || state.phase === "downloading";
+  if (
+    state.version &&
+    (state.phase === "available" || state.phase === "checking")
+  ) {
+    const version = state.version;
+    return (
+      <UpdateOffer
+        version={version}
+        checking={busy}
+        failure={failure}
+        onCheck={() => act("appUpdate:check")}
+        onDownload={(mode) => act("appUpdate:download", { mode, version })}
+      />
+    );
+  }
   const text =
     state.phase === "checking"
       ? t("update.checking")
       : state.phase === "current"
         ? t("update.current", { time: timeText(state.checkedAt!) })
-        : state.phase === "available"
-          ? t("update.available", { version: state.version! })
-          : state.phase === "downloading"
-            ? t("update.downloading", {
-                version: state.version!,
-                percent: String(state.percent ?? 0),
-              })
-            : state.phase === "ready"
-              ? t("update.ready", { version: state.version! })
+        : state.phase === "downloading"
+          ? t("update.downloading", {
+              version: state.version!,
+              percent: String(state.percent ?? 0),
+            })
+          : state.phase === "ready"
+            ? t(
+                state.restartAt === undefined
+                  ? "update.scheduled"
+                  : "update.ready",
+                { version: state.version! },
+              )
+            : state.phase === "installing"
+              ? t("update.installing", { version: state.version! })
               : state.phase === "failed"
                 ? t("update.failed", { message: state.error! })
                 : t("update.idle");
   const retry = state.phase === "failed" && state.retryDownload;
-  const button = retry
-    ? {
-        label: t("update.retryDownload"),
-        action: "appUpdate:download" as const,
-      }
-    : state.phase === "available"
-      ? { label: t("update.download"), action: "appUpdate:download" as const }
-      : state.phase === "ready"
-        ? { label: t("update.restart"), action: "appUpdate:install" as const }
-        : { label: t("update.check"), action: "appUpdate:check" as const };
   const hasError = state.phase === "failed" || !!failure;
   return (
     <div className="feedback-product-update">
@@ -196,21 +207,23 @@ function ProductUpdateControl({ info }: { info: DesktopInfo | null }) {
         {retry && state.version && ` · ${state.version}`}
       </p>
       <div className="feedback-product-update-actions">
-        {!busy ? (
-          <button
-            type="button"
-            className={`settings-button${state.phase === "ready" || state.phase === "available" ? " feedback-primary" : ""}`}
-            onClick={() => act(button.action)}
-          >
-            {button.label}
-          </button>
-        ) : (
-          <Loader2 size={15} className="studio-spin" aria-hidden="true" />
-        )}
         {retry && (
           <button
             className="settings-button"
             type="button"
+            onClick={() => act("appUpdate:download", { version: state.version })}
+          >
+            {t("update.retryDownload")}
+          </button>
+        )}
+        {busy || state.phase === "installing" ? (
+          <Loader2 size={15} className="studio-spin" aria-hidden="true" />
+        ) : state.phase === "ready" ? (
+          <Check size={15} aria-hidden="true" />
+        ) : (
+          <button
+            type="button"
+            className="settings-button"
             onClick={() => act("appUpdate:check")}
           >
             {t("update.check")}

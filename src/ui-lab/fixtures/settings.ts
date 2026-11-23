@@ -6,7 +6,7 @@ import type {
   LocalAgent,
   ModelSource,
 } from "../../agent-host/types";
-import type { AppUpdateState } from "../../host/protocol";
+import { APP_UPDATE_RESTART_DELAY_MS, type AppUpdateState } from "../../host/protocol";
 import type {
   PluginHost,
   PluginInstallation,
@@ -287,6 +287,8 @@ export function settingsFixture(
     "appUpdate:state",
     "appUpdate:check",
     "appUpdate:download",
+    "appUpdate:install",
+    "appUpdate:defer",
     "sync:status",
     "sync:serverInfo",
     "sync:connect",
@@ -442,6 +444,9 @@ export function settingsFixture(
           appUpdate = {
             ...appUpdate,
             phase: "current",
+            version: undefined,
+            restartAt: undefined,
+            installMode: undefined,
             checkedAt: "2026-11-21T07:30:00.000Z",
           };
           return copy(appUpdate);
@@ -450,7 +455,15 @@ export function settingsFixture(
             ...appUpdate,
             phase: "ready",
             version: appUpdate.version ?? "0.12.1",
+            installMode: args.mode === "restart" ? "restart" : "onQuit",
+            restartAt: args.mode === "restart" ? Date.now() + APP_UPDATE_RESTART_DELAY_MS : undefined,
           };
+          return copy(appUpdate);
+        case "appUpdate:defer":
+          appUpdate = { ...appUpdate, restartAt: undefined, installMode: "onQuit" };
+          return copy(appUpdate);
+        case "appUpdate:install":
+          appUpdate = { ...appUpdate, phase: "installing", restartAt: undefined };
           return copy(appUpdate);
 
         case "sync:status":

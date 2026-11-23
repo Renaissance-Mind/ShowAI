@@ -6,7 +6,11 @@ import {
   type ProgressInfo,
   type UpdateInfo,
 } from "electron-updater";
-import type { AppUpdateState } from "../host/protocol";
+import {
+  APP_UPDATE_RESTART_DELAY_MS,
+  type AppUpdateInstallMode,
+  type AppUpdateState,
+} from "../host/protocol";
 import type { LogLevel } from "./main-log";
 
 const FIRST_CHECK_DELAY_MS = 20_000;
@@ -20,6 +24,7 @@ export const appUpdateActions = new Set([
   "appUpdate:download",
   "appUpdate:setAutomatic",
   "appUpdate:install",
+  "appUpdate:defer",
 ]);
 
 function shortError(error: unknown): string {
@@ -31,8 +36,9 @@ function shortError(error: unknown): string {
 export class AppUpdates {
   private state: AppUpdateState;
   private timer?: ReturnType<typeof setInterval>;
+  private firstCheck?: ReturnType<typeof setTimeout>;
+  private restartTimer?: ReturnType<typeof setTimeout>;
   private checking?: Promise<void>;
-  private installRequested = false;
 
   constructor(
     private readonly options: {
@@ -40,6 +46,7 @@ export class AppUpdates {
       log: (level: LogLevel, ...values: unknown[]) => void;
       publish: (state: AppUpdateState) => void;
       saveAutomatic: (automatic: boolean) => Promise<void>;
+      quit: () => void;
     },
   ) {
     const unavailableReason = !app.isPackaged
@@ -62,10 +69,15 @@ export class AppUpdates {
       error: (message?: unknown) => log("error", message),
       debug: () => {},
     };
-    autoUpdater.autoDownload = options.automatic;
+    autoUpdater.autoDownload = false;
     autoUpdater.autoInstallOnAppQuit = true;
     autoUpdater.on("checking-for-update", () =>
-      this.set({ phase: "checking", retryDownload: false, error: undefined }),
+      this.set({
+        phase: "checking",
+        installMode: undefined,
+        retryDownload: false,
+        error: undefined,
+      }),
     );
     autoUpdater.on("update-not-available", () =>
       this.set({
@@ -76,34 +88,58 @@ export class AppUpdates {
     );
     autoUpdater.on("update-available", (info: UpdateInfo) =>
       this.set({
-        phase: autoUpdater.autoDownload ? "downloading" : "available",
+        phase: "available",
         version: info.version,
         percent: 0,
         checkedAt: new Date().toISOString(),
       }),
     );
-    autoUpdater.on("download-progress", (progress: ProgressInfo) =>
-      this.set({ phase: "downloading", percent: Math.floor(progress.percent) }),
-    );
-    autoUpdater.on("update-downloaded", (info: UpdateInfo) =>
-      this.set(
-        process.platform === "darwin"
-          ? { phase: "downloading", version: info.version, percent: 100 }
-          : { phase: "ready", version: info.version, error: undefined },
-      ),
-    );
+    autoUpdater.on("download-progress", (progress: ProgressInfo) => {
+      if (this.state.phase === "downloading")
+        this.set({ percent: Math.floor(progress.percent) });
+    });
+    autoUpdater.on("update-downloaded", (info: UpdateInfo) => {
+      if (this.state.phase !== "downloading") return;
+      if (process.platform === "darwin")
+        this.set({ version: info.version, percent: 100 });
+      else this.ready(info.version);
+    });
     if (process.platform === "darwin")
       nativeUpdater.on("update-downloaded", () =>
-        this.set({ phase: "ready", error: undefined }),
+        this.ready(this.state.version),
       );
-    autoUpdater.on("error", (error: Error) => {
-      if (this.state.phase === "ready") return;
-      this.set({
-        phase: "failed",
-        retryDownload:
-          this.state.phase === "downloading" || this.state.retryDownload,
-        error: shortError(error),
-      });
+    autoUpdater.on("error", (error: Error) => this.failed(error));
+  }
+
+  private ready(version?: string): void {
+    if (this.state.phase !== "downloading") return;
+    let restartAt: number | undefined;
+    if (this.state.installMode === "restart") {
+      restartAt = Date.now() + APP_UPDATE_RESTART_DELAY_MS;
+      this.restartTimer = setTimeout(
+        () => this.requestInstall(),
+        APP_UPDATE_RESTART_DELAY_MS,
+      );
+      this.restartTimer.unref();
+    }
+    this.set({
+      phase: "ready",
+      version,
+      percent: 100,
+      restartAt,
+      error: undefined,
+      retryDownload: false,
+    });
+  }
+
+  private failed(error: unknown): void {
+    if (this.state.phase === "ready" || this.state.phase === "installing")
+      return;
+    this.set({
+      phase: "failed",
+      retryDownload:
+        this.state.phase === "downloading" || this.state.retryDownload,
+      error: shortError(error),
     });
   }
 
@@ -113,25 +149,33 @@ export class AppUpdates {
 
   start(): void {
     if (!this.state.supported) return;
-    setTimeout(() => {
-      if (this.state.automatic) void this.check();
-    }, FIRST_CHECK_DELAY_MS).unref();
-    this.timer = setInterval(() => {
-      if (this.state.automatic) void this.check();
-    }, CHECK_INTERVAL_MS);
+    const scheduledCheck = () => {
+      if (
+        this.state.automatic &&
+        this.state.phase !== "available" &&
+        !this.state.retryDownload
+      )
+        void this.check();
+    };
+    this.firstCheck = setTimeout(scheduledCheck, FIRST_CHECK_DELAY_MS);
+    this.firstCheck.unref();
+    this.timer = setInterval(scheduledCheck, CHECK_INTERVAL_MS);
     this.timer.unref();
   }
 
   async check(): Promise<AppUpdateState> {
-    if (!this.state.supported || this.state.phase === "ready")
+    if (
+      !this.state.supported ||
+      this.state.phase === "ready" ||
+      this.state.phase === "installing"
+    )
       return this.state;
     if (this.state.phase === "downloading") return this.state;
     this.checking ??= autoUpdater
       .checkForUpdates()
       .then(
         () => {},
-        (error: unknown) =>
-          this.set({ phase: "failed", error: shortError(error) }),
+        (error: unknown) => this.failed(error),
       )
       .finally(() => {
         this.checking = undefined;
@@ -140,44 +184,57 @@ export class AppUpdates {
     return this.state;
   }
 
-  async download(): Promise<AppUpdateState> {
+  async download(mode?: AppUpdateInstallMode): Promise<AppUpdateState> {
     if (
       this.state.phase !== "available" &&
       !(this.state.phase === "failed" && this.state.retryDownload)
     )
       return this.state;
-    this.set({ phase: "downloading", percent: 0, error: undefined });
-    await autoUpdater.downloadUpdate().catch((error: unknown) => {
-      this.set({
-        phase: "failed",
-        retryDownload: true,
-        error: shortError(error),
-      });
+    const installMode = mode ?? this.state.installMode ?? "onQuit";
+    this.set({
+      phase: "downloading",
+      installMode,
+      percent: 0,
+      error: undefined,
+      retryDownload: false,
     });
+    await autoUpdater
+      .downloadUpdate()
+      .catch((error: unknown) => this.failed(error));
     return this.state;
   }
 
   async setAutomatic(automatic: boolean): Promise<AppUpdateState> {
     await this.options.saveAutomatic(automatic);
-    if (this.state.supported) autoUpdater.autoDownload = automatic;
     this.set({ automatic });
-    if (automatic && this.state.phase === "available") await this.download();
-    else if (automatic && this.state.phase !== "ready") await this.check();
+    if (automatic && this.state.phase !== "available") await this.check();
     return this.state;
   }
 
-  requestInstall(quit: () => void): void {
+  private requestInstall(): void {
     if (this.state.phase !== "ready") return;
-    this.installRequested = true;
-    quit();
+    clearTimeout(this.restartTimer);
+    this.set({ phase: "installing", restartAt: undefined });
+    this.options.quit();
+  }
+
+  deferRestart(): void {
+    if (
+      this.state.installMode !== "restart" ||
+      this.state.phase === "installing"
+    )
+      return;
+    clearTimeout(this.restartTimer);
+    this.set({ installMode: "onQuit", restartAt: undefined });
   }
 
   cancelInstall(): void {
-    this.installRequested = false;
+    if (this.state.phase === "installing")
+      this.set({ phase: "ready", installMode: "onQuit", restartAt: undefined });
   }
 
   finishQuit(quit: () => void): boolean {
-    if (!this.installRequested || this.state.phase !== "ready") return false;
+    if (this.state.phase !== "installing") return false;
     const log = this.options.log;
     log("info", `Installing ShowAI ${this.state.version} and relaunching.`);
     const exit = () => {
@@ -209,7 +266,6 @@ export class AppUpdates {
   async action(
     action: string,
     args: Record<string, unknown>,
-    quit: () => void,
   ): Promise<AppUpdateState> {
     switch (action) {
       case "appUpdate:state":
@@ -217,7 +273,15 @@ export class AppUpdates {
       case "appUpdate:check":
         return this.check();
       case "appUpdate:download":
-        return this.download();
+        if (args.version !== undefined && args.version !== this.state.version)
+          return this.state;
+        if (
+          args.mode !== undefined &&
+          args.mode !== "restart" &&
+          args.mode !== "onQuit"
+        )
+          throw new TypeError("Unknown update installation mode.");
+        return this.download(args.mode);
       case "appUpdate:setAutomatic":
         if (typeof args.automatic !== "boolean")
           throw new TypeError(
@@ -225,7 +289,19 @@ export class AppUpdates {
           );
         return this.setAutomatic(args.automatic);
       case "appUpdate:install":
-        this.requestInstall(quit);
+        if (
+          args.version === undefined ||
+          (args.version === this.state.version &&
+            this.state.restartAt !== undefined)
+        )
+          this.requestInstall();
+        return this.state;
+      case "appUpdate:defer":
+        if (
+          args.version === this.state.version &&
+          this.state.restartAt !== undefined
+        )
+          this.deferRestart();
         return this.state;
       default:
         throw new TypeError(`Unknown update action: ${action}`);
@@ -233,6 +309,8 @@ export class AppUpdates {
   }
 
   dispose(): void {
+    clearTimeout(this.firstCheck);
+    clearTimeout(this.restartTimer);
     clearInterval(this.timer);
   }
 

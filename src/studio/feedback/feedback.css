@@ -48,6 +48,67 @@
 .feedback-product-update-actions .settings-button {
   flex-shrink: 0;
 }
+.feedback-about {
+  container: feedback-about / inline-size;
+}
+.feedback-product-card:has(.feedback-update-offer) {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+}
+.feedback-update-offer {
+  min-width: 0;
+  margin: 0;
+}
+.feedback-update-version,
+.feedback-update-offer .feedback-product-update-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+}
+.feedback-update-version {
+  gap: 3px;
+}
+.feedback-update-version .feedback-update-status {
+  color: var(--text);
+  font-weight: 550;
+}
+.feedback-update-version .feedback-update-recheck {
+  width: 24px;
+  height: 24px;
+  border: 0;
+  background: transparent;
+}
+.feedback-update-recheck[aria-disabled="true"] {
+  cursor: progress;
+}
+.feedback-update-offer .feedback-product-update-actions {
+  flex-wrap: wrap;
+}
+.feedback-update-offer .settings-button {
+  max-width: 100%;
+  white-space: normal;
+}
+@container feedback-about (max-width: 520px) {
+  .feedback-product-card:has(.feedback-update-offer) {
+    grid-template-columns: minmax(68px, max-content) minmax(0, 1fr);
+    gap: 10px;
+    padding: 14px;
+  }
+  .feedback-product-card:has(.feedback-update-offer) .settings-product {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 6px;
+  }
+  .feedback-product-card:has(.feedback-update-offer) .settings-product-symbol {
+    width: 35px;
+    height: 35px;
+  }
+  .feedback-update-offer .feedback-product-update-actions {
+    flex-direction: column;
+    align-items: flex-end;
+  }
+}
 .feedback-info-list {
   margin: 0;
 }

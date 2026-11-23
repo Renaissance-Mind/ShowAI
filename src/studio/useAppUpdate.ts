@@ -7,6 +7,7 @@ export type AppUpdateAction =
   | "appUpdate:check"
   | "appUpdate:download"
   | "appUpdate:install"
+  | "appUpdate:defer"
   | "appUpdate:setAutomatic";
 
 export function useAppUpdate() {

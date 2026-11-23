@@ -42,3 +42,24 @@
 .plugin-update-notice .settings-button:disabled {
   opacity: 0.6;
 }
+.app-restart-notice {
+  right: 14px;
+  bottom: 14px;
+  width: min(320px, calc(100vw - 28px));
+}
+.app-restart-notice .plugin-update-notice-primary {
+  font-variant-numeric: tabular-nums;
+  white-space: pre;
+}
+@media (max-width: 450px) {
+  .app-restart-notice {
+    right: 10px;
+    bottom: 10px;
+    width: min(300px, calc(100vw - 20px));
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .app-restart-notice {
+    animation: none;
+  }
+}

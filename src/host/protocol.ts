@@ -36,6 +36,9 @@ export interface DesktopInfo {
   versions?: { node: string; electron?: string; chrome?: string };
 }
 
+export type AppUpdateInstallMode = "restart" | "onQuit";
+export const APP_UPDATE_RESTART_DELAY_MS = 20_000;
+
 export interface AppUpdateState {
   supported: boolean;
   unavailableReason?: "development" | "missingFeed" | "browser";
@@ -48,7 +51,10 @@ export interface AppUpdateState {
     | "available"
     | "downloading"
     | "ready"
+    | "installing"
     | "failed";
+  installMode?: AppUpdateInstallMode;
+  restartAt?: number;
   version?: string;
   percent?: number;
   retryDownload?: boolean;

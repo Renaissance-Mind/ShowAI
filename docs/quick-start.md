@@ -19,7 +19,7 @@ ShowAI works inside the agent you already use: the plugin lets your agent build 
 2. Open it and drag **ShowAI** into **Applications**, then open ShowAI.
 3. Current builds are not yet notarized by Apple, so macOS may block the first launch. If it does, open **System Settings → Privacy & Security** and choose **Open Anyway** ([Apple's instructions](https://support.apple.com/en-us/102445)). Each release's notes say whether this is still needed.
 
-ShowAI keeps itself up to date: it checks the latest release in the background, downloads a new version and installs it when you click **Restart to update** or the next time you quit. **Settings → About & feedback → Updates** shows the state; turn off automatic updates there to check and download yourself. After an update, ShowAI offers to update the agent plugin as well.
+ShowAI checks for new releases in the background. Open **Settings → About & feedback** to see the available version. The refresh icon beside it checks again. **Install and restart** downloads the update, then shows a notice in the bottom-right corner when it is ready. Choose **Restart now**, wait 20 seconds for ShowAI to restart automatically, or choose **Restart later** to keep working. **Download and update on next launch** prepares the update for the next normal quit and launch. After an update, ShowAI offers to update the agent plugin as well.
 
 ## 2. Connect your agent
 

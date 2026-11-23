@@ -727,11 +727,7 @@ export default function Studio() {
             />
           </AssistantWorkbench>
         </AutoHideSidebar>
-        <AppUpdateNotice
-          state={appUpdate.state}
-          run={appUpdate.run}
-          hidden={view === "settings"}
-        />
+        <AppUpdateNotice state={appUpdate.state} run={appUpdate.run} />
         <PluginUpdateNotice
           home={
             info &&
@@ -742,7 +738,7 @@ export default function Studio() {
               : null
           }
           hidden={
-            appUpdate.state?.phase === "ready" ||
+            appUpdate.state?.restartAt !== undefined ||
             view === "settings" ||
             (view === "docs" && docPage?.id === WELCOME_DOC) ||
             (view === "projects" && workspaceReady && welcoming && !showDocs)

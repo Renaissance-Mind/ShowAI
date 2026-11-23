@@ -955,7 +955,7 @@ async function handle(
     );
   if (agentActions.has(action)) return agentHost!.action(action, args);
   if (appUpdateActions.has(action))
-    return appUpdates!.action(action, args, () => app.quit());
+    return appUpdates!.action(action, args);
   const result = await createWorkbench(store, service, {
     preferencesChanged: () =>
       broadcast("files", {
@@ -1937,7 +1937,8 @@ else {
       );
       const settings = await startupSettings();
       appUpdates = new AppUpdates({
-        automatic: true,
+        automatic: settings.autoUpdate ?? true,
+        quit: () => app.quit(),
         log: (level, ...values) => mainLog.write(level, "update", ...values),
         publish: (state) => {
           for (const window of windows)
@@ -2270,6 +2271,7 @@ else {
       return;
     }
     checkingQuit = true;
+    appUpdates?.deferRestart();
     const open = [...windows];
     mainLog.write(
       "info",
