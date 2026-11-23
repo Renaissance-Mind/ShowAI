@@ -134,6 +134,7 @@ function registerCodexWorkbench(
     ...views,
     { mode: "thread", name: "workbench_file", uri: codexWorkbenchFileUri, entrypoint: "file" },
     { mode: "thread", name: "workbench_page_card", uri: codexWorkbenchCardUri, entrypoint: "card" },
+    { mode: "thread", name: "workbench_page_card_v13", uri: "ui://showai/workbench-card-v13.html", entrypoint: "card" },
     { mode: "thread", name: "workbench_page_card_v12", uri: "ui://showai/workbench-card-v12.html", entrypoint: "card" },
     { mode: "thread", name: "workbench_page_card_v11", uri: "ui://showai/workbench-card-v11.html", entrypoint: "card" },
     { mode: "thread", name: "workbench_page_card_v10", uri: previousWorkbenchCardUri, entrypoint: "card" },

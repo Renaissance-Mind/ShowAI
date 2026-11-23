@@ -27,7 +27,7 @@
   box-sizing: border-box;
   position: relative;
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
   align-items: center;
   padding: var(--showai-card-padding-y) var(--showai-card-padding-x);
   border: 1px solid var(--card-border);
@@ -75,6 +75,7 @@
 }
 .showai-card-open:disabled { cursor: default }
 .showai-card-destination { margin-inline-start: var(--showai-card-actions-gap); color: var(--card-muted); font-size: 12px; pointer-events: none }
+.showai-card-destination:not([hidden]) + .showai-card-actions { margin-inline-start: 4px }
 .showai-card-open:focus-visible { outline: 2px solid var(--card-focus); outline-offset: -2px }
 .showai-card-list .showai-card:has(> .showai-card-open:active:not(:disabled)) { background: var(--card-hover) }
 @media (hover: hover) {

@@ -12,7 +12,7 @@ export const codexWorkbenchUri = "ui://showai/workbench-v3.html";
 export const codexWorkbenchThreadUri = "ui://showai/workbench-thread-v5.html";
 export const codexWorkbenchFileUri = "ui://showai/workbench-file-v3.html";
 
-export const codexWorkbenchCardUri = "ui://showai/workbench-card-v13.html";
+export const codexWorkbenchCardUri = "ui://showai/workbench-card-v14.html";
 export const previousWorkbenchCardUri = "ui://showai/workbench-card-v10.html";
 export const codexWorkbenchTargetUri = "ui://showai/workbench-target-v3.html";
 
@@ -375,13 +375,14 @@ ${card}
       busy: !initialized || openingCard || (!capabilities.serverTools && (desktop || ((linked || remote) && !webLinks))),
       workbench: webLinks || ((hasGlobalEntrypoint || linked) && !!capabilities.serverTools),
       desktop: !!capabilities.serverTools,
+      showDestination: desktop || ${host === "codex"},
       ...(qoder && { showOptions: false }),
       ...(remote && { openLabel: t("openRemotePage"), showOptions: false }),
       ...(linked && {
         openLabel: t(hasGlobalEntrypoint ? "cardCursor" : "cardEditorLink"),
         workbenchLabel: t("copyEditorLink"),
       }),
-      ...(desktop && { openLabel: t("cardDesktop"), showOptions: false, showDestination: true }),
+      ...(desktop && { openLabel: t("cardDesktop"), showOptions: false }),
     });
     card.hidden = false;
     if (initialized && adjustSpacing && !spacingEditor) {
