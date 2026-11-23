@@ -13,7 +13,7 @@ import SurfaceEditor from "../surface/SurfaceEditor";
 import type { ShowDocument } from "../types";
 import { useLocale, useTranslator } from "../i18n/react";
 import sidebarMessages from "../i18n/messages/sidebar";
-import { ChevronRight, Folder, FolderOpen, Loader2 } from "../ui/icons";
+import { Folder, FolderOpen, Loader2 } from "../ui/icons";
 import { errorMessage } from "../host/bridge";
 import {
   NAVIGATE_EVENT,
@@ -86,38 +86,25 @@ export function DocsNavigation({
       : undefined;
   const row = (
     key: string,
-    depth: ReactNode,
     main: ReactNode,
-    active = false,
+    active: boolean,
+    children?: ReactNode,
   ) => (
-    <div
-      key={key}
-      className={`studio-tree-row${active ? " active" : ""}`}
-      data-docs-id={key}
-    >
-      {depth}
-      {main}
+    <div key={key} className="studio-docs-entry">
+      <div
+        className={`studio-tree-row${active ? " active" : ""}`}
+        data-docs-id={key}
+      >
+        {main}
+      </div>
+      {children}
     </div>
-  );
-  const chevron = (id: string, name: string) => (
-    <button
-      type="button"
-      className="studio-tree-chevron"
-      aria-label={t(expanded[id] ? "collapseItem" : "expandItem", {
-        title: name,
-      })}
-      aria-expanded={!!expanded[id]}
-      onClick={() => toggle(id)}
-    >
-      <ChevronRight size={13} aria-hidden="true" />
-    </button>
   );
   const page = (id: string) => {
     const meta = title(id);
     const label = id === DOCS_HOME ? t("docs.home") : meta.title;
     return row(
       id,
-      <span className="studio-tree-chevron" aria-hidden="true" />,
       <button
         type="button"
         className="studio-tree-main"
@@ -137,39 +124,34 @@ export function DocsNavigation({
     );
   };
   const entries = (items: DocsEntry[]): ReactNode =>
-    items.map((entry) =>
-      entry.type === "page" ? (
-        page(entry.id)
-      ) : (
-        <div key={entry.id}>
-          {row(
-            entry.id,
-            chevron(entry.id, entry.name),
-            <button
-              type="button"
-              className="studio-tree-main"
-              title={entry.name}
-              onClick={() => toggle(entry.id)}
-            >
-              {entry.icon ? (
-                <PageIcon value={entry.icon} size={15} />
-              ) : expanded[entry.id] ? (
-                <FolderOpen size={15} aria-hidden="true" />
-              ) : (
-                <Folder size={15} aria-hidden="true" />
-              )}
-              <span className="studio-tree-title">{entry.name}</span>
-            </button>,
-            closedAncestor === entry.id,
-          )}
-          {expanded[entry.id] && (
-            <div className="studio-tree-children">
-              {entries(entry.children)}
-            </div>
-          )}
-        </div>
-      ),
-    );
+    items.map((entry) => {
+      if (entry.type === "page") return page(entry.id);
+      const open = !!expanded[entry.id];
+      const Icon = open ? FolderOpen : Folder;
+      return row(
+        entry.id,
+        <button
+          type="button"
+          className="studio-tree-main"
+          title={entry.name}
+          aria-expanded={open}
+          onClick={() => toggle(entry.id)}
+        >
+          <Icon size={15} strokeWidth={1.7} aria-hidden="true" />
+          <span className="studio-tree-title">{entry.name}</span>
+        </button>,
+        closedAncestor === entry.id,
+        open && (
+          <div
+            className="studio-docs-children"
+            role="group"
+            aria-label={entry.name}
+          >
+            {entries(entry.children)}
+          </div>
+        ),
+      );
+    });
   return (
     <section
       id="studio-docs-navigation"

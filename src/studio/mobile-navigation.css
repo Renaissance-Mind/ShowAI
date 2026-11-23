@@ -1,11 +1,18 @@
 html[data-native="ios"] .studio-workspace {
   position: relative;
 }
+.studio-workspace:is(
+    [data-mobile-sidebar="hidden"],
+    [data-mobile-sidebar="overlay"]
+  )
+  > .studio-main {
+  isolation: isolate;
+}
 .studio-mobile-navigation-tools {
   position: absolute;
   top: 6px;
   left: 6px;
-  z-index: 112;
+  z-index: 99;
   height: 36px;
   display: flex;
   align-items: center;
@@ -65,6 +72,9 @@ html[data-native="ios"] .studio-sidebar-shell > .studio-sidebar {
 .studio-mobile-sidebar-brand img {
   width: 22px;
   height: 22px;
+}
+.studio-mobile-sidebar-brand:has(.studio-docs-toggle[aria-expanded="true"]) {
+  margin-bottom: 0;
 }
 html[data-native="ios"] .board-tool-shortcuts {
   display: none;

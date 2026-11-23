@@ -286,7 +286,7 @@ try {
   await row(opened, target.other).waitFor({ state: "hidden" });
   const toolbarBeforeHide = await toolbar.boundingBox();
   const docsToggle = addressRow.getByRole("button", {
-    name: "ShowAI 文档",
+    name: "文档",
     exact: true,
   });
   await docsToggle.click();

@@ -11,7 +11,36 @@
   animation: showai-fade-in var(--duration-fast) var(--ease-out);
 }
 .studio-docs .studio-tree-row > .studio-tree-main {
-  padding-right: 6px;
+  padding-inline: 4px 6px;
+}
+.studio-docs-children {
+  padding-inline-start: 16px;
+}
+.studio-docs-entry,
+.studio-docs-entry > .studio-tree-row {
+  position: relative;
+}
+.studio-docs-children > .studio-docs-entry:not(:last-child)::before,
+.studio-docs-children
+  > .studio-docs-entry:last-child
+  > .studio-tree-row::before {
+  content: "";
+  position: absolute;
+  inset-block: 0;
+  inset-inline-start: -5px;
+  width: 1px;
+  background: color-mix(in srgb, var(--muted) 30%, transparent);
+  pointer-events: none;
+}
+.studio-docs-children
+  > .studio-docs-entry:last-child
+  > .studio-tree-row::before {
+  inset-block-end: 25%;
+}
+@media (hover: hover) {
+  .studio-docs .studio-tree-row:not(.active):hover {
+    background: color-mix(in srgb, var(--text) 6%, var(--docs-panel-surface));
+  }
 }
 .studio-sidebar:has(> .studio-docs) > .studio-sidebar-projects {
   min-height: min(48px, 30%);

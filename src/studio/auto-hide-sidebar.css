@@ -120,16 +120,44 @@
   width: 24px;
 }
 .studio-docs-toggle {
-  display: grid;
-  place-items: center;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
   align-self: stretch;
   position: relative;
   isolation: isolate;
-  flex: 0 0 27px;
-  padding: 0;
+  flex: none;
+  padding: 0 6px;
+  font-size: 13px;
+  white-space: nowrap;
   color: var(--muted);
   background: transparent;
   -webkit-app-region: no-drag;
+}
+.studio-address-tools > .studio-docs-toggle {
+  margin-inline-start: auto;
+}
+.studio-address-tools[data-narrow] {
+  gap: 2px;
+  padding-inline: 5px 1px;
+}
+.studio-address-tools[data-narrow] .studio-address-brand {
+  gap: 2px;
+  font-size: 13px;
+}
+.studio-address-tools[data-narrow] .studio-address-brand img {
+  width: 16px;
+  height: 16px;
+}
+.studio-address-tools[data-narrow] .studio-docs-toggle {
+  gap: 2px;
+  padding-inline: 2px;
+  font-size: 12px;
+}
+.studio-address-tools[data-narrow] .studio-docs-toggle svg {
+  width: 15px;
+  height: 15px;
 }
 .studio-docs-toggle::before {
   content: "";
@@ -150,23 +178,27 @@
   background: var(--docs-panel-surface);
 }
 .studio-docs-toggle[aria-expanded="true"]::after {
+  --docs-join-radius: 14px;
   content: "";
   position: absolute;
-  inset: auto -5px 0;
-  height: 5px;
-  background:
+  inset: auto calc(-1 * var(--docs-join-radius)) 0;
+  height: var(--docs-join-radius);
+  background-image:
     radial-gradient(
-        circle at left top,
-        transparent 4.5px,
-        var(--docs-panel-surface) 5px
-      )
-      left / 5px 5px no-repeat,
+      circle var(--docs-join-radius) at left top,
+      transparent calc(100% - 0.5px),
+      var(--docs-panel-surface) 100%
+    ),
     radial-gradient(
-        circle at right top,
-        transparent 4.5px,
-        var(--docs-panel-surface) 5px
-      )
-      right / 5px 5px no-repeat;
+      circle var(--docs-join-radius) at right top,
+      transparent calc(100% - 0.5px),
+      var(--docs-panel-surface) 100%
+    );
+  background-position:
+    left bottom,
+    right bottom;
+  background-size: var(--docs-join-radius) 100%;
+  background-repeat: no-repeat;
   pointer-events: none;
 }
 .studio-workspace:not([data-mobile-sidebar]) .studio-sidebar[data-docs-open] {

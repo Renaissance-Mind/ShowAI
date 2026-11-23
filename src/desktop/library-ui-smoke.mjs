@@ -232,12 +232,11 @@ try {
     width: innerWidth,
     height: innerHeight,
   }));
-  await page.setViewportSize({ width: fullSize.width, height: 260 });
   const docsToggle = page.getByRole("button", {
-    name: "ShowAI 文档",
+    name: "文档",
     exact: true,
   });
-  await docsToggle.click();
+  await docsToggle.locator("svg").click();
   const docsPanel = sidebar.getByRole("region", { name: "ShowAI 文档" });
   await docsPanel
     .getByRole("button", { name: "文档首页", exact: true })
@@ -246,6 +245,39 @@ try {
     await docsPanel.getByText("ShowAI 文档", { exact: true }).count(),
     0,
   );
+  assert.equal(await docsPanel.locator(".studio-tree-chevron").count(), 0);
+  const folderName = "使用工作台";
+  const docsFolder = docsPanel.getByRole("button", {
+    name: folderName,
+    exact: true,
+  });
+  const children = docsPanel.getByRole("group", {
+    name: folderName,
+    exact: true,
+  });
+  const folderIcon = docsFolder.locator("svg");
+  const closedIcon = await folderIcon.innerHTML();
+  await docsFolder.press("Enter");
+  await children.waitFor();
+  assert.equal(await docsFolder.getAttribute("aria-expanded"), "true");
+  assert.notEqual(await folderIcon.innerHTML(), closedIcon);
+  const guide = await children.evaluate((group) => {
+    const first = group.firstElementChild;
+    const lastRow = group.lastElementChild.querySelector(".studio-tree-row");
+    return {
+      start: parseFloat(getComputedStyle(first, "::before").top),
+      end: parseFloat(getComputedStyle(lastRow, "::before").height),
+      rowHeight: lastRow.getBoundingClientRect().height,
+    };
+  });
+  assert.equal(guide.start, 0);
+  assert.ok(Math.abs(guide.end - guide.rowHeight * 0.75) < 0.1);
+  await docsFolder.click();
+  await children.waitFor({ state: "detached" });
+  assert.equal(await docsFolder.getAttribute("aria-expanded"), "false");
+  assert.equal(await folderIcon.innerHTML(), closedIcon);
+
+  await page.setViewportSize({ width: fullSize.width, height: 260 });
   const docsBox = await docsPanel.boundingBox();
   const toggleBox = await docsToggle.boundingBox();
   const searchBox = await sidebar
@@ -272,7 +304,7 @@ try {
     return menu && Number(getComputedStyle(menu).opacity) < 0.9;
   }, project.id);
   await poll(menuOpacity, (value) => value === 1, "restored hover menu");
-  await docsToggle.click();
+  await docsToggle.getByText("文档", { exact: true }).click();
   await page.setViewportSize(fullSize);
   result.checks.push(
     "Scrolling suspends row hover and restores the menu under a stationary pointer",

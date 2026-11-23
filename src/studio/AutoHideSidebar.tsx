@@ -364,7 +364,6 @@ export default function AutoHideSidebar({
       ref={docsButton}
       type="button"
       className="studio-docs-toggle"
-      aria-label={t("docs.title")}
       title={t("docs.title")}
       aria-controls="studio-docs-navigation"
       aria-expanded={docsVisible}
@@ -376,7 +375,8 @@ export default function AutoHideSidebar({
         if (!hidden || !docsOpen) docsExpansion.toggle("root");
       }}
     >
-      <BookOpen size={17} strokeWidth={1.7} aria-hidden="true" />
+      <BookOpen size={16} strokeWidth={1.7} aria-hidden="true" />
+      <span>{t("docs.button")}</span>
     </button>
   );
 
@@ -443,7 +443,9 @@ export default function AutoHideSidebar({
             onClickCapture={(event) => {
               if (
                 !nativeLayout.docked &&
-                (event.target as Element).closest(".studio-tree-main")
+                (event.target as Element).closest(
+                  ".studio-tree-main:not([aria-expanded])",
+                )
               )
                 setNativeOpen(false);
             }}
@@ -527,6 +529,7 @@ export default function AutoHideSidebar({
         <div
           ref={addressTools}
           className="studio-address-tools"
+          data-narrow={(documentation && width < 234) || undefined}
           onPointerEnter={automatic ? reveal : undefined}
           onPointerLeave={automatic ? leave : undefined}
           onFocusCapture={(event) => {
