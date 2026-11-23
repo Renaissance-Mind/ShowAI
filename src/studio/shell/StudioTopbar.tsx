@@ -1,4 +1,5 @@
 import { SettingsSearch } from "../Settings";
+import { AddressBarNavigation } from "../AutoHideSidebar";
 import { codexWorkbench, codexWorkbenchPageOpener } from "../../browser/codex-workbench";
 import { appIconForTheme } from "../../design/app-icon";
 import { useAppearanceTheme } from "../../design/useAppearanceTheme";
@@ -270,6 +271,136 @@ export function StudioTopbar({
   }
   return (
     <div className="studio-topbar">
+      <div className="studio-address">
+        <AddressBarNavigation />
+        {view === "settings" ||
+        view === "projects" ||
+        view === "templates" ||
+        view === "components" ? (
+          <h1 className="studio-topbar-title">
+            {view === "projects" ? (
+              <History size={17} aria-hidden="true" />
+            ) : view === "templates" ? (
+              <LayoutTemplate size={17} aria-hidden="true" />
+            ) : view === "components" ? (
+              <Blocks size={17} aria-hidden="true" />
+            ) : (
+              <Settings2 size={17} aria-hidden="true" />
+            )}
+            <span>{heading}</span>
+          </h1>
+        ) : (
+          <div className="studio-breadcrumb">
+            {!singlePage && selectedProject && (
+              <button
+                onClick={(event) =>
+                  project && openTargetClick(projectTarget(project), event)
+                }
+              >
+                <ProjectIcon
+                  value={project?.icon}
+                  size={17}
+                  cloud={syncOverview.bindings.has(selectedProject)}
+                />
+                <span>{project?.name ?? t("heading.project")}</span>
+                {selectedMarker && (
+                  <span
+                    className={`studio-tree-marker is-${selectedMarker.tone}`}
+                    title={selectedMarker.title}
+                  >
+                    {selectedMarker.label}
+                  </span>
+                )}
+              </button>
+            )}
+            {!singlePage && breadcrumbFolders.map((item) => (
+              <span className="studio-breadcrumb-folder" key={item.id}>
+                <ChevronRight size={13} />
+                <button
+                  onClick={(event) =>
+                    openTargetClick(folderTarget(item, selectedProject!), event)
+                  }
+                >
+                  <PageIcon
+                    value={item.icon}
+                    size={16}
+                    fallback={<Folder size={16} />}
+                  />
+                  <span>{item.name}</span>
+                </button>
+              </span>
+            ))}
+            {view === "docs" && docMeta && (
+              <>
+                <button onClick={action(() => openDoc(DOCS_HOME))}>
+                  <PageIcon value={builtinDocs(locale).icon} size={17} />
+                  <span>{builtinDocs(locale).name}</span>
+                </button>
+                {docFolders.map((name) => (
+                  <span className="studio-breadcrumb-folder" key={name}>
+                    <ChevronRight size={13} />
+                    <span>{name}</span>
+                  </span>
+                ))}
+                <ChevronRight size={13} />
+                <PageIcon value={docMeta.icon} size={18} />
+                <span className="studio-breadcrumb-current">{docMeta.title}</span>
+              </>
+            )}
+            {view === "page" && (
+              <>
+                {codexPage && !capabilities.remote ? (
+                  <button
+                    type="button"
+                    className="studio-codex-workbench-link"
+                    aria-label={tcodex("openWorkbench")}
+                    title={tcodex("openWorkbench")}
+                    disabled={!openWorkbench || !page.projectId || !page.draft}
+                    onClick={action(async () => {
+                      if (!openWorkbench || !page.projectId || !page.draft) return;
+                      if (!(await page.flushOrDefer())) return draftHeld();
+                      await openWorkbench(page.projectId, page.draft.id);
+                    })}
+                  >
+                    <img src={appIconForTheme(theme)} alt="" draggable={false} />
+                  </button>
+                ) : !singlePage && (
+                  <ChevronRight size={13} />
+                )}
+                <PageIcon value={page.draft?.icon} size={18} />
+                <input
+                  className="studio-page-title-input"
+                  aria-label={t("pageTitle")}
+                  disabled={!page.draft}
+                  readOnly={syncReadOnly ?? page.record?.readOnly}
+                  placeholder={tc("untitled")}
+                  value={page.draft?.title ?? ""}
+                  maxLength={1000}
+                  onChange={(event) =>
+                    page.edit({
+                      ...upgradeResource(page.draft!),
+                      title: event.target.value.replaceAll("\n", ""),
+                    })
+                  }
+                />
+                {page.draft && (
+                  <SaveStatusMark
+                    sessions={page.sessions}
+                    onShowProblem={() => {
+                      if (focusSaveBanner()) return;
+                      if (page.conflictId)
+                        setDialog({
+                          type: "externalConflict",
+                          id: page.conflictId,
+                        });
+                    }}
+                  />
+                )}
+              </>
+            )}
+          </div>
+        )}
+      </div>
       {navigationUpdating && (
         <span className="studio-navigation-updating" role="status">
           {t("updatingProjects")}
@@ -286,133 +417,6 @@ export function StudioTopbar({
         >
           {ts("marker.statusUnavailable")}
         </span>
-      )}
-      {view === "settings" ||
-      view === "projects" ||
-      view === "templates" ||
-      view === "components" ? (
-        <h1 className="studio-topbar-title">
-          {view === "projects" ? (
-            <History size={17} aria-hidden="true" />
-          ) : view === "templates" ? (
-            <LayoutTemplate size={17} aria-hidden="true" />
-          ) : view === "components" ? (
-            <Blocks size={17} aria-hidden="true" />
-          ) : (
-            <Settings2 size={17} aria-hidden="true" />
-          )}
-          <span>{heading}</span>
-        </h1>
-      ) : (
-        <div className="studio-breadcrumb">
-          {!singlePage && selectedProject && (
-            <button
-              onClick={(event) =>
-                project && openTargetClick(projectTarget(project), event)
-              }
-            >
-              <ProjectIcon
-                value={project?.icon}
-                size={17}
-                cloud={syncOverview.bindings.has(selectedProject)}
-              />
-              <span>{project?.name ?? t("heading.project")}</span>
-              {selectedMarker && (
-                <span
-                  className={`studio-tree-marker is-${selectedMarker.tone}`}
-                  title={selectedMarker.title}
-                >
-                  {selectedMarker.label}
-                </span>
-              )}
-            </button>
-          )}
-          {!singlePage && breadcrumbFolders.map((item) => (
-            <span className="studio-breadcrumb-folder" key={item.id}>
-              <ChevronRight size={13} />
-              <button
-                onClick={(event) =>
-                  openTargetClick(folderTarget(item, selectedProject!), event)
-                }
-              >
-                <PageIcon
-                  value={item.icon}
-                  size={16}
-                  fallback={<Folder size={16} />}
-                />
-                <span>{item.name}</span>
-              </button>
-            </span>
-          ))}
-          {view === "docs" && docMeta && (
-            <>
-              <button onClick={action(() => openDoc(DOCS_HOME))}>
-                <PageIcon value={builtinDocs(locale).icon} size={17} />
-                <span>{builtinDocs(locale).name}</span>
-              </button>
-              {docFolders.map((name) => (
-                <span className="studio-breadcrumb-folder" key={name}>
-                  <ChevronRight size={13} />
-                  <span>{name}</span>
-                </span>
-              ))}
-              <ChevronRight size={13} />
-              <PageIcon value={docMeta.icon} size={18} />
-              <span className="studio-breadcrumb-current">{docMeta.title}</span>
-            </>
-          )}
-          {view === "page" && (
-            <>
-              {codexPage && !capabilities.remote ? (
-                <button
-                  type="button"
-                  className="studio-codex-workbench-link"
-                  aria-label={tcodex("openWorkbench")}
-                  title={tcodex("openWorkbench")}
-                  disabled={!openWorkbench || !page.projectId || !page.draft}
-                  onClick={action(async () => {
-                    if (!openWorkbench || !page.projectId || !page.draft) return;
-                    if (!(await page.flushOrDefer())) return draftHeld();
-                    await openWorkbench(page.projectId, page.draft.id);
-                  })}
-                >
-                  <img src={appIconForTheme(theme)} alt="" draggable={false} />
-                </button>
-              ) : !singlePage && (
-                <ChevronRight size={13} />
-              )}
-              <PageIcon value={page.draft?.icon} size={18} />
-              <input
-                className="studio-page-title-input"
-                aria-label={t("pageTitle")}
-                disabled={!page.draft}
-                readOnly={syncReadOnly ?? page.record?.readOnly}
-                placeholder={tc("untitled")}
-                value={page.draft?.title ?? ""}
-                maxLength={1000}
-                onChange={(event) =>
-                  page.edit({
-                    ...upgradeResource(page.draft!),
-                    title: event.target.value.replaceAll("\n", ""),
-                  })
-                }
-              />
-              {page.draft && (
-                <SaveStatusMark
-                  sessions={page.sessions}
-                  onShowProblem={() => {
-                    if (focusSaveBanner()) return;
-                    if (page.conflictId)
-                      setDialog({
-                        type: "externalConflict",
-                        id: page.conflictId,
-                      });
-                  }}
-                />
-              )}
-            </>
-          )}
-        </div>
       )}
       {view === "components" && (
         <nav

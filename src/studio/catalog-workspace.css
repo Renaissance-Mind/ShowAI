@@ -630,6 +630,9 @@
   gap: 28px;
   flex-wrap: wrap;
 }
+.catalog-view .studio-address {
+  flex: 0 0 auto;
+}
 .catalog-view .studio-topbar-title {
   font-size: 24px;
   font-weight: 600;

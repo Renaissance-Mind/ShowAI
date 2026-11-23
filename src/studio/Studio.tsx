@@ -475,7 +475,6 @@ export default function Studio() {
           onStep={(offset) => void workspace.step(offset).catch(report)}
         />
         <AutoHideSidebar
-          enabled={view === "page" && !!page.draft}
           pageOnly={pageOnly}
           compactOverlay={
             capabilities.singlePage

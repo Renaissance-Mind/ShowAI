@@ -1,4 +1,6 @@
 import {
+  createContext,
+  useContext,
   useEffect,
   useRef,
   useState,
@@ -23,13 +25,18 @@ import { mobileNavigationLayout, sidebarSwipe } from "./mobile-navigation.mjs";
 import "./mobile-navigation.css";
 
 export const SIDEBAR_TOGGLE_EVENT = "showai:toggle-sidebar";
+const AddressNavigationContext = createContext<ReactNode>(null);
+
+export function AddressBarNavigation() {
+  return useContext(AddressNavigationContext);
+}
+
 const minimumWidth = 200;
 const maximumWidth = 480;
 const widthPreference = "showai:sidebar-width";
 const lockedPreference = "showai:sidebar-locked";
 
 export default function AutoHideSidebar({
-  enabled,
   interactionHeld,
   children,
   navigation,
@@ -43,7 +50,6 @@ export default function AutoHideSidebar({
   compactOverlay = false,
   pageOnly = false,
 }: {
-  enabled: boolean;
   interactionHeld: boolean;
   children: ReactNode;
   navigation: ReactNode;
@@ -114,7 +120,7 @@ export default function AutoHideSidebar({
     : clampWidth(preferredWidth ?? (viewportWidth <= 1100 ? 208 : 240));
   const sidebar = useRef<HTMLElement>(null);
   const compact = !nativeTouch && (compactOverlay === "always" || (compactOverlay && viewportWidth < 720));
-  const automatic = enabled && !locked && !nativeTouch && !compact && !pageOnly;
+  const automatic = !locked && !nativeTouch && !compact && !pageOnly;
   const mode = nativeTouch
     ? nativeLayout.docked
       ? "docked"
@@ -136,7 +142,7 @@ export default function AutoHideSidebar({
       !!bounds &&
       point.x >= bounds.left &&
       point.x <= bounds.left + width + 4 &&
-      point.y >= bounds.top - 44 &&
+      point.y >= bounds.top &&
       point.y <= bounds.bottom
     );
   };
@@ -178,7 +184,7 @@ export default function AutoHideSidebar({
   useEffect(() => {
     setPosition("docked");
     if (nativeTouch || (compact && compactOverlay !== "always")) setNativeOpen(false);
-  }, [enabled, locked, mobileBoardKey, compact, compactOverlay]);
+  }, [locked, mobileBoardKey, compact, compactOverlay]);
 
   const toggleLocked = () =>
     setLocked((current) => {
@@ -317,7 +323,7 @@ export default function AutoHideSidebar({
     if (hidden) setPosition("overlay");
   };
   const lockLabel =
-    nativeTouch || compact
+    compact
       ? nativeOpen
         ? t("collapseSidebar")
         : t("expandSidebar")
@@ -449,68 +455,23 @@ export default function AutoHideSidebar({
   return (
     <>
       <header className="studio-window-topbar">
-        <div
-          className="studio-topbar-brand"
-          style={
-            {
-              width: nativeTouch && viewportWidth <= 650 ? 56 : width,
-            } as CSSProperties
-          }
-          onPointerEnter={reveal}
-          onPointerLeave={leave}
-        >
-          <span className="studio-app-brand">
-            <img src={appIcon} alt="" draggable={false} />
-            <strong>ShowAI</strong>
-          </span>
-          <div className="studio-topbar-actions">
-            {history}
-            <button
-              type="button"
-              className="studio-sidebar-locate"
-              aria-label={locateLabel}
-              title={locateLabel}
-              disabled={!canLocate}
-              onClick={() => {
-                if (compact) setNativeOpen(true);
-                else if (hidden) setPosition("overlay");
-                setLocating(true);
-                onLocate();
-              }}
-            >
-              <LocateFixed size={17} strokeWidth={1.7} aria-hidden="true" />
-            </button>
-            <button
-              type="button"
-              className="studio-sidebar-lock"
-              aria-label={lockLabel}
-              title={lockLabel}
-              aria-pressed={nativeTouch || compact ? nativeOpen : locked}
-              aria-controls="studio-project-navigation"
-              aria-expanded={nativeTouch || compact ? nativeOpen : !hidden}
-              onPointerDown={
-                nativeTouch
-                  ? (event) => {
-                      event.preventDefault();
-                      setNativeOpen((value) => !value);
-                    }
-                  : undefined
-              }
-              onClick={(event) => {
-                if (nativeTouch) {
-                  if (event.detail === 0) setNativeOpen((value) => !value);
-                  return;
-                }
-                if (compact) {
-                  setNativeOpen((value) => !value);
-                  return;
-                }
-                toggleLocked();
-              }}
-            >
-              <PanelLeft size={19} strokeWidth={1.7} aria-hidden="true" />
-            </button>
-          </div>
+        <div className="studio-topbar-brand">
+          <img src={appIcon} alt="ShowAI" draggable={false} />
+          <button
+            type="button"
+            className="studio-sidebar-lock"
+            aria-label={lockLabel}
+            title={lockLabel}
+            aria-pressed={compact ? nativeOpen : locked}
+            aria-controls="studio-project-navigation"
+            aria-expanded={!hidden}
+            onClick={() => {
+              if (compact) setNativeOpen((value) => !value);
+              else toggleLocked();
+            }}
+          >
+            <PanelLeft size={18} strokeWidth={1.7} aria-hidden="true" />
+          </button>
         </div>
         {topbar}
       </header>
@@ -657,7 +618,30 @@ export default function AutoHideSidebar({
             onClick={() => setNativeOpen(false)}
           />
         )}
-        {children}
+        <AddressNavigationContext.Provider
+          value={
+            <div className="studio-address-navigation">
+              {history}
+              <button
+                type="button"
+                className="studio-sidebar-locate"
+                aria-label={locateLabel}
+                title={locateLabel}
+                disabled={!canLocate}
+                onClick={() => {
+                  if (compact) setNativeOpen(true);
+                  else if (hidden) setPosition("overlay");
+                  setLocating(true);
+                  onLocate();
+                }}
+              >
+                <LocateFixed size={16} strokeWidth={1.7} aria-hidden="true" />
+              </button>
+            </div>
+          }
+        >
+          {children}
+        </AddressNavigationContext.Provider>
       </div>
     </>
   );

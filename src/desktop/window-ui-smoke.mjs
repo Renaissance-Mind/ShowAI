@@ -160,16 +160,48 @@ try {
   await title(opened).waitFor();
   assert.equal(await title(opened).inputValue(), "Target page");
   assert.equal(new URL(opened.url()).searchParams.has("focus"), false);
-  await opened.locator(".studio-topbar-brand").waitFor();
-  await opened.locator(".studio-tab-history").waitFor();
-  await opened.getByRole("tab", { name: /Target page/ }).waitFor();
+  const header = opened.locator(".studio-window-topbar");
+  await header.getByRole("img", { name: "ShowAI" }).waitFor();
+  assert.equal(await header.getByText("ShowAI", { exact: true }).count(), 0);
+  const tab = header.getByRole("tab", { name: /Target page/ });
+  const address = opened.locator(".studio-address");
+  const navigation = address.locator(".studio-address-navigation");
+  assert.deepEqual(
+    await navigation
+      .getByRole("button")
+      .evaluateAll((buttons) =>
+        buttons.map((button) => button.getAttribute("aria-label")),
+      ),
+    ["后退", "前进", "在侧栏中定位当前页面"],
+  );
   await row(opened, target.page).waitFor();
+  const windowSize = await opened.evaluate(() => ({
+    width: window.innerWidth,
+    height: window.innerHeight,
+  }));
+  await opened.setViewportSize({ width: 760, height: 640 });
+  const resizer = opened.getByRole("separator", { name: "调整侧栏宽度" });
+  const tabLeft = (await tab.boundingBox()).x;
+  assert.ok(tabLeft < (await resizer.boundingBox()).x);
+  await resizer.press("End");
+  assert.equal(
+    await resizer.getAttribute("aria-valuenow"),
+    await resizer.getAttribute("aria-valuemax"),
+  );
+  assert.equal((await tab.boundingBox()).x, tabLeft);
+  const addressBox = await address.boundingBox();
+  const actionsBox = await opened
+    .locator(".studio-header-actions")
+    .boundingBox();
+  assert.ok(addressBox.y + addressBox.height <= actionsBox.y);
+  await resizer.dblclick();
+  await opened.setViewportSize(windowSize);
   await opened.screenshot({
     path: join(output, "full-window.png"),
     fullPage: true,
   });
   result.checks.push(
-    "The page context menu opens a native window with the target page, sidebar, tabs and history",
+    "A native window puts navigation beside the address and keeps tabs in place when the sidebar is resized",
   );
 
   await row(opened, target.other).locator(".studio-tree-main").click();
@@ -183,13 +215,41 @@ try {
     "The new window can navigate to another page while the source keeps its original page",
   );
 
-  await opened.getByRole("button", { name: "后退", exact: true }).click();
+  await navigation.getByRole("button", { name: "后退", exact: true }).click();
   await opened.waitForFunction(
     () =>
       document.querySelector('input[aria-label="页面标题"]')?.value ===
       "Target page",
   );
-  result.checks.push("Window history returns to the target page");
+  await navigation.getByRole("button", { name: "前进", exact: true }).click();
+  await opened
+    .locator('.studio-page-title-input[value="Other page"]')
+    .waitFor();
+  result.checks.push(
+    "Back and forward restore both pages from the address bar",
+  );
+
+  await row(opened, target.project).locator(".studio-tree-chevron").click();
+  await row(opened, target.other).waitFor({ state: "hidden" });
+  const lock = header.locator(".studio-sidebar-lock");
+  await lock.click();
+  await header.getByRole("tab", { selected: true }).hover({
+    position: { x: 6, y: 8 },
+  });
+  const sidebar = (mode) =>
+    opened.locator(`.studio-sidebar-shell[data-sidebar-mode="${mode}"]`);
+  await sidebar("hidden").waitFor({ state: "attached" });
+  await navigation
+    .getByRole("button", { name: "在侧栏中定位当前页面" })
+    .click();
+  await sidebar("overlay")
+    .locator(`.studio-tree-row.is-located[data-library-id="${target.other}"]`)
+    .waitFor();
+  await lock.click();
+  await sidebar("docked").locator(".studio-sidebar").waitFor();
+  result.checks.push(
+    "Reveal expands the hidden sidebar to the current page and pin docks it again",
+  );
   assert.deepEqual(await opened.getByRole("alert").allTextContents(), []);
   assert.deepEqual(errors, []);
   await opened.close();

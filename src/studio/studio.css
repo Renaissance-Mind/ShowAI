@@ -69,7 +69,7 @@
 .studio-sidebar {
   width: 226px;
   flex-shrink: 0;
-  background: var(--surface);
+  background: var(--paper);
   border-right: 1px solid var(--line);
   display: flex;
   flex-direction: column;
@@ -230,7 +230,6 @@
 }
 .studio-sidebar-bottom {
   margin-top: 8px;
-  border-top: 1px solid var(--line);
   padding-top: 8px;
 }
 .studio-main {
@@ -257,6 +256,14 @@
   background: var(--paper);
   border-bottom: 1px solid var(--line);
 }
+.studio:not(.catalog-view) .studio-topbar:has(.studio-address-navigation) {
+  height: auto;
+  min-height: 36px;
+  flex-basis: auto;
+  flex-wrap: wrap;
+  row-gap: 0;
+  padding-inline-start: 8px;
+}
 .studio-topbar .expandable-search {
   position: static;
 }
@@ -268,6 +275,26 @@
 .studio-topbar button,
 .studio-header-actions {
   -webkit-app-region: no-drag;
+}
+.studio-address {
+  display: flex;
+  align-items: center;
+  flex: 1 1 200px;
+  min-width: 0;
+  gap: 8px;
+}
+.studio-address-navigation {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  min-height: 35px;
+}
+.studio-address-navigation::after {
+  content: "";
+  width: 1px;
+  height: 16px;
+  margin-inline-start: 6px;
+  background: var(--line);
 }
 .studio-breadcrumb {
   display: flex;
@@ -306,6 +333,7 @@
   gap: 6px;
   min-width: 0;
   flex-shrink: 1;
+  margin-inline-start: auto;
 }
 .studio-topbar-title {
   margin: 0;

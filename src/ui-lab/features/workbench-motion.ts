@@ -143,10 +143,9 @@ export function workbenchMotion(locale: Locale): {
   const tabs = [first, second].map((name, i) =>
     action(i ? "second" : "first", name, tab(name)),
   );
-  const marker = {
+  const tabSelection = {
     selector: ".studio-tab[data-active]",
     events: ["animation:studio-tab-select"],
-    pseudo: "::after",
   };
   add(
     "tabs",
@@ -162,8 +161,8 @@ export function workbenchMotion(locale: Locale): {
     },
     tabs,
     [
-      click(tabs[0], panel(first), marker),
-      click(tabs[1], panel(second), marker),
+      click(tabs[0], panel(first), tabSelection),
+      click(tabs[1], panel(second), tabSelection),
     ],
   );
 

@@ -1,5 +1,5 @@
 .studio-project-icon {
-  --project-icon-backdrop: var(--surface);
+  --project-icon-backdrop: var(--paper);
   display: inline-flex;
   position: relative;
   flex-shrink: 0;
@@ -13,7 +13,6 @@
   --project-icon-backdrop: var(--accent-soft);
 }
 .studio-breadcrumb button > .studio-project-icon {
-  --project-icon-backdrop: var(--paper);
   overflow: visible;
 }
 .studio-project-icon-cloud {

@@ -26,6 +26,10 @@
 .studio-sidebar-shell[data-sidebar-mode="overlay"] > .studio-sidebar {
   box-shadow: 8px 0 24px #00000018;
 }
+.studio-workspace:not([data-mobile-sidebar])
+  > .studio-sidebar-shell[data-sidebar-mode="overlay"] {
+  z-index: 130;
+}
 .studio-sidebar-resizer {
   position: absolute;
   inset: 0 -4px 0 auto;
@@ -63,10 +67,10 @@
 .studio-window-topbar {
   display: flex;
   align-items: center;
-  height: 36px;
+  height: 40px;
   flex-shrink: 0;
-  background: var(--surface);
-  border-bottom: 1px solid var(--line);
+  padding-inline: 12px;
+  background: color-mix(in srgb, var(--surface) 58%, var(--line));
   position: relative;
   z-index: 110;
   -webkit-app-region: drag;
@@ -78,45 +82,14 @@
   min-width: 0;
 }
 .studio-topbar-brand {
-  box-sizing: border-box;
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  gap: 8px;
   flex-shrink: 0;
-  height: 36px;
-  min-width: 0;
-  padding: 0 8px 0 19px;
-  gap: 4px;
-  user-select: none;
-  container: studio-topbar-brand / inline-size;
 }
-.studio-app-brand {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  min-width: 0;
-}
-.studio-topbar-actions {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  flex-shrink: 0;
-  margin-left: auto;
-}
-@container studio-topbar-brand (max-width: 180px) {
-  .studio-app-brand strong {
-    display: none;
-  }
-}
-@container studio-topbar-brand (max-width: 116px) {
-  .studio-app-brand {
-    display: none;
-  }
-}
-.studio-app-brand img {
+.studio-topbar-brand img {
   width: 20px;
   height: 20px;
-  flex-shrink: 0;
 }
 .studio-topbar .studio-breadcrumb > button.studio-codex-workbench-link {
   display: grid;
@@ -141,16 +114,8 @@
 .studio-codex-workbench-link:disabled {
   opacity: 0.45;
 }
-.studio-topbar-brand strong {
-  font-size: 16px;
-  font-weight: 600;
-  letter-spacing: -0.2px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
 .studio[data-native-titlebar="mac"]:not([data-window-fullscreen="true"])
-  .studio-topbar-brand {
+  .studio-window-topbar {
   padding-left: 88px;
 }
 .studio-sidebar-lock,
@@ -173,12 +138,12 @@
   opacity: 0.3;
 }
 .studio-sidebar-lock[aria-pressed="true"] {
-  color: var(--accent);
-  background: var(--selected, var(--accent-soft));
+  color: var(--text);
+  background: color-mix(in srgb, var(--paper) 72%, transparent);
 }
 .studio-sidebar-edge {
-  position: fixed;
-  inset: 37px auto 0 0;
+  position: absolute;
+  inset: 0 auto 0 0;
   z-index: 101;
   width: 12px;
   display: grid;

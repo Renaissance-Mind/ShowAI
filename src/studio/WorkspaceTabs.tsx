@@ -33,7 +33,7 @@ export function WorkspaceHistory({
 }) {
   const t = useTranslator(sidebarMessages);
   return (
-    <div className="studio-tab-history" aria-label={t("tabHistory")}>
+    <div className="studio-tab-history" role="group" aria-label={t("tabHistory")}>
       <button
         type="button"
         aria-label={t("back")}
