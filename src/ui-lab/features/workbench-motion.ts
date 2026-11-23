@@ -110,7 +110,7 @@ export function workbenchMotion(locale: Locale): {
     {
       id: "docs",
       title: m("docs"),
-      selector: '[data-docs-id="root"] > .studio-tree-chevron',
+      selector: ".studio-docs-toggle",
     },
   ];
   const arrowActions = arrows.map(({ id, title, selector }) =>
@@ -136,7 +136,10 @@ export function workbenchMotion(locale: Locale): {
       arrowStep(0, true, "reopen-project"),
       arrowStep(1, true),
       arrowStep(2, false),
-      arrowStep(3, true),
+      click(arrowActions[3], css("#studio-docs-navigation"), {
+        selector: ".studio-docs",
+        events: ["animation:showai-fade-in"],
+      }),
     ],
   );
 
@@ -174,7 +177,7 @@ export function workbenchMotion(locale: Locale): {
   const sidebar = {
     selector: ".studio-sidebar-shell > .studio-sidebar",
     events: ["transition:transform"],
-    stableWidth: ".studio-main",
+    stableWidth: ".studio-address-row > .studio-topbar",
   };
   add(
     "navigation",

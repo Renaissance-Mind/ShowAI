@@ -1,8 +1,20 @@
 .studio-docs {
-  margin: -4px 0 12px;
+  flex: 0 1 auto;
+  min-height: 0;
+  max-height: 48%;
+  overflow: auto;
+  overscroll-behavior: contain;
+  margin-bottom: 8px;
+  padding: 4px;
+  border-radius: 8px;
+  background: var(--docs-panel-surface);
+  animation: showai-fade-in var(--duration-fast) var(--ease-out);
 }
 .studio-docs .studio-tree-row > .studio-tree-main {
   padding-right: 6px;
+}
+.studio-sidebar:has(> .studio-docs) > .studio-sidebar-projects {
+  min-height: min(48px, 30%);
 }
 .studio-scroll.has-page-surface > .studio-builtin-doc,
 .studio-builtin-doc > .surface-editor-shell {

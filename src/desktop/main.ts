@@ -1480,7 +1480,7 @@ async function createWindow(page?: WindowTarget): Promise<BrowserWindow> {
     show: false,
     titleBarStyle: process.platform === "darwin" ? "hiddenInset" : "default",
     trafficLightPosition:
-      process.platform === "darwin" ? { x: 16, y: 12 } : undefined,
+      process.platform === "darwin" ? { x: 16, y: 13 } : undefined,
     webPreferences: {
       backgroundThrottling: !presentation.background,
       preload: join(directory, "preload.cjs"),

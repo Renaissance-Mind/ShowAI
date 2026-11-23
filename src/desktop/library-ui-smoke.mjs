@@ -233,10 +233,26 @@ try {
     height: innerHeight,
   }));
   await page.setViewportSize({ width: fullSize.width, height: 260 });
-  const docsToggle = sidebar.locator(
-    '[data-docs-id="root"] .studio-tree-chevron',
-  );
+  const docsToggle = page.getByRole("button", {
+    name: "ShowAI 文档",
+    exact: true,
+  });
   await docsToggle.click();
+  const docsPanel = sidebar.getByRole("region", { name: "ShowAI 文档" });
+  await docsPanel
+    .getByRole("button", { name: "文档首页", exact: true })
+    .waitFor({ state: "attached" });
+  assert.equal(
+    await docsPanel.getByText("ShowAI 文档", { exact: true }).count(),
+    0,
+  );
+  const docsBox = await docsPanel.boundingBox();
+  const toggleBox = await docsToggle.boundingBox();
+  const searchBox = await sidebar
+    .locator(".studio-sidebar-search")
+    .boundingBox();
+  assert.equal(toggleBox.y + toggleBox.height, docsBox.y);
+  assert.ok(docsBox.y + docsBox.height <= searchBox.y);
   await projectRow.hover();
   await poll(menuOpacity, (value) => value === 1, "hover before scrolling");
   const tree = sidebar.locator(".studio-sidebar-projects");

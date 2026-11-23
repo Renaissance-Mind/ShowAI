@@ -34,7 +34,6 @@ export default function ProjectSidebar({
   onManage,
   onGroupMenu,
   unreadable,
-  docs,
 }: {
   projects: ProjectSummary[];
   organization: SidebarOrganization;
@@ -48,7 +47,6 @@ export default function ProjectSidebar({
   onManage?: () => void;
   onGroupMenu: (group: ProjectGroup, anchor: HTMLElement) => void;
   unreadable?: ReactNode;
-  docs?: ReactNode;
 }) {
   const t = useTranslator(sidebarMessages);
   const tn = useTranslator(navigationMessages);
@@ -203,7 +201,6 @@ export default function ProjectSidebar({
         <Plus size={17} aria-hidden="true" />
         <span>{tn("new")}</span>
       </button>
-      {docs}
       {!!pinned.length && section("pinned", t("section.pinned"), pinned)}
       {section("projects", t("section.projects"), ungrouped)}
       {organization.groups.map((group) =>

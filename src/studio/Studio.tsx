@@ -17,6 +17,7 @@ import { useAppUpdate } from "./useAppUpdate";
 import { WELCOME_DOC } from "./builtin-docs";
 import { useSampleProject } from "./sample-project";
 import AutoHideSidebar from "./AutoHideSidebar";
+import { clickDisposition } from "./open-target";
 import WorkspaceTabs, { WorkspaceHistory } from "./WorkspaceTabs";
 import { WorkspaceSwipeNavigation } from "./WorkspaceSwipeNavigation";
 import { clientIsMac } from "./keyboard-shortcuts";
@@ -444,6 +445,27 @@ export default function Studio() {
     router,
     edits,
   });
+  const inlineAddress =
+    pageOnly || document.documentElement.dataset.native === "ios";
+  const addressBar = (
+    <StudioTopbar
+      feedback={feedback}
+      library={library}
+      route={route}
+      catalog={catalog}
+      catalogActions={catalogActions}
+      dialogs={dialogs}
+      menus={menus}
+      directory={directory}
+      router={router}
+      pageActions={pageActions}
+      moves={moves}
+      page={page}
+      workbench={workbench}
+      assistant={assistant}
+      externalChangeCount={externalChangeCount}
+    />
+  );
   const workbenchView = (
     <ComponentLibraryContext.Provider value={pickerLibrary}>
       <div
@@ -476,6 +498,22 @@ export default function Studio() {
         />
         <AutoHideSidebar
           pageOnly={pageOnly}
+          addressBar={inlineAddress ? null : addressBar}
+          documentation={
+            showDocs
+              ? {
+                  activeId: view === "docs" ? (docPage?.id ?? null) : null,
+                  onOpen: (id, event) => {
+                    event.preventDefault();
+                    void openDoc(
+                      id,
+                      "",
+                      clickDisposition(event, info?.platform === "darwin"),
+                    ).catch(report);
+                  },
+                }
+              : undefined
+          }
           compactOverlay={
             capabilities.singlePage
               ? "always"
@@ -580,23 +618,7 @@ export default function Studio() {
               role={capabilities.tabs ? "tabpanel" : undefined}
               aria-labelledby={capabilities.tabs ? `workspace-tab-${workspace.activeId}` : undefined}
             >
-              <StudioTopbar
-                feedback={feedback}
-                library={library}
-                route={route}
-                catalog={catalog}
-                catalogActions={catalogActions}
-                dialogs={dialogs}
-                menus={menus}
-                directory={directory}
-                router={router}
-                pageActions={pageActions}
-                moves={moves}
-                page={page}
-                workbench={workbench}
-                assistant={assistant}
-                externalChangeCount={externalChangeCount}
-              />
+              {inlineAddress && addressBar}
               {view === "project" && pageSelection.active && (
                 <DirectorySelectionBar
                   selection={pageSelection}

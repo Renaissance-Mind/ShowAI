@@ -25,10 +25,11 @@
 }
 .studio-tabs {
   --tab-curve: 9px;
+  --tab-top-gap: 6px;
   display: flex;
   align-items: stretch;
   min-width: 0;
-  padding: 6px var(--tab-curve) 0;
+  padding: var(--tab-top-gap) var(--tab-curve) 0;
   scroll-padding-inline: var(--tab-curve);
   overflow-x: auto;
   scrollbar-width: none;
@@ -89,7 +90,7 @@
   flex: 1;
   min-width: 0;
   height: 100%;
-  padding: 0 32px 0 12px;
+  padding: 0 32px var(--tab-top-gap) 12px;
   border-radius: inherit;
   background: transparent;
   --control-keyboard-line: inset 0 0 0 2px var(--accent);
@@ -151,6 +152,7 @@
 .studio-tab-close {
   position: absolute;
   right: 6px;
+  translate: 0 calc(var(--tab-top-gap) / -2);
   display: grid;
   place-items: center;
   width: 20px;
@@ -171,7 +173,6 @@
 .studio-tab-add {
   flex-shrink: 0;
   align-self: center;
-  margin-top: 4px;
   border-radius: 50%;
 }
 .studio-tabs-bar button:focus-visible,

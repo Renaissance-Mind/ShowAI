@@ -30,6 +30,10 @@
   > .studio-sidebar-shell[data-sidebar-mode="overlay"] {
   z-index: 130;
 }
+.studio-workspace[data-auto-sidebar]
+  > .studio-sidebar-shell:not([data-sidebar-resizing]) {
+  transition: width var(--duration-base) var(--ease-in-out);
+}
 .studio-sidebar-resizer {
   position: absolute;
   inset: 0 -4px 0 auto;
@@ -81,15 +85,92 @@
   min-height: 0;
   min-width: 0;
 }
-.studio-topbar-brand {
+.studio-address-row {
+  display: flex;
+  align-items: stretch;
+  flex: none;
+  min-width: 0;
+  background: var(--paper);
+}
+.studio .studio-address-row > .studio-topbar {
+  flex: 1 1 0;
+}
+.studio-address-tools {
   display: flex;
   align-items: center;
-  gap: 8px;
-  flex-shrink: 0;
+  flex: 0 0 var(--navigation-width);
+  min-width: 0;
+  gap: 4px;
+  padding-inline: 10px 5px;
+  border-right: 1px solid var(--line);
+  background: var(--surface);
 }
-.studio-topbar-brand img {
-  width: 20px;
-  height: 20px;
+.studio-address-brand {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  flex-shrink: 0;
+  font-size: 14px;
+}
+.studio-address-brand img {
+  width: 19px;
+  height: 19px;
+}
+.studio-address-tools .studio-address-navigation button {
+  width: 24px;
+}
+.studio-docs-toggle {
+  display: grid;
+  place-items: center;
+  align-self: stretch;
+  position: relative;
+  isolation: isolate;
+  flex: 0 0 27px;
+  padding: 0;
+  color: var(--muted);
+  background: transparent;
+  -webkit-app-region: no-drag;
+}
+.studio-docs-toggle::before {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  inset: calc(50% - 13px) 0;
+  border-radius: 7px;
+}
+.studio-docs-toggle:hover::before {
+  background: var(--hover);
+}
+.studio-docs-toggle[aria-expanded="true"] {
+  color: var(--text);
+}
+.studio-docs-toggle[aria-expanded="true"]::before {
+  bottom: 0;
+  border-radius: 7px 7px 0 0;
+  background: var(--docs-panel-surface);
+}
+.studio-docs-toggle[aria-expanded="true"]::after {
+  content: "";
+  position: absolute;
+  inset: auto -5px 0;
+  height: 5px;
+  background:
+    radial-gradient(
+        circle at left top,
+        transparent 4.5px,
+        var(--docs-panel-surface) 5px
+      )
+      left / 5px 5px no-repeat,
+    radial-gradient(
+        circle at right top,
+        transparent 4.5px,
+        var(--docs-panel-surface) 5px
+      )
+      right / 5px 5px no-repeat;
+  pointer-events: none;
+}
+.studio-workspace:not([data-mobile-sidebar]) .studio-sidebar[data-docs-open] {
+  padding-top: 0;
 }
 .studio-topbar .studio-breadcrumb > button.studio-codex-workbench-link {
   display: grid;
@@ -165,6 +246,7 @@
   pointer-events: none;
 }
 .studio-sidebar-lock:focus-visible,
+.studio-docs-toggle:focus-visible,
 .studio-sidebar-locate:focus-visible,
 .studio-sidebar-edge:focus-visible {
   outline: 2px solid var(--accent);

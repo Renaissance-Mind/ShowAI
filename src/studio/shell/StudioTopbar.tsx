@@ -1,5 +1,4 @@
 import { SettingsSearch } from "../Settings";
-import { AddressBarNavigation } from "../AutoHideSidebar";
 import { codexWorkbench, codexWorkbenchPageOpener } from "../../browser/codex-workbench";
 import { appIconForTheme } from "../../design/app-icon";
 import { useAppearanceTheme } from "../../design/useAppearanceTheme";
@@ -272,7 +271,6 @@ export function StudioTopbar({
   return (
     <div className="studio-topbar">
       <div className="studio-address">
-        <AddressBarNavigation />
         {view === "settings" ||
         view === "projects" ||
         view === "templates" ||

@@ -24,6 +24,7 @@ import {
   builtinDocPath,
   builtinDocs,
   loadBuiltinDoc,
+  DOCS_HOME,
   WELCOME_DOC,
   type DocsEntry,
 } from "./builtin-docs";
@@ -54,10 +55,23 @@ export function useBuiltinDocTitle() {
       : (builtinDocs(locale).pages[id] ?? { title: t("docs.title"), icon: "" });
 }
 
+export function useDocsExpansion() {
+  const [expanded, setExpanded] = useState(readExpanded);
+  const toggle = (id: string) =>
+    setExpanded((current) => {
+      const next = { ...current, [id]: !current[id] };
+      localStorage.setItem(EXPANDED_KEY, JSON.stringify(next));
+      return next;
+    });
+  return { expanded, toggle };
+}
+
 export function DocsNavigation({
   activeId,
   onOpen,
-}: {
+  expanded,
+  toggle,
+}: ReturnType<typeof useDocsExpansion> & {
   activeId: string | null;
   onOpen: (id: string, event: MouseEvent<HTMLButtonElement>) => void;
 }) {
@@ -65,22 +79,11 @@ export function DocsNavigation({
   const t = useTranslator(sidebarMessages);
   const docs = builtinDocs(locale);
   const title = useBuiltinDocTitle();
-  const [expanded, setExpanded] = useState(readExpanded);
-  const closedAncestor = !activeId
-    ? null
-    : !expanded.root
-      ? "root"
-      : activeId === WELCOME_DOC
-        ? null
-        : ((builtinDocPath(locale, activeId) ?? []).find(
-            (folder) => !expanded[folder.id],
-          )?.id ?? null);
-  const toggle = (id: string) =>
-    setExpanded((current) => {
-      const next = { ...current, [id]: !current[id] };
-      localStorage.setItem(EXPANDED_KEY, JSON.stringify(next));
-      return next;
-    });
+  const closedAncestor =
+    activeId && activeId !== WELCOME_DOC
+      ? builtinDocPath(locale, activeId)?.find((folder) => !expanded[folder.id])
+          ?.id
+      : undefined;
   const row = (
     key: string,
     depth: ReactNode,
@@ -111,6 +114,7 @@ export function DocsNavigation({
   );
   const page = (id: string) => {
     const meta = title(id);
+    const label = id === DOCS_HOME ? t("docs.home") : meta.title;
     return row(
       id,
       <span className="studio-tree-chevron" aria-hidden="true" />,
@@ -118,7 +122,7 @@ export function DocsNavigation({
         type="button"
         className="studio-tree-main"
         aria-current={activeId === id ? "page" : undefined}
-        title={meta.title}
+        title={label}
         onClick={(event) => onOpen(id, event)}
         onAuxClick={(event) => {
           if (event.button !== 1) return;
@@ -127,7 +131,7 @@ export function DocsNavigation({
         }}
       >
         <PageIcon value={meta.icon} size={15} />
-        <span className="studio-tree-title">{meta.title}</span>
+        <span className="studio-tree-title">{label}</span>
       </button>,
       activeId === id,
     );
@@ -167,28 +171,13 @@ export function DocsNavigation({
       ),
     );
   return (
-    <section className="studio-docs" aria-label={docs.name}>
-      {row(
-        "root",
-        chevron("root", docs.name),
-        <button
-          type="button"
-          className="studio-tree-main"
-          title={docs.name}
-          aria-expanded={!!expanded.root}
-          onClick={() => toggle("root")}
-        >
-          <PageIcon value={docs.icon} size={15} />
-          <span className="studio-tree-title">{docs.name}</span>
-        </button>,
-        closedAncestor === "root",
-      )}
-      {expanded.root && (
-        <div className="studio-tree-children">
-          {page(WELCOME_DOC)}
-          {entries(docs.tree)}
-        </div>
-      )}
+    <section
+      id="studio-docs-navigation"
+      className="studio-docs"
+      aria-label={docs.name}
+    >
+      {page(WELCOME_DOC)}
+      {entries(docs.tree)}
     </section>
   );
 }

@@ -24,9 +24,7 @@ import SidebarNavigation from "../SidebarNavigation";
 import TemplateNavigation from "../TemplateNavigation";
 import { ComponentNavigation } from "../ComponentCatalog";
 import { SettingsNavigation } from "../Settings";
-import { DocsNavigation } from "../BuiltinDocs";
 import type { RecentPage } from "../RecentPages";
-import { clickDisposition } from "../open-target";
 import {
   clientIsMac,
   formatShortcut,
@@ -248,7 +246,7 @@ export function StudioSidebar({
   catalog,
   dialogs: { setDialog },
   menus: { setNewMenu, setProjectsMenu, setGroupMenu },
-  router: { navigate, openDoc, leaveDetour, openProjectManagement },
+  router: { navigate, leaveDetour, openProjectManagement },
   moves: { libraryDrag },
   rows: {
     sidebarChildren,
@@ -306,8 +304,6 @@ export function StudioSidebar({
     setSettingsSection,
     selectedProject,
     selectedFolder,
-    showDocs,
-    docPage,
     catalogScrollRef,
   } = route;
   const {
@@ -471,21 +467,6 @@ export function StudioSidebar({
               <span>{t("unreadableProject", { name: item.directory })}</span>
             </button>
           ))}
-          docs={
-            showDocs ? (
-              <DocsNavigation
-                activeId={view === "docs" ? (docPage?.id ?? null) : null}
-                onOpen={(id, event) => {
-                  event.preventDefault();
-                  void openDoc(
-                    id,
-                    "",
-                    clickDisposition(event, info?.platform === "darwin"),
-                  ).catch(report);
-                }}
-              />
-            ) : undefined
-          }
           renderProject={(item) => (
             <div key={item.id}>
               <LibraryRow

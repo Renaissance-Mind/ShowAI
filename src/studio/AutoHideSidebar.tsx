@@ -1,14 +1,13 @@
 import {
-  createContext,
-  useContext,
   useEffect,
   useRef,
   useState,
+  type ComponentProps,
   type CSSProperties,
   type PointerEvent,
   type ReactNode,
 } from "react";
-import { ArrowLeft, LocateFixed, PanelLeft } from "../ui/icons";
+import { ArrowLeft, BookOpen, LocateFixed, PanelLeft } from "../ui/icons";
 import { appIconForTheme } from "../design/app-icon";
 import { useAppearanceTheme } from "../design/useAppearanceTheme";
 import { useTranslator } from "../i18n/react";
@@ -20,16 +19,12 @@ import {
   isSidebarToggleShortcut,
 } from "./keyboard-shortcuts";
 import { locateHoldDuration } from "./sidebar-locate";
+import { DocsNavigation, useDocsExpansion } from "./BuiltinDocs";
 import "./auto-hide-sidebar.css";
 import { mobileNavigationLayout, sidebarSwipe } from "./mobile-navigation.mjs";
 import "./mobile-navigation.css";
 
 export const SIDEBAR_TOGGLE_EVENT = "showai:toggle-sidebar";
-const AddressNavigationContext = createContext<ReactNode>(null);
-
-export function AddressBarNavigation() {
-  return useContext(AddressNavigationContext);
-}
 
 const minimumWidth = 200;
 const maximumWidth = 480;
@@ -39,6 +34,8 @@ const lockedPreference = "showai:sidebar-locked";
 export default function AutoHideSidebar({
   interactionHeld,
   children,
+  addressBar,
+  documentation,
   navigation,
   history,
   canLocate,
@@ -52,6 +49,11 @@ export default function AutoHideSidebar({
 }: {
   interactionHeld: boolean;
   children: ReactNode;
+  addressBar: ReactNode;
+  documentation?: Pick<
+    ComponentProps<typeof DocsNavigation>,
+    "activeId" | "onOpen"
+  >;
   navigation: ReactNode;
   history: ReactNode;
   canLocate: boolean;
@@ -73,9 +75,7 @@ export default function AutoHideSidebar({
   const [locked, setLocked] = useState(
     () => localStorage.getItem(lockedPreference) !== "false",
   );
-  const [position, setPosition] = useState<"docked" | "hidden" | "overlay">(
-    "docked",
-  );
+  const [autoRevealed, setAutoRevealed] = useState(false);
   const [hovered, setHovered] = useState(false);
   const [pressed, setPressed] = useState(false);
   const pointer = useRef<{ x: number; y: number } | null>(null);
@@ -119,7 +119,11 @@ export default function AutoHideSidebar({
     ? nativeLayout.width
     : clampWidth(preferredWidth ?? (viewportWidth <= 1100 ? 208 : 240));
   const sidebar = useRef<HTMLElement>(null);
-  const compact = !nativeTouch && (compactOverlay === "always" || (compactOverlay && viewportWidth < 720));
+  const addressTools = useRef<HTMLDivElement>(null);
+  const docsButton = useRef<HTMLButtonElement>(null);
+  const compact =
+    !nativeTouch &&
+    (compactOverlay === "always" || (compactOverlay && viewportWidth < 720));
   const automatic = !locked && !nativeTouch && !compact && !pageOnly;
   const mode = nativeTouch
     ? nativeLayout.docked
@@ -132,7 +136,9 @@ export default function AutoHideSidebar({
         ? "overlay"
         : "hidden"
       : automatic
-        ? position
+        ? autoRevealed
+          ? "revealed"
+          : "hidden"
         : "docked";
   const hidden = mode === "hidden";
 
@@ -142,7 +148,7 @@ export default function AutoHideSidebar({
       !!bounds &&
       point.x >= bounds.left &&
       point.x <= bounds.left + width + 4 &&
-      point.y >= bounds.top &&
+      point.y >= bounds.top - (addressTools.current?.offsetHeight ?? 0) &&
       point.y <= bounds.bottom
     );
   };
@@ -182,15 +188,17 @@ export default function AutoHideSidebar({
   }, [automatic, hidden, width]);
 
   useEffect(() => {
-    setPosition("docked");
-    if (nativeTouch || (compact && compactOverlay !== "always")) setNativeOpen(false);
-  }, [locked, mobileBoardKey, compact, compactOverlay]);
+    if (nativeTouch || (compact && compactOverlay !== "always"))
+      setNativeOpen(false);
+  }, [nativeTouch, mobileBoardKey, compact, compactOverlay]);
 
-  const toggleLocked = () =>
+  const toggleLocked = () => {
+    setAutoRevealed(!!sidebar.current?.matches(":hover, :focus-within"));
     setLocked((current) => {
       localStorage.setItem(lockedPreference, String(!current));
       return !current;
     });
+  };
   useEffect(() => {
     if (nativeTouch || pageOnly) return;
     const toggle = () => {
@@ -278,7 +286,7 @@ export default function AutoHideSidebar({
         setHovered(true);
         return;
       }
-      setPosition("hidden");
+      setAutoRevealed(false);
     }, 300);
     return () => window.clearTimeout(timer);
   }, [
@@ -318,19 +326,23 @@ export default function AutoHideSidebar({
   };
 
   const reveal = (event: PointerEvent<HTMLElement>) => {
+    if (
+      event.pointerType === "touch" ||
+      docsButton.current?.contains(event.target as Node)
+    )
+      return;
     pointer.current = { x: event.clientX, y: event.clientY };
     setHovered(true);
-    if (hidden) setPosition("overlay");
+    if (hidden) setAutoRevealed(true);
   };
-  const lockLabel =
-    compact
-      ? nativeOpen
-        ? t("collapseSidebar")
-        : t("expandSidebar")
-      : tn("withShortcut", {
-          label: locked ? tn("autoHideSidebar") : tn("pinSidebar"),
-          keys: toggleKeys,
-        });
+  const lockLabel = compact
+    ? nativeOpen
+      ? t("collapseSidebar")
+      : t("expandSidebar")
+    : tn("withShortcut", {
+        label: locked ? tn("autoHideSidebar") : tn("pinSidebar"),
+        keys: toggleKeys,
+      });
   const locateLabel = tn("locateInSidebar");
   const focusNavigation = () => {
     window.requestAnimationFrame(() => {
@@ -338,10 +350,43 @@ export default function AutoHideSidebar({
       setKeyboardFocus(true);
     });
   };
+  const navigationStyle = {
+    "--navigation-width": `${width}px`,
+  } as CSSProperties;
+  const docsExpansion = useDocsExpansion();
+  const docsOpen = !!documentation && !!docsExpansion.expanded.root;
+  const docsVisible = docsOpen && !hidden;
+  const docsTree = docsOpen && (
+    <DocsNavigation {...documentation} {...docsExpansion} />
+  );
+  const docsToggle = documentation && (
+    <button
+      ref={docsButton}
+      type="button"
+      className="studio-docs-toggle"
+      aria-label={t("docs.title")}
+      title={t("docs.title")}
+      aria-controls="studio-docs-navigation"
+      aria-expanded={docsVisible}
+      onClick={() => {
+        if (hidden) {
+          if (nativeTouch || compact) setNativeOpen(true);
+          else setAutoRevealed(true);
+        }
+        if (!hidden || !docsOpen) docsExpansion.toggle("root");
+      }}
+    >
+      <BookOpen size={17} strokeWidth={1.7} aria-hidden="true" />
+    </button>
+  );
 
   if (pageOnly)
     return (
-      <div className="studio-workspace" inert={switchingTab} aria-busy={switchingTab}>
+      <div
+        className="studio-workspace"
+        inert={switchingTab}
+        aria-busy={switchingTab}
+      >
         {children}
       </div>
     );
@@ -384,7 +429,7 @@ export default function AutoHideSidebar({
         <div
           className="studio-sidebar-shell"
           data-sidebar-mode={mode}
-          style={{ "--navigation-width": `${width}px` } as CSSProperties}
+          style={navigationStyle}
         >
           <aside
             ref={sidebar}
@@ -406,7 +451,9 @@ export default function AutoHideSidebar({
             <div className="studio-mobile-sidebar-brand">
               <img src={appIcon} alt="" />
               <strong>ShowAI</strong>
+              {docsToggle}
             </div>
+            {docsTree}
             {navigation}
           </aside>
         </div>
@@ -455,28 +502,73 @@ export default function AutoHideSidebar({
   return (
     <>
       <header className="studio-window-topbar">
-        <div className="studio-topbar-brand">
-          <img src={appIcon} alt="ShowAI" draggable={false} />
-          <button
-            type="button"
-            className="studio-sidebar-lock"
-            aria-label={lockLabel}
-            title={lockLabel}
-            aria-pressed={compact ? nativeOpen : locked}
-            aria-controls="studio-project-navigation"
-            aria-expanded={!hidden}
-            onClick={() => {
-              if (compact) setNativeOpen((value) => !value);
-              else toggleLocked();
-            }}
-          >
-            <PanelLeft size={18} strokeWidth={1.7} aria-hidden="true" />
-          </button>
-        </div>
+        <button
+          type="button"
+          className="studio-sidebar-lock"
+          aria-label={lockLabel}
+          title={lockLabel}
+          aria-pressed={compact ? nativeOpen : locked}
+          aria-controls="studio-project-navigation"
+          aria-expanded={!hidden}
+          onClick={() => {
+            if (compact) setNativeOpen((value) => !value);
+            else toggleLocked();
+          }}
+        >
+          <PanelLeft size={18} strokeWidth={1.7} aria-hidden="true" />
+        </button>
         {topbar}
       </header>
       <div
+        className="studio-address-row"
+        style={navigationStyle}
+        inert={switchingTab}
+      >
+        <div
+          ref={addressTools}
+          className="studio-address-tools"
+          onPointerEnter={automatic ? reveal : undefined}
+          onPointerLeave={automatic ? leave : undefined}
+          onFocusCapture={(event) => {
+            if (event.target.matches(":focus-visible")) setKeyboardFocus(true);
+          }}
+          onBlurCapture={(event) => {
+            if (
+              !event.currentTarget.contains(event.relatedTarget) &&
+              !sidebar.current?.contains(event.relatedTarget)
+            )
+              setKeyboardFocus(false);
+          }}
+        >
+          <span className="studio-address-brand">
+            <img src={appIcon} alt="" draggable={false} />
+            <strong>ShowAI</strong>
+          </span>
+          {docsToggle}
+          <div className="studio-address-navigation">
+            {history}
+            <button
+              type="button"
+              className="studio-sidebar-locate"
+              aria-label={locateLabel}
+              title={locateLabel}
+              disabled={!canLocate}
+              onClick={() => {
+                if (compact) setNativeOpen(true);
+                else if (hidden) setAutoRevealed(true);
+                setLocating(true);
+                onLocate();
+              }}
+            >
+              <LocateFixed size={16} strokeWidth={1.7} aria-hidden="true" />
+            </button>
+          </div>
+        </div>
+        {addressBar}
+      </div>
+      <div
         className="studio-workspace"
+        data-auto-sidebar={automatic || undefined}
         data-compact-sidebar={compact || undefined}
         inert={switchingTab}
         aria-busy={switchingTab}
@@ -485,13 +577,14 @@ export default function AutoHideSidebar({
           className="studio-sidebar-shell"
           data-sidebar-mode={mode}
           data-sidebar-resizing={resizing || undefined}
-          style={{ "--navigation-width": `${width}px` } as CSSProperties}
+          style={navigationStyle}
         >
           <aside
             ref={sidebar}
             id="studio-project-navigation"
             className="studio-sidebar"
             aria-label={t("projectNavigation")}
+            data-docs-open={docsOpen || undefined}
             inert={hidden}
             onPointerEnter={reveal}
             onPointerLeave={leave}
@@ -500,10 +593,24 @@ export default function AutoHideSidebar({
                 setKeyboardFocus(true);
             }}
             onBlurCapture={(event) => {
-              if (!event.currentTarget.contains(event.relatedTarget))
+              if (
+                !event.currentTarget.contains(event.relatedTarget) &&
+                !addressTools.current?.contains(event.relatedTarget)
+              )
                 setKeyboardFocus(false);
             }}
             onKeyDown={(event) => {
+              if (
+                event.key === "Escape" &&
+                docsOpen &&
+                (event.target as Element).closest(".studio-docs")
+              ) {
+                event.preventDefault();
+                event.stopPropagation();
+                docsExpansion.toggle("root");
+                docsButton.current?.focus();
+                return;
+              }
               if (event.key === "Escape" && compact) {
                 event.preventDefault();
                 setNativeOpen(false);
@@ -520,9 +627,10 @@ export default function AutoHideSidebar({
                 document.activeElement.blur();
               setKeyboardFocus(false);
               setHovered(false);
-              setPosition("hidden");
+              setAutoRevealed(false);
             }}
           >
+            {docsTree}
             {navigation}
             <div
               ref={resizeHandle}
@@ -594,7 +702,7 @@ export default function AutoHideSidebar({
               onPointerLeave={leave}
               onFocus={() => {
                 setKeyboardFocus(true);
-                setPosition("overlay");
+                setAutoRevealed(true);
                 focusNavigation();
               }}
               onBlur={(event) => {
@@ -602,7 +710,7 @@ export default function AutoHideSidebar({
                   setKeyboardFocus(false);
               }}
               onClick={() => {
-                setPosition("overlay");
+                setAutoRevealed(true);
                 focusNavigation();
               }}
             >
@@ -618,30 +726,7 @@ export default function AutoHideSidebar({
             onClick={() => setNativeOpen(false)}
           />
         )}
-        <AddressNavigationContext.Provider
-          value={
-            <div className="studio-address-navigation">
-              {history}
-              <button
-                type="button"
-                className="studio-sidebar-locate"
-                aria-label={locateLabel}
-                title={locateLabel}
-                disabled={!canLocate}
-                onClick={() => {
-                  if (compact) setNativeOpen(true);
-                  else if (hidden) setPosition("overlay");
-                  setLocating(true);
-                  onLocate();
-                }}
-              >
-                <LocateFixed size={16} strokeWidth={1.7} aria-hidden="true" />
-              </button>
-            </div>
-          }
-        >
-          {children}
-        </AddressNavigationContext.Provider>
+        {children}
       </div>
     </>
   );

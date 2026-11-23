@@ -202,9 +202,6 @@
   max-width: 180px;
 }
 @media (max-width: 700px) {
-  .components-view .studio-sidebar {
-    width: 160px;
-  }
   .components-view .studio-library {
     padding-inline: 18px;
   }

@@ -161,11 +161,39 @@ try {
   assert.equal(await title(opened).inputValue(), "Target page");
   assert.equal(new URL(opened.url()).searchParams.has("focus"), false);
   const header = opened.locator(".studio-window-topbar");
-  await header.getByRole("img", { name: "ShowAI" }).waitFor();
-  assert.equal(await header.getByText("ShowAI", { exact: true }).count(), 0);
+  const addressRow = opened.locator(".studio-address-row");
+  await addressRow.getByText("ShowAI", { exact: true }).waitFor();
+  await addressRow.locator(".studio-address-brand img").waitFor();
   const tab = header.getByRole("tab", { name: /Target page/ });
+  const lock = header.locator(".studio-sidebar-lock");
+  const centerY = async (element) => {
+    const box = await element.boundingBox();
+    return box.y + box.height / 2;
+  };
+  assert.ok(
+    Math.abs(
+      (await centerY(lock)) - (await centerY(tab.locator("span").last())),
+    ) < 1,
+  );
   const address = opened.locator(".studio-address");
-  const navigation = address.locator(".studio-address-navigation");
+  const navigation = addressRow.locator(".studio-address-navigation");
+  const toolbar = addressRow.locator(".studio-topbar");
+  const waitForSidebarLayout = (visible) =>
+    opened.waitForFunction((visible) => {
+      const box = (selector) =>
+        document.querySelector(selector).getBoundingClientRect();
+      const tools = box(".studio-address-tools");
+      const bar = box(".studio-address-row > .studio-topbar");
+      const side = box(".studio-sidebar-shell");
+      const main = box(".studio-main");
+      return (
+        tools.x === 0 &&
+        tools.right === bar.x &&
+        bar.right === innerWidth &&
+        tools.bottom === side.top &&
+        Math.abs(main.x - (visible ? bar.x : 0)) < 0.5
+      );
+    }, visible);
   assert.deepEqual(
     await navigation
       .getByRole("button")
@@ -184,6 +212,7 @@ try {
   const tabLeft = (await tab.boundingBox()).x;
   assert.ok(tabLeft < (await resizer.boundingBox()).x);
   await resizer.press("End");
+  await waitForSidebarLayout(true);
   assert.equal(
     await resizer.getAttribute("aria-valuenow"),
     await resizer.getAttribute("aria-valuemax"),
@@ -196,6 +225,7 @@ try {
   assert.ok(addressBox.y + addressBox.height <= actionsBox.y);
   await resizer.dblclick();
   await opened.setViewportSize(windowSize);
+  await waitForSidebarLayout(true);
   await opened.screenshot({
     path: join(output, "full-window.png"),
     fullPage: true,
@@ -254,7 +284,13 @@ try {
 
   await row(opened, target.project).locator(".studio-tree-chevron").click();
   await row(opened, target.other).waitFor({ state: "hidden" });
-  const lock = header.locator(".studio-sidebar-lock");
+  const toolbarBeforeHide = await toolbar.boundingBox();
+  const docsToggle = addressRow.getByRole("button", {
+    name: "ShowAI 文档",
+    exact: true,
+  });
+  await docsToggle.click();
+  await opened.locator("#studio-docs-navigation").waitFor();
   await lock.click();
   await header.getByRole("tab", { selected: true }).hover({
     position: { x: 6, y: 8 },
@@ -262,10 +298,20 @@ try {
   const sidebar = (mode) =>
     opened.locator(`.studio-sidebar-shell[data-sidebar-mode="${mode}"]`);
   await sidebar("hidden").waitFor({ state: "attached" });
+  await waitForSidebarLayout(false);
+  assert.deepEqual(await toolbar.boundingBox(), toolbarBeforeHide);
+  await docsToggle.click();
+  await sidebar("revealed").locator("#studio-docs-navigation").waitFor();
+  await docsToggle.click();
+  await header.getByRole("tab", { selected: true }).hover();
+  await waitForSidebarLayout(false);
+  await opened.locator(".studio-sidebar-edge").hover();
+  await waitForSidebarLayout(true);
+  assert.deepEqual(await toolbar.boundingBox(), toolbarBeforeHide);
   await navigation
     .getByRole("button", { name: "在侧栏中定位当前页面" })
     .click();
-  await sidebar("overlay")
+  await sidebar("revealed")
     .locator(`.studio-tree-row.is-located[data-library-id="${target.other}"]`)
     .waitFor();
   await lock.click();
