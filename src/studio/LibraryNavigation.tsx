@@ -5,14 +5,7 @@ import {
   isRenameShortcut,
 } from "./keyboard-shortcuts";
 import { memo, useRef, type KeyboardEvent, type MouseEvent } from "react";
-import {
-  ChevronRight,
-  FileText,
-  Folder,
-  FolderOpen,
-  MoreHorizontal,
-  Pin,
-} from "../ui/icons";
+import { Folder, FolderOpen, MoreHorizontal, Pin } from "../ui/icons";
 import "./library-row.css";
 import PageIcon from "../components/PageIcon";
 import ProjectIcon from "./ProjectIcon";
@@ -83,8 +76,20 @@ function LibraryRowView({
       : target.kind === "folder"
         ? t("newFolder")
         : t("untitledProject"));
-  const Icon =
-    target.kind === "page" ? FileText : expanded ? FolderOpen : Folder;
+  const FolderIcon = expanded ? FolderOpen : Folder;
+  const icon =
+    target.kind === "project" ? (
+      <ProjectIcon
+        value={expanded ? undefined : target.icon}
+        size={15}
+        expanded={expanded}
+        cloud={cloud}
+      />
+    ) : target.kind === "folder" ? (
+      <FolderIcon size={15} strokeWidth={1.7} aria-hidden="true" />
+    ) : (
+      <PageIcon value={target.icon} size={15} />
+    );
   const openKeyboardMenu = (event: KeyboardEvent<HTMLDivElement>) => {
     const mac = clientIsMac();
     const renaming = isRenameShortcut(event, mac);
@@ -118,21 +123,20 @@ function LibraryRowView({
           });
       }}
     >
-      {onToggle ? (
+      {onToggle && (
         <button
           type="button"
-          className="studio-tree-chevron"
+          className="studio-tree-folder-toggle"
           aria-label={t(expanded ? "collapseItem" : "expandItem", { title })}
+          title={t(expanded ? "collapseItem" : "expandItem", { title })}
           aria-expanded={expanded}
           onClick={(event) => {
             event.stopPropagation();
             onToggle();
           }}
         >
-          <ChevronRight size={13} aria-hidden="true" />
+          {icon}
         </button>
-      ) : (
-        <span className="studio-tree-chevron" aria-hidden="true" />
       )}
       <button
         type="button"
@@ -151,13 +155,7 @@ function LibraryRowView({
           }
         }}
       >
-        {target.kind === "project" ? (
-          <ProjectIcon value={target.icon} expanded={expanded} cloud={cloud} />
-        ) : target.kind === "page" || target.icon ? (
-          <PageIcon value={target.icon} size={15} />
-        ) : (
-          <Icon size={15} aria-hidden="true" />
-        )}
+        {!onToggle && icon}
         <span className="studio-tree-title">{title}</span>
         {"agentCreated" in target && target.agentCreated !== undefined && (
           <span
@@ -243,6 +241,7 @@ export const LibraryRow = memo(
     sameTarget(previous.target, next.target) &&
     previous.active === next.active &&
     previous.expanded === next.expanded &&
+    previous.cloud === next.cloud &&
     previous.onToggle === next.onToggle &&
     previous.marker?.label === next.marker?.label &&
     previous.marker?.title === next.marker?.title &&

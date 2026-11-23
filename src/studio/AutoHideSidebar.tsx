@@ -20,6 +20,7 @@ import {
 } from "./keyboard-shortcuts";
 import { locateHoldDuration } from "./sidebar-locate";
 import { DocsNavigation, useDocsExpansion } from "./BuiltinDocs";
+import { SidebarSearch } from "./SidebarNavigation";
 import "./auto-hide-sidebar.css";
 import { mobileNavigationLayout, sidebarSwipe } from "./mobile-navigation.mjs";
 import "./mobile-navigation.css";
@@ -33,8 +34,8 @@ const lockedPreference = "showai:sidebar-locked";
 
 export default function AutoHideSidebar({
   interactionHeld,
+  onOpenSearch,
   children,
-  addressBar,
   documentation,
   navigation,
   history,
@@ -48,8 +49,8 @@ export default function AutoHideSidebar({
   pageOnly = false,
 }: {
   interactionHeld: boolean;
+  onOpenSearch: () => void;
   children: ReactNode;
-  addressBar: ReactNode;
   documentation?: Pick<
     ComponentProps<typeof DocsNavigation>,
     "activeId" | "onOpen"
@@ -119,7 +120,6 @@ export default function AutoHideSidebar({
     ? nativeLayout.width
     : clampWidth(preferredWidth ?? (viewportWidth <= 1100 ? 208 : 240));
   const sidebar = useRef<HTMLElement>(null);
-  const addressTools = useRef<HTMLDivElement>(null);
   const docsButton = useRef<HTMLButtonElement>(null);
   const compact =
     !nativeTouch &&
@@ -148,7 +148,7 @@ export default function AutoHideSidebar({
       !!bounds &&
       point.x >= bounds.left &&
       point.x <= bounds.left + width + 4 &&
-      point.y >= bounds.top - (addressTools.current?.offsetHeight ?? 0) &&
+      point.y >= bounds.top &&
       point.y <= bounds.bottom
     );
   };
@@ -326,11 +326,7 @@ export default function AutoHideSidebar({
   };
 
   const reveal = (event: PointerEvent<HTMLElement>) => {
-    if (
-      event.pointerType === "touch" ||
-      docsButton.current?.contains(event.target as Node)
-    )
-      return;
+    if (event.pointerType === "touch") return;
     pointer.current = { x: event.clientX, y: event.clientY };
     setHovered(true);
     if (hidden) setAutoRevealed(true);
@@ -355,8 +351,7 @@ export default function AutoHideSidebar({
   } as CSSProperties;
   const docsExpansion = useDocsExpansion();
   const docsOpen = !!documentation && !!docsExpansion.expanded.root;
-  const docsVisible = docsOpen && !hidden;
-  const docsTree = docsOpen && (
+  const docsTree = documentation && (
     <DocsNavigation {...documentation} {...docsExpansion} />
   );
   const docsToggle = documentation && (
@@ -364,20 +359,21 @@ export default function AutoHideSidebar({
       ref={docsButton}
       type="button"
       className="studio-docs-toggle"
+      aria-label={t("docs.button")}
       title={t("docs.title")}
       aria-controls="studio-docs-navigation"
-      aria-expanded={docsVisible}
-      onClick={() => {
-        if (hidden) {
-          if (nativeTouch || compact) setNativeOpen(true);
-          else setAutoRevealed(true);
-        }
-        if (!hidden || !docsOpen) docsExpansion.toggle("root");
-      }}
+      aria-expanded={docsOpen}
+      onClick={() => docsExpansion.toggle("root")}
     >
       <BookOpen size={16} strokeWidth={1.7} aria-hidden="true" />
-      <span>{t("docs.button")}</span>
     </button>
+  );
+
+  const sidebarTools = (
+    <div className="studio-sidebar-tools">
+      <SidebarSearch onOpen={onOpenSearch} />
+      {docsToggle}
+    </div>
   );
 
   if (pageOnly)
@@ -453,8 +449,8 @@ export default function AutoHideSidebar({
             <div className="studio-mobile-sidebar-brand">
               <img src={appIcon} alt="" />
               <strong>ShowAI</strong>
-              {docsToggle}
             </div>
+            {sidebarTools}
             {docsTree}
             {navigation}
           </aside>
@@ -504,6 +500,30 @@ export default function AutoHideSidebar({
   return (
     <>
       <header className="studio-window-topbar">
+        <img
+          className="studio-window-logo"
+          src={appIcon}
+          alt="ShowAI"
+          draggable={false}
+        />
+        <div className="studio-window-navigation">
+          {history}
+          <button
+            type="button"
+            className="studio-sidebar-locate"
+            aria-label={locateLabel}
+            title={locateLabel}
+            disabled={!canLocate}
+            onClick={() => {
+              if (compact) setNativeOpen(true);
+              else if (hidden) setAutoRevealed(true);
+              setLocating(true);
+              onLocate();
+            }}
+          >
+            <LocateFixed size={16} strokeWidth={1.7} aria-hidden="true" />
+          </button>
+        </div>
         <button
           type="button"
           className="studio-sidebar-lock"
@@ -522,54 +542,6 @@ export default function AutoHideSidebar({
         {topbar}
       </header>
       <div
-        className="studio-address-row"
-        style={navigationStyle}
-        inert={switchingTab}
-      >
-        <div
-          ref={addressTools}
-          className="studio-address-tools"
-          data-narrow={(documentation && width < 234) || undefined}
-          onPointerEnter={automatic ? reveal : undefined}
-          onPointerLeave={automatic ? leave : undefined}
-          onFocusCapture={(event) => {
-            if (event.target.matches(":focus-visible")) setKeyboardFocus(true);
-          }}
-          onBlurCapture={(event) => {
-            if (
-              !event.currentTarget.contains(event.relatedTarget) &&
-              !sidebar.current?.contains(event.relatedTarget)
-            )
-              setKeyboardFocus(false);
-          }}
-        >
-          <span className="studio-address-brand">
-            <img src={appIcon} alt="" draggable={false} />
-            <strong>ShowAI</strong>
-          </span>
-          {docsToggle}
-          <div className="studio-address-navigation">
-            {history}
-            <button
-              type="button"
-              className="studio-sidebar-locate"
-              aria-label={locateLabel}
-              title={locateLabel}
-              disabled={!canLocate}
-              onClick={() => {
-                if (compact) setNativeOpen(true);
-                else if (hidden) setAutoRevealed(true);
-                setLocating(true);
-                onLocate();
-              }}
-            >
-              <LocateFixed size={16} strokeWidth={1.7} aria-hidden="true" />
-            </button>
-          </div>
-        </div>
-        {addressBar}
-      </div>
-      <div
         className="studio-workspace"
         data-auto-sidebar={automatic || undefined}
         data-compact-sidebar={compact || undefined}
@@ -587,7 +559,6 @@ export default function AutoHideSidebar({
             id="studio-project-navigation"
             className="studio-sidebar"
             aria-label={t("projectNavigation")}
-            data-docs-open={docsOpen || undefined}
             inert={hidden}
             onPointerEnter={reveal}
             onPointerLeave={leave}
@@ -596,10 +567,7 @@ export default function AutoHideSidebar({
                 setKeyboardFocus(true);
             }}
             onBlurCapture={(event) => {
-              if (
-                !event.currentTarget.contains(event.relatedTarget) &&
-                !addressTools.current?.contains(event.relatedTarget)
-              )
+              if (!event.currentTarget.contains(event.relatedTarget))
                 setKeyboardFocus(false);
             }}
             onKeyDown={(event) => {
@@ -633,6 +601,7 @@ export default function AutoHideSidebar({
               setAutoRevealed(false);
             }}
           >
+            {sidebarTools}
             {docsTree}
             {navigation}
             <div

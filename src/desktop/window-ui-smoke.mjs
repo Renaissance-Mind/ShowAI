@@ -162,8 +162,8 @@ try {
   assert.equal(new URL(opened.url()).searchParams.has("focus"), false);
   const header = opened.locator(".studio-window-topbar");
   const addressRow = opened.locator(".studio-address-row");
-  await addressRow.getByText("ShowAI", { exact: true }).waitFor();
-  await addressRow.locator(".studio-address-brand img").waitFor();
+  const logo = header.getByRole("img", { name: "ShowAI" });
+  await logo.waitFor();
   const tab = header.getByRole("tab", { name: /Target page/ });
   const lock = header.locator(".studio-sidebar-lock");
   const centerY = async (element) => {
@@ -176,24 +176,37 @@ try {
     ) < 1,
   );
   const address = opened.locator(".studio-address");
-  const navigation = addressRow.locator(".studio-address-navigation");
+  const navigation = header.locator(".studio-window-navigation");
   const toolbar = addressRow.locator(".studio-topbar");
   const waitForSidebarLayout = (visible) =>
     opened.waitForFunction((visible) => {
       const box = (selector) =>
         document.querySelector(selector).getBoundingClientRect();
-      const tools = box(".studio-address-tools");
+      const sidebarWidth = box(".studio-sidebar").width;
       const bar = box(".studio-address-row > .studio-topbar");
       const side = box(".studio-sidebar-shell");
       const main = box(".studio-main");
       return (
-        tools.x === 0 &&
-        tools.right === bar.x &&
+        Math.abs(bar.x - side.right) < 0.5 &&
+        Math.abs(bar.x - main.x) < 0.5 &&
         bar.right === innerWidth &&
-        tools.bottom === side.top &&
-        Math.abs(main.x - (visible ? bar.x : 0)) < 0.5
+        bar.top === side.top &&
+        main.x === (visible ? sidebarWidth : 0)
       );
     }, visible);
+  const waitForSlidingAddress = () =>
+    opened.waitForFunction(() => {
+      const width = document
+        .querySelector(".studio-sidebar-shell")
+        .getBoundingClientRect().width;
+      const full = document
+        .querySelector(".studio-sidebar")
+        .getBoundingClientRect().width;
+      const addressX = document
+        .querySelector(".studio-address-row")
+        .getBoundingClientRect().left;
+      return width > 1 && width < full - 1 && Math.abs(addressX - width) < 0.5;
+    });
   assert.deepEqual(
     await navigation
       .getByRole("button")
@@ -210,7 +223,15 @@ try {
   await opened.setViewportSize({ width: 760, height: 640 });
   const resizer = opened.getByRole("separator", { name: "调整侧栏宽度" });
   const tabLeft = (await tab.boundingBox()).x;
-  assert.ok(tabLeft < (await resizer.boundingBox()).x);
+  const topButtons = await Promise.all(
+    [logo, navigation, lock, tab].map((el) => el.boundingBox()),
+  );
+  assert.ok(
+    topButtons
+      .slice(1)
+      .every((box, i) => box.x >= topButtons[i].x + topButtons[i].width),
+  );
+  const barBeforeResize = await toolbar.boundingBox();
   await resizer.press("End");
   await waitForSidebarLayout(true);
   assert.equal(
@@ -222,7 +243,11 @@ try {
   const actionsBox = await opened
     .locator(".studio-header-actions")
     .boundingBox();
-  assert.ok(addressBox.y + addressBox.height <= actionsBox.y);
+  assert.ok((await toolbar.boundingBox()).x > barBeforeResize.x);
+  assert.ok(
+    addressBox.x + addressBox.width <= actionsBox.x ||
+      addressBox.y + addressBox.height <= actionsBox.y,
+  );
   await resizer.dblclick();
   await opened.setViewportSize(windowSize);
   await waitForSidebarLayout(true);
@@ -231,7 +256,7 @@ try {
     fullPage: true,
   });
   result.checks.push(
-    "A native window puts navigation beside the address and keeps tabs in place when the sidebar is resized",
+    "The tab strip stays fixed while the address row begins at the resized sidebar edge",
   );
 
   const sidebarSearch = opened.locator(".studio-sidebar").getByRole("button", {
@@ -282,13 +307,17 @@ try {
     "Back and forward restore both pages from the address bar",
   );
 
-  await row(opened, target.project).locator(".studio-tree-chevron").click();
+  await row(opened, target.project)
+    .locator(".studio-tree-folder-toggle")
+    .click();
   await row(opened, target.other).waitFor({ state: "hidden" });
   const toolbarBeforeHide = await toolbar.boundingBox();
-  const docsToggle = addressRow.getByRole("button", {
-    name: "文档",
-    exact: true,
-  });
+  const docsToggle = opened
+    .locator(".studio-sidebar-tools")
+    .getByRole("button", {
+      name: "文档",
+      exact: true,
+    });
   await docsToggle.click();
   await opened.locator("#studio-docs-navigation").waitFor();
   await lock.click();
@@ -299,11 +328,20 @@ try {
     opened.locator(`.studio-sidebar-shell[data-sidebar-mode="${mode}"]`);
   await sidebar("hidden").waitFor({ state: "attached" });
   await waitForSidebarLayout(false);
-  assert.deepEqual(await toolbar.boundingBox(), toolbarBeforeHide);
-  await docsToggle.click();
+  assert.equal((await toolbar.boundingBox()).x, 0);
+  await docsToggle.waitFor({ state: "hidden" });
+  await opened.emulateMedia({ reducedMotion: "no-preference" });
+  await Promise.all([
+    waitForSlidingAddress(),
+    opened.locator(".studio-sidebar-edge").hover(),
+  ]);
+  await waitForSidebarLayout(true);
   await sidebar("revealed").locator("#studio-docs-navigation").waitFor();
   await docsToggle.click();
-  await header.getByRole("tab", { selected: true }).hover();
+  await Promise.all([
+    waitForSlidingAddress(),
+    header.getByRole("tab", { selected: true }).hover(),
+  ]);
   await waitForSidebarLayout(false);
   await opened.locator(".studio-sidebar-edge").hover();
   await waitForSidebarLayout(true);

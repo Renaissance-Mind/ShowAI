@@ -497,8 +497,8 @@ export default function Studio() {
           onStep={(offset) => void workspace.step(offset).catch(report)}
         />
         <AutoHideSidebar
+          onOpenSearch={commands.openQuickJump}
           pageOnly={pageOnly}
-          addressBar={inlineAddress ? null : addressBar}
           documentation={
             showDocs
               ? {
@@ -540,7 +540,6 @@ export default function Studio() {
           switchingTab={workspace.switching || routing}
           navigation={
             <StudioSidebar
-              onOpenSearch={commands.openQuickJump}
               feedback={feedback}
               library={library}
               route={route}
@@ -618,7 +617,11 @@ export default function Studio() {
               role={capabilities.tabs ? "tabpanel" : undefined}
               aria-labelledby={capabilities.tabs ? `workspace-tab-${workspace.activeId}` : undefined}
             >
-              {inlineAddress && addressBar}
+              {inlineAddress ? (
+                addressBar
+              ) : (
+                <div className="studio-address-row">{addressBar}</div>
+              )}
               {view === "project" && pageSelection.active && (
                 <DirectorySelectionBar
                   selection={pageSelection}

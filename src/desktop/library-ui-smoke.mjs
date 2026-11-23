@@ -165,7 +165,7 @@ try {
     await dialog.waitFor({ state: "hidden" });
   };
   const expand = async (id) => {
-    const toggle = row(id).locator("button.studio-tree-chevron");
+    const toggle = row(id).locator("button.studio-tree-folder-toggle");
     if ((await toggle.getAttribute("aria-expanded")) === "false")
       await toggle.click();
   };
@@ -232,10 +232,11 @@ try {
     width: innerWidth,
     height: innerHeight,
   }));
-  const docsToggle = page.getByRole("button", {
+  const docsToggle = sidebar.getByRole("button", {
     name: "文档",
     exact: true,
   });
+  await page.emulateMedia({ reducedMotion: "no-preference" });
   await docsToggle.locator("svg").click();
   const docsPanel = sidebar.getByRole("region", { name: "ShowAI 文档" });
   await docsPanel
@@ -245,7 +246,7 @@ try {
     await docsPanel.getByText("ShowAI 文档", { exact: true }).count(),
     0,
   );
-  assert.equal(await docsPanel.locator(".studio-tree-chevron").count(), 0);
+  assert.equal(await sidebar.locator(".studio-tree-chevron").count(), 0);
   const folderName = "使用工作台";
   const docsFolder = docsPanel.getByRole("button", {
     name: folderName,
@@ -284,7 +285,9 @@ try {
     .locator(".studio-sidebar-search")
     .boundingBox();
   assert.equal(toggleBox.y + toggleBox.height, docsBox.y);
-  assert.ok(docsBox.y + docsBox.height <= searchBox.y);
+  assert.equal(searchBox.y, toggleBox.y);
+  assert.ok(searchBox.x + searchBox.width <= toggleBox.x);
+  assert.equal(toggleBox.x + toggleBox.width, docsBox.x + docsBox.width);
   await projectRow.hover();
   await poll(menuOpacity, (value) => value === 1, "hover before scrolling");
   const tree = sidebar.locator(".studio-sidebar-projects");
@@ -304,7 +307,24 @@ try {
     return menu && Number(getComputedStyle(menu).opacity) < 0.9;
   }, project.id);
   await poll(menuOpacity, (value) => value === 1, "restored hover menu");
-  await docsToggle.getByText("文档", { exact: true }).click();
+  await Promise.all([
+    page.waitForFunction(() => {
+      const panel = document.querySelector(
+        '.studio-docs[data-presence="exiting"]',
+      );
+      if (!panel || panel.clientHeight < 1) return false;
+      const button = document.querySelector(".studio-docs-toggle");
+      const paint = getComputedStyle(button, "::before");
+      const surface = getComputedStyle(panel);
+      return (
+        paint.bottom === "0px" &&
+        paint.backgroundColor === surface.backgroundColor &&
+        surface.opacity === "1" &&
+        button.getBoundingClientRect().bottom === panel.getBoundingClientRect().top
+      );
+    }),
+    docsToggle.press("Space"),
+  ]);
   await page.setViewportSize(fullSize);
   result.checks.push(
     "Scrolling suspends row hover and restores the menu under a stationary pointer",
@@ -406,6 +426,16 @@ try {
     (data) => data.name === "Renamed project" && data.pinned === true,
     "project rename and pin persistence",
   );
+  const textLeft = (el) =>
+    el.evaluate((node) => {
+      const range = document.createRange();
+      range.selectNodeContents(node);
+      return range.getBoundingClientRect().left;
+    });
+  assert.equal(
+    await textLeft(sidebar.locator('[data-project-section="pinned"] .studio-section-title')),
+    await textLeft(row(project.id).locator(".studio-tree-title")),
+  );
   await addContent("文件夹");
   await nameDialog("文件夹名称", "Folder A");
   const folderA = (await projectData()).folders.find(
@@ -425,6 +455,14 @@ try {
   await expand(project.id);
   await expand(folderA.id);
   await expand(folderB.id);
+  const folderToggle = row(folderB.id).locator(".studio-tree-folder-toggle");
+  const openFolderIcon = await folderToggle.locator("svg").innerHTML();
+  await folderToggle.click();
+  await row(nested.id).waitFor({ state: "detached" });
+  assert.notEqual(await folderToggle.locator("svg").innerHTML(), openFolderIcon);
+  await folderToggle.press("Enter");
+  await row(nested.id).waitFor();
+  assert.equal(await folderToggle.locator("svg").innerHTML(), openFolderIcon);
   await choose(nested.id, "重命名");
   await nameDialog("名称", "Renamed page");
   await choose(nested.id, "置顶");

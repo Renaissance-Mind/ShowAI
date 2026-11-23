@@ -101,45 +101,43 @@ export function workbenchMotion(locale: Locale): {
     await ctx.ui.click(css(byTitle(first)));
     await ctx.ui.expect(panel(first));
   }
-  const rowArrow = (title: string) =>
-    `.studio-tree-row:has(> ${byTitle(title)}) > .studio-tree-chevron`;
-  const arrows = [
-    { id: "project", title: m("project"), selector: rowArrow(research) },
-    { id: "folder", title: m("folder"), selector: rowArrow(m("materials")) },
+  const rowToggle = (title: string) =>
+    `.studio-tree-row:has(> ${byTitle(title)}) > .studio-tree-folder-toggle`;
+  const toggles = [
+    { id: "project", title: m("project"), selector: rowToggle(research) },
+    { id: "folder", title: m("folder"), selector: rowToggle(m("materials")) },
     { id: "group", title: m("group"), selector: ".studio-section-toggle" },
-    {
-      id: "docs",
-      title: m("docs"),
-      selector: ".studio-docs-toggle",
-    },
   ];
-  const arrowActions = arrows.map(({ id, title, selector }) =>
+  const directoryActions = toggles.map(({ id, title, selector }) =>
     action(id, title, css(selector)),
   );
-  const arrowStep = (i: number, expanded: boolean, id = arrows[i].id) =>
+  const toggleStep = (i: number, expanded: boolean, id = toggles[i].id) =>
     click(
-      { ...arrowActions[i], id },
-      css(`${arrows[i].selector}[aria-expanded="${expanded}"]`),
-      {
-        selector: arrows[i].selector + " > svg",
-        events: ["transition:transform"],
-      },
+      { ...directoryActions[i], id },
+      css(`${toggles[i].selector}[aria-expanded="${expanded}"]`),
     );
+  const docs = action("docs", m("docs"), css(".studio-docs-toggle"));
+  const docsMotion = {
+    selector: ".studio-docs",
+    events: ["transition:grid-template-rows"],
+  };
   add(
     "directory",
     m("directory"),
     ".studio-sidebar-projects",
     project,
-    arrowActions,
+    [...directoryActions, docs],
     [
-      arrowStep(0, false),
-      arrowStep(0, true, "reopen-project"),
-      arrowStep(1, true),
-      arrowStep(2, false),
-      click(arrowActions[3], css("#studio-docs-navigation"), {
-        selector: ".studio-docs",
-        events: ["animation:showai-fade-in"],
-      }),
+      toggleStep(0, false),
+      toggleStep(0, true, "reopen-project"),
+      toggleStep(1, true),
+      toggleStep(2, false),
+      click(docs, css('.studio-docs-toggle[aria-expanded="true"]'), docsMotion),
+      click(
+        { ...docs, id: "close-docs" },
+        css('.studio-docs-toggle[aria-expanded="false"]'),
+        docsMotion,
+      ),
     ],
   );
 
@@ -177,7 +175,7 @@ export function workbenchMotion(locale: Locale): {
   const sidebar = {
     selector: ".studio-sidebar-shell > .studio-sidebar",
     events: ["transition:transform"],
-    stableWidth: ".studio-address-row > .studio-topbar",
+    stableWidth: ".studio-window-topbar",
   };
   add(
     "navigation",

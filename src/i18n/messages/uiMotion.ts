@@ -3,7 +3,7 @@ import { defineMessages } from "../index";
 export default defineMessages("uiMotion", {
   "zh-CN": {
     feature: "工作台动效",
-    directory: "目录箭头",
+    directory: "目录展开与收起",
     tabs: "标签切换",
     navigation: "导航侧栏",
     assistant: "Agent 面板",
@@ -36,7 +36,7 @@ export default defineMessages("uiMotion", {
   },
   en: {
     feature: "Workbench motion",
-    directory: "Directory arrows",
+    directory: "Folder navigation",
     tabs: "Tab selection",
     navigation: "Navigation sidebar",
     assistant: "Agent panel",

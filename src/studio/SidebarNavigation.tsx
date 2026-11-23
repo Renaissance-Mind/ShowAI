@@ -1,7 +1,53 @@
-import { useLayoutEffect, useRef, useState } from "react";
-import { History, LayoutTemplate, Blocks, Settings2 } from "../ui/icons";
+import { useLayoutEffect, useRef, useState, useSyncExternalStore } from "react";
+import {
+  History,
+  LayoutTemplate,
+  Blocks,
+  Settings2,
+  Search,
+} from "../ui/icons";
 import { useTranslator } from "../i18n/react";
 import sidebarMessages from "../i18n/messages/sidebar";
+import commonMessages from "../i18n/messages/common";
+import navigationMessages from "../i18n/messages/navigation";
+import {
+  clientIsMac,
+  formatShortcut,
+  getQuickJumpShortcut,
+  subscribeShortcuts,
+} from "./keyboard-shortcuts";
+
+export function SidebarSearch({ onOpen }: { onOpen: () => void }) {
+  const tc = useTranslator(commonMessages);
+  const tn = useTranslator(navigationMessages);
+  const searchChord = useSyncExternalStore(
+    subscribeShortcuts,
+    getQuickJumpShortcut,
+    getQuickJumpShortcut,
+  );
+  const searchKeys = formatShortcut(searchChord, clientIsMac());
+  return (
+    <button
+      className="studio-sidebar-search"
+      type="button"
+      aria-haspopup="dialog"
+      title={tn("withShortcut", {
+        label: tn("shortcut.search"),
+        keys: searchKeys,
+      })}
+      onMouseDown={(event) => {
+        if (document.activeElement?.closest(".container-workspace"))
+          event.preventDefault();
+      }}
+      onClick={onOpen}
+    >
+      <Search size={15} aria-hidden="true" />
+      <span>{tc("search")}</span>
+      <kbd aria-hidden="true">{searchKeys}</kbd>
+    </button>
+  );
+}
+
 export type SidebarSection = "recent" | "templates" | "components" | "settings";
 
 const sections = [

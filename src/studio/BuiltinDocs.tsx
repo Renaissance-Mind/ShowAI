@@ -14,6 +14,7 @@ import type { ShowDocument } from "../types";
 import { useLocale, useTranslator } from "../i18n/react";
 import sidebarMessages from "../i18n/messages/sidebar";
 import { Folder, FolderOpen, Loader2 } from "../ui/icons";
+import { usePresence } from "../ui/presence";
 import { errorMessage } from "../host/bridge";
 import {
   NAVIGATE_EVENT,
@@ -79,6 +80,9 @@ export function DocsNavigation({
   const t = useTranslator(sidebarMessages);
   const docs = builtinDocs(locale);
   const title = useBuiltinDocTitle();
+  const panelOpen = !!expanded.root;
+  const panel = useRef<HTMLElement>(null);
+  const presence = usePresence(panelOpen, panel);
   const closedAncestor =
     activeId && activeId !== WELCOME_DOC
       ? builtinDocPath(locale, activeId)?.find((folder) => !expanded[folder.id])
@@ -90,7 +94,7 @@ export function DocsNavigation({
     active: boolean,
     children?: ReactNode,
   ) => (
-    <div key={key} className="studio-docs-entry">
+    <div key={key} className="studio-tree-entry">
       <div
         className={`studio-tree-row${active ? " active" : ""}`}
         data-docs-id={key}
@@ -143,7 +147,7 @@ export function DocsNavigation({
         closedAncestor === entry.id,
         open && (
           <div
-            className="studio-docs-children"
+            className="studio-tree-children"
             role="group"
             aria-label={entry.name}
           >
@@ -154,12 +158,22 @@ export function DocsNavigation({
     });
   return (
     <section
+      ref={panel}
       id="studio-docs-navigation"
       className="studio-docs"
       aria-label={docs.name}
+      aria-hidden={!panelOpen}
+      inert={!panelOpen}
+      data-presence={presence.state}
     >
-      {page(WELCOME_DOC)}
-      {entries(docs.tree)}
+      <div className="studio-docs-scroll">
+        {presence.mounted && (
+          <>
+            {page(WELCOME_DOC)}
+            {entries(docs.tree)}
+          </>
+        )}
+      </div>
     </section>
   );
 }

@@ -5,7 +5,7 @@ import {
   type SetStateAction,
   type ReactNode,
 } from "react";
-import { ChevronRight, MoreHorizontal, Plus } from "../ui/icons";
+import { Folder, FolderOpen, MoreHorizontal, Plus } from "../ui/icons";
 import type {
   ProjectGroup,
   ProjectSummary,
@@ -108,7 +108,11 @@ export default function ProjectSidebar({
             aria-expanded={!collapsed[id]}
             onClick={() => toggle(id)}
           >
-            <ChevronRight size={13} aria-hidden="true" />
+            {collapsed[id] ? (
+              <Folder size={15} strokeWidth={1.7} aria-hidden="true" />
+            ) : (
+              <FolderOpen size={15} strokeWidth={1.7} aria-hidden="true" />
+            )}
             <span>{name}</span>
           </button>
         ) : id === "projects" && onManage ? (
@@ -155,7 +159,7 @@ export default function ProjectSidebar({
       </div>
       {(!group || !collapsed[id]) && (
         <div
-          className="studio-project-section-items"
+          className={`studio-project-section-items${group ? " studio-tree-children" : ""}`}
           {...drag?.section(id, () =>
             setCollapsed((current) => ({ ...current, [id]: false })),
           )}

@@ -367,7 +367,7 @@ export function useLibraryDragController(options: {
             finishing.current ||
             event.button !== 0 ||
             (event.target as HTMLElement).closest(
-              ".studio-row-menu,.studio-tree-chevron",
+              ".studio-row-menu,.studio-tree-folder-toggle",
             )
           )
             return;

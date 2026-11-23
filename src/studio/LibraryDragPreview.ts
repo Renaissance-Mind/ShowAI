@@ -260,7 +260,7 @@ export class LibraryDragPreview {
           this.temporary.className = target.matches(
             "[data-library-drop-section]",
           )
-            ? "studio-project-section-items"
+            ? "studio-project-section-items studio-tree-children"
             : "studio-tree-children";
           this.temporary.dataset.dragContainer = "true";
           unit.append(this.temporary);

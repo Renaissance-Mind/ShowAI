@@ -1,41 +1,34 @@
 .studio-docs {
+  display: grid;
+  grid-template-rows: minmax(0, 0fr);
   flex: 0 1 auto;
   min-height: 0;
   max-height: 48%;
+  overflow: clip;
+  margin-block-end: 0;
+  border-radius: 8px 0 8px 8px;
+  background: var(--docs-panel-surface);
+  transition:
+    grid-template-rows var(--duration-base) ease-in-out,
+    margin-block-end var(--duration-base) ease-in-out;
+}
+.studio-docs:not([inert]) {
+  grid-template-rows: minmax(0, 1fr);
+  margin-block-end: 6px;
+}
+.studio-docs-scroll {
+  min-height: 0;
   overflow: auto;
   overscroll-behavior: contain;
-  margin-bottom: 8px;
   padding: 4px;
-  border-radius: 8px;
-  background: var(--docs-panel-surface);
-  animation: showai-fade-in var(--duration-fast) var(--ease-out);
+  opacity: 0;
+  transition: opacity var(--duration-base) linear;
+}
+.studio-docs:not([inert]) > .studio-docs-scroll {
+  opacity: 1;
 }
 .studio-docs .studio-tree-row > .studio-tree-main {
   padding-inline: 4px 6px;
-}
-.studio-docs-children {
-  padding-inline-start: 16px;
-}
-.studio-docs-entry,
-.studio-docs-entry > .studio-tree-row {
-  position: relative;
-}
-.studio-docs-children > .studio-docs-entry:not(:last-child)::before,
-.studio-docs-children
-  > .studio-docs-entry:last-child
-  > .studio-tree-row::before {
-  content: "";
-  position: absolute;
-  inset-block: 0;
-  inset-inline-start: -5px;
-  width: 1px;
-  background: color-mix(in srgb, var(--muted) 30%, transparent);
-  pointer-events: none;
-}
-.studio-docs-children
-  > .studio-docs-entry:last-child
-  > .studio-tree-row::before {
-  inset-block-end: 25%;
 }
 @media (hover: hover) {
   .studio-docs .studio-tree-row:not(.active):hover {

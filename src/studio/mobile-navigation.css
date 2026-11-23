@@ -73,9 +73,6 @@ html[data-native="ios"] .studio-sidebar-shell > .studio-sidebar {
   width: 22px;
   height: 22px;
 }
-.studio-mobile-sidebar-brand:has(.studio-docs-toggle[aria-expanded="true"]) {
-  margin-bottom: 0;
-}
 html[data-native="ios"] .board-tool-shortcuts {
   display: none;
 }

@@ -70,6 +70,7 @@
 }
 .studio-window-topbar {
   display: flex;
+  gap: 4px;
   align-items: center;
   height: 40px;
   flex-shrink: 0;
@@ -95,114 +96,84 @@
 .studio .studio-address-row > .studio-topbar {
   flex: 1 1 0;
 }
-.studio-address-tools {
-  display: flex;
-  align-items: center;
-  flex: 0 0 var(--navigation-width);
-  min-width: 0;
-  gap: 4px;
-  padding-inline: 10px 5px;
-  border-right: 1px solid var(--line);
-  background: var(--surface);
-}
-.studio-address-brand {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  flex-shrink: 0;
-  font-size: 14px;
-}
-.studio-address-brand img {
-  width: 19px;
-  height: 19px;
-}
-.studio-address-tools .studio-address-navigation button {
-  width: 24px;
-}
-.studio-docs-toggle {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 4px;
-  align-self: stretch;
-  position: relative;
-  isolation: isolate;
+.studio-window-logo {
+  width: 20px;
+  height: 20px;
   flex: none;
-  padding: 0 6px;
-  font-size: 13px;
-  white-space: nowrap;
-  color: var(--muted);
-  background: transparent;
+  margin-inline-end: 4px;
+}
+.studio-window-navigation {
+  display: flex;
+  align-items: center;
+  flex: none;
   -webkit-app-region: no-drag;
 }
-.studio-address-tools > .studio-docs-toggle {
-  margin-inline-start: auto;
+.studio-window-navigation button {
+  width: 26px;
 }
-.studio-address-tools[data-narrow] {
-  gap: 2px;
-  padding-inline: 5px 1px;
+.studio-sidebar-tools {
+  display: flex;
+  align-items: stretch;
+  gap: 6px;
+  flex: none;
 }
-.studio-address-tools[data-narrow] .studio-address-brand {
-  gap: 2px;
-  font-size: 13px;
+.studio-sidebar-tools .studio-sidebar-search {
+  align-self: flex-start;
+  flex: 1 1 0;
+  min-width: 0;
+  width: auto;
 }
-.studio-address-tools[data-narrow] .studio-address-brand img {
-  width: 16px;
-  height: 16px;
-}
-.studio-address-tools[data-narrow] .studio-docs-toggle {
-  gap: 2px;
-  padding-inline: 2px;
-  font-size: 12px;
-}
-.studio-address-tools[data-narrow] .studio-docs-toggle svg {
-  width: 15px;
-  height: 15px;
+.studio-docs-toggle {
+  display: grid;
+  place-items: center;
+  position: relative;
+  isolation: isolate;
+  flex: 0 0 32px;
+  min-height: 36px;
+  padding: 0 0 4px;
+  color: var(--muted);
+  background: transparent;
 }
 .studio-docs-toggle::before {
   content: "";
   position: absolute;
   z-index: -1;
-  inset: calc(50% - 13px) 0;
+  inset: 0 0 4px;
   border-radius: 7px;
+  background: var(--docs-panel-surface);
+  transition:
+    bottom var(--duration-base) var(--ease-out),
+    border-radius var(--duration-base) var(--ease-out);
 }
-.studio-docs-toggle:hover::before {
-  background: var(--hover);
-}
+.studio-docs-toggle:hover,
 .studio-docs-toggle[aria-expanded="true"] {
   color: var(--text);
 }
-.studio-docs-toggle[aria-expanded="true"]::before {
+.studio-sidebar-tools:has(+ .studio-docs:not([data-presence="hidden"]))
+  .studio-docs-toggle::before {
   bottom: 0;
   border-radius: 7px 7px 0 0;
-  background: var(--docs-panel-surface);
+  transition: none;
 }
-.studio-docs-toggle[aria-expanded="true"]::after {
+.studio-docs-toggle::after {
   --docs-join-radius: 14px;
   content: "";
   position: absolute;
-  inset: auto calc(-1 * var(--docs-join-radius)) 0;
+  inset: auto 100% 0 auto;
+  width: var(--docs-join-radius);
   height: var(--docs-join-radius);
-  background-image:
-    radial-gradient(
-      circle var(--docs-join-radius) at left top,
-      transparent calc(100% - 0.5px),
-      var(--docs-panel-surface) 100%
-    ),
-    radial-gradient(
-      circle var(--docs-join-radius) at right top,
-      transparent calc(100% - 0.5px),
-      var(--docs-panel-surface) 100%
-    );
-  background-position:
-    left bottom,
-    right bottom;
-  background-size: var(--docs-join-radius) 100%;
-  background-repeat: no-repeat;
+  background: radial-gradient(
+    circle at left top,
+    transparent calc(var(--docs-join-radius) - 0.5px),
+    var(--docs-panel-surface) var(--docs-join-radius)
+  );
+  scale: 0 1;
+  transform-origin: right bottom;
+  transition: scale var(--duration-base) ease-in-out;
   pointer-events: none;
 }
-.studio-workspace:not([data-mobile-sidebar]) .studio-sidebar[data-docs-open] {
-  padding-top: 0;
+.studio-docs-toggle[aria-expanded="true"]::after {
+  scale: 1 1;
 }
 .studio-topbar .studio-breadcrumb > button.studio-codex-workbench-link {
   display: grid;
@@ -257,7 +228,7 @@
 .studio-sidebar-edge {
   position: absolute;
   inset: 0 auto 0 0;
-  z-index: 101;
+  z-index: 130;
   width: 12px;
   display: grid;
   place-items: center;

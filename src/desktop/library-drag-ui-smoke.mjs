@@ -255,7 +255,12 @@ try {
     () => saved(other.id),
     (value) => value.document.title === "移动后继续编辑",
   );
-  await title.waitFor();
+  await row(id)
+    .locator(
+      `.studio-tree-main[data-open-project="${other.id}"][aria-current="page"]`,
+    )
+    .waitFor();
+  await title.and(page.locator('input[value="移动后继续编辑"]:enabled')).waitFor();
   await title.fill("跨项目后继续编辑");
   await title.press("Meta+s");
   await waitFor(
