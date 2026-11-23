@@ -502,6 +502,7 @@ export default function Studio() {
           switchingTab={workspace.switching || routing}
           navigation={
             <StudioSidebar
+              onOpenSearch={commands.openQuickJump}
               feedback={feedback}
               library={library}
               route={route}

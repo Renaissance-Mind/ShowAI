@@ -204,7 +204,29 @@ try {
     "A native window puts navigation beside the address and keeps tabs in place when the sidebar is resized",
   );
 
-  await row(opened, target.other).locator(".studio-tree-main").click();
+  const sidebarSearch = opened.locator(".studio-sidebar").getByRole("button", {
+    name: "搜索",
+    exact: true,
+  });
+  const newEntry = opened.locator(".studio-new-project");
+  const searchBox = await sidebarSearch.boundingBox();
+  assert.ok(searchBox.y + searchBox.height <= (await newEntry.boundingBox()).y);
+  const jump = opened.getByRole("dialog", { name: "快速跳转" });
+  const query = jump.getByRole("combobox");
+  const match = jump
+    .getByRole("group", { name: "页面", exact: true })
+    .getByRole("option", { name: /Other page/ });
+  await opened.keyboard.press("ControlOrMeta+k");
+  await query.fill("Other page");
+  const shortcutResult = await match.innerText();
+  await query.press("Escape");
+  await jump.waitFor({ state: "detached" });
+  await sidebarSearch.click();
+  await query.waitFor();
+  assert.ok(await query.evaluate((input) => input === document.activeElement));
+  await opened.keyboard.type("Other page");
+  assert.equal(await match.innerText(), shortcutResult);
+  await match.click();
   await opened.waitForFunction(
     () =>
       document.querySelector('input[aria-label="页面标题"]')?.value ===
@@ -212,7 +234,8 @@ try {
   );
   assert.equal(await title(source).inputValue(), "Target page");
   result.checks.push(
-    "The new window can navigate to another page while the source keeps its original page",
+    "Sidebar search above New and the keyboard shortcut open the same focused Quick Jump and find the same page",
+    "The new window can navigate to a search result while the source keeps its original page",
   );
 
   await navigation.getByRole("button", { name: "后退", exact: true }).click();

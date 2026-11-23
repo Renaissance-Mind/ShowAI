@@ -31,7 +31,12 @@ import type { SearchResult } from "../../core/library-index";
 import type { ProjectSummary } from "../../core/model";
 import type { EditorControls } from "../../surface/EditorControls";
 import { desktop } from "../../host/bridge";
-import { clientIsMac, formatShortcut } from "../keyboard-shortcuts";
+import {
+  clientIsMac,
+  formatShortcut,
+  getQuickJumpShortcut,
+  matchesChord,
+} from "../keyboard-shortcuts";
 import {
   QuickJumpRegistry,
   flattenGroups,
@@ -219,8 +224,7 @@ export default function QuickJump({
           if (event.nativeEvent.isComposing || event.keyCode === 229) return;
           if (
             event.key === "Escape" ||
-            ((mac ? event.metaKey : event.ctrlKey) &&
-              event.key.toLowerCase() === "k")
+            matchesChord(event, getQuickJumpShortcut(), mac)
           ) {
             event.preventDefault();
             event.stopPropagation();

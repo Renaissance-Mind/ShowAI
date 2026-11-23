@@ -66,6 +66,10 @@ const glyphs: Record<string, [mac: string, other: string]> = {
 
 export const clientIsMac = detectMacPlatform;
 
+export function getQuickJumpShortcut(): KeyChord {
+  return resolvedSlotChord("general.search", 0, "Mod+K");
+}
+
 export function setCustomShortcut(
   entryId: string,
   slotIndex: number,

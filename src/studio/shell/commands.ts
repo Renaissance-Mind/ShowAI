@@ -24,6 +24,7 @@ import { builtinDocLink } from "../builtin-docs";
 import {
   clientIsMac,
   entryKeyMatches,
+  getQuickJumpShortcut,
   matchesChord,
   readCustomShortcuts,
   resolvedSlotChord,
@@ -146,20 +147,24 @@ export function useStudioCommands({
     window.addEventListener("keydown", handle);
     return () => window.removeEventListener("keydown", handle);
   }, []);
-  const openSearchRef = useRef<() => void>(() => {});
+  function openQuickJump() {
+    if (dialogRef.current || modalOpen()) return false;
+    setDialog({ type: "quickJump" });
+    loadImporters();
+    return true;
+  }
+  const openSearchRef = useRef(openQuickJump);
+  openSearchRef.current = openQuickJump;
   useEffect(() => {
     const search = (event: KeyboardEvent) => {
       if (
-        !entryKeyMatches(event, "general.search", 0, "Mod+K", clientIsMac()) ||
+        !matchesChord(event, getQuickJumpShortcut(), clientIsMac()) ||
         event.isComposing ||
         event.keyCode === 229 ||
-        event.defaultPrevented ||
-        dialogRef.current ||
-        modalOpen()
+        event.defaultPrevented
       )
         return;
-      event.preventDefault();
-      openSearchRef.current();
+      if (openSearchRef.current()) event.preventDefault();
     };
     const shortcuts = () => setDialog({ type: "shortcuts" });
     window.addEventListener("keydown", search);
@@ -188,10 +193,6 @@ export function useStudioCommands({
       open();
     else void navigate("projects").then(() => setTimeout(open, 50), report);
   }
-  openSearchRef.current = () => {
-    setDialog({ type: "quickJump" });
-    loadImporters();
-  };
   useEffect(() => {
     if (!capabilities.tabs) return;
     const command = (command: TabCommand) => {
@@ -492,7 +493,13 @@ export function useStudioCommands({
       },
     ];
   }
-  return { menuCommand, helpDoc, openFeedback, quickJumpCommands };
+  return {
+    menuCommand,
+    helpDoc,
+    openFeedback,
+    openQuickJump,
+    quickJumpCommands,
+  };
 }
 
 export type StudioCommands = ReturnType<typeof useStudioCommands>;

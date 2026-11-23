@@ -2,10 +2,11 @@ import {
   useCallback,
   useMemo,
   useRef,
+  useSyncExternalStore,
   type MouseEvent as ReactMouseEvent,
   type ReactNode,
 } from "react";
-import { ArrowLeft, TriangleAlert } from "../../ui/icons";
+import { ArrowLeft, Search, TriangleAlert } from "../../ui/icons";
 import { sortDirectoryItems } from "../../core/directory-sort";
 import { useTranslator } from "../../i18n/react";
 import commonMessages from "../../i18n/messages/common";
@@ -26,6 +27,12 @@ import { SettingsNavigation } from "../Settings";
 import { DocsNavigation } from "../BuiltinDocs";
 import type { RecentPage } from "../RecentPages";
 import { clickDisposition } from "../open-target";
+import {
+  clientIsMac,
+  formatShortcut,
+  getQuickJumpShortcut,
+  subscribeShortcuts,
+} from "../keyboard-shortcuts";
 import type { StudioFeedback } from "./useStudioFeedback";
 import type { LibraryState } from "./useLibraryState";
 import type { RouteState } from "./useRouteState";
@@ -234,6 +241,7 @@ export function useLibraryRows({
 export type LibraryRows = ReturnType<typeof useLibraryRows>;
 
 export function StudioSidebar({
+  onOpenSearch,
   feedback: { report, action },
   library,
   route,
@@ -253,6 +261,7 @@ export function StudioSidebar({
   page,
   workspace,
 }: {
+  onOpenSearch: () => void;
   feedback: StudioFeedback;
   library: LibraryState;
   route: RouteState;
@@ -268,6 +277,12 @@ export function StudioSidebar({
   const t = useTranslator(studioMessages);
   const tc = useTranslator(commonMessages);
   const tn = useTranslator(navigationMessages);
+  const searchChord = useSyncExternalStore(
+    subscribeShortcuts,
+    getQuickJumpShortcut,
+    getQuickJumpShortcut,
+  );
+  const searchKeys = formatShortcut(searchChord, clientIsMac());
   const {
     info,
     projects,
@@ -357,9 +372,9 @@ export function StudioSidebar({
   );
   return (
     <LibraryDragContext.Provider value={libraryDrag.bindings}>
-      {(view === "templates" ||
+      {view === "templates" ||
         view === "components" ||
-        view === "settings") && (
+        view === "settings" ? (
         <button
           className="studio-sidebar-back"
           aria-label={tn("backToPrevious")}
@@ -369,6 +384,25 @@ export function StudioSidebar({
         >
           <ArrowLeft size={17} strokeWidth={1.7} aria-hidden="true" />
           <span>{tc("back")}</span>
+        </button>
+      ) : (
+        <button
+          className="studio-sidebar-search"
+          type="button"
+          aria-haspopup="dialog"
+          title={tn("withShortcut", {
+            label: tn("shortcut.search"),
+            keys: searchKeys,
+          })}
+          onMouseDown={(event) => {
+            if (document.activeElement?.closest(".container-workspace"))
+              event.preventDefault();
+          }}
+          onClick={onOpenSearch}
+        >
+          <Search size={15} aria-hidden="true" />
+          <span>{tc("search")}</span>
+          <kbd aria-hidden="true">{searchKeys}</kbd>
         </button>
       )}
       {view === "settings" ? (
