@@ -624,29 +624,45 @@ export function useStudioRouter({
     }
     return false;
   }
+  async function openTargetWindow(target: {
+    projectId: string;
+    pageId?: string;
+    folderId?: string;
+  }) {
+    if (!workspaceReady || !capabilities.windows) return false;
+    await workspaceRef.current.settled();
+    return desktop.openWindow(target, async () => {
+      if (!(await page.flush())) return false;
+      const session = target.pageId
+        ? page.sessions.sessionFor(target.projectId, target.pageId)
+        : undefined;
+      if (
+        session &&
+        session !== page.sessions.getSnapshot().active &&
+        !(await session.flush())
+      )
+        return draftHeld();
+      return true;
+    });
+  }
   async function openTarget(
     target: LibraryTarget,
     disposition: OpenDisposition = "current",
   ) {
-    const workspace = workspaceRef.current;
     if (!workspaceReady) return false;
+    if (disposition === "window" && capabilities.windows)
+      return openTargetWindow({
+        projectId: target.projectId,
+        ...(target.kind === "page" ? { pageId: target.id } : {}),
+        ...(target.kind === "folder" ? { folderId: target.id } : {}),
+      });
+    const workspace = workspaceRef.current;
     await workspace.settled();
     if (
-      (!capabilities.tabs && disposition !== "window") ||
-      (!capabilities.windows && disposition === "window")
+      capabilities.tabs &&
+      (disposition === "tab" || disposition === "foreground-tab")
     )
-      disposition = "current";
-    if (disposition === "window") {
-      return desktop.openWindow(
-        {
-          projectId: target.projectId,
-          ...(target.kind === "page" ? { pageId: target.id } : {}),
-          ...(target.kind === "folder" ? { folderId: target.id } : {}),
-        },
-        page.flush,
-      );
-    }
-    if (disposition !== "current") return workspace.open(libraryEntry(target));
+      return workspace.open(libraryEntry(target));
     return target.kind === "page"
       ? openPage(target.id, target.projectId)
       : openProject(
@@ -764,6 +780,7 @@ export function useStudioRouter({
     followPageLink,
     locateAssistantTarget,
     openTarget,
+    openTargetWindow,
     openTargetClick,
     openDoc,
     locateCurrentPage,

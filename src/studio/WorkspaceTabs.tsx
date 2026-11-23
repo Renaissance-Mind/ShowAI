@@ -7,12 +7,24 @@ import {
   Folder,
   History,
   LayoutTemplate,
+  Pin,
+  PinOff,
   Plus,
   Settings2,
   X,
 } from "../ui/icons";
+import {
+  LibraryContextMenu,
+  type LibraryContextMenuItem,
+  type LibraryMenuPoint,
+} from "../ui/LibraryContextMenu";
 import PageIcon from "../components/PageIcon";
-import { currentEntry, type WorkspaceTabsState } from "./workspace-tabs";
+import { isContextMenuShortcut } from "./keyboard-shortcuts";
+import {
+  currentEntry,
+  type WorkspaceEntry,
+  type WorkspaceTabsState,
+} from "./workspace-tabs";
 import "./workspace-tabs.css";
 import { useTranslator } from "../i18n/react";
 import sidebarMessages from "../i18n/messages/sidebar";
@@ -64,6 +76,8 @@ export default function WorkspaceTabs({
   onClose,
   onAdd,
   onMove,
+  onSetPinned,
+  contextItems,
   shortcutHint = true,
 }: WorkspaceTabsState & {
   busy: boolean;
@@ -72,11 +86,25 @@ export default function WorkspaceTabs({
   onClose: (id: string) => void;
   onAdd: () => void;
   onMove: (id: string, targetId: string, placement: "before" | "after") => void;
+  onSetPinned: (id: string, pinned: boolean) => void;
+  contextItems: (entry: WorkspaceEntry) => LibraryContextMenuItem[];
 }) {
   const t = useTranslator(sidebarMessages);
   const list = useRef<HTMLDivElement>(null);
   const ghost = useRef<HTMLDivElement>(null);
   const restoreFocus = useRef(false);
+  const [contextMenu, setContextMenu] = useState<{
+    tabId: string;
+    anchor: HTMLButtonElement;
+    point?: LibraryMenuPoint;
+  } | null>(null);
+  const contextTab =
+    contextMenu && !busy
+      ? tabs.find((tab) => tab.id === contextMenu.tabId)
+      : undefined;
+  useEffect(() => {
+    if (contextMenu && !contextTab) setContextMenu(null);
+  }, [contextMenu, contextTab]);
   const gesture = useRef<{
     id: string;
     x: number;
@@ -90,6 +118,8 @@ export default function WorkspaceTabs({
     offsetY: number;
     width: number;
     height: number;
+    firstIndex: number;
+    lastIndex: number;
     original: string[];
     layout: Map<string, { left: number; width: number }>;
   } | null>(null);
@@ -137,6 +167,19 @@ export default function WorkspaceTabs({
     document.body.classList.remove("studio-tab-drag-active");
     document.body.style.cursor = "";
   };
+  const openContextMenu = (
+    tabId: string,
+    anchor: HTMLButtonElement,
+    point?: LibraryMenuPoint,
+  ) => {
+    if (busy) return;
+    finishDrag();
+    setContextMenu({ tabId, anchor, point });
+  };
+  const closeAndRestoreFocus = (id: string) => {
+    restoreFocus.current = true;
+    onClose(id);
+  };
   const locate = (x: number, y: number) => {
     const container = list.current;
     const current = gesture.current;
@@ -153,13 +196,16 @@ export default function WorkspaceTabs({
     const right = left + current.width;
     const from = current.original.indexOf(current.id);
     const others = current.original.filter((id) => id !== current.id);
-    let index = others.findIndex((id, position) => {
+    const index = others.findIndex((id, position) => {
       const slot = current.layout.get(id)!;
       const middle = slot.left + slot.width / 2;
       return position < from ? left < middle : right <= middle;
     });
-    if (index < 0) index = others.length;
-    others.splice(index, 0, current.id);
+    const insertion = Math.max(
+      current.firstIndex,
+      Math.min(current.lastIndex, index < 0 ? others.length : index),
+    );
+    others.splice(insertion, 0, current.id);
     return others;
   };
   const update = () => {
@@ -268,10 +314,11 @@ export default function WorkspaceTabs({
         preview(null);
         if (!target) return;
         const index = target.indexOf(current.id);
-        if (index === current.original.indexOf(current.id)) return;
-        if (index > 0)
+        const from = current.original.indexOf(current.id);
+        if (index > from)
           latest.current.onMove(current.id, target[index - 1], "after");
-        else latest.current.onMove(current.id, target[1], "before");
+        else if (index < from)
+          latest.current.onMove(current.id, target[index + 1], "before");
       });
       const slot = list.current?.querySelector<HTMLElement>(
         `.studio-tab[data-tab-id="${CSS.escape(current.id)}"]`,
@@ -366,6 +413,7 @@ export default function WorkspaceTabs({
       ?.focus();
   }, [activeId, busy, tabs.length]);
   const draggedTab = tabs.find((tab) => tab.id === dragging);
+  const pinnedCount = tabs.filter((tab) => tab.pinned).length;
   const shown =
     order && tabsMatchDrag
       ? order.map((id) => tabs.find((tab) => tab.id === id)!)
@@ -426,13 +474,29 @@ export default function WorkspaceTabs({
           const index = tabs.indexOf(tab);
           const entry = currentEntry(tab);
           const active = tab.id === activeId;
+          const reorderable =
+            !busy && (tab.pinned ? pinnedCount : tabs.length - pinnedCount) > 1;
+          const dragHint = reorderable ? t("tabDragHint") : undefined;
           return (
             <div
               key={tab.id}
               className="studio-tab"
               data-active={active || undefined}
+              data-pinned={tab.pinned || undefined}
               data-tab-id={tab.id}
               data-dragging={dragging === tab.id || undefined}
+              onContextMenu={(event) => {
+                event.preventDefault();
+                event.stopPropagation();
+                const anchor =
+                  event.currentTarget.querySelector<HTMLButtonElement>('button[role="tab"]');
+                if (anchor)
+                  openContextMenu(tab.id, anchor, {
+                    x: event.clientX,
+                    y: event.clientY,
+                  });
+                if (event.ctrlKey) suppressClick.current = true;
+              }}
             >
               <button
                 type="button"
@@ -440,16 +504,17 @@ export default function WorkspaceTabs({
                 id={`workspace-tab-${tab.id}`}
                 aria-selected={active}
                 aria-controls="studio-tab-panel"
+                aria-label={tab.pinned ? entry.title : undefined}
+                aria-haspopup="menu"
                 tabIndex={active ? 0 : -1}
                 disabled={busy}
-                title={`${entry.title}\n${t("tabDragHint")}`}
-                aria-description={t("tabDragHint")}
-                data-reorderable={(!busy && tabs.length > 1) || undefined}
+                title={dragHint ? `${entry.title}\n${dragHint}` : entry.title}
+                aria-description={dragHint}
+                data-reorderable={reorderable || undefined}
                 onDragStart={(event) => event.preventDefault()}
                 onPointerDown={(event) => {
                   if (
-                    busy ||
-                    tabs.length < 2 ||
+                    !reorderable ||
                     event.button !== 0 ||
                     !event.isPrimary ||
                     gesture.current
@@ -468,6 +533,8 @@ export default function WorkspaceTabs({
                     offsetY: 0,
                     width: 0,
                     height: 0,
+                    firstIndex: tab.pinned ? 0 : pinnedCount,
+                    lastIndex: tab.pinned ? pinnedCount - 1 : tabs.length - 1,
                     original: [],
                     layout: new Map(),
                   };
@@ -483,6 +550,12 @@ export default function WorkspaceTabs({
                   }
                 }}
                 onKeyDown={(event) => {
+                  if (isContextMenuShortcut(event)) {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    openContextMenu(tab.id, event.currentTarget);
+                    return;
+                  }
                   if (
                     event.altKey &&
                     event.shiftKey &&
@@ -515,28 +588,28 @@ export default function WorkspaceTabs({
                     onSelect(tabs[next].id);
                   } else if (event.key === "Delete") {
                     event.preventDefault();
-                    restoreFocus.current = true;
-                    onClose(tab.id);
+                    closeAndRestoreFocus(tab.id);
                   }
                 }}
               >
                 {tabIcon(tab)}
-                <span>{entry.title}</span>
+                {!tab.pinned && (
+                  <span className="studio-tab-title">{entry.title}</span>
+                )}
               </button>
-              <button
-                type="button"
-                className="studio-tab-close"
-                tabIndex={active ? 0 : -1}
-                disabled={busy}
-                aria-label={t("closeTabNamed", { title: entry.title })}
-                title={t("closeTab")}
-                onClick={() => {
-                  restoreFocus.current = true;
-                  onClose(tab.id);
-                }}
-              >
-                <X size={13} />
-              </button>
+              {!tab.pinned && (
+                <button
+                  type="button"
+                  className="studio-tab-close"
+                  tabIndex={active ? 0 : -1}
+                  disabled={busy}
+                  aria-label={t("closeTabNamed", { title: entry.title })}
+                  title={t("closeTab")}
+                  onClick={() => closeAndRestoreFocus(tab.id)}
+                >
+                  <X size={13} />
+                </button>
+              )}
             </div>
           );
         })}
@@ -561,16 +634,49 @@ export default function WorkspaceTabs({
             className="studio-tab-drag-ghost"
             aria-hidden="true"
             data-active={draggedTab.id === activeId || undefined}
+            data-pinned={draggedTab.pinned || undefined}
             style={{
               width: gesture.current?.width,
               height: gesture.current?.height,
             }}
           >
             {tabIcon(draggedTab)}
-            <span>{currentEntry(draggedTab).title}</span>
+            {!draggedTab.pinned && (
+              <span className="studio-tab-title">{currentEntry(draggedTab).title}</span>
+            )}
           </div>,
           document.body,
         )}
+      {contextMenu && contextTab && (
+        <LibraryContextMenu
+          anchor={contextMenu.anchor}
+          point={contextMenu.point}
+          label={t("itemActions", { title: currentEntry(contextTab).title })}
+          onClose={() => setContextMenu(null)}
+          items={[
+            {
+              label: t(contextTab.pinned ? "unpinTab" : "pinTab"),
+              icon: contextTab.pinned ? <PinOff size={15} /> : <Pin size={15} />,
+              onSelect: () => {
+                onSetPinned(contextTab.id, !contextTab.pinned);
+                requestAnimationFrame(() =>
+                  contextMenu.anchor.scrollIntoView({
+                    block: "nearest",
+                    inline: "nearest",
+                  }),
+                );
+              },
+            },
+            ...contextItems(currentEntry(contextTab)),
+            {
+              label: t("closeTab"),
+              icon: <X size={15} />,
+              separatorBefore: true,
+              onSelect: () => closeAndRestoreFocus(contextTab.id),
+            },
+          ]}
+        />
+      )}
     </div>
   );
 }

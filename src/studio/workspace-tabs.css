@@ -48,6 +48,11 @@
   border-radius: 11px 11px 0 0;
   color: var(--muted);
 }
+.studio-tab[data-pinned] {
+  flex: 0 0 auto;
+  width: 36px;
+  min-width: 0;
+}
 .studio-tab[data-active] {
   z-index: 1;
   background: var(--paper);
@@ -133,7 +138,7 @@
   background: var(--paper);
   color: var(--text);
 }
-.studio-tab-drag-ghost > span:last-child {
+.studio-tab-title {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -141,10 +146,10 @@
 .studio-tab-drag-ghost .page-icon {
   flex-shrink: 0;
 }
-.studio-tab > [role="tab"] > span:last-child {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+.studio-tab[data-pinned] > [role="tab"],
+.studio-tab-drag-ghost[data-pinned] {
+  justify-content: center;
+  padding-inline: 0;
 }
 .studio-tab .page-icon {
   flex-shrink: 0;

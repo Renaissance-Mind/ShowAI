@@ -13,6 +13,7 @@ import {
   sameEntry,
   sameLocation,
   setWorkspaceAssistantOpen,
+  setWorkspaceTabPinned,
   visitWorkspace,
   type WorkspaceEntry,
   type WorkspaceLocation,
@@ -282,6 +283,11 @@ export function useWorkspaceTabs({
     move: (id: string, targetId: string, placement: "before" | "after") => {
       if (pending.current || closing.current || !ready) return;
       publish(moveWorkspaceTab(current.current, id, targetId, placement));
+    },
+    setPinned: (id: string, pinned: boolean) => {
+      if (busyNow()) return;
+      const next = setWorkspaceTabPinned(current.current, id, pinned);
+      if (next !== current.current) publish(next);
     },
     close,
     step,

@@ -369,6 +369,7 @@ export default function Studio() {
     dialogs,
     menus,
     directory,
+    router,
     pageActions,
     edits,
     moves,
@@ -582,6 +583,8 @@ export default function Studio() {
               onClose={(id) => void workspace.close(id).catch(report)}
               onAdd={() => void workspace.add().catch(report)}
               onMove={workspace.move}
+              onSetPinned={workspace.setPinned}
+              contextItems={menuItems.workspaceTabMenuItems}
               shortcutHint={info?.mode !== "browser"}
             />
           )}

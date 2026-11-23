@@ -89,6 +89,42 @@ async function verifyTabReorder(page) {
   await ghost.waitFor({ state: "detached" });
   assert.deepEqual(await order(), [second, active, first]);
   await session.detach();
+
+  const background = list.locator(`#${active}`);
+  const name = await background.locator(".studio-tab-title").textContent();
+  const menu = page.getByRole("menu", { name: `${name}的操作`, exact: true });
+  const pinned = list.locator(`.studio-tab[data-pinned] > #${active}`);
+  const width = (await background.boundingBox()).width;
+  await background.click({ button: "right" });
+  await menu.getByRole("menuitem", { name: "固定标签页", exact: true }).click();
+  await pinned.waitFor();
+  assert.deepEqual(await order(), [active, second, first]);
+  assert.equal(await pinned.getAttribute("aria-label"), name);
+  assert.equal(await pinned.locator(".studio-tab-title").count(), 0);
+  assert.equal(await list.locator(".studio-tab[data-pinned] .studio-tab-close").count(), 0);
+  assert.ok((await pinned.boundingBox()).width < width);
+  await page.reload();
+  await pinned.waitFor();
+  assert.deepEqual(await order(), [active, second, first]);
+  await drag(2, 0);
+  await page.mouse.up();
+  await ghost.waitFor({ state: "detached" });
+  assert.deepEqual(await order(), [active, first, second]);
+  await background.focus();
+  await page.keyboard.press("Shift+F10");
+  const unpin = menu.getByRole("menuitem", { name: "取消固定标签页", exact: true });
+  await unpin.waitFor();
+  await page.keyboard.press("Escape");
+  await menu.waitFor({ state: "detached" });
+  assert.equal(await page.evaluate(() => document.activeElement.id), active);
+  await page.keyboard.press("Shift+F10");
+  await unpin.click();
+  await pinned.waitFor({ state: "detached" });
+  assert.equal(await background.locator(".studio-tab-title").textContent(), name);
+  assert.equal(
+    await list.getByRole("tab", { selected: true }).getAttribute("id"),
+    first,
+  );
 }
 
 try {
@@ -109,6 +145,7 @@ try {
   await verifyTabReorder(source);
   result.checks.push(
     "Mouse and touch reorder workspace tabs, drops survive reload, Escape cancels and clicks select",
+    "Pinning a background tab compacts it at the left across reload and drag; the keyboard menu unpins it",
   );
   const target = await source.evaluate(async () => {
     const api = window.showai;
@@ -148,6 +185,34 @@ try {
   assert.equal(await title(source).inputValue(), "Target page");
   const row = (page, id) =>
     page.locator(`.studio-sidebar .studio-tree-row[data-library-id="${id}"]`);
+  await row(source, target.other).hover();
+  await row(source, target.other).locator(".studio-row-menu").click();
+  await source.getByRole("menuitem", { name: "在新标签页打开", exact: true }).click();
+  const targetTab = source.getByRole("tab", { name: "Target page", exact: true });
+  const otherTab = source.getByRole("tab", { name: "Other page", exact: true });
+  await otherTab.and(source.getByRole("tab", { selected: true })).waitFor();
+  await targetTab.click();
+  await targetTab.and(source.getByRole("tab", { selected: true })).waitFor();
+  await otherTab.click({ button: "right" });
+  const tabMenu = source.getByRole("menu", { name: "Other page的操作", exact: true });
+  await tabMenu.waitFor();
+  assert.deepEqual(await tabMenu.getByRole("menuitem").allTextContents(), [
+    "固定标签页", "在新窗口打开", "复制链接", "复制引用", "关闭标签页",
+  ]);
+  const openingOther = application.waitForEvent("window");
+  await tabMenu.getByRole("menuitem", { name: "在新窗口打开", exact: true }).click();
+  const otherWindow = await openingOther;
+  otherWindow.on("pageerror", (error) => errors.push(error.message));
+  await title(otherWindow).waitFor();
+  assert.equal(await title(otherWindow).inputValue(), "Other page");
+  assert.equal(await title(source).inputValue(), "Target page");
+  await otherWindow.close();
+  await otherTab.click({ button: "right" });
+  await tabMenu.getByRole("menuitem", { name: "关闭标签页", exact: true }).click();
+  await otherTab.waitFor({ state: "detached" });
+  assert.equal(await title(source).inputValue(), "Target page");
+  result.checks.push("A background page tab exposes page actions and opens and closes the intended page");
+
   await row(source, target.page).hover();
   await row(source, target.page).locator(".studio-row-menu").click();
   const opening = application.waitForEvent("window");

@@ -32,6 +32,7 @@ export interface WorkspaceTab {
   id: string;
   entries: WorkspaceEntry[];
   cursor: number;
+  pinned?: boolean;
   assistantOpen?: boolean;
 }
 
@@ -136,6 +137,19 @@ export function closeWorkspaceTab(state: WorkspaceTabsState, id: string) {
   };
 }
 
+export function setWorkspaceTabPinned(
+  state: WorkspaceTabsState,
+  id: string,
+  pinned: boolean,
+): WorkspaceTabsState {
+  const tab = state.tabs.find((item) => item.id === id);
+  if (!tab || !!tab.pinned === pinned) return state;
+  const tabs = state.tabs.filter((item) => item.id !== id);
+  const index = pinned ? 0 : tabs.filter((item) => item.pinned).length;
+  tabs.splice(index, 0, { ...tab, pinned });
+  return { ...state, tabs };
+}
+
 export function pruneWorkspace(
   state: WorkspaceTabsState,
   gone: (location: WorkspaceLocation) => boolean,
@@ -190,7 +204,8 @@ export function moveWorkspaceTab(
 ): WorkspaceTabsState {
   if (id === targetId) return state;
   const source = state.tabs.find((tab) => tab.id === id);
-  if (!source || !state.tabs.some((tab) => tab.id === targetId)) return state;
+  const target = state.tabs.find((tab) => tab.id === targetId);
+  if (!source || !target || !!source.pinned !== !!target.pinned) return state;
   const tabs = state.tabs.filter((tab) => tab.id !== id);
   const index = tabs.findIndex((tab) => tab.id === targetId);
   tabs.splice(index + (placement === "after" ? 1 : 0), 0, source);
@@ -241,6 +256,7 @@ export function parseWorkspaceTabs(
       !tab.entries.length ||
       tab.entries.length > 50 ||
       !Number.isInteger(tab.cursor) ||
+      (tab.pinned !== undefined && typeof tab.pinned !== "boolean") ||
       (tab.assistantOpen !== undefined &&
         typeof tab.assistantOpen !== "boolean") ||
       tab.cursor < 0 ||
@@ -272,7 +288,12 @@ export function parseWorkspaceTabs(
     }
   }
   if (!ids.has(state.activeId)) return;
-  const tabs = singlePage ? state.tabs.filter(tab => tab.id === state.activeId) : state.tabs;
+  const tabs = singlePage
+    ? state.tabs.filter((tab) => tab.id === state.activeId)
+    : [
+        ...state.tabs.filter((tab) => tab.pinned),
+        ...state.tabs.filter((tab) => !tab.pinned),
+      ];
   return { tabs, activeId: state.activeId };
 }
 

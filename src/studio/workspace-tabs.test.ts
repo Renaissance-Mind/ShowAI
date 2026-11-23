@@ -12,6 +12,7 @@ import {
   relocateWorkspace,
   sameEntry,
   setWorkspaceAssistantOpen,
+  setWorkspaceTabPinned,
   visitWorkspace,
   type WorkspaceEntry,
 } from "./workspace-tabs";
@@ -158,6 +159,64 @@ describe("workspace tabs", () => {
     expect(moveWorkspaceTab(state, a.id, a.id, "before")).toBe(state);
     expect(moveWorkspaceTab(state, a.id, b.id, "before")).toBe(state);
     expect(moveWorkspaceTab(state, b.id, a.id, "after")).toBe(state);
+  });
+
+  it("pins tabs at the far left without replacing their sessions", () => {
+    const visited = visitWorkspace(
+      createWorkspace(page("page-a")),
+      page("page-b"),
+    );
+    const state = addWorkspaceTab(
+      addWorkspaceTab(
+        setWorkspaceAssistantOpen(visited, visited.activeId, true),
+        page("page-c"),
+      ),
+      page("page-d"),
+    );
+    const [a, b, c] = state.tabs;
+    const pinned = setWorkspaceTabPinned(
+      setWorkspaceTabPinned(state, a.id, true),
+      b.id,
+      true,
+    );
+    expect(pinned.tabs).toEqual([
+      { ...b, pinned: true },
+      { ...a, pinned: true },
+      c,
+    ]);
+    expect(pinned.tabs[1].entries).toBe(a.entries);
+    expect(pinned.activeId).toBe(c.id);
+    expect(parseWorkspaceTabs(JSON.stringify({ version: 1, ...pinned }))).toEqual(
+      pinned,
+    );
+    expect(setWorkspaceTabPinned(pinned, b.id, true)).toBe(pinned);
+    expect(setWorkspaceTabPinned(pinned, b.id, false).tabs).toEqual([
+      { ...a, pinned: true },
+      { ...b, pinned: false },
+      c,
+    ]);
+  });
+
+  it("reorders tabs within each group while keeping fixed tabs on the left", () => {
+    let state = createWorkspace(page("page-a"));
+    for (const id of ["page-b", "page-c", "page-d"])
+      state = addWorkspaceTab(state, page(id));
+    const [a, b, c, d] = state.tabs;
+    const pinned = setWorkspaceTabPinned(
+      setWorkspaceTabPinned(state, b.id, true),
+      a.id,
+      true,
+    );
+    expect(moveWorkspaceTab(pinned, c.id, a.id, "before")).toBe(pinned);
+    expect(moveWorkspaceTab(pinned, a.id, d.id, "after")).toBe(pinned);
+    const moved = moveWorkspaceTab(
+      moveWorkspaceTab(pinned, b.id, a.id, "before"),
+      d.id,
+      c.id,
+      "before",
+    );
+    expect(moved.tabs.map((tab) => tab.id)).toEqual([b.id, a.id, d.id, c.id]);
+    expect(moved.activeId).toBe(d.id);
   });
 
   it("closes the active tab using its new neighbors after reordering", () => {

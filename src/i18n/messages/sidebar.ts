@@ -50,6 +50,8 @@ export default defineMessages("sidebar", {
     forward: "前进",
     workspaceTabs: "工作区标签页",
     tabDragHint: "拖动调整顺序，或按 Alt+Shift+左右方向键移动标签页",
+    pinTab: "固定标签页",
+    unpinTab: "取消固定标签页",
     closeTabNamed: "关闭标签页 {title}",
     closeTab: "关闭标签页",
     newTab: "新建标签页",
@@ -105,6 +107,8 @@ export default defineMessages("sidebar", {
     workspaceTabs: "Workspace tabs",
     tabDragHint:
       "Drag to reorder, or press Alt+Shift+Left/Right to move this tab",
+    pinTab: "Pin tab",
+    unpinTab: "Unpin tab",
     closeTabNamed: "Close tab {title}",
     closeTab: "Close tab",
     newTab: "New tab",

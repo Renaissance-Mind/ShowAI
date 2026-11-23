@@ -1,5 +1,6 @@
 import { useCodexReferenceLabel } from "../useCodexReferenceLabel";
 import {
+  AppWindow,
   ArrowDown,
   ArrowUp,
   ArrowUpRight,
@@ -31,7 +32,9 @@ import type {
   LibraryTarget,
 } from "../../LibraryNavigation";
 import { newMenuDestination, type CreationChoice } from "../../new-menu";
+import type { WorkspaceEntry } from "../../workspace-tabs";
 import type { StudioFeedback } from "../useStudioFeedback";
+import type { StudioRouter } from "../useStudioRouter";
 import type { LibraryState } from "../useLibraryState";
 import type { RouteState } from "../useRouteState";
 import type { DialogControl } from "../useDialogState";
@@ -57,6 +60,7 @@ export function useMenuItems({
   dialogs: { setDialog },
   menus: { directoryViewControl },
   directory: { project, currentFolder },
+  router: { openTargetWindow },
   pageActions: {
     busy,
     exportPage,
@@ -87,6 +91,7 @@ export function useMenuItems({
   dialogs: Pick<DialogControl, "setDialog">;
   menus: Pick<MenuState, "directoryViewControl">;
   directory: Pick<DirectoryState, "project" | "currentFolder">;
+  router: Pick<StudioRouter, "openTargetWindow">;
   pageActions: Pick<
     PageActions,
     | "busy"
@@ -104,6 +109,42 @@ export function useMenuItems({
   const tc = useTranslator(commonMessages);
   const codexReference = useCodexReferenceLabel();
   const tn = useTranslator(navigationMessages);
+  function workspaceTabMenuItems({
+    location: { view, projectId, folderId, pageId },
+  }: WorkspaceEntry): LibraryContextMenuItem[] {
+    if (!projectId || (view !== "page" && view !== "project")) return [];
+    const target = view === "page" && pageId ? { projectId, pageId } : null;
+    const items: LibraryContextMenuItem[] = [];
+    if (capabilities.windows && (target || view === "project")) {
+      items.push({
+        label: t("openInNewWindow"),
+        icon: <AppWindow size={15} />,
+        onSelect: action(() =>
+          openTargetWindow(target ?? { projectId, ...(folderId ? { folderId } : {}) }),
+        ),
+      });
+    }
+    if (target) {
+      items.push(
+        {
+          label: tc("copyLink"),
+          icon: <Link2 size={15} />,
+          onSelect: action(() => copyPageLink({ ...target, blockIds: [] })),
+        },
+        {
+          label: codexReference ?? tc("copyReference"),
+          icon: <AtSign size={15} />,
+          onSelect: action(() =>
+            copyPageReference(target.projectId, {
+              kind: "page",
+              pageId: target.pageId,
+            }),
+          ),
+        },
+      );
+    }
+    return items;
+  }
   function creationMenuItems(
     target: LibraryTarget | null,
   ): LibraryContextMenuItem[] {
@@ -394,6 +435,7 @@ export function useMenuItems({
     }));
   }
   return {
+    workspaceTabMenuItems,
     creationMenuItems,
     pageExportMenuItems,
     newMenuItems,

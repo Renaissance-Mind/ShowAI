@@ -241,6 +241,76 @@ let bundle: string,
   token: string;
 let server: Awaited<ReturnType<typeof startBrowserServer>>;
 
+test("page tab clipboard actions target the background page", async () => {
+  const project = await invoke<{ id: string }>("projects:create", {
+    name: "Page tab actions",
+  });
+  const createPage = (title: string) =>
+    invoke<LoadedPage>("pages:create", {
+      projectId: project.id,
+      document: { ...blankDocument(), title },
+    });
+  const foreground = await createPage("Foreground page");
+  const background = await createPage("Background page");
+  const url = new URL(server.url);
+  url.searchParams.set("project", project.id);
+  url.searchParams.set("page", foreground.document.id);
+  const browser = await chromium.launch({ headless: true });
+  try {
+    const context = await browser.newContext({
+      colorScheme: "dark",
+      viewport: { width: 1120, height: 800 },
+      permissions: ["clipboard-read", "clipboard-write"],
+    });
+    const editor = await context.newPage();
+    await editor.addInitScript(() =>
+      localStorage.setItem("showai:sidebar-locked", "true"),
+    );
+    await editor.goto(url.href);
+    const selected = editor.getByRole("tab", { selected: true });
+    const foregroundTab = editor.getByRole("tab", {
+      name: "Foreground page",
+      exact: true,
+    });
+    const backgroundTab = editor.getByRole("tab", {
+      name: "Background page",
+      exact: true,
+    });
+    await foregroundTab.and(selected).waitFor();
+    const row = editor.locator(
+      `.studio-sidebar [data-library-id="${background.document.id}"]`,
+    );
+    await row.hover();
+    await row.locator(".studio-row-menu").click();
+    await editor
+      .getByRole("menuitem", { name: /^(在新标签页打开|Open in new tab)$/ })
+      .click();
+    await backgroundTab.and(selected).waitFor();
+    await foregroundTab.click();
+    await foregroundTab.and(selected).waitFor();
+    await editor.setViewportSize({ width: 760, height: 640 });
+    await editor.locator('html[data-theme="dark"]').waitFor({ state: "attached" });
+    const readClipboard = () => editor.evaluate(() => navigator.clipboard.readText());
+    const link = `showai://project/${project.id}/page/${background.document.id}`;
+    await backgroundTab.click({ button: "right" });
+    await editor.getByRole("menuitem", { name: /^(复制链接|Copy link)$/ }).click();
+    await expect.poll(readClipboard).toBe(link);
+    await backgroundTab.click({ button: "right" });
+    await editor.getByRole("menuitem", { name: /^(复制引用|Copy reference)$/ }).click();
+    await expect.poll(readClipboard).toContain(`\n${link}\n`);
+    const [, , reference] = (await readClipboard()).split("\n");
+    expect(JSON.parse(reference)).toMatchObject({
+      type: "showai.reference",
+      projectId: project.id,
+      pageId: background.document.id,
+      hash: background.hash,
+    });
+    expect(await foregroundTab.and(selected).count()).toBe(1);
+  } finally {
+    await browser.close();
+  }
+}, 30000);
+
 test.each(["Antigravity page", "Harness session", "Harness global"] as const)(
   "%s opens the saved Page with the appropriate workspace controls",
   async (surface) => {
