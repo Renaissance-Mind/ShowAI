@@ -420,22 +420,38 @@ try {
 
   await choose(project.id, "重命名");
   await nameDialog("项目名称", "Renamed project");
+  const checkSectionHeading = async (sectionId) => {
+    const section = sidebar.locator(`[data-project-section="${sectionId}"]`);
+    await poll(
+      () =>
+        section.evaluate((node) => {
+          const title = document.createRange();
+          title.selectNodeContents(node.querySelector(".studio-section-title"));
+          const header = node
+            .querySelector(".studio-sidebar-label")
+            .getBoundingClientRect();
+          const row = node.querySelector(".studio-tree-row");
+          const icon = row
+            .querySelector(".studio-project-icon")
+            .getBoundingClientRect();
+          return {
+            offset: title.getBoundingClientRect().left - icon.left,
+            height: header.height,
+            gap: row.getBoundingClientRect().top - header.bottom,
+          };
+        }),
+      ({ offset, height, gap }) => offset === 0 && height === 24 && gap === 0,
+      `${sectionId} heading layout after the row settles`,
+    );
+  };
+  await checkSectionHeading("projects");
   await choose(project.id, "置顶");
   await poll(
     projectData,
     (data) => data.name === "Renamed project" && data.pinned === true,
     "project rename and pin persistence",
   );
-  const textLeft = (el) =>
-    el.evaluate((node) => {
-      const range = document.createRange();
-      range.selectNodeContents(node);
-      return range.getBoundingClientRect().left;
-    });
-  assert.equal(
-    await textLeft(sidebar.locator('[data-project-section="pinned"] .studio-section-title')),
-    await textLeft(row(project.id).locator(".studio-tree-title")),
-  );
+  await checkSectionHeading("pinned");
   await addContent("文件夹");
   await nameDialog("文件夹名称", "Folder A");
   const folderA = (await projectData()).folders.find(
