@@ -6,19 +6,24 @@
     <p class="showai-card-body" dir="auto" hidden></p>
     <p class="showai-card-error" role="status" hidden></p>
   </div>
-  <button type="button" class="showai-card-open" disabled></button>
-  <span class="showai-card-destination" aria-hidden="true" hidden></span>
-  <div class="showai-card-actions">
-    <button type="button" class="showai-button showai-card-toggle" aria-haspopup="menu" aria-expanded="false" disabled></button>
-    <div class="showai-card-menu" role="menu" hidden>
-      <button type="button" role="menuitem" tabindex="-1" data-destination="workbench">
-        <span class="showai-card-app-icon is-chatgpt" aria-hidden="true"><img src="__CHATGPT_ICON__" alt=""></span>
-        <span></span>
-      </button>
-      <button type="button" role="menuitem" tabindex="-1" data-destination="desktop">
-        <span class="showai-card-app-icon" aria-hidden="true"><img src="__SHOWAI_ICON__" alt=""></span>
-        <span></span>
-      </button>
+  <div class="showai-card-actions" hidden>
+    <button type="button" class="showai-button showai-card-open" disabled></button>
+    <div class="showai-card-options" hidden>
+      <button type="button" class="showai-button showai-card-toggle" aria-haspopup="menu" aria-expanded="false" disabled></button>
+      <div class="showai-card-menu" role="menu" hidden>
+        <button type="button" role="menuitem" tabindex="-1" data-destination="workbench">
+          <span class="showai-card-app-icon is-chatgpt" aria-hidden="true"><img src="__CHATGPT_ICON__" alt=""></span>
+          <span></span>
+        </button>
+        <button type="button" role="menuitem" tabindex="-1" data-destination="copyLink">
+          <svg class="showai-card-app-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><rect x="8" y="8" width="12" height="13" rx="2"/><path d="M15 5V4a1 1 0 0 0-1-1H5a2 2 0 0 0-2 2v10a1 1 0 0 0 1 1h1"/></svg>
+          <span></span>
+        </button>
+        <button type="button" role="menuitem" tabindex="-1" data-destination="desktop">
+          <span class="showai-card-app-icon" aria-hidden="true"><img src="__SHOWAI_ICON__" alt=""></span>
+          <span></span>
+        </button>
+      </div>
     </div>
   </div>
 </article>

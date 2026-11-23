@@ -47,7 +47,7 @@ function createShowaiCardView(list, template, openTarget) {
   }
 
   function openMenu(toggle, focusEdge) {
-    if (toggle.disabled) return;
+    if (toggle.disabled || toggle.parentElement.hidden) return;
     if (active?.toggle !== toggle) {
       closeMenu();
       const menu = toggle.nextElementSibling;
@@ -73,9 +73,10 @@ function createShowaiCardView(list, template, openTarget) {
       else openMenu(button, event.detail === 0 ? "first" : undefined);
       return;
     }
-    const destination = button.dataset.destination || "panel";
+    const destination = button.dataset.destination;
+    if (!destination) return;
     const index = Array.from(list.children).indexOf(button.closest(".showai-card"));
-    closeMenu(destination !== "panel");
+    closeMenu(button.getAttribute("role") === "menuitem");
     if (index >= 0) openTarget(index, destination);
   });
   list.addEventListener("keydown", event => {
@@ -127,29 +128,35 @@ function createShowaiCardView(list, template, openTarget) {
     }));
   }
 
-  function updateActions(t, { busy, workbench, desktop, openLabel, workbenchLabel, showOptions = true, showDestination = false }) {
+  function updateActions(t, busy, destinations, workbenchLabel = "cardWorkbench") {
+    const labels = { panel: "openPage", workbench: workbenchLabel, desktop: "cardDesktop",
+      editor: "openRemotePage", editorLink: "cardEditorLink", copyLink: "copyEditorLink" };
     if (busy) closeMenu();
-    for (const row of list.children) {
+    for (const [index, row] of Array.from(list.children).entries()) {
+      const [primary, ...alternatives] = destinations(index);
       const open = row.querySelector(".showai-card-open");
-      const label = openLabel ?? t("openPage");
+      const label = primary ? t(primary === "desktop" ? "cardDesktopPrimary" : labels[primary]) : "";
+      open.parentElement.hidden = !primary;
+      open.dataset.destination = primary ?? "";
+      open.textContent = label;
       open.setAttribute("aria-label", label + " · " + row.querySelector(".showai-card-title").textContent);
       open.title = label;
-      open.disabled = busy;
-      const destination = row.querySelector(".showai-card-destination");
-      destination.hidden = !showDestination;
-      destination.textContent = showDestination ? label : "";
+      open.disabled = busy || !primary;
       const toggle = row.querySelector(".showai-card-toggle");
-      toggle.parentElement.hidden = !showOptions;
+      const options = toggle.parentElement;
+      if (!alternatives.length && options.contains(document.activeElement) && primary && !busy)
+        open.focus({ preventScroll: true });
+      if (active?.toggle === toggle && !alternatives.length) closeMenu();
+      options.hidden = !alternatives.length;
       toggle.setAttribute("aria-label", t("openOptions"));
-      toggle.disabled = busy || (!workbench && !desktop);
+      toggle.disabled = busy || !alternatives.length;
       const menu = row.querySelector(".showai-card-menu");
       menu.setAttribute("aria-label", t("openOptions"));
       for (const button of menu.querySelectorAll("button")) {
-        const isWorkbench = button.dataset.destination === "workbench";
-        button.lastElementChild.textContent = isWorkbench
-          ? workbenchLabel ?? t("cardWorkbench")
-          : t("cardDesktop");
-        button.disabled = busy || !(isWorkbench ? workbench : desktop);
+        const key = button.dataset.destination;
+        button.hidden = !alternatives.includes(key);
+        button.disabled = busy || button.hidden;
+        button.lastElementChild.textContent = t(labels[key]);
       }
     }
   }

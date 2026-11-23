@@ -58,7 +58,7 @@ export class CodexWorkbenchNavigation {
     }
   }
 
-  async navigate(scope: string | undefined, target: CodexPageTarget) {
+  private visiblePanel(scope: string | undefined, target: PageIdentity) {
     const cutoff = Date.now() - 5000;
     let panel: Panel | undefined;
     for (const candidate of this.panels.values()) {
@@ -66,9 +66,17 @@ export class CodexWorkbenchNavigation {
       if (!this.reuseSidePanel && !samePage(candidate.page, target)) continue;
       if (!panel || candidate.seen > panel.seen) panel = candidate;
     }
-    if (!panel) return "unavailable";
-    const selected = panel;
-    panel.pending?.finish("superseded");
+    return panel;
+  }
+
+  openCardIndices(scope: string | undefined, pages: PageIdentity[]) {
+    return pages.flatMap((page, index) => this.visiblePanel(scope, page) ? [index] : []);
+  }
+
+  async navigate(scope: string | undefined, target: CodexPageTarget) {
+    const selected = this.visiblePanel(scope, target);
+    if (!selected) return "unavailable";
+    selected.pending?.finish("superseded");
     return new Promise<"accepted" | "superseded" | "unavailable">((resolve) => {
       const timer = setTimeout(() => finish("unavailable"), 3500);
       const finish: Pending["finish"] = (status) => {

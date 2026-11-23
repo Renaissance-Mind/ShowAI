@@ -31,6 +31,10 @@ window.__ModuleLoader__.load({
       "action.hide": "隐藏页面",
       "action.show": "显示页面",
       "action.sidebar": "在侧栏编辑",
+      "card.sidebar": "侧边打开",
+      "card.desktop": "从 ShowAI 打开",
+      "card.desktopMenu": "从 ShowAI App 打开",
+      "card.options": "选择打开方式",
       "workbench.title": "ShowAI 工作台",
       "workbench.loading": "正在打开 ShowAI 工作台…",
       "workbench.failed": "无法连接工作台。请在 ShowAI 中重新准备插件，重启 Harness 后重试。",
@@ -55,6 +59,10 @@ window.__ModuleLoader__.load({
       "action.hide": "Hide page",
       "action.show": "Show page",
       "action.sidebar": "Edit in sidebar",
+      "card.sidebar": "Open in side panel",
+      "card.desktop": "Open in ShowAI",
+      "card.desktopMenu": "Open in ShowAI App",
+      "card.options": "Choose how to open",
       "workbench.title": "ShowAI workbench",
       "workbench.loading": "Opening the ShowAI workbench…",
       "workbench.failed": "Could not connect. Prepare the plugin in ShowAI and restart Harness.",
@@ -96,12 +104,27 @@ body[data-ds-dark-theme] .showai-workbench-logo{background-image:url("assets/log
 .showai-page-row .showai-page-actions,.showai-page-tailHead .showai-page-actions{position:relative;z-index:1}
 .showai-page-sideClick{position:absolute;inset:0;width:100%;padding:0;border:0;border-radius:inherit;background:transparent;cursor:pointer}
 .showai-saved-pages{display:grid;gap:5px;padding:3px 2px}
-.showai-saved-page{display:flex;align-items:center;gap:16px;min-width:0;width:100%;padding:9px 16px;border:1px solid var(--dsw-alias-border-l1);border-radius:12px;background:var(--dsw-alias-bg-base);color:inherit;text-align:start;font:inherit;cursor:pointer;text-decoration:none}
-.showai-saved-page:hover,.showai-page-row:has(.showai-page-sideClick:hover),.showai-page-tailHead:has(.showai-page-sideClick:hover){background:var(--dsw-alias-interactive-bg-hover-solid)}
-.showai-saved-page:focus-visible,.showai-page-sideClick:focus-visible{outline:2px solid currentColor;outline-offset:-2px}
+.showai-saved-page{display:flex;position:relative;align-items:center;gap:16px;min-width:0;width:100%;padding:9px 16px;border:1px solid var(--dsw-alias-border-l1);border-radius:12px;background:var(--dsw-alias-bg-base);color:inherit;text-align:start;font:inherit}
+.showai-saved-page:has(.showai-saved-open:hover),.showai-page-row:has(.showai-page-sideClick:hover),.showai-page-tailHead:has(.showai-page-sideClick:hover){background:var(--dsw-alias-interactive-bg-hover-solid)}
+.showai-saved-open:after{content:"";position:absolute;inset:0;border-radius:12px}
+.showai-saved-open:focus-visible:after,.showai-page-sideClick:focus-visible{outline:2px solid currentColor;outline-offset:-2px}
 .showai-saved-page span{min-width:0;overflow-wrap:anywhere}
-.showai-saved-pageText{display:grid}
+.showai-saved-pageText{display:grid;flex:1}
 .showai-saved-pagePath{font-size:12px;color:var(--dsw-alias-label-tertiary)}
+.showai-saved-actions{display:inline-flex;align-items:stretch;flex:none;border:1px solid var(--dsw-alias-border-l1);border-radius:10px;background:var(--dsw-alias-bg-base);font-size:13px}
+.showai-saved-open,.showai-saved-options summary{display:grid;position:static;transform:none!important;translate:none!important;place-items:center;min-height:32px;margin:0;border:0;background:transparent;color:inherit;text-decoration:none;font:inherit;cursor:pointer}
+.showai-saved-open{padding:0 10px;border-radius:9px;white-space:nowrap}
+.showai-saved-open:has(+ details){border-radius:9px 0 0 9px}
+.showai-saved-options{position:relative;z-index:1}
+.showai-saved-options[open]{z-index:2}
+.showai-saved-options summary{width:30px;list-style:none;border-inline-start:1px solid var(--dsw-alias-border-l1);border-radius:0 9px 9px 0;background:color-mix(in srgb,currentColor 3%,var(--dsw-alias-bg-base))}
+.showai-saved-options summary::-webkit-details-marker{display:none}
+.showai-saved-options summary:after{content:"";width:6px;height:6px;border:solid currentColor;border-width:0 1.5px 1.5px 0;transform:translateY(-1px) rotate(45deg)}
+.showai-saved-options[open] summary{outline:none;box-shadow:none}
+.showai-saved-open:hover,.showai-saved-options a:hover{background:var(--dsw-alias-interactive-bg-hover-solid)}
+.showai-saved-options a{display:flex;align-items:center;gap:8px;white-space:nowrap;position:absolute;top:calc(100% + 5px);inset-inline-end:-1px;padding:9px 12px;border:1px solid var(--dsw-alias-border-l1);border-radius:12px;background:var(--dsw-alias-bg-base);box-shadow:0 3px 10px #0002;color:inherit;text-decoration:none}
+@media (max-width:380px){.showai-saved-page{padding-inline:10px;gap:9px}}
+@media (pointer:coarse){.showai-saved-open,.showai-saved-options summary{min-height:44px}.showai-saved-options summary{width:44px}}
 @media (prefers-reduced-motion:reduce){.showai-page-card[data-state=running] .showai-page-row:after{animation:none;display:none}}
 `;
     const tagId = "@showai/dsh-showai/preview.css";
@@ -323,17 +346,55 @@ body[data-ds-dark-theme] .showai-workbench-logo{background-image:url("assets/log
       };
     }
 
+    function SavedPageList({ children }) {
+      const list = React.useRef(null);
+      React.useEffect(() => {
+        const root = list.current;
+        const dismissOutside = event => {
+          for (const menu of root.querySelectorAll("details[open]"))
+            if (!menu.contains(event.target)) menu.open = false;
+        };
+        root.ownerDocument.addEventListener("pointerdown", dismissOutside, true);
+        root.ownerDocument.addEventListener("focusin", dismissOutside);
+        return () => {
+          root.ownerDocument.removeEventListener("pointerdown", dismissOutside, true);
+          root.ownerDocument.removeEventListener("focusin", dismissOutside);
+        };
+      }, []);
+      return h("div", { className: "showai-saved-pages", ref: list }, children);
+    }
+
+    function savedMenuKeys(event) {
+      const details = event.currentTarget;
+      const activate = !details.open && event.target.tagName === "SUMMARY" && (event.key === "Enter" || event.key === " ");
+      if (event.key === "Escape" && details.open) {
+        event.preventDefault();
+        details.open = false;
+        details.querySelector("summary").focus();
+      } else if (activate || event.key === "ArrowDown" || event.key === "ArrowUp") {
+        event.preventDefault();
+        details.open = true;
+        details.querySelector("a").focus();
+      }
+    }
+
     function SavedPages({ cards, openInSidebar, tr }) {
-      return h("div", { className: "showai-saved-pages" }, cards.map((card, index) => {
-        const label = openInSidebar ? tr("action.sidebar") + " · " + card.title : card.title;
+      return h(SavedPageList, null, cards.map((card, index) => {
+        const label = tr(openInSidebar ? "card.sidebar" : "card.desktop");
+        const href = originalPageLink(sidebarTarget(card.address));
         const action = openInSidebar ? { type: "button", onClick: () => openInSidebar(card.address, card.title) }
-          : { href: originalPageLink(sidebarTarget(card.address)) };
-        return h(openInSidebar ? "button" : "a", { ...action, key: index, className: "showai-saved-page",
-          title: label, "aria-label": label },
+          : { href };
+        return h("article", { key: index, className: "showai-saved-page", "aria-label": card.title },
           h(WorkbenchIcon, { size: 24 }),
           h("span", { className: "showai-saved-pageText" }, h("strong", null, card.title),
             card.path && h("span", { className: "showai-saved-pagePath" }, card.path),
-            card.description && h("span", null, card.description)));
+            card.description && h("span", null, card.description)),
+          h("div", { className: "showai-saved-actions" },
+            h(openInSidebar ? "button" : "a", { ...action, className: "showai-saved-open", "aria-label": label + " · " + card.title }, label),
+            openInSidebar && h("details", { className: "showai-saved-options", onKeyDown: savedMenuKeys },
+              h("summary", { "aria-label": tr("card.options") }),
+              h("a", { href, onClick: event => { event.currentTarget.closest("details").open = false; } },
+                h(WorkbenchIcon, { size: 16 }), tr("card.desktopMenu")))));
       }));
     }
 

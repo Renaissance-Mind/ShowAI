@@ -38,7 +38,7 @@ The plugin takes over the Tool call view of the three ShowAI presentation tools
 delivered page under a status row with reload, expand, open-in-a-new-tab and
 open-the-full-HTML actions.
 
-`mcp__showai__card_present` delivers compact original-Page cards. Each card opens its own saved target in the current conversation’s side panel.
+`mcp__showai__card_present` delivers compact original-Page cards. When the conversation has a side panel, the card opens its saved target there and the dropdown offers the ShowAI App. With only the App available, the card has a single **Open in ShowAI** button.
 
 ### Why the preview is needed
 
@@ -110,7 +110,7 @@ npm test
 
 ## 简体中文
 
-在聊天中看图时，工具结果和回合末尾都提供交互预览。保存页面后，点击整张原页卡片就能在当前会话右侧打开编辑器，还能把页面或选区引用放进当前对话草稿。也可以从右侧栏的新标签打开 ShowAI，再用宿主的全屏、分栏或浮动控件调整空间。左侧导航的 ShowAI 打开全局工作台。以上入口共用安装时绑定的本机内容库。
+在聊天中看图时，工具结果和回合末尾都提供交互预览。会话提供侧栏时，点击原页卡片在右侧打开编辑器，箭头可改选 ShowAI App。仅桌面 App 可用时，卡片显示单个「从 ShowAI 打开」按钮。在侧栏编辑器中可以把页面或选区引用放进当前对话草稿，也可以用宿主的全屏、分栏或浮动控件调整空间。左侧导航的 ShowAI 打开全局工作台。以上入口共用安装时绑定的本机内容库。
 
 此 Harness bundle 提供 ShowAI 在 DeepSeek Harness 中所需的全部内容：`showai-mcp` 行通过 bundle 内的启动器连接本机 ShowAI 运行时与内容库，提供 `mcp__showai__*` 工具；`showai-skills` 行以 Harness 内置 Skill 的优先级发布 [ShowAI](https://github.com/Renaissance-Mind/ShowAI/tree/main/plugins/showai-deepseek) 的 Skill；`showai-preview` 行在对话中显示页面。
 

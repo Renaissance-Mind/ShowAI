@@ -27,7 +27,7 @@
   box-sizing: border-box;
   position: relative;
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto auto;
+  grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
   padding: var(--showai-card-padding-y) var(--showai-card-padding-x);
   border: 1px solid var(--card-border);
@@ -61,37 +61,30 @@
 .showai-card-error[data-kind="info"] { color: var(--card-muted) }
 .showai-card-app-link { display: block; margin-top: 8px; font-size: 12px; color: var(--card-muted) }
 .showai-card-app-link input { box-sizing: border-box; width: 100%; font: inherit; color: var(--card-ink); background: transparent; border: 1px solid var(--card-border); border-radius: 4px; padding: 4px 6px }
-.showai-card-error :is(a, input) { position: relative; z-index: 1 }
+.showai-card-error :is(a, input, button) { position: relative; z-index: 1 }
 .showai-card-error input { box-sizing: border-box; width: 100%; font: inherit }
-.showai-card-open {
+.showai-card-open::after {
+  content: "";
   position: absolute;
   inset: 0;
-  width: 100%;
-  border: 0;
-  border-radius: inherit;
-  background: transparent;
-  padding: 0;
-  cursor: pointer;
+  border-radius: 13px;
 }
-.showai-card-open:disabled { cursor: default }
-.showai-card-destination { margin-inline-start: var(--showai-card-actions-gap); color: var(--card-muted); font-size: 12px; pointer-events: none }
-.showai-card-destination:not([hidden]) + .showai-card-actions { margin-inline-start: 4px }
-.showai-card-open:focus-visible { outline: 2px solid var(--card-focus); outline-offset: -2px }
-.showai-card-list .showai-card:has(> .showai-card-open:active:not(:disabled)) { background: var(--card-hover) }
+.showai-card-open:focus-visible::after { outline: 2px solid var(--card-focus); outline-offset: -2px }
+.showai-card-list .showai-card:has(.showai-card-open:active:not(:disabled)) { background: var(--card-hover) }
 @media (hover: hover) {
-  .showai-card-list .showai-card:has(> .showai-card-open:hover:not(:disabled)) { background: var(--card-hover) }
+  .showai-card-list .showai-card:has(.showai-card-open:hover:not(:disabled)) { background: var(--card-hover) }
 }
 .showai-card-actions {
-  position: relative;
-  z-index: 1;
   display: inline-flex;
   align-items: stretch;
+  justify-self: end;
   margin-inline-start: var(--showai-card-actions-gap);
-  border: 1px solid var(--card-border);
+  border: 1px solid color-mix(in srgb, var(--card-ink) 20%, var(--card-fill));
   border-radius: 10px;
   background: var(--card-fill);
+  box-shadow: 0 1px 2px color-mix(in srgb, var(--card-ink) 4%, transparent);
 }
-.showai-card-actions button {
+.showai-card-actions :is(button, a) {
   box-sizing: border-box;
   appearance: none;
   min-height: 0;
@@ -102,30 +95,45 @@
   color: inherit;
   font: 500 13px/1.25 system-ui, sans-serif;
   cursor: pointer;
+  text-decoration: none;
   -webkit-tap-highlight-color: transparent;
 }
-.showai-card-actions > button { height: 30px }
-.showai-card-actions > .showai-card-toggle {
+/* A pressed button must keep its full-card hit area when the editor stylesheet is loaded. */
+.showai-card-actions :is(.showai-card-open, .showai-card-toggle) { position: static; transform: none !important; translate: none !important }
+.showai-card-actions .showai-card-open {
   display: grid;
-  width: 27px;
+  place-items: center;
+  min-height: 32px;
+  padding: 0 10px;
+  border-radius: 9px;
+  font-weight: 550;
+  white-space: nowrap;
+}
+.showai-card-actions:has(.showai-card-options:not([hidden])) .showai-card-open { border-radius: 9px 0 0 9px }
+.showai-card-options { position: relative; z-index: 1; display: flex }
+.showai-card-options:has([aria-expanded="true"]) { z-index: 2 }
+.showai-card-actions .showai-card-toggle {
+  display: grid;
+  width: 30px;
   padding: 0;
   place-items: center;
+  border-inline-start: 1px solid var(--card-border);
   color: var(--card-muted);
-  border-radius: 9px;
+  border-radius: 0 9px 9px 0;
+  background: color-mix(in srgb, var(--card-ink) 3%, var(--card-fill));
 }
 .showai-card-toggle::after {
   content: "";
-  width: 5px;
-  height: 5px;
+  width: 6px;
+  height: 6px;
   border: solid currentColor;
   border-width: 0 1.5px 1.5px 0;
   transform: translateY(-1px) rotate(45deg);
 }
 .showai-card-actions button:focus { outline: none; box-shadow: none }
-.showai-card-actions > button:focus-visible { outline: 2px solid var(--card-focus); outline-offset: -2px }
+.showai-card-actions button:focus-visible:not([aria-expanded="true"]) { outline: 2px solid var(--card-focus); outline-offset: -2px }
 .showai-card-actions button:disabled { opacity: .45; cursor: default }
-.showai-card-actions > button:active:enabled,
-.showai-card-actions > .showai-card-toggle[aria-expanded="true"] { background: var(--card-hover) }
+.showai-card-actions button:not(.showai-card-toggle):active:enabled { background: var(--card-hover) }
 
 .showai-card-menu {
   --card-menu-offset: 5px;
@@ -136,11 +144,11 @@
   display: grid;
   box-sizing: border-box;
   width: max-content;
-  min-width: min(184px, calc(100vw - 26px));
+  min-width: min(168px, calc(100vw - 26px));
   max-width: calc(100vw - 26px);
-  padding: 5px;
+  padding: 4px;
   border: 1px solid var(--card-border);
-  border-radius: 15px;
+  border-radius: 12px;
   background: var(--card-fill);
   box-shadow: 0 3px 14px light-dark(rgb(0 0 0 / 8%), rgb(0 0 0 / 28%));
 }
@@ -148,11 +156,11 @@
 .showai-card-menu button {
   display: flex;
   width: 100%;
-  min-height: 35px;
+  min-height: 32px;
   align-items: center;
-  gap: 9px;
+  gap: 8px;
   padding: 5px 9px;
-  border-radius: 9px;
+  border-radius: 7px;
   text-align: start;
   font-weight: 400;
 }
@@ -162,12 +170,12 @@
 }
 .showai-card-menu button:focus-visible { background: var(--card-hover); outline: 1px solid var(--card-focus); outline-offset: -1px }
 @media (hover: hover) {
-  .showai-card-actions button:hover:enabled { background: var(--card-hover) }
+  .showai-card-actions button:not(.showai-card-toggle):hover:enabled { background: var(--card-hover) }
 }
 .showai-card-app-icon {
   display: grid;
-  width: 18px;
-  height: 18px;
+  width: 16px;
+  height: 16px;
   flex: 0 0 auto;
   place-items: center;
   overflow: hidden;
@@ -179,12 +187,19 @@
   box-shadow: inset 0 0 0 1px rgb(0 0 0 / 10%);
 }
 .showai-card-app-icon.is-chatgpt img { width: 14px; height: 14px; opacity: .78 }
+@media (max-width: 380px) {
+  .showai-card-list { --showai-card-padding-x: 10px; --showai-card-logo-gap: 9px; --showai-card-actions-gap: 9px }
+}
+@media (max-width: 305px) {
+  .showai-card-list .showai-card { grid-template-columns: minmax(0, 1fr) auto }
+  .showai-card-icon { display: none }
+}
 @media (pointer: coarse) {
-  .showai-card-actions > button, .showai-card-menu button { min-height: 44px }
-  .showai-card-actions > .showai-card-toggle { width: 44px }
+  .showai-card-actions .showai-card-open, .showai-card-actions button { min-height: 44px }
+  .showai-card-actions .showai-card-toggle { width: 44px }
 }
 @media (forced-colors: active) {
-  .showai-card-open:focus-visible, .showai-card-actions > button:focus-visible, .showai-card-menu button:focus-visible { outline: 2px solid Highlight }
+  .showai-card-open:focus-visible::after, .showai-card-actions button:focus-visible:not([aria-expanded="true"]) { outline: 2px solid Highlight }
 }
 
 .showai-spacing-editor {

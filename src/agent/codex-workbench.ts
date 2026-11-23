@@ -134,6 +134,7 @@ function registerCodexWorkbench(
     ...views,
     { mode: "thread", name: "workbench_file", uri: codexWorkbenchFileUri, entrypoint: "file" },
     { mode: "thread", name: "workbench_page_card", uri: codexWorkbenchCardUri, entrypoint: "card" },
+    { mode: "thread", name: "workbench_page_card_v14", uri: "ui://showai/workbench-card-v14.html", entrypoint: "card" },
     { mode: "thread", name: "workbench_page_card_v13", uri: "ui://showai/workbench-card-v13.html", entrypoint: "card" },
     { mode: "thread", name: "workbench_page_card_v12", uri: "ui://showai/workbench-card-v12.html", entrypoint: "card" },
     { mode: "thread", name: "workbench_page_card_v11", uri: "ui://showai/workbench-card-v11.html", entrypoint: "card" },
@@ -145,6 +146,7 @@ function registerCodexWorkbench(
     { mode: "thread", name: "workbench_page_card_v5", uri: "ui://showai/workbench-card-v5.html", entrypoint: "card" },
     { mode: "thread", name: "workbench_page_card_v4", uri: "ui://showai/workbench-card-v4.html", entrypoint: "card" },
     { mode: "thread", name: "workbench_page_target", uri: codexWorkbenchTargetUri, entrypoint: "open" },
+    { mode: "thread", name: "workbench_page_target_v3", uri: "ui://showai/workbench-target-v3.html", entrypoint: "open" },
     { mode: "thread", name: "workbench_page_target_v2", uri: "ui://showai/workbench-target-v2.html", entrypoint: "open" },
     { mode: "thread", name: "workbench_page_target_v1", uri: "ui://showai/workbench-target-v1.html", entrypoint: "open" },
     { mode: "thread", name: "workbench_page_card_v3", uri: "ui://showai/workbench-card-v3.html", entrypoint: "card" },
@@ -251,6 +253,8 @@ function registerCodexWorkbench(
   ) {
     try {
       const cards = await readCodexPageCards(service, targets);
+      const scope = navigation.scope(meta);
+      const openSideCards = navigation.openCardIndices(scope, cards);
       const presentation = cards.length === 1 ? cards[0] : { id: randomUUID(), cards };
       const data = adjustSpacing ? { ...presentation, adjustSpacing: true } : presentation;
       return {
@@ -258,7 +262,8 @@ function registerCodexWorkbench(
         _meta: {
           [cards.length === 1 ? "showaiPageCard" : "showaiCardGroup"]: data,
           ...(openIn && { showaiCardDestination: openIn }),
-          showaiNavigationScope: navigation.scope(meta),
+          ...(openSideCards.length && { showaiOpenSideCards: openSideCards }),
+          showaiNavigationScope: scope,
         },
       };
     } catch (error) {
@@ -319,6 +324,18 @@ function registerCodexWorkbench(
       : "Open a saved Page or component directly in a new expanded editor. Try card_navigate first to reuse the current conversation's open editor.",
     _meta: { ui: { resourceUri: codexWorkbenchTargetUri, visibility: ["model", "app"] } },
   }, (target, extra) => presentPageCard([target], extra._meta));
+  function cardScope(meta?: Record<string, unknown>) {
+    const token = meta?.["showai/navigationScope"];
+    return navigation.scope(meta) ?? (typeof token === "string" ? token : undefined);
+  }
+  server.registerTool("workbench_card_panels", {
+    description: "List the indices of these saved pages that a visible side editor in this conversation can receive.",
+    inputSchema: { pages: z.array(z.object(codexPageIdentity)).min(1).max(20) },
+    annotations: readOnly,
+    _meta: appOnly,
+  }, ({ pages }, extra) => ({
+    content: [], _meta: { showaiWorkbenchData: navigation.openCardIndices(cardScope(extra._meta), pages) },
+  }));
   server.registerTool("card_navigate", {
     title: "Navigate the current ShowAI editor",
     description: qoder
@@ -330,9 +347,7 @@ function registerCodexWorkbench(
   }, async (target, extra) => {
     try {
       await readCodexPageTarget(service, target);
-      const token = extra._meta?.["showai/navigationScope"];
-      const scope = navigation.scope(extra._meta) ?? (typeof token === "string" ? token : undefined);
-      return mcpSuccess({ status: await navigation.navigate(scope, target) });
+      return mcpSuccess({ status: await navigation.navigate(cardScope(extra._meta), target) });
     } catch (error) {
       return mcpFailure(error);
     }

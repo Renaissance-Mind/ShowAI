@@ -28,7 +28,7 @@ import cardMarkup from "./codex-workbench-card.html?raw";
 import cardView from "./codex-workbench-card-view.js?raw";
 import cardSpacingEditor from "./codex-workbench-card-spacing.js?raw";
 
-export const antigravityCardUri = "ui://showai/antigravity-card-v3.html";
+export const antigravityCardUri = "ui://showai/antigravity-card-v4.html";
 export const antigravityFileUri = "ui://showai/antigravity-file-v1.html";
 export const antigravityGlobalUri = "ui://showai/antigravity-workbench-v1.html";
 const NAV_FILE = "antigravity-workbench-nav.json";
@@ -277,11 +277,7 @@ ${cardStyles}
 
   function updateCardControls() {
     if (!pageCards.length) return;
-    cards.updateActions(t, {
-      busy: !initialized || showBusy,
-      workbench: serverTools,
-      desktop: serverTools,
-    });
+    cards.updateActions(t, showBusy, () => serverTools ? ["panel", "desktop"] : []);
     card.hidden = false;
     if (initialized && adjustSpacing && !spacingEditor) {
       spacingEditor = createShowaiSpacingEditor(spacingForm, card, t, {
@@ -799,6 +795,7 @@ export function antigravityWorkbenchConnection(
       const mimeType = "text/html;profile=mcp-app";
       for (const [name, uri] of [
         ["antigravity_page_card", antigravityCardUri],
+        ["antigravity_page_card_v3", "ui://showai/antigravity-card-v3.html"],
         ["antigravity_page_card_v2", "ui://showai/antigravity-card-v2.html"],
         ["antigravity_page_card_v1", "ui://showai/antigravity-card-v1.html"],
       ]) server.registerResource(

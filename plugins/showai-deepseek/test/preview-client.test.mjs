@@ -148,11 +148,17 @@ test("each saved-page card opens its selected original in the sidebar", async ()
   };
   const view = savedCard(props);
   const rendered = renderToStaticMarkup(view);
-  assert.match(rendered, /<button[^>]+class="showai-saved-page"[^>]*>[\s\S]*Second page/);
+  assert.match(rendered, /<button[^>]+class="showai-saved-open"[^>]*>card.sidebar<\/button>/);
+  assert.match(rendered, /<summary aria-label="card.options">/);
+  assert.match(rendered, /href="showai:\/\/project\/notes\/page\/second\?blocks=chart"/);
   assert.doesNotMatch(rendered, /<iframe/);
-  const buttons = view.type(view.props).props.children;
-  buttons[1].props.onClick();
+  const rows = view.type(view.props).props.children;
+  const controls = rows[1].props.children.at(-1);
+  controls.props.children[0].props.onClick();
   assert.deepEqual(opens, [{ address: "dsh-resource://showai-page/notes/second?blocks=chart", title: "Second page" }]);
+  const appOnly = renderToStaticMarkup(savedCard({ ...props, openInSidebar: undefined }));
+  assert.match(appOnly, /<a[^>]+class="showai-saved-open"[^>]*>card.desktop<\/a>/);
+  assert.doesNotMatch(appOnly, /<summary|<details/);
 });
 
 test("the Turn tail keeps a presented page outside the folded process", async () => {

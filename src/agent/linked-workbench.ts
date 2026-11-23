@@ -22,7 +22,7 @@ import { codexWorkbenchHtml } from "./codex-workbench-ui";
 import { hostDisplay, mcpFailure, mcpSuccess } from "./presentation-tools";
 import type { AgentService } from "./service";
 
-const cardUri = "ui://showai/saved-page-card-v4.html";
+const cardUri = "ui://showai/saved-page-card-v5.html";
 const mimeType = "text/html;profile=mcp-app";
 const icon = "data:image/svg+xml;base64," + Buffer.from(lightLogo).toString("base64");
 const readOnly = { readOnlyHint: true, destructiveHint: false, openWorldHint: false };
@@ -101,7 +101,7 @@ async function cardFiles(
 ) {
   const locale = getLocale();
   const t = translator(messages);
-  const label = t("cardDesktop");
+  const label = t("cardDesktopPrimary");
   const rows = cards.map(card => {
     const href = escapeHtml(pageLink({ ...card, blockIds: card.blockId ? [card.blockId] : [] }));
     const detail = card.description || card.blockTitle;
@@ -112,7 +112,7 @@ async function cardFiles(
       <div class="showai-card-content"><h2 class="showai-card-title">${escapeHtml(card.title)}</h2>
       <p class="showai-card-path">${escapeHtml(card.breadcrumb.join(" / "))}</p>
       ${detail ? `<p class="showai-card-body">${escapeHtml(detail)}</p>` : ""}${linkField}</div>
-      ${linkField ? "" : `<a class="showai-card-open" href="${href}" aria-label="${escapeHtml(label + " · " + card.title)}" title="${escapeHtml(label)}"></a>`}</article>`;
+      ${linkField ? "" : `<div class="showai-card-actions"><a class="showai-card-open" href="${href}" aria-label="${escapeHtml(label + " · " + card.title)}">${escapeHtml(label)}</a></div>`}</article>`;
   }).join("\n");
   const fragment = `<style>${cardStyles}</style><section class="showai-card-list" aria-label="ShowAI">${rows}</section>`;
   await mkdir(root, { recursive: true });
@@ -144,6 +144,7 @@ export function linkedWorkbenchConnection(
       registerBrowserWorkbenchTools(server, service, open);
       if (!fileCards) for (const [name, uri] of [
         ["saved_page_card", cardUri],
+        ["saved_page_card_v4", "ui://showai/saved-page-card-v4.html"],
         ["saved_page_card_v3", "ui://showai/saved-page-card-v3.html"],
         ["saved_page_card_v2", "ui://showai/saved-page-card-v2.html"],
         ["saved_page_card_v1", "ui://showai/saved-page-card-v1.html"],

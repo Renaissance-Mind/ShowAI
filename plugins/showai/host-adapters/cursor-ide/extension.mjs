@@ -12,7 +12,7 @@ const globalUri = "ui://showai/workbench-v3.html";
 const threadUri = "ui://showai/workbench-thread-v5.html";
 const bridgeTools = new Set([
   "workbench_refresh", "workbench_request", "workbench_changes",
-  "workbench_asset", "workbench_media",
+  "workbench_asset", "workbench_media", "workbench_open_destination",
 ]);
 const identity = /^[a-zA-Z0-9][a-zA-Z0-9_-]{0,127}$/;
 const zh = () => vscode.env.language.toLowerCase().startsWith("zh");

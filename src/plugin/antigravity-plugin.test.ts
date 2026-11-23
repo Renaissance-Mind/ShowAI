@@ -8,6 +8,9 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 import { promisify } from "node:util";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
+import { chromium } from "playwright-core";
+import { readingBrowserExecutable } from "../agent/reading-renderer";
+import { mountWorkbenchCards } from "../test/workbench-card-frame";
 import { afterEach, describe, expect, test } from "vitest";
 import {
   antigravityCardUri,
@@ -227,6 +230,24 @@ describe("Antigravity page cards and live workbench navigation", () => {
       expect((groupCards.structuredContent as any).data.adjustSpacing).toBe(true);
       expect((groupCards.structuredContent as any).data.cards).toHaveLength(2);
       expect((groupCards._meta as any).showaiCardGroup.cards).toHaveLength(2);
+
+      const browser = await chromium.launch({ executablePath: await readingBrowserExecutable() });
+      try {
+        const view = await browser.newPage();
+        const cards = await mountWorkbenchCards(view, htmlText, groupCards._meta!, { serverTools: {} }, "antigravity");
+        const second = cards.getByRole("article").nth(1);
+        expect(await second.locator(".showai-card-open").innerText()).toBe("侧边打开");
+        await second.getByRole("button", { name: "选择打开方式" }).click();
+        const choices = second.getByRole("menuitem");
+        expect(await choices.count()).toBe(1);
+        expect((await choices.innerText()).trim()).toBe("从 ShowAI App 打开");
+        await choices.click();
+        await expect.poll(async () => JSON.parse(await view.locator("output").textContent() || "null")).toMatchObject({
+          name: "workbench_open_destination", arguments: { projectId, pageId: pageTwoId, destination: "desktop" },
+        });
+      } finally {
+        await browser.close();
+      }
 
       // Before any visible sidecar SSE client connects, workbench_open_destination returns queued + .showai-ref fileUri for toggle-aux-pane
       const closedPaneOpen = await client.callTool({

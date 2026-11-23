@@ -302,6 +302,21 @@ test("the remote MCP App card opens the real editor and persists an edit", async
     await expect.poll(async () => (await service.store.readPage(selected, original.document.id)).document.title,
       { timeout: 8_000 }).toBe("Edited in the remote MCP App");
     expect((await service.store.readPage(selected, other.document.id)).revision).toBe(other.revision);
+    await page.locator("iframe").first().evaluate(frame => (frame as HTMLIFrameElement).contentWindow!.postMessage({
+      jsonrpc: "2.0", method: "ui/notifications/host-context-changed", params: { displayMode: "inline" },
+    }, "*"));
+    await heading.waitFor({ timeout: 5000 });
+    const reopened = (await heading.boundingBox())!;
+    await page.mouse.move(reopened.x + 8, reopened.y + reopened.height / 2);
+    await page.mouse.down();
+    const receivesClick = await heading.evaluate(el => {
+      const rect = el.getBoundingClientRect();
+      return el.ownerDocument.elementFromPoint(rect.x + 8, rect.y + rect.height / 2)?.closest("button")?.dataset.destination;
+    });
+    await page.mouse.up();
+    expect(receivesClick).toBe("editor");
+    await title.waitFor({ timeout: 5000 });
+    expect(await title.inputValue()).toBe("Edited in the remote MCP App");
     expect(failures).toEqual([]);
   } finally {
     await browser.close();

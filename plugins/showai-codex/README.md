@@ -2,7 +2,7 @@
 
 [简体中文](README.zh-CN.md)
 
-Interact with previews in chat. Open a saved page card to edit the original or jump to a component in the side panel. Desktop builds with plugin extensions also offer a global workbench and selection references in chat.
+Interact with previews in chat. A saved page card opens the original page or component in the side panel, workbench, or ShowAI App. The main button shows the destination. Desktop builds with plugin extensions also support selection references in chat.
 
 Install or update the Codex plugin in ShowAI under Settings → Agent plugins. Refresh plugins or restart Codex, then start a new chat. From a source checkout, run `npm run plugin:install`.
 

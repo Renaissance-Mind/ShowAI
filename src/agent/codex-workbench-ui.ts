@@ -12,9 +12,9 @@ export const codexWorkbenchUri = "ui://showai/workbench-v3.html";
 export const codexWorkbenchThreadUri = "ui://showai/workbench-thread-v5.html";
 export const codexWorkbenchFileUri = "ui://showai/workbench-file-v3.html";
 
-export const codexWorkbenchCardUri = "ui://showai/workbench-card-v14.html";
+export const codexWorkbenchCardUri = "ui://showai/workbench-card-v15.html";
 export const previousWorkbenchCardUri = "ui://showai/workbench-card-v10.html";
-export const codexWorkbenchTargetUri = "ui://showai/workbench-target-v3.html";
+export const codexWorkbenchTargetUri = "ui://showai/workbench-target-v4.html";
 
 export function codexWorkbenchHtml(
   mode?: CodexWorkbenchMode,
@@ -81,6 +81,7 @@ ${card}
   let context = {};
   let capabilities = {};
   let t3Local = false, desktopRequested = false;
+  let openSideCards = new Set(), checkingSideCards;
   let launch, launchUrl, bundle, launchTimer, initialized = false;
   let ready = false, refreshing = false, sequence = 0;
   let fileInput, referencePage, readingFile = false;
@@ -162,10 +163,13 @@ ${card}
     });
   }
 
+  function canOpenPageTab() {
+    return !!editorBridge || (!qoder && !remote && !linked && !!capabilities.serverTools && !!capabilities.experimental?.["openai/files"]);
+  }
+
   async function openPageTab({ projectId, pageId, blockId }) {
     if (editorBridge) return request("showai/open-page", { projectId, pageId, blockId });
-    if (!capabilities.experimental?.["openai/files"] || !capabilities.serverTools)
-      throw new Error(t("cannotOpenPageTab"));
+    if (!canOpenPageTab()) throw new Error(t("cannotOpenPageTab"));
     const path = await callWorkbench("workbench_side_file", { projectId, pageId, ...(blockId && { blockId }) });
     if (typeof path !== "string") throw new Error(t("cannotOpenPageTab"));
     const opened = await request("openai/files/open", { path });
@@ -203,8 +207,8 @@ ${card}
     return envelope?.mcp_tool_result ?? envelope?.call_tool_result ?? result;
   }
 
-  async function callWorkbench(name, args) {
-    const payload = resultPayload(await request("tools/call", { name, arguments: args }));
+  async function callWorkbench(name, args, meta) {
+    const payload = resultPayload(await request("tools/call", { name, arguments: args, ...(meta && { _meta: meta }) }));
     if (payload?.isError) {
       const error = payload.structuredContent?.error;
       throw new Error(error?.message ?? t("unavailable"));
@@ -367,23 +371,46 @@ ${card}
     return { url, bundle: descriptor.bundle };
   }
 
+  function cardDestinations(index) {
+    if (!initialized) return [];
+    const server = !!capabilities.serverTools;
+    if (t3Local || desktopRequested) return server ? ["desktop"] : [];
+    if (remote) {
+      const modes = context.availableDisplayModes;
+      return server && (!Array.isArray(modes) || modes.includes("fullscreen")) ? ["editor"] : [];
+    }
+    const result = [];
+    if (canOpenPageTab() || (!linked && server && openSideCards.has(index))) result.push("panel");
+    if (editorBridge || (hasGlobalEntrypoint && server && !qoder)) result.push("workbench");
+    if (linked && (server || pageCards[index].editorUrl))
+      result.push(result.length ? "copyLink" : "editorLink");
+    if (server) result.push("desktop");
+    return result;
+  }
+
+  async function refreshOpenSideCards() {
+    if (!initialized || !navigationScope || !pageCards.length || !capabilities.serverTools ||
+        remote || linked || t3Local || desktopRequested || canOpenPageTab() ||
+        openingCard || checkingSideCards === pageCards) return;
+    const group = pageCards;
+    checkingSideCards = group;
+    try {
+      const pages = group.map(({ projectId, pageId }) => ({ projectId, pageId }));
+      const indices = await callWorkbench("workbench_card_panels", { pages }, { "showai/navigationScope": navigationScope });
+      if (pageCards === group) {
+        openSideCards = new Set(indices);
+        showPageCard();
+      }
+    } catch (error) {
+      console.warn("ShowAI side panel availability:", error.message);
+    } finally {
+      if (checkingSideCards === group) checkingSideCards = undefined;
+    }
+  }
+
   function showPageCard() {
     if (!pageCards.length || (ready && !root.hidden) || refreshing) return;
-    const webLinks = linked && pageCards.every(item => typeof item.editorUrl === "string");
-    const desktop = t3Local || desktopRequested;
-    cards.updateActions(t, {
-      busy: !initialized || openingCard || (!capabilities.serverTools && (desktop || ((linked || remote) && !webLinks))),
-      workbench: webLinks || ((hasGlobalEntrypoint || linked) && !!capabilities.serverTools),
-      desktop: !!capabilities.serverTools,
-      showDestination: desktop || ${host === "codex"},
-      ...(qoder && { showOptions: false }),
-      ...(remote && { openLabel: t("openRemotePage"), showOptions: false }),
-      ...(linked && {
-        openLabel: t(hasGlobalEntrypoint ? "cardCursor" : "cardEditorLink"),
-        workbenchLabel: t("copyEditorLink"),
-      }),
-      ...(desktop && { openLabel: t("cardDesktop"), showOptions: false }),
-    });
+    cards.updateActions(t, openingCard, cardDestinations, linked && hasGlobalEntrypoint ? "cardCursor" : "cardWorkbench");
     card.hidden = false;
     if (initialized && adjustSpacing && !spacingEditor) {
       spacingEditor = createShowaiSpacingEditor(spacingForm, card, t, {
@@ -412,10 +439,25 @@ ${card}
     input.value = url;
     input.setAttribute("aria-label", t("editorLink"));
     row.dataset.kind = "info";
-    row.replaceChildren(t("editorLinkSideHint"), document.createElement("br"), input);
+    const copy = document.createElement("button");
+    copy.type = "button";
+    copy.textContent = t("copyEditorLink");
+    copy.addEventListener("click", () => copyEditorLink(row, url));
+    row.replaceChildren(t("editorLinkSideHint"), document.createElement("br"), input, copy);
     row.hidden = false;
     input.focus();
     input.select();
+  }
+
+  async function copyEditorLink(row, url) {
+    try {
+      await navigator.clipboard.writeText(url);
+      row.dataset.kind = "info";
+      row.textContent = t("copiedEditorLink");
+      row.hidden = false;
+    } catch {
+      revealEditorLink(row, url);
+    }
   }
 
   async function showCardEditor(target) {
@@ -455,7 +497,7 @@ ${card}
     }
   }
 
-  async function openPageCard(index, destination = "panel") {
+  async function openPageCard(index, destination) {
     const pageCard = pageCards[index];
     if (!initialized || !pageCard || openingCard) return;
     const { projectId, pageId, blockId } = pageCard;
@@ -467,11 +509,12 @@ ${card}
     showPageCard();
     status.hidden = true;
     try {
-      if ((t3Local || desktopRequested) && destination === "panel") {
+      if (destination === "desktop") {
         await callWorkbench("workbench_open_destination", { ...target, destination: "desktop" });
         return;
       }
-      if (remote) {
+      if (destination === "workbench") return await openWorkbench(projectId, pageId, blockId);
+      if (destination === "editor") {
         if (cardGroup) await callWorkbench("workbench_card_choice", { groupId: cardGroup, index });
         const reply = await request(${JSON.stringify(host === "remote" ? "ui/request-display-mode" : "")}, { mode: "fullscreen" });
         if (reply?.mode !== "fullscreen" && reply?.displayMode !== "fullscreen" && context.displayMode !== "fullscreen")
@@ -479,25 +522,13 @@ ${card}
         await showCardEditor(target);
         return;
       }
-      if (linked && hasGlobalEntrypoint && destination === "panel")
-        return await callWorkbench("workbench_open_destination", { ...target, destination: "workbench" });
-      if (linked && destination !== "desktop") {
+      if (destination === "editorLink" || destination === "copyLink") {
         const url = pageCard.editorUrl ?? (await callWorkbench("workbench_page_url", target)).url;
-        if (destination === "panel") revealEditorLink(errorMessage, url);
-        else {
-          try {
-            await navigator.clipboard.writeText(url);
-            errorMessage.dataset.kind = "info";
-            errorMessage.textContent = t("copiedEditorLink");
-          } catch {
-            revealEditorLink(errorMessage, url);
-          }
-          errorMessage.hidden = false;
-        }
+        if (destination === "editorLink") revealEditorLink(errorMessage, url);
+        else await copyEditorLink(errorMessage, url);
         return;
       }
-      if (destination !== "panel")
-        return await callWorkbench("workbench_open_destination", { ...target, destination });
+      if (editorBridge) return await openPageTab(target);
       if (capabilities.serverTools) {
         const reply = resultPayload(await request("tools/call", {
           name: "card_navigate", arguments: target,
@@ -506,6 +537,7 @@ ${card}
         if (reply?.isError) throw new Error(reply.structuredContent?.error?.message ?? t("unavailable"));
         const status = reply?.structuredContent?.data?.status;
         if (status === "accepted" || status === "superseded") return;
+        openSideCards.delete(index);
       }
       if (qoder) {
         errorMessage.dataset.kind = "info";
@@ -538,6 +570,7 @@ ${card}
       const targets = group?.cards ?? (target?.pageId ? [target] : undefined);
       if (!targets?.length) return;
       desktopRequested = !remote && meta?.showaiCardDestination === "desktop";
+      openSideCards = new Set(Array.isArray(meta?.showaiOpenSideCards) ? meta.showaiOpenSideCards : []);
       adjustSpacing = !qoder && !directEditor && (group ?? target)?.adjustSpacing === true;
       navigationScope ??= meta?.showaiNavigationScope;
       const singleChanged = !group && (["projectId", "pageId", "blockId", "title", "blockTitle", "description", "editorUrl"]
@@ -707,6 +740,11 @@ ${card}
 
   const reportCardSize = card && observeShowaiCardHeight([card, spacingForm, status],
     () => initialized && root.hidden && context.displayMode !== "fullscreen");
+  if (card) {
+    card.addEventListener("pointerenter", refreshOpenSideCards);
+    card.addEventListener("focusin", refreshOpenSideCards);
+    window.addEventListener("focus", refreshOpenSideCards);
+  }
   retry.addEventListener("click", () => {
     if (useFileEntrypoint) void readReferenceFile();
     else void refreshLaunch();

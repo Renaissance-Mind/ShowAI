@@ -9,6 +9,7 @@ import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js"
 import { chromium } from "playwright-core";
 import { expect, it } from "vitest";
 import { readingBrowserExecutable } from "./reading-renderer";
+import { mountWorkbenchCards } from "../test/workbench-card-frame";
 import { codexWorkbenchUri, codexWorkbenchThreadUri, codexWorkbenchFileUri, codexWorkbenchCardUri, codexWorkbenchTargetUri } from "./codex-workbench-ui";
 import { codexPageReferenceExtension, codexWorkbenchPageLink, type CodexPageTarget } from "./codex-page-reference";
 import type { ShowDocument } from "../types";
@@ -35,58 +36,91 @@ async function workbenchTool<T>(client: Client, name: string, args: Record<strin
 
 async function checkCardClicks(html: string, metadata: Record<string, unknown>, target: CodexPageTarget) {
   const browser = await chromium.launch({ executablePath: await readingBrowserExecutable() });
+  const files = { serverTools: {}, experimental: { "openai/files": {} } };
+  const server = { serverTools: {} };
+  const layouts: { host: string; capabilities: Record<string, unknown>; primary: string; label: string; alternatives: string[] }[] = [
+    { host: "codex", capabilities: files, primary: "panel", label: "侧边打开", alternatives: ["workbench", "desktop"] },
+    { host: "codex", capabilities: server, primary: "workbench", label: "从工作台打开", alternatives: ["desktop"] },
+    { host: "t3-code", capabilities: server, primary: "desktop", label: "从 ShowAI 打开", alternatives: [] },
+    { host: "codex", capabilities: {}, primary: "", label: "", alternatives: [] },
+  ];
+  const menuLabels: Record<string, string> = { workbench: "从工作台打开", desktop: "从 ShowAI App 打开" };
   try {
-    for (const trigger of ["title", "label", "workbench", "desktop"] as const) {
-      const page = await browser.newPage({
-        locale: "zh-CN", colorScheme: trigger === "desktop" ? "dark" : "light",
-        viewport: { width: trigger === "title" ? 640 : 320, height: 700 },
-      });
-      await page.setContent('<iframe style="display:block;width:100%;height:650px;border:0"></iframe><output hidden></output>');
-      await page.evaluate(({ html, metadata }) => {
-        const frame = document.querySelector("iframe")!;
-        const send = (message: object) => frame.contentWindow!.postMessage({ jsonrpc: "2.0", ...message }, "*");
-        window.addEventListener("message", ({ source, data }) => {
-          if (source !== frame.contentWindow || data?.jsonrpc !== "2.0") return;
-          if (data.method === "ui/initialize") send({ id: data.id, result: {
-            protocolVersion: data.params.protocolVersion, hostInfo: { name: "card-test", version: "1" },
-            hostCapabilities: { serverTools: {} }, hostContext: { displayMode: "inline", locale: "zh-CN" },
-          } });
-          if (data.method === "ui/notifications/initialized")
-            send({ method: "ui/notifications/tool-result", params: { _meta: metadata } });
-          if (data.method === "tools/call") document.querySelector("output")!.value = JSON.stringify(data.params);
+    for (const { host, capabilities, primary, label, alternatives } of layouts) {
+      const triggers = primary ? ["title", "main", ...alternatives] : ["none"];
+      for (const trigger of triggers) {
+        const page = await browser.newPage({
+          locale: "zh-CN", colorScheme: trigger === "desktop" ? "dark" : "light",
+          deviceScaleFactor: process.env.SHOWAI_SMOKE_OUTPUT ? 2 : 1,
+          viewport: { width: trigger === "title" ? 640 : 320, height: 700 },
         });
-        frame.srcdoc = html;
-      }, { html, metadata });
-
-      const list = page.frameLocator("iframe").locator("#showai-page-card");
-      const card = list.getByRole("article").nth(1);
-      const label = card.getByText("侧边打开", { exact: true });
-      const toggle = card.getByRole("button", { name: "选择打开方式" });
-      await label.waitFor({ timeout: 5000 });
-      const labelBox = (await label.boundingBox())!;
-      const toggleBox = (await toggle.boundingBox())!;
-      expect(labelBox.x + labelBox.width).toBeLessThanOrEqual(toggleBox.x);
-      expect(Math.abs(labelBox.y + labelBox.height / 2 - toggleBox.y - toggleBox.height / 2)).toBeLessThan(2);
-
-      const isMenu = trigger === "workbench" || trigger === "desktop";
-      let action = trigger === "label" ? label : card.getByRole("heading");
-      if (isMenu) {
-        if (trigger === "workbench") await toggle.click();
-        else await toggle.press("ArrowDown");
-        const items = card.getByRole("menuitem");
-        expect((await items.allTextContents()).map(text => text.trim())).toEqual(["从工作台打开", "从 ShowAI App 打开"]);
-        action = card.locator(`[data-destination="${trigger}"]`);
+        const list = await mountWorkbenchCards(page, html, metadata, capabilities, host);
+        const card = list.getByRole("article").nth(1);
+        await card.getByRole("heading").waitFor({ timeout: 5000 });
+        const face = card.locator(".showai-card-actions");
+        if (!primary) {
+          expect(await face.isVisible()).toBe(false);
+          await page.close();
+          continue;
+        }
+        const main = face.locator(".showai-card-open");
+        const toggle = face.getByRole("button", { name: "选择打开方式" });
+        expect(await main.innerText()).toBe(label);
+        expect(await toggle.count()).toBe(alternatives.length ? 1 : 0);
+        if (alternatives.length) {
+          const button = (await main.boundingBox())!;
+          const arrow = (await toggle.boundingBox())!;
+          expect(Math.abs(button.x + button.width - arrow.x)).toBeLessThan(1);
+          expect(button.y).toBe(arrow.y);
+          expect(button.height).toBe(arrow.height);
+          expect(await toggle.evaluate(el => {
+            const css = getComputedStyle(el);
+            return [css.borderTopLeftRadius, css.borderBottomLeftRadius, css.borderTopRightRadius, css.borderBottomRightRadius];
+          })).toEqual(["0px", "0px", "9px", "9px"]);
+        } else {
+          expect(await main.evaluate(el => getComputedStyle(el).borderRadius)).toBe("9px");
+        }
+        let action = trigger === "title" ? card.getByRole("heading") : main;
+        const menuItem = alternatives.includes(trigger);
+        if (menuItem) {
+          const restingFill = await toggle.evaluate(el => getComputedStyle(el).backgroundColor);
+          await toggle.press("ArrowDown");
+          const items = card.getByRole("menuitem");
+          expect((await items.allTextContents()).map(text => text.trim())).toEqual(alternatives.map(key => menuLabels[key]));
+          expect(await items.first().evaluate(el => el === el.ownerDocument.activeElement && el.matches(":focus-visible"))).toBe(true);
+          await page.keyboard.press("Escape");
+          expect(await toggle.getAttribute("aria-expanded")).toBe("false");
+          expect(await toggle.evaluate(el => el === el.ownerDocument.activeElement)).toBe(true);
+          await toggle.click();
+          expect(await toggle.evaluate(el => {
+            const style = getComputedStyle(el);
+            return [style.outlineStyle, style.boxShadow, style.backgroundColor];
+          })).toEqual(["none", "none", restingFill]);
+          action = card.getByRole("menuitem", { name: menuLabels[trigger], exact: true });
+        }
+        if (process.env.SHOWAI_SMOKE_OUTPUT) {
+          await list.screenshot({ path: join(process.env.SHOWAI_SMOKE_OUTPUT, `codex-card-${primary}-${trigger}.png`) });
+          if (menuItem) {
+            await page.setViewportSize({ width: 640, height: 700 });
+            await page.mouse.move(0, 0);
+            const button = (await face.boundingBox())!;
+            const menu = (await card.getByRole("menu").boundingBox())!;
+            const x = Math.floor(Math.min(button.x, menu.x)) - 5;
+            const y = Math.floor(Math.min(button.y, menu.y)) - 5;
+            const width = Math.ceil(Math.max(button.x + button.width, menu.x + menu.width)) - x + 5;
+            const height = Math.ceil(Math.max(button.y + button.height, menu.y + menu.height)) - y + 1;
+            await page.screenshot({ clip: { x, y, width, height },
+              path: join(process.env.SHOWAI_SMOKE_OUTPUT, `open-menu-${primary}-${trigger}.png`) });
+          }
+        }
+        await action.click({ force: trigger === "title" });
+        const destination = menuItem ? trigger : primary;
+        await expect.poll(async () => JSON.parse(await page.locator("output").textContent() || "null")).toMatchObject({
+          name: destination === "panel" ? "card_navigate" : "workbench_open_destination",
+          arguments: destination === "panel" ? target : { ...target, destination },
+        });
+        await page.close();
       }
-      if (process.env.SHOWAI_SMOKE_OUTPUT)
-        await list.screenshot({ path: join(process.env.SHOWAI_SMOKE_OUTPUT, `codex-card-${trigger}.png`) });
-      // The full-card button receives clicks at the position of the title or label.
-      await action.click({ force: !isMenu });
-      const request = page.locator("output");
-      await expect.poll(async () => JSON.parse(await request.textContent() || "null")).toMatchObject({
-        name: isMenu ? "workbench_open_destination" : "card_navigate",
-        arguments: isMenu ? { ...target, destination: trigger } : target,
-      });
-      await page.close();
     }
   } finally {
     await browser.close();
@@ -137,7 +171,7 @@ it("opens both Codex workbench entries and saves into the MCP library", async ()
         .toEqual({ resourceUri: codexWorkbenchCardUri, visibility: ["model", "app"] });
     }
     const cardResource = await client.readResource({ uri: codexWorkbenchCardUri });
-    for (const version of [5, 6, 7, 8, 9, 10, 11, 12, 13]) {
+    for (const version of [5, 6, 7, 8, 9, 10, 11, 12, 13, 14]) {
       const previous = await client.readResource({ uri: `ui://showai/workbench-card-v${version}.html` });
       expect(previous.contents[0].mimeType).toBe("text/html;profile=mcp-app");
     }
@@ -398,6 +432,11 @@ it("opens both Codex workbench entries and saves into the MCP library", async ()
       name: "card_navigate", arguments: target, _meta: { threadId },
     });
     await poll("first", component);
+    const panelQuery = { name: "workbench_card_panels", arguments: { pages: [component, otherPage] } };
+    expect((await client.callTool({ ...panelQuery, _meta: { threadId: "first" } }))._meta?.showaiWorkbenchData).toEqual([0]);
+    expect((await client.callTool({ ...panelQuery, _meta: { threadId: "second" } }))._meta?.showaiWorkbenchData).toEqual([]);
+    const liveCard = await client.callTool({ name: "card_present", arguments: component, _meta: { threadId: "first" } });
+    expect(liveCard._meta?.showaiOpenSideCards).toEqual([0]);
     expect((await jump("second", component)).structuredContent).toMatchObject({ data: { status: "unavailable" } });
     expect((await jump("first", otherPage)).structuredContent).toMatchObject({ data: { status: "unavailable" } });
     await poll("first", otherPage);

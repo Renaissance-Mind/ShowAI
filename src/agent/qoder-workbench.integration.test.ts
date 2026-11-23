@@ -4,6 +4,9 @@ import { join } from "node:path";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
 import { expect, it } from "vitest";
+import { chromium } from "playwright-core";
+import { readingBrowserExecutable } from "./reading-renderer";
+import { mountWorkbenchCards } from "../test/workbench-card-frame";
 import { codexWorkbenchTargetUri } from "./codex-workbench-ui";
 
 it("opens Qoder workbench entries and saves a large page through its MCP transport", async () => {
@@ -80,7 +83,31 @@ it("opens Qoder workbench entries and saves a large page through its MCP transpo
     expect(panel.scope).toMatch(/^[a-f0-9]{64}$/);
     const changes = (state: Record<string, unknown>) =>
       appData("workbench_changes", { after: -1, client: "qoder-side", panel: state });
+    const eligible = () => call("workbench_card_panels", { pages: [{ projectId, pageId }] }, task)
+      .then(result => result._meta?.showaiWorkbenchData);
+    expect(await eligible()).toEqual([]);
+    const browser = await chromium.launch({ executablePath: await readingBrowserExecutable() });
+    try {
+      const view = await browser.newPage();
+      const resource = cardResource.contents[0];
+      if (!("text" in resource)) throw new Error("Expected the Qoder card HTML.");
+      const list = await mountWorkbenchCards(view, resource.text, card._meta!, { serverTools: {} }, "qoder",
+        params => client.callTool(params));
+      const main = list.locator(".showai-card-open");
+      expect(await main.innerText()).toBe("从 ShowAI 打开");
+      expect(await list.getByRole("button", { name: "选择打开方式" }).count()).toBe(0);
+      await changes(panel);
+      await main.hover();
+      await expect.poll(() => main.innerText()).toBe("侧边打开");
+      await changes({ ...panel, visible: false });
+      await view.mouse.move(0, 0);
+      await main.hover();
+      await expect.poll(() => main.innerText()).toBe("从 ShowAI 打开");
+    } finally {
+      await browser.close();
+    }
     await changes(panel);
+    expect(await eligible()).toEqual([0]);
     const foreignTask = { "com.qoder/turnContext": { sessionId: "different-task" } };
     expect((await call("card_navigate", { projectId, pageId }, foreignTask)).structuredContent)
       .toMatchObject({ data: { status: "unavailable" } });

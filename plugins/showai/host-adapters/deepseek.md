@@ -3,7 +3,7 @@
 <!-- showai-host-delivery:start -->
 
 - Harness 连接后会注册 ShowAI 的 MCP 工具，可直接调用。用 `show_component` 的 `delivery:"auto"` 取得 `fragment-file`，插件自动读取本机 `delivery.inline`（缺省时读取 `delivery.html`），在工具结果旁显示预览。
-- 新建或续改保存成功后用 `card_present` 交付原页卡片。多页使用 `additionalTargets`，点击每张卡片在当前会话右侧打开该原页。要在对话中阅读正文时用 `page_present`，连接尚未提供卡片工具时可沿用原页预览。
+- 新建或续改保存成功后用 `card_present` 交付原页卡片。多页使用 `additionalTargets`。会话提供侧栏时，点击卡片在右侧打开原页，箭头可改选桌面 App。仅桌面 App 可用时，卡片显示单个「从 ShowAI 打开」按钮。要在对话中阅读正文时用 `page_present`，连接尚未提供卡片工具时可沿用原页预览。
 - 确认预览出现后，正文只补充必要结论。缺少预览或返回远程 URL 时查完整宿主适配。
 
 <!-- showai-host-delivery:end -->

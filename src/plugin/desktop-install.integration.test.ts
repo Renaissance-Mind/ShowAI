@@ -546,9 +546,10 @@ describe.skipIf(!output || !config)(
       try {
         await client.connect(transport);
         const tools = await client.listTools();
-        expect(
-          tools.tools.some((tool) => tool.name.startsWith("workbench_")),
-        ).toBe(false);
+        const names = tools.tools.map(tool => tool.name);
+        expect(names.filter(name => name.startsWith("workbench_")).sort())
+          .toEqual(["workbench_page_url", "workbench_url"]);
+        expect(names).toContain("card_present");
         expect(tools.tools.some((tool) => tool.name === "page_apply")).toBe(
           true,
         );

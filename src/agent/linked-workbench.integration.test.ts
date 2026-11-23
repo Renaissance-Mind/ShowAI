@@ -4,6 +4,9 @@ import { join } from "node:path";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
 import { expect, test } from "vitest";
+import { chromium } from "playwright-core";
+import { readingBrowserExecutable } from "./reading-renderer";
+import { mountWorkbenchCards } from "../test/workbench-card-frame";
 
 test.each(["mcp-app", "model-html", "fragment-file", "t3-html"])(
   "delivers a real saved Page in %s and opens its attached workbench",
@@ -54,14 +57,33 @@ test.each(["mcp-app", "model-html", "fragment-file", "t3-html"])(
       if (display === "mcp-app") {
         const uri = (cardTool._meta?.ui as { resourceUri?: string })?.resourceUri;
         expect(uri).toBeDefined();
-        expect((await client.readResource({ uri: uri! })).contents[0].mimeType)
-          .toBe("text/html;profile=mcp-app");
+        const resource = (await client.readResource({ uri: uri! })).contents[0];
+        expect(resource.mimeType).toBe("text/html;profile=mcp-app");
+        if (!("text" in resource)) throw new Error("Expected the linked card HTML.");
+        const browser = await chromium.launch({ executablePath: await readingBrowserExecutable() });
+        try {
+          const page = await browser.newPage();
+          const list = await mountWorkbenchCards(page, resource.text, shown._meta!, {});
+          expect(await list.getByRole("button", { name: "选择打开方式" }).count()).toBe(0);
+          const main = list.locator(".showai-card-open");
+          expect(await main.innerText()).toBe("显示原页编辑链接");
+          await main.click();
+          const link = await list.getByRole("textbox", { name: "网页编辑链接" }).inputValue();
+          expect(new URL(link).searchParams.get("page")).toBe(target.pageId);
+          expect(await list.getByRole("button", { name: "复制网页编辑链接" }).isVisible()).toBe(true);
+        } finally {
+          await browser.close();
+        }
       } else {
         expect(cardTool._meta?.ui).toBeUndefined();
         const output = shown.structuredContent as { data: { delivery: { html: string; path: string } } };
         const html = await readFile(display === "t3-html" ? output.data.delivery.path : output.data.delivery.html, "utf8");
         expect(html).toContain("Saved Page &lt;&amp;&gt;");
         expect(html).toContain(`showai://project/${target.projectId}/page/${target.pageId}`);
+        if (display !== "t3-html") {
+          expect(html).toMatch(/<div class="showai-card-actions"><a class="showai-card-open"[^>]+>[^<]+<\/a><\/div>/);
+          expect(html).not.toContain('aria-haspopup="menu"');
+        }
         if (display === "t3-html") {
           expect(html).toContain("<input readonly");
           expect(html).not.toContain("localhost:");
