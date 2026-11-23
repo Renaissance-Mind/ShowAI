@@ -1,0 +1,48 @@
+.studio-sidebar-projects[data-sidebar-scheme]:not(
+    [data-sidebar-scheme="original"]
+  ) {
+  --root-inset: var(--tree-icon-inset);
+}
+:is(.studio-sidebar, .settings-folder-preview-tree) [data-root-tone] {
+  --tree-guide-width: 2px;
+  --root-background: color-mix(
+    in srgb,
+    var(--root-pigment) 16%,
+    var(--surface)
+  );
+  --root-hover: color-mix(in srgb, var(--root-pigment) 26%, var(--surface));
+  --hover: var(--root-hover);
+  --selected: color-mix(in srgb, var(--root-pigment) 38%, var(--surface));
+  --tree-guide-color: color-mix(
+    in srgb,
+    var(--root-pigment) 78%,
+    var(--surface)
+  );
+  --accent-soft: var(--selected);
+  --line: var(--selected);
+  --muted: color-mix(in srgb, var(--text) 87%, var(--root-background));
+  --subtle: var(--muted);
+  padding-inline: var(--tree-icon-inset, 4px);
+  background-color: var(--root-background);
+  border-radius: 8px;
+}
+[data-sidebar-scheme="solid"] [data-root-tone] {
+  --root-hover: color-mix(in srgb, var(--root-background), var(--text) 6%);
+  --selected: color-mix(in srgb, var(--root-background), var(--text) 13%);
+  --tree-guide-color: color-mix(in srgb, var(--root-pigment) 62%, var(--text));
+}
+.studio-project-section[data-root-tone] {
+  margin-inline-start: 4px;
+}
+.studio-tree-entry[data-root-tone] + .studio-tree-entry[data-root-tone] {
+  margin-block-start: 3px;
+}
+:is(.studio-sidebar, .settings-folder-preview-tree)
+  [data-root-tone]:has(> .studio-tree-children:not(:empty)) {
+  padding-block: 4px 6px;
+}
+:is(.studio-sidebar, .settings-folder-preview-tree)
+  [data-root-tone]
+  .studio-tree-row.active {
+  font-weight: 600;
+}

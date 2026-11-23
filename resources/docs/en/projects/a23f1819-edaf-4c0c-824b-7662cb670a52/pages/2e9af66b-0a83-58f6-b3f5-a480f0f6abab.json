@@ -1033,7 +1033,7 @@
               "content": [
                 {
                   "type": "text",
-                  "text": "Can. The workbench supports Simplified Chinese and English. By default, it \"follows the system\" and can be switched in \"Settings → Appearance → Language\". The reader control of the exported page uses the language in which it was exported."
+                  "text": "Can. The workbench supports Simplified Chinese and English. By default, it \"follows the system\" and can be switched in \"Settings → General → Language\". The reader control of the exported page uses the language in which it was exported."
                 }
               ],
               "attrs": {

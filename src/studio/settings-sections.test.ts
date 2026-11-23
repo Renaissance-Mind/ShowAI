@@ -8,5 +8,6 @@ it.each([
   [null, "general"],
 ] as const)("routes storage and shortcuts for %j", (info, storage) => {
   expect(availableSettingsSection("storage", info)).toBe(storage);
+  expect(availableSettingsSection("general", info)).toBe("general");
   expect(availableSettingsSection("shortcuts", info)).toBe("shortcuts");
 });

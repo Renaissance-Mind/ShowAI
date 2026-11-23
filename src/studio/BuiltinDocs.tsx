@@ -15,6 +15,8 @@ import { useLocale, useTranslator } from "../i18n/react";
 import sidebarMessages from "../i18n/messages/sidebar";
 import { Folder, FolderOpen, Loader2 } from "../ui/icons";
 import { usePresence } from "../ui/presence";
+import { useSidebarRootTones } from "./sidebar-root-tones";
+import { sidebarRootProps, useSidebarPalette } from "../design/sidebar-palette";
 import { errorMessage } from "../host/bridge";
 import {
   NAVIGATE_EVENT,
@@ -79,6 +81,15 @@ export function DocsNavigation({
   const locale = useLocale();
   const t = useTranslator(sidebarMessages);
   const docs = builtinDocs(locale);
+  const rootFolders = useMemo(
+    () =>
+      docs.tree
+        .filter((entry) => entry.type === "folder")
+        .map((entry) => entry.id),
+    [docs.tree],
+  );
+  const rootTones = useSidebarRootTones("builtin-docs", rootFolders);
+  const palette = useSidebarPalette();
   const title = useBuiltinDocTitle();
   const panelOpen = !!expanded.root;
   const panel = useRef<HTMLElement>(null);
@@ -93,8 +104,9 @@ export function DocsNavigation({
     main: ReactNode,
     active: boolean,
     children?: ReactNode,
+    tone?: string,
   ) => (
-    <div key={key} className="studio-tree-entry">
+    <div key={key} className="studio-tree-entry" {...sidebarRootProps(palette, tone)}>
       <div
         className={`studio-tree-row${active ? " active" : ""}`}
         data-docs-id={key}
@@ -127,7 +139,7 @@ export function DocsNavigation({
       activeId === id,
     );
   };
-  const entries = (items: DocsEntry[]): ReactNode =>
+  const entries = (items: DocsEntry[], root = false): ReactNode =>
     items.map((entry) => {
       if (entry.type === "page") return page(entry.id);
       const open = !!expanded[entry.id];
@@ -154,6 +166,7 @@ export function DocsNavigation({
             {entries(entry.children)}
           </div>
         ),
+        root ? rootTones[entry.id] : undefined,
       );
     });
   return (
@@ -161,6 +174,7 @@ export function DocsNavigation({
       ref={panel}
       id="studio-docs-navigation"
       className="studio-docs"
+      data-sidebar-scheme={palette.scheme}
       aria-label={docs.name}
       aria-hidden={!panelOpen}
       inert={!panelOpen}
@@ -170,7 +184,7 @@ export function DocsNavigation({
         {presence.mounted && (
           <>
             {page(WELCOME_DOC)}
-            {entries(docs.tree)}
+            {entries(docs.tree, true)}
           </>
         )}
       </div>

@@ -1,4 +1,5 @@
 .studio,
+.settings-folder-preview-tree,
 .studio-modal-shade,
 .studio-context-menu {
   --text: #37352f;
@@ -22,6 +23,7 @@
   -webkit-font-smoothing: antialiased;
 }
 :root[data-theme="dark"] .studio,
+:root[data-theme="dark"] .settings-folder-preview-tree,
 :root[data-theme="dark"] .studio-modal-shade,
 :root[data-theme="dark"] .studio-context-menu {
   --text: #e6e6e4;
@@ -167,8 +169,14 @@
   padding: 5px 3px;
   border-radius: 5px;
   text-align: left;
+}
+.studio-tree-main,
+.studio-sidebar-projects .studio-section-toggle {
   font-size: 14px;
   line-height: 20px;
+}
+.studio-sidebar-projects .studio-section-toggle > span {
+  color: var(--text);
 }
 .studio-tree-main:hover {
   background: transparent;
@@ -197,7 +205,7 @@
 }
 .studio-sidebar-projects .studio-section-title {
   min-height: inherit;
-  padding-inline-start: var(--tree-icon-inset);
+  padding-inline-start: calc(var(--tree-icon-inset) + var(--root-inset, 0px));
 }
 .studio-sidebar-projects .studio-section-toggle,
 .studio-tree-row[data-kind] > .studio-tree-main {
@@ -235,8 +243,11 @@
   position: absolute;
   inset-block: 0;
   inset-inline-start: -5px;
-  width: 1px;
-  background: color-mix(in srgb, var(--muted) 30%, transparent);
+  width: var(--tree-guide-width, 1px);
+  background: var(
+    --tree-guide-color,
+    color-mix(in srgb, var(--muted) 30%, transparent)
+  );
   pointer-events: none;
 }
 .studio-tree-children

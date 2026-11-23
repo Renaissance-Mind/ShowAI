@@ -205,7 +205,7 @@
      "title": "ShowAI 文档",
      "icon": "📚",
      "file": "zh-CN/projects/a23f1819-edaf-4c0c-824b-7662cb670a52/pages/2e9af66b-0a83-58f6-b3f5-a480f0f6abab.json",
-     "sha256": "23856651079caf744401b2c1605536b225af5f90157306ae98ac996336510dca",
+     "sha256": "07b76eb5d8e208955defd3e6f8a8815d7f55d5f146f1d05de3404a7651527bab",
      "components": [
       "zh-CN/projects/a23f1819-edaf-4c0c-824b-7662cb670a52/packages/components/doc-hero/1.0.0/compiled.json",
       "zh-CN/projects/a23f1819-edaf-4c0c-824b-7662cb670a52/packages/components/doc-cards/1.0.0/compiled.json",
@@ -606,7 +606,7 @@
      "title": "ShowAI Documentation",
      "icon": "📚",
      "file": "en/projects/a23f1819-edaf-4c0c-824b-7662cb670a52/pages/2e9af66b-0a83-58f6-b3f5-a480f0f6abab.json",
-     "sha256": "df2a6fb95da6ef55e1ee53b49c68da9b4c3e1f6d7b77ad1aaa88c0fdfcd489fc",
+     "sha256": "3128ea0335c244a42e122289352b062e43d2808b438afc48384e381cbd3991f3",
      "components": [
       "en/projects/a23f1819-edaf-4c0c-824b-7662cb670a52/packages/components/doc-hero/1.0.0/compiled.json",
       "en/projects/a23f1819-edaf-4c0c-824b-7662cb670a52/packages/components/doc-cards/1.0.0/compiled.json",

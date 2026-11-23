@@ -32,7 +32,10 @@
 }
 @media (hover: hover) {
   .studio-docs .studio-tree-row:not(.active):hover {
-    background: color-mix(in srgb, var(--text) 6%, var(--docs-panel-surface));
+    background: var(
+      --root-hover,
+      color-mix(in srgb, var(--text) 6%, var(--docs-panel-surface))
+    );
   }
 }
 .studio-sidebar:has(> .studio-docs) > .studio-sidebar-projects {

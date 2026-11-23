@@ -458,7 +458,7 @@ try {
   await page.getByRole("separator", { name: "调整侧栏宽度" }).press("End");
   for (const locale of ["zh-CN", "en"]) {
     if (locale === "en") {
-      await button("外观").click();
+      await button("通用").click();
       await page.getByRole("combobox", { name: "语言", exact: true }).click();
       await page.getByRole("option", { name: "English", exact: true }).click();
       await button("Remote MCP").click();
@@ -513,7 +513,7 @@ try {
     }
   }
   await page.getByRole("separator", { name: "Resize sidebar" }).press("Home");
-  await button("Appearance").click();
+  await button("General").click();
   await page.locator("#settings-language").click();
   await page.getByRole("option", { name: "简体中文", exact: true }).click();
   await button("远程 MCP").click();

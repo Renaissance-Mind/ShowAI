@@ -193,7 +193,7 @@ export function useLibraryRows({
     (target, event) => rowHandlers.current.openTargetClick(target, event),
     [],
   );
-  const showRowMenu = useCallback<LibraryRowProps["onMenu"]>(
+  const showRowMenu = useCallback<NonNullable<LibraryRowProps["onMenu"]>>(
     (target, anchor, point) =>
       rowHandlers.current.showMenu(target, anchor, point),
     [],
@@ -398,6 +398,7 @@ export function StudioSidebar({
         />
       ) : (
         <ProjectSidebar
+          home={info?.home}
           projects={projects}
           organization={organization}
           selectedProject={selectedProject}
@@ -434,7 +435,7 @@ export function StudioSidebar({
             </button>
           ))}
           renderProject={(item) => (
-            <div key={item.id} className="studio-tree-entry">
+            <>
               <LibraryRow
                 target={projectTarget(item)}
                 marker={projectSyncMarker(item.id)}
@@ -456,7 +457,7 @@ export function StudioSidebar({
                   {renderChildren(item.id)}
                 </div>
               )}
-            </div>
+            </>
           )}
         />
       )}

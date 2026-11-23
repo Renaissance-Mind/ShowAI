@@ -7,7 +7,7 @@
   color: var(--muted);
 }
 .studio-sidebar .studio-project-icon {
-  --project-icon-backdrop: var(--surface);
+  --project-icon-backdrop: var(--root-background, var(--surface));
 }
 .studio-tree-row[data-sidebar-hover] .studio-project-icon {
   --project-icon-backdrop: var(--hover);

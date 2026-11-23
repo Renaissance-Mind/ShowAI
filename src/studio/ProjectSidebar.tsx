@@ -1,5 +1,6 @@
 import {
   useEffect,
+  useMemo,
   useRef,
   type Dispatch,
   type SetStateAction,
@@ -13,6 +14,9 @@ import type {
 } from "../core/model";
 import { orderSidebarProjects } from "../core/sidebar-order";
 import { useLibraryDrag } from "./LibraryDrag";
+import { useSidebarRootTones } from "./sidebar-root-tones";
+import { sidebarRootProps, useSidebarPalette } from "../design/sidebar-palette";
+import "./sidebar-root-tones.css";
 import { useTranslator } from "../i18n/react";
 import sidebarMessages from "../i18n/messages/sidebar";
 import navigationMessages from "../i18n/messages/navigation";
@@ -22,7 +26,8 @@ const hoverTargets =
   ".studio-tree-row, .studio-sidebar-label, .studio-new-project";
 
 export default function ProjectSidebar({
-  projects,
+  home,
+  projects: libraryProjects,
   organization,
   selectedProject,
   collapsed,
@@ -35,6 +40,7 @@ export default function ProjectSidebar({
   onGroupMenu,
   unreadable,
 }: {
+  home?: string;
   projects: ProjectSummary[];
   organization: SidebarOrganization;
   selectedProject: string | null;
@@ -61,7 +67,21 @@ export default function ProjectSidebar({
     hovered.current = element;
     element?.setAttribute("data-sidebar-hover", "");
   };
-  projects = orderSidebarProjects(projects, organization.projectOrder);
+  const projects = useMemo(
+    () => orderSidebarProjects(libraryProjects, organization.projectOrder),
+    [libraryProjects, organization.projectOrder],
+  );
+  const rootIds = useMemo(
+    () => [
+      ...projects
+        .filter((item) => item.pinned || !organization.projectGroups[item.id])
+        .map((item) => `project:${item.id}`),
+      ...organization.groups.map((group) => `group:${group.id}`),
+    ],
+    [projects, organization.projectGroups, organization.groups],
+  );
+  const rootTones = useSidebarRootTones(home, rootIds);
+  const palette = useSidebarPalette();
   const selected = projects.find((item) => item.id === selectedProject);
   const selectedSection =
     selected && !selected.pinned
@@ -94,6 +114,7 @@ export default function ProjectSidebar({
       className="studio-project-section"
       key={id}
       data-project-section={id}
+      {...sidebarRootProps(palette, group && rootTones[`group:${id}`])}
       aria-label={name}
     >
       <div
@@ -164,7 +185,18 @@ export default function ProjectSidebar({
             setCollapsed((current) => ({ ...current, [id]: false })),
           )}
         >
-          {items.map(renderProject)}
+          {items.map((item) => (
+            <div
+              key={item.id}
+              className="studio-tree-entry"
+              {...sidebarRootProps(
+                palette,
+                group ? undefined : rootTones[`project:${item.id}`],
+              )}
+            >
+              {renderProject(item)}
+            </div>
+          ))}
           {id === "projects" && unreadable}
           {!items.length && group && (
             <div className="studio-group-empty">{t("noProjects")}</div>
@@ -176,6 +208,7 @@ export default function ProjectSidebar({
   return (
     <div
       className="studio-sidebar-projects"
+      data-sidebar-scheme={palette.scheme}
       onPointerOver={({ target, pointerType }) => {
         if (
           !hoverTimer.current &&

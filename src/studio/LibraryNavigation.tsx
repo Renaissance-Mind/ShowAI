@@ -42,7 +42,7 @@ export interface LibraryRowProps {
   expanded?: boolean;
   onToggle?: () => void;
   onOpen: (target: LibraryTarget, event: MouseEvent<HTMLButtonElement>) => void;
-  onMenu: (
+  onMenu?: (
     target: LibraryTarget,
     anchor: HTMLElement,
     point?: LibraryMenuPoint,
@@ -51,6 +51,7 @@ export interface LibraryRowProps {
   onUnpin?: (target: LibraryTarget) => void;
   marker?: { label: string; title?: string; tone?: "warning" | "muted" };
   cloud?: boolean;
+  prefetch?: boolean;
 }
 
 function LibraryRowView({
@@ -64,6 +65,7 @@ function LibraryRowView({
   onUnpin,
   marker,
   cloud,
+  prefetch = true,
 }: LibraryRowProps) {
   const t = useTranslator(sidebarMessages);
   const tc = useTranslator(commonMessages);
@@ -99,7 +101,7 @@ function LibraryRowView({
       onCommand(target, renaming ? "rename" : "delete");
       return;
     }
-    if (!isContextMenuShortcut(event, mac)) return;
+    if (!onMenu || !isContextMenuShortcut(event, mac)) return;
     event.preventDefault();
     event.stopPropagation();
     if (menuButton.current) onMenu(target, menuButton.current);
@@ -114,6 +116,7 @@ function LibraryRowView({
       data-pinned={target.pinned || undefined}
       onKeyDown={openKeyboardMenu}
       onContextMenu={(event) => {
+        if (!onMenu) return;
         event.preventDefault();
         event.stopPropagation();
         if (menuButton.current)
@@ -143,9 +146,11 @@ function LibraryRowView({
         className="studio-tree-main"
         aria-current={active ? "page" : undefined}
         title={title}
-        data-open-page={target.kind === "page" ? target.id : undefined}
+        data-open-page={
+          prefetch && target.kind === "page" ? target.id : undefined
+        }
         data-open-project={
-          target.kind === "page" ? target.projectId : undefined
+          prefetch && target.kind === "page" ? target.projectId : undefined
         }
         onClick={(event) => onOpen(target, event)}
         onAuxClick={(event) => {
@@ -204,21 +209,23 @@ function LibraryRowView({
           <Pin size={11} aria-hidden="true" />
         </button>
       )}
-      <button
-        ref={menuButton}
-        type="button"
-        className="studio-row-menu"
-        aria-label={t("itemActions", { title })}
-        aria-haspopup="menu"
-        aria-expanded={false}
-        onClick={(event) => {
-          event.preventDefault();
-          event.stopPropagation();
-          onMenu(target, event.currentTarget);
-        }}
-      >
-        <MoreHorizontal size={15} aria-hidden="true" />
-      </button>
+      {onMenu && (
+        <button
+          ref={menuButton}
+          type="button"
+          className="studio-row-menu"
+          aria-label={t("itemActions", { title })}
+          aria-haspopup="menu"
+          aria-expanded={false}
+          onClick={(event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            onMenu(target, event.currentTarget);
+          }}
+        >
+          <MoreHorizontal size={15} aria-hidden="true" />
+        </button>
+      )}
     </div>
   );
 }
@@ -242,6 +249,7 @@ export const LibraryRow = memo(
     previous.active === next.active &&
     previous.expanded === next.expanded &&
     previous.cloud === next.cloud &&
+    previous.prefetch === next.prefetch &&
     previous.onToggle === next.onToggle &&
     previous.marker?.label === next.marker?.label &&
     previous.marker?.title === next.marker?.title &&

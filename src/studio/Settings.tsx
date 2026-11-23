@@ -20,6 +20,7 @@ import Select from "../ui/Select";
 import { appIconForTheme } from "../design/app-icon";
 import type { DesktopInfo } from "../host/protocol";
 import type { AppearancePreference } from "../design/appearance-preference";
+import { setSidebarPalette, sidebarSchemes, useSidebarPalette } from "../design/sidebar-palette";
 import {
   isLanguagePreference,
   LOCALE_NAMES,
@@ -31,6 +32,7 @@ import libraryMessages from "../i18n/messages/library";
 import messages from "../i18n/messages/settings";
 import "./settings.css";
 import { SettingsPath } from "./SettingsPath";
+import SidebarPaletteSettings from "./SidebarPaletteSettings";
 import LibrarySpace from "./LibrarySpace";
 import SyncSettings, { type ProjectSyncRequest } from "./SyncSettings";
 import AgentSettings from "./AgentSettings";
@@ -127,8 +129,7 @@ export function availableSettingsSection(
 ): SettingsSection {
   const capabilities = workbenchCapabilities(info?.platform);
   if (
-    ((section === "general" || section === "storage") &&
-      !capabilities.manageLibrary) ||
+    (section === "storage" && !capabilities.manageLibrary) ||
     ((section === "plugins" || section === "mcp" || section === "remote") &&
       !capabilities.localPlugins)
   )
@@ -245,8 +246,18 @@ export function SettingsSearch({
     },
     {
       id: "appearance",
-      name: t("language"),
+      name: t("folderColors"),
       category: t("section.appearance"),
+      target: "settings-folder-colors",
+      alias: [
+        t("interface"),
+        ...sidebarSchemes.map((scheme) => t(`palette.${scheme}`)),
+      ].join(" "),
+    },
+    {
+      id: "general",
+      name: t("language"),
+      category: t("section.general"),
       target: "settings-language",
     },
     {
@@ -304,7 +315,7 @@ export function SettingsSearch({
       target: "feedback-help-title",
     },
   );
-  if (availableSettingsSection("general", info) === "general")
+  if (workbenchCapabilities(info?.platform).manageLibrary)
     options.push(
       {
         id: "general",
@@ -474,6 +485,7 @@ export function SettingsPanel({
 }) {
   const t = useTranslator(messages);
   const language = useLanguagePreference();
+  const sidebarPalette = useSidebarPalette();
   const tr = useTranslator(remoteMcpMessages);
   const capabilities = workbenchCapabilities(info?.platform);
   section = availableSettingsSection(section, info);
@@ -495,6 +507,43 @@ export function SettingsPanel({
         />
       )}
       {section === "general" && (
+        <section
+          className="settings-group"
+          aria-labelledby="settings-language-label"
+        >
+          <div className="settings-card">
+            <div className="settings-row">
+              <div className="settings-row-text">
+                <label
+                  id="settings-language-label"
+                  htmlFor="settings-language"
+                >
+                  {t("language")}
+                </label>
+                <p>{t("languageDetail")}</p>
+              </div>
+              <div className="settings-select">
+                <Select
+                  id="settings-language"
+                  value={language}
+                  onChange={(event) => {
+                    if (isLanguagePreference(event.target.value))
+                      setLanguagePreference(event.target.value);
+                  }}
+                >
+                  <option value="system">{t("languageSystem")}</option>
+                  {LOCALES.map((locale) => (
+                    <option key={locale} value={locale} lang={locale}>
+                      {LOCALE_NAMES[locale]}
+                    </option>
+                  ))}
+                </Select>
+              </div>
+            </div>
+          </div>
+        </section>
+      )}
+      {section === "general" && capabilities.manageLibrary && (
         <>
           <section
             className="settings-group"
@@ -623,37 +672,10 @@ export function SettingsPanel({
               })}
             </div>
           </section>
-          <section
-            className="settings-group"
-            aria-labelledby="settings-interface-title"
-          >
-            <h2 id="settings-interface-title">{t("interface")}</h2>
-            <div className="settings-card">
-              <div className="settings-row">
-                <div className="settings-row-text">
-                  <label htmlFor="settings-language">{t("language")}</label>
-                  <p>{t("languageDetail")}</p>
-                </div>
-                <div className="settings-select">
-                  <Select
-                    id="settings-language"
-                    value={language}
-                    onChange={(event) => {
-                      if (isLanguagePreference(event.target.value))
-                        setLanguagePreference(event.target.value);
-                    }}
-                  >
-                    <option value="system">{t("languageSystem")}</option>
-                    {LOCALES.map((locale) => (
-                      <option key={locale} value={locale} lang={locale}>
-                        {LOCALE_NAMES[locale]}
-                      </option>
-                    ))}
-                  </Select>
-                </div>
-              </div>
-            </div>
-          </section>
+          <SidebarPaletteSettings
+            palette={sidebarPalette}
+            onChange={setSidebarPalette}
+          />
         </>
       )}
       {section === "agent" && (

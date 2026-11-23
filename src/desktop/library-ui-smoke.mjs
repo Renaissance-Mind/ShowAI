@@ -130,6 +130,13 @@ try {
   const sidebar = page.locator(".studio-sidebar");
   const row = (id) =>
     sidebar.locator(`.studio-tree-row[data-library-id="${id}"]`);
+  const rootTone = (target) =>
+    target.evaluate((element) => {
+      const root = element.closest("[data-root-tone]");
+      if (!root || getComputedStyle(root).backgroundColor === "rgba(0, 0, 0, 0)")
+        throw new Error("Expected a painted root folder");
+      return root.dataset.rootTone;
+    });
   const openMenu = async (id) => {
     await row(id).hover();
     await row(id).locator(".studio-row-menu").click();
@@ -261,17 +268,26 @@ try {
   await docsFolder.press("Enter");
   await children.waitFor();
   assert.equal(await docsFolder.getAttribute("aria-expanded"), "true");
+  assert.equal(
+    await rootTone(children.locator(".studio-tree-row").first()),
+    await rootTone(docsFolder),
+  );
   assert.notEqual(await folderIcon.innerHTML(), closedIcon);
   const guide = await children.evaluate((group) => {
     const first = group.firstElementChild;
     const lastRow = group.lastElementChild.querySelector(".studio-tree-row");
     return {
+      width: getComputedStyle(first, "::before").width,
+      color: getComputedStyle(first, "::before").backgroundColor,
+      lastColor: getComputedStyle(lastRow, "::before").backgroundColor,
       start: parseFloat(getComputedStyle(first, "::before").top),
       end: parseFloat(getComputedStyle(lastRow, "::before").height),
       rowHeight: lastRow.getBoundingClientRect().height,
     };
   });
   assert.equal(guide.start, 0);
+  assert.equal(guide.width, "2px");
+  assert.equal(guide.color, guide.lastColor);
   assert.ok(Math.abs(guide.end - guide.rowHeight * 0.75) < 0.1);
   await docsFolder.click();
   await children.waitFor({ state: "detached" });
@@ -445,6 +461,7 @@ try {
     );
   };
   await checkSectionHeading("projects");
+  const projectTone = await rootTone(row(project.id));
   await choose(project.id, "置顶");
   await poll(
     projectData,
@@ -478,6 +495,7 @@ try {
   assert.notEqual(await folderToggle.locator("svg").innerHTML(), openFolderIcon);
   await folderToggle.press("Enter");
   await row(nested.id).waitFor();
+  assert.equal(await rootTone(row(nested.id)), projectTone);
   assert.equal(await folderToggle.locator("svg").innerHTML(), openFolderIcon);
   await choose(nested.id, "重命名");
   await nameDialog("名称", "Renamed page");
@@ -512,6 +530,7 @@ try {
 
   await page.reload();
   await row(project.id).waitFor();
+  assert.equal(await rootTone(row(project.id)), projectTone);
   assert.equal(
     await row(project.id).locator(".studio-tree-title").innerText(),
     "Renamed project",
@@ -656,6 +675,94 @@ try {
   await assertNoAlerts("final reload");
   result.checks.push(
     "No visible error alerts throughout authoring, cross-project navigation and deletion",
+  );
+  await sidebar.getByRole("button", { name: "设置", exact: true }).click();
+  await sidebar.getByRole("button", { name: "通用", exact: true }).click();
+  const language = page.getByRole("combobox", { name: "语言", exact: true });
+  await language.click();
+  await page.getByRole("option", { name: "English", exact: true }).click();
+  await page.getByRole("combobox", { name: "Language", exact: true }).click();
+  await page.getByRole("option", { name: "简体中文", exact: true }).click();
+  await sidebar.getByRole("button", { name: "外观", exact: true }).click();
+  assert.equal(await language.count(), 0);
+  const picker = page.getByRole("radiogroup", { name: "侧栏文件夹配色" });
+  const preview = page.getByRole("group", { name: "侧栏预览" });
+  const painted = preview.locator("[data-root-tone]");
+  const backgrounds = () =>
+    painted.evaluateAll((roots) =>
+      roots.map((root) => getComputedStyle(root).backgroundColor),
+    );
+  assert.equal(await picker.getByRole("radio").count(), 6);
+  const schemes = new Set();
+  for (const name of ["原始", "莫兰迪", "海岸", "林间", "暖陶", "纯色"]) {
+    await picker.getByRole("radio", { name, exact: true }).check();
+    const fills = await backgrounds();
+    assert.equal(fills.length, name === "原始" ? 0 : 3);
+    assert.equal(
+      new Set(fills).size,
+      name === "原始" ? 0 : name === "纯色" ? 1 : 3,
+    );
+    schemes.add(fills.join(","));
+  }
+  assert.equal(schemes.size, 6);
+  await page.getByRole("radio", { name: "深色", exact: true }).check();
+  const morandi = picker.getByRole("radio", { name: "莫兰迪", exact: true });
+  await morandi.check();
+  await morandi.press("ArrowRight");
+  assert.ok(
+    await picker.getByRole("radio", { name: "海岸", exact: true }).isChecked(),
+  );
+  assert.ok(!schemes.has((await backgrounds()).join(",")));
+  await page.setViewportSize({ width: 680, height: 760 });
+  assert.ok(
+    await picker.evaluate((node) => node.scrollWidth <= node.clientWidth + 1),
+  );
+  await page.screenshot({
+    path: join(output, "folder-colors-dark-narrow.png"),
+  });
+  await page.setViewportSize(fullSize);
+  await page.getByRole("radio", { name: "浅色", exact: true }).check();
+  await picker.getByRole("radio", { name: "纯色", exact: true }).check();
+  await page.getByLabel("统一颜色").fill("#527a82");
+  const solid = (await backgrounds())[0];
+  await preview.getByRole("button", { name: "收起设计项目" }).click();
+  assert.equal(
+    await preview
+      .getByRole("button", { name: "方案评审", exact: true })
+      .count(),
+    0,
+  );
+  await preview.getByRole("button", { name: "展开设计项目" }).click();
+  await preview.getByRole("button", { name: "方案评审", exact: true }).click();
+  const rootLayout = await painted.first().evaluate((root) => {
+    const row = root.querySelector(".studio-tree-row.active");
+    const style = getComputedStyle(root);
+    return [
+      style.paddingTop,
+      style.paddingBottom,
+      style.paddingLeft,
+      style.paddingRight,
+      Math.round(
+        root.getBoundingClientRect().bottom -
+          row.getBoundingClientRect().bottom,
+      ),
+    ];
+  });
+  assert.deepEqual(rootLayout, ["4px", "6px", "4px", "4px", 6]);
+  await page.screenshot({ path: join(output, "folder-color-settings.png") });
+  await page.reload();
+  await sidebar.getByRole("button", { name: "通用", exact: true }).waitFor();
+  await sidebar.getByRole("button", { name: "最近", exact: true }).click();
+  const actualRoot = sidebar
+    .locator(".studio-tree-entry[data-root-tone]")
+    .first();
+  await actualRoot.waitFor();
+  assert.equal(
+    await actualRoot.evaluate((node) => getComputedStyle(node).backgroundColor),
+    solid,
+  );
+  result.checks.push(
+    "General language switching, six visual palettes, editable solid color, nested preview, root padding and real sidebar colors after reload",
   );
   assert.deepEqual(rendererErrors, []);
   assert.deepEqual(
