@@ -35,9 +35,6 @@
   border-radius: 9px;
   background: var(--surface);
 }
-.page-icon-tabs[data-count="3"] {
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-}
 .page-icon-tabs button {
   min-height: 32px;
   border-radius: 6px;

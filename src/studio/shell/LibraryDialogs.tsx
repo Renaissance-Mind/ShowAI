@@ -5,10 +5,8 @@ import type { LibraryTarget } from "../LibraryNavigation";
 import Dialog from "../../ui/Dialog";
 import FolderIcon from "../../components/FolderIcon";
 import PageIcon from "../../components/PageIcon";
-import folderIconPicker from "../../components/FolderIconDefaults";
-import PageIconDialog, {
-  type IconPresetPicker,
-} from "../../components/PageIconDialog";
+import FolderIconDialog from "../../components/FolderIconDialog";
+import PageIconDialog from "../../components/PageIconDialog";
 import { desktop, errorMessage } from "../../host/bridge";
 import { useTranslator } from "../../i18n/react";
 import accountFlowMessages from "../../i18n/messages/accountFlow";
@@ -286,7 +284,7 @@ export function FolderDialog({
       inputLabel={t("folderName")}
       iconButtonLabel={t("setFolderIcon")}
       iconDialogTitle={t("folderIcon")}
-      iconPresets={folderIconPicker}
+      folderIcon
       submitLabel={folder ? tc("save") : tc("create")}
       initialName={folder?.title}
       initialIcon={folder?.icon}
@@ -302,7 +300,7 @@ function DirectoryDialog({
   placeholder,
   iconButtonLabel,
   iconDialogTitle,
-  iconPresets,
+  folderIcon,
   submitLabel,
   initialName = "",
   initialIcon = "",
@@ -316,7 +314,7 @@ function DirectoryDialog({
   placeholder?: string;
   iconButtonLabel: string;
   iconDialogTitle: string;
-  iconPresets?: IconPresetPicker;
+  folderIcon?: boolean;
   submitLabel: string;
   initialName?: string;
   initialIcon?: string;
@@ -363,10 +361,14 @@ function DirectoryDialog({
             onClick={() => setChoosingIcon(true)}
             aria-label={iconButtonLabel}
           >
-            {iconPresets ? (
+            {folderIcon ? (
               <FolderIcon value={icon} size={28} strokeWidth={2} />
             ) : (
-              <PageIcon value={icon} size={28} fallback={<Folder size={28} />} />
+              <PageIcon
+                value={icon}
+                size={28}
+                fallback={<Folder size={28} />}
+              />
             )}
             <span>{t("setIconButton")}</span>
           </button>
@@ -390,18 +392,23 @@ function DirectoryDialog({
           </footer>
         </form>
       </Dialog>
-      {choosingIcon && (
-        <PageIconDialog
-          title={iconDialogTitle}
-          value={icon}
-          presets={iconPresets}
-          fallback={<Folder size={56} />}
-          onClose={() => setChoosingIcon(false)}
-          onSave={async (next) => {
-            setIcon(next);
-          }}
-        />
-      )}
+      {choosingIcon &&
+        (folderIcon ? (
+          <FolderIconDialog
+            title={iconDialogTitle}
+            value={icon}
+            onClose={() => setChoosingIcon(false)}
+            onSave={async (next) => setIcon(next)}
+          />
+        ) : (
+          <PageIconDialog
+            title={iconDialogTitle}
+            value={icon}
+            fallback={<Folder size={56} />}
+            onClose={() => setChoosingIcon(false)}
+            onSave={async (next) => setIcon(next)}
+          />
+        ))}
     </>
   );
 }

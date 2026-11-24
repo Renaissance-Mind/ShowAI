@@ -1,28 +1,36 @@
 import { describe, expect, it } from "vitest";
 import {
-  folderIconGroups,
-  folderPresetFromIcon,
-  tagFolderPresetIcon,
+  folderColors,
+  folderSymbols,
+  readFolderIconStyle,
+  tagFolderIcon,
 } from "./folder-icon-presets";
 import { validatePageIcon } from "../lib/page-icon.mjs";
 
-describe("folder icon presets", () => {
-  it("provides three distinct groups with unique preset ids", () => {
-    expect(folderIconGroups.map((group) => group.id)).toEqual([
-      "color",
-      "work",
-      "mark",
-    ]);
-    const presets = folderIconGroups.flatMap((group) => group.presets);
-    expect(presets).toHaveLength(18);
-    expect(new Set(presets.map((preset) => preset.id)).size).toBe(18);
+const png =
+  "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=";
+
+describe("folder icon styles", () => {
+  it("offers unique colors and symbols independently", () => {
+    expect(folderColors[0].value).toBe("");
+    expect(new Set(folderColors.map(({ value }) => value)).size).toBe(
+      folderColors.length,
+    );
+    expect(new Set(folderSymbols).size).toBe(folderSymbols.length);
   });
 
-  it("preserves the PNG and identifies its folder preset", () => {
-    const png =
-      "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=";
-    const preset = folderIconGroups[1].presets[0];
-    const tagged = tagFolderPresetIcon(png, preset);
+  it.each([
+    { mode: "folder", color: "#5b8def", badge: { kind: "emoji", value: "👩🏽‍💻" } },
+    { mode: "folder", color: "#d47f50", badge: null },
+    {
+      mode: "standalone",
+      color: "#4fae9c",
+      badge: { kind: "symbol", value: "chart" },
+    },
+  ] as const)("round trips %j while keeping the PNG compatible", (style) => {
+    const tagged = tagFolderIcon(png, style);
+    expect(readFolderIconStyle(tagged)).toEqual(style);
+    expect(validatePageIcon(tagged)).toBe(tagged);
     const bytes = Buffer.from(tagged.split(",")[1], "base64");
     const endOfHeader = 33;
     const endOfTag = endOfHeader + bytes.readUInt32BE(endOfHeader) + 12;
@@ -32,8 +40,22 @@ describe("folder icon presets", () => {
     expect(
       Buffer.concat([bytes.subarray(0, endOfHeader), bytes.subarray(endOfTag)]),
     ).toEqual(Buffer.from(png.split(",")[1], "base64"));
-    expect(validatePageIcon(tagged)).toBe(tagged);
-    expect(folderPresetFromIcon(tagged)).toBe(preset);
-    expect(folderPresetFromIcon(png)).toBeUndefined();
+  });
+
+  it("restores the previous preset from a tagged PNG", () => {
+    const legacy =
+      png.slice(0, 66) +
+      "AAAAIXRFWHRTaG93QUkgRm9sZGVyIFByZXNldAB3b3JrLWNoYXJ0ICCl75ti" +
+      png.slice(66);
+    expect(readFolderIconStyle(legacy)).toEqual({
+      mode: "folder",
+      color: "#4f9a83",
+      badge: { kind: "symbol", value: "chart" },
+    });
+  });
+
+  it("leaves ordinary images and emoji as direct icons", () => {
+    expect(readFolderIconStyle(png)).toBeUndefined();
+    expect(readFolderIconStyle("📊")).toBeUndefined();
   });
 });

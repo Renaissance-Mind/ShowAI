@@ -1,0 +1,215 @@
+.studio-modal.folder-icon-dialog {
+  --folder-composer-pad: 22px;
+  width: min(748px, 100%);
+}
+
+.folder-icon-dialog .folder-icon-form {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  gap: 12px;
+  padding-bottom: 18px;
+}
+
+.folder-icon-scroll {
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 6px var(--folder-composer-pad) 4px;
+}
+
+.folder-icon-composer {
+  display: grid;
+  grid-template-columns: minmax(0, 0.83fr) minmax(0, 1.17fr);
+  gap: 22px;
+}
+
+.folder-icon-preview-column,
+.folder-icon-settings {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  gap: 12px;
+}
+
+.folder-icon-settings {
+  gap: 18px;
+}
+
+.folder-icon-modes,
+.folder-icon-sources {
+  display: flex;
+  gap: 3px;
+  padding: 3px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: var(--surface);
+}
+
+.folder-icon-modes > button,
+.folder-icon-sources > button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 4px 9px;
+  min-height: 28px;
+  border-radius: 6px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 550;
+  white-space: nowrap;
+}
+
+.folder-icon-modes > button {
+  flex: 1;
+  min-height: 32px;
+  font-size: 13px;
+}
+
+.folder-icon-modes > button[aria-pressed="true"],
+.folder-icon-sources > button[aria-pressed="true"] {
+  color: var(--text);
+  background: var(--paper);
+  box-shadow: 0 1px 4px color-mix(in srgb, var(--text) 9%, transparent);
+}
+
+.folder-icon-stage {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 192px;
+  padding: 12px;
+  border: 1px solid
+    color-mix(in srgb, var(--folder-preview-color) 23%, var(--line));
+  border-radius: 17px;
+  background: linear-gradient(
+    145deg,
+    color-mix(in srgb, var(--folder-preview-color) 10%, var(--paper)),
+    color-mix(in srgb, var(--folder-preview-color) 24%, var(--surface))
+  );
+}
+
+.folder-icon-stage > div {
+  display: grid;
+  place-items: center;
+  min-width: 0;
+  color: color-mix(in srgb, var(--text) 74%, var(--muted));
+}
+
+.folder-icon-stage svg {
+  display: block;
+  max-width: 100%;
+  height: auto;
+}
+
+.folder-icon-stage > [data-folder-state="standalone"] {
+  min-height: 108px;
+}
+
+.folder-icon-settings h3 {
+  margin: 0;
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 620;
+}
+
+.folder-icon-colors,
+.folder-icon-picker,
+.folder-icon-emoji {
+  display: grid;
+  gap: 9px;
+}
+
+.folder-icon-swatches {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.folder-icon-swatches > button {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  color: var(--muted);
+}
+
+.folder-icon-swatches > button > span {
+  width: 21px;
+  height: 21px;
+  border: 1px solid color-mix(in srgb, var(--text) 12%, transparent);
+  border-radius: 50%;
+}
+
+.folder-icon-picker-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.folder-icon-choices {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(47px, 100%), 1fr));
+  gap: 6px;
+}
+
+.folder-icon-choices > button {
+  display: grid;
+  place-items: center;
+  min-width: 0;
+  height: 45px;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--text);
+  font-size: 24px;
+  line-height: 1;
+}
+
+.folder-icon-swatches > button:hover,
+.folder-icon-choices > button:hover {
+  background: var(--hover);
+}
+
+.folder-icon-swatches > button[aria-pressed="true"],
+.folder-icon-choices > button[aria-pressed="true"] {
+  border-color: color-mix(in srgb, var(--text) 30%, var(--paper));
+  background: var(--accent-soft);
+}
+
+.folder-icon-form button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.folder-icon-dialog .folder-icon-form > .studio-dialog-actions {
+  flex: none;
+  justify-content: flex-end;
+  margin-inline: var(--folder-composer-pad);
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+}
+
+.folder-icon-form > .studio-error {
+  margin-inline: var(--folder-composer-pad);
+}
+
+@media (max-width: 630px) {
+  .studio-modal.folder-icon-dialog {
+    --folder-composer-pad: 16px;
+  }
+  .folder-icon-composer {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 16px;
+  }
+  .folder-icon-stage {
+    min-height: 142px;
+  }
+}

@@ -1,140 +1,95 @@
-import type { MessageKey } from "../i18n";
-import type folderIconMessages from "../i18n/messages/folderIcons";
+export const folderColors = [
+  { value: "", name: "defaultColor" },
+  { value: "#7c8492", name: "preset.graphite" },
+  { value: "#5b8def", name: "preset.blue" },
+  { value: "#4fae9c", name: "preset.teal" },
+  { value: "#75965e", name: "preset.olive" },
+  { value: "#d5a541", name: "preset.yellow" },
+  { value: "#d47f50", name: "preset.orange" },
+  { value: "#cf6464", name: "preset.red" },
+  { value: "#9274c0", name: "preset.violet" },
+] as const;
 
-type FolderIconMessageKey = MessageKey<typeof folderIconMessages>;
+export const folderSymbols = [
+  "briefcase",
+  "code",
+  "chart",
+  "book",
+  "flask",
+  "camera",
+  "star",
+  "heart",
+  "bookmark",
+  "flag",
+  "bolt",
+  "globe",
+] as const;
 
-export interface FolderIconPreset {
-  id: string;
-  nameKey: FolderIconMessageKey;
+export type FolderSymbol = (typeof folderSymbols)[number];
+export type FolderBadge =
+  { kind: "symbol"; value: FolderSymbol } | { kind: "emoji"; value: string };
+
+export type FolderIconStyle = {
+  mode: "folder" | "standalone";
   color: string;
-  symbol?:
-    | "briefcase"
-    | "code"
-    | "chart"
-    | "book"
-    | "flask"
-    | "camera"
-    | "star"
-    | "heart"
-    | "bookmark"
-    | "flag"
-    | "bolt"
-    | "globe";
-}
+  badge: FolderBadge | null;
+};
 
-export const folderIconGroups: {
-  id: "color" | "work" | "mark";
-  nameKey: FolderIconMessageKey;
-  presets: FolderIconPreset[];
-}[] = [
-  {
-    id: "color",
-    nameKey: "group.color",
-    presets: [
-      {
-        id: "color-graphite",
-        nameKey: "preset.graphite",
-        color: "#7c8492",
-      },
-      { id: "color-blue", nameKey: "preset.blue", color: "#5b8def" },
-      { id: "color-teal", nameKey: "preset.teal", color: "#4fae9c" },
-      { id: "color-yellow", nameKey: "preset.yellow", color: "#d5a541" },
-      { id: "color-orange", nameKey: "preset.orange", color: "#d47f50" },
-      { id: "color-red", nameKey: "preset.red", color: "#cf6464" },
-    ],
-  },
-  {
-    id: "work",
-    nameKey: "group.work",
-    presets: [
-      {
-        id: "work-briefcase",
-        nameKey: "preset.briefcase",
-        color: "#6686c9",
-        symbol: "briefcase",
-      },
-      {
-        id: "work-code",
-        nameKey: "preset.code",
-        color: "#64748b",
-        symbol: "code",
-      },
-      {
-        id: "work-chart",
-        nameKey: "preset.chart",
-        color: "#4f9a83",
-        symbol: "chart",
-      },
-      {
-        id: "work-book",
-        nameKey: "preset.book",
-        color: "#b18455",
-        symbol: "book",
-      },
-      {
-        id: "work-flask",
-        nameKey: "preset.flask",
-        color: "#7683bd",
-        symbol: "flask",
-      },
-      {
-        id: "work-camera",
-        nameKey: "preset.camera",
-        color: "#a2729f",
-        symbol: "camera",
-      },
-    ],
-  },
-  {
-    id: "mark",
-    nameKey: "group.mark",
-    presets: [
-      {
-        id: "mark-star",
-        nameKey: "preset.star",
-        color: "#d3a341",
-        symbol: "star",
-      },
-      {
-        id: "mark-heart",
-        nameKey: "preset.heart",
-        color: "#ce6c76",
-        symbol: "heart",
-      },
-      {
-        id: "mark-bookmark",
-        nameKey: "preset.bookmark",
-        color: "#7286c5",
-        symbol: "bookmark",
-      },
-      {
-        id: "mark-flag",
-        nameKey: "preset.flag",
-        color: "#d17e54",
-        symbol: "flag",
-      },
-      {
-        id: "mark-bolt",
-        nameKey: "preset.bolt",
-        color: "#b4933f",
-        symbol: "bolt",
-      },
-      {
-        id: "mark-globe",
-        nameKey: "preset.globe",
-        color: "#539a9c",
-        symbol: "globe",
-      },
-    ],
-  },
-];
+const legacyColors: Record<string, string> = {
+  "color-graphite": "#7c8492",
+  "color-blue": "#5b8def",
+  "color-teal": "#4fae9c",
+  "color-yellow": "#d5a541",
+  "color-orange": "#d47f50",
+  "color-red": "#cf6464",
+  "work-briefcase": "#6686c9",
+  "work-code": "#64748b",
+  "work-chart": "#4f9a83",
+  "work-book": "#b18455",
+  "work-flask": "#7683bd",
+  "work-camera": "#a2729f",
+  "mark-star": "#d3a341",
+  "mark-heart": "#ce6c76",
+  "mark-bookmark": "#7286c5",
+  "mark-flag": "#d17e54",
+  "mark-bolt": "#b4933f",
+  "mark-globe": "#539a9c",
+};
 
 const pngPrefix = "data:image/png;base64,";
+const styleTag = "ShowAI Folder Style\0";
+const legacyTag = "ShowAI Folder Preset\0";
 // The PNG signature and IHDR chunk are 33 bytes, or 44 base64 characters.
 const pngMetadataStart = pngPrefix.length + 44;
 
-function presetPngChunk(id: string): string {
-  const text = `ShowAI Folder Preset\0${id}`;
+function isFolderSymbol(value: unknown): value is FolderSymbol {
+  return folderSymbols.some((symbol) => symbol === value);
+}
+
+function isBadge(value: unknown): value is FolderBadge {
+  if (!value || typeof value !== "object") return false;
+  const badge = value as Partial<FolderBadge>;
+  return badge.kind === "symbol"
+    ? isFolderSymbol(badge.value)
+    : badge.kind === "emoji" &&
+        typeof badge.value === "string" &&
+        badge.value.length >= 1 &&
+        badge.value.length <= 64 &&
+        !/[\u0000-\u001f]/.test(badge.value);
+}
+
+function isFolderStyle(value: unknown): value is FolderIconStyle {
+  if (!value || typeof value !== "object") return false;
+  const style = value as Partial<FolderIconStyle>;
+  return (
+    (style.mode === "folder" || style.mode === "standalone") &&
+    typeof style.color === "string" &&
+    (style.color === "" || /^#[\da-f]{6}$/i.test(style.color)) &&
+    (style.badge === null || isBadge(style.badge))
+  );
+}
+
+function pngTextChunk(text: string): string {
   // Keep the chunk on a base64 boundary when inserting it after IHDR.
   const data = text.padEnd(Math.ceil(text.length / 3) * 3);
   const body = new TextEncoder().encode("tEXt" + data);
@@ -152,31 +107,57 @@ function presetPngChunk(id: string): string {
   return btoa(String.fromCharCode(...chunk));
 }
 
-const taggedPresets = folderIconGroups.flatMap((group) =>
-  group.presets.map((preset) => ({ preset, chunk: presetPngChunk(preset.id) })),
-);
-
-export function folderPresetFromIcon(
+export function readFolderIconStyle(
   value?: string,
-): FolderIconPreset | undefined {
+): FolderIconStyle | undefined {
   if (!value?.startsWith(pngPrefix + "iVBORw0KGgo")) return undefined;
-  return taggedPresets.find(({ chunk }) =>
-    value.startsWith(chunk, pngMetadataStart),
-  )?.preset;
+  try {
+    const start = pngMetadataStart;
+    const header = atob(value.slice(start, start + 12));
+    if (header.slice(4, 8) !== "tEXt") return undefined;
+    const length = new DataView(
+      Uint8Array.from(header, (byte) => byte.charCodeAt(0)).buffer,
+    ).getUint32(0);
+    if (length === 0 || length > 1024) return undefined;
+    const end = start + Math.ceil((length + 12) / 3) * 4;
+    if (value.length < end) return undefined;
+    const text = atob(value.slice(start, end))
+      .slice(8, 8 + length)
+      .trimEnd();
+    if (text.startsWith(legacyTag)) {
+      const id = text.slice(legacyTag.length);
+      if (!Object.hasOwn(legacyColors, id)) return undefined;
+      const symbol = id.slice(id.indexOf("-") + 1);
+      return {
+        mode: "folder",
+        color: legacyColors[id],
+        badge: isFolderSymbol(symbol)
+          ? { kind: "symbol", value: symbol }
+          : null,
+      };
+    }
+    if (!text.startsWith(styleTag)) return undefined;
+    const style: unknown = JSON.parse(
+      decodeURIComponent(text.slice(styleTag.length)),
+    );
+    return isFolderStyle(style) ? style : undefined;
+  } catch {
+    return undefined;
+  }
 }
 
-export function tagFolderPresetIcon(
-  value: string,
-  preset: FolderIconPreset,
-): string {
-  const chunk = presetPngChunk(preset.id);
+export function tagFolderIcon(value: string, style: FolderIconStyle): string {
+  if (!isFolderStyle(style)) throw new TypeError("Invalid folder icon style.");
+  const chunk = pngTextChunk(
+    styleTag + encodeURIComponent(JSON.stringify(style)),
+  );
   return (
     value.slice(0, pngMetadataStart) + chunk + value.slice(pngMetadataStart)
   );
 }
 
-export async function rasterizeFolderPreset(
-  preset: FolderIconPreset,
+export async function rasterizeFolderIcon(
+  style: FolderIconStyle,
   glyph: SVGSVGElement,
 ): Promise<string> {
   const image = new Image();
@@ -187,5 +168,5 @@ export async function rasterizeFolderPreset(
   canvas.width = 128;
   canvas.height = 128;
   canvas.getContext("2d")!.drawImage(image, 0, 0, 128, 128);
-  return tagFolderPresetIcon(canvas.toDataURL("image/png"), preset);
+  return tagFolderIcon(canvas.toDataURL("image/png"), style);
 }

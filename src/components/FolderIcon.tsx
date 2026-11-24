@@ -1,8 +1,9 @@
 import PageIcon from "./PageIcon";
 import { Folder, FolderOpen } from "../ui/icons";
 import {
-  folderPresetFromIcon,
-  type FolderIconPreset,
+  readFolderIconStyle,
+  type FolderBadge,
+  type FolderIconStyle,
 } from "./folder-icon-presets";
 
 const badges = {
@@ -125,32 +126,150 @@ type FolderIconAppearance = {
   strokeWidth?: number;
 };
 
+const neutral = "#7c8492";
+const emojiFont =
+  "Apple Color Emoji, Segoe UI Emoji, Noto Color Emoji, sans-serif";
+const segmenter = new Intl.Segmenter(undefined, { granularity: "grapheme" });
+
+function BadgeArtwork({
+  badge,
+  color,
+  x,
+  y,
+  scale,
+}: {
+  badge: FolderBadge;
+  color: string;
+  x: number;
+  y: number;
+  scale: number;
+}) {
+  if (badge.kind === "emoji") {
+    const count = Array.from(segmenter.segment(badge.value)).length;
+    return (
+      <text
+        x={x}
+        y={y + 1}
+        textAnchor="middle"
+        dominantBaseline="central"
+        fontFamily={emojiFont}
+        fontSize={(46 * scale) / Math.max(1, count)}
+        fill={color}
+      >
+        {badge.value}
+      </text>
+    );
+  }
+  return (
+    <g
+      transform={`translate(${x} ${y}) scale(${scale}) translate(-48 -56)`}
+      color={color}
+      fill="none"
+      stroke={color}
+      strokeWidth={4}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      {badges[badge.value]}
+    </g>
+  );
+}
+
+export function FolderBadgeGlyph({
+  badge,
+  color,
+  size = 24,
+}: {
+  badge: FolderBadge;
+  color: string;
+  size?: number;
+}) {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      width={size}
+      height={size}
+      viewBox="0 0 96 96"
+      aria-hidden="true"
+    >
+      <BadgeArtwork badge={badge} color={color} x={48} y={48} scale={1.6} />
+    </svg>
+  );
+}
+
 export function FolderIconGlyph({
-  preset,
+  composition,
   open = false,
   size = 18,
   strokeWidth = 1.7,
 }: FolderIconAppearance & {
-  preset?: FolderIconPreset;
+  composition?: FolderIconStyle;
 }) {
-  const Outline = open ? FolderOpen : Folder;
+  const paint = composition?.color || neutral;
+  const ink = `color-mix(in srgb, ${paint}, #1f2937 50%)`;
+  if (composition?.mode === "standalone" && composition.badge) {
+    return (
+      <FolderBadgeGlyph
+        badge={composition.badge}
+        color={composition.color || "currentColor"}
+        size={size}
+      />
+    );
+  }
+  if (!composition?.color && !composition?.badge) {
+    const Outline = open ? FolderOpen : Folder;
+    return <Outline size={size} strokeWidth={strokeWidth} aria-hidden="true" />;
+  }
+
+  const face = `color-mix(in srgb, ${paint}, white 40%)`;
+  const back = `color-mix(in srgb, ${paint}, white 20%)`;
   return (
-    <Outline
-      size={size}
-      strokeWidth={strokeWidth}
-      color={preset?.color}
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      width={size}
+      height={size}
+      viewBox="0 0 96 96"
       aria-hidden="true"
     >
-      {preset?.symbol && (
-        <g
-          transform="translate(12.5 15) scale(.19) translate(-48 -56)"
-          color={preset.color}
-          strokeWidth={4}
-        >
-          {badges[preset.symbol]}
+      {open ? (
+        <>
+          <path
+            d="M8 24a9 9 0 0 1 9-9h17a10 10 0 0 1 7 3l7 7h27a9 9 0 0 1 9 9v39a9 9 0 0 1-9 9H17a9 9 0 0 1-9-9Z"
+            fill={back}
+          />
+          <path
+            d="M23 38h64a7 7 0 0 1 7 9l-8 28a10 10 0 0 1-10 7H17a9 9 0 0 1-9-11l7-27a8 8 0 0 1 8-6Z"
+            fill={face}
+          />
+        </>
+      ) : (
+        <path
+          d="M8 24a9 9 0 0 1 9-9h17a10 10 0 0 1 7 3l7 7h33a9 9 0 0 1 9 9v39a9 9 0 0 1-9 9H17a9 9 0 0 1-9-9Z"
+          fill={face}
+        />
+      )}
+      {composition.badge && (
+        <g>
+          <rect
+            x="43"
+            y="40"
+            width="46"
+            height="46"
+            rx="13"
+            fill={ink}
+            opacity={0.2}
+          />
+          <rect x="43" y="37" width="46" height="46" rx="13" fill="#fffaf3" />
+          <BadgeArtwork
+            badge={composition.badge}
+            color={ink}
+            x={66}
+            y={60}
+            scale={0.72}
+          />
         </g>
       )}
-    </Outline>
+    </svg>
   );
 }
 
@@ -162,14 +281,14 @@ export default function FolderIcon({
 }: FolderIconAppearance & {
   value?: string;
 }) {
-  const preset = folderPresetFromIcon(value);
+  const composition = readFolderIconStyle(value);
   return (
     <PageIcon
-      value={preset ? undefined : value}
+      value={composition ? undefined : value}
       size={size}
       fallback={
         <FolderIconGlyph
-          preset={preset}
+          composition={composition}
           size={size}
           open={open}
           strokeWidth={strokeWidth}

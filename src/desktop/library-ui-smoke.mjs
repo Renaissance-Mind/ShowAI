@@ -560,68 +560,66 @@ try {
   const openFolderIconPicker = () =>
     folderSettings.getByRole("button", { name: "设置文件夹图标" }).click();
   const folderIconPicker = page.getByRole("dialog", { name: "文件夹图标" });
-  const presets = folderIconPicker.locator(".folder-icon-grid button");
   const defaultColor = folderIconPicker.getByRole("button", { name: "默认色" });
+  const blue = folderIconPicker.getByRole("button", { name: "蓝色", exact: true });
+  const gold = folderIconPicker.getByRole("button", { name: "黄色", exact: true });
+  const chart = folderIconPicker.getByRole("button", { name: "使用数据图标" });
+  const folderMode = folderIconPicker.getByRole("button", { name: "文件夹", exact: true });
+  const standaloneMode = folderIconPicker.getByRole("button", { name: "独立图标" });
   const closedPreview = folderIconPicker.locator('[data-folder-state="closed"]');
   const openPreview = folderIconPicker.locator('[data-folder-state="open"]');
-  const closedGlyph = closedPreview.locator("svg");
-  const openGlyph = openPreview.locator("svg");
+  const singlePreview = folderIconPicker.locator('[data-folder-state="standalone"]');
+  const saveIcon = folderIconPicker.getByRole("button", { name: "保存", exact: true });
+  const saveFolder = async () => {
+    await saveIcon.click();
+    await folderIconPicker.waitFor({ state: "hidden" });
+    await folderSettings.getByRole("button", { name: "保存", exact: true }).click();
+    await folderSettings.waitFor({ state: "hidden" });
+  };
+  const readSavedIcon = async () =>
+    (await projectData()).folders.find((folder) => folder.id === folderB.id)?.icon;
+
   await openFolderIconPicker();
-  const closedOutline = await folderOutline(closedGlyph);
-  const openOutline = await folderOutline(openGlyph);
-  assert.equal(closedOutline.width, "64px");
-  assert.equal(openOutline.width, closedOutline.width);
-  assert.notEqual(closedOutline.path, openOutline.path);
-  assert.equal(await presets.count(), 19);
-  assert.equal(await folderIconPicker.getByRole("switch").count(), 0);
-  assert.equal(await presets.first().getAttribute("aria-label"), "默认色");
   assert.equal(await defaultColor.getAttribute("aria-pressed"), "true");
-  const dataFolder = folderIconPicker.getByRole("button", {
-    name: "使用数据文件夹",
-  });
-  const paletteOutline = await folderOutline(defaultColor.locator("svg"));
-  assert.equal(paletteOutline.width, "48px");
-  assert.deepEqual(
-    await folderOutline(dataFolder.locator("svg")),
-    paletteOutline,
-  );
+  assert.equal(await closedPreview.count(), 1);
+  assert.equal(await openPreview.count(), 1);
+  await blue.click();
+  await chart.click();
+  assert.equal(await blue.getAttribute("aria-pressed"), "true");
+  assert.equal(await chart.getAttribute("aria-pressed"), "true");
+  await gold.click();
+  assert.equal(await chart.getAttribute("aria-pressed"), "true");
+  assert.equal(await gold.getAttribute("aria-pressed"), "true");
+  assert.equal(await closedPreview.locator("g rect").count(), 5);
+  await page.screenshot({ path: join(output, "folder-icon-composed-chart.png") });
+
+  await standaloneMode.click();
+  assert.equal(await singlePreview.count(), 1);
+  assert.equal(await closedPreview.count(), 0);
+  assert.equal(await openPreview.count(), 0);
+  assert.equal(await gold.getAttribute("aria-pressed"), "true");
+  await folderMode.click();
+
   await page.setViewportSize({ width: 360, height: 700 });
-  const colorGrid = folderIconPicker.locator(".folder-icon-grid").first();
-  assert.ok(
-    await colorGrid.evaluate(
-      (grid) => getComputedStyle(grid).gridTemplateColumns.split(" ").length < 7,
-    ),
+  const composer = folderIconPicker.locator(".folder-icon-composer");
+  assert.equal(
+    await composer.evaluate((grid) => getComputedStyle(grid).gridTemplateColumns.split(" ").length),
+    1,
   );
-  assert.deepEqual(
-    await folderOutline(dataFolder.locator("svg")),
-    paletteOutline,
-  );
-  assert.deepEqual(
-    await folderOutline(defaultColor.locator("svg")),
-    paletteOutline,
-  );
-  const presetStroke = await dataFolder.locator("svg").getAttribute("stroke");
-  assert.match(presetStroke, /^#[\da-f]{6}$/i);
-  await dataFolder.click();
-  await closedGlyph.locator(":scope > g").waitFor();
+  await folderIconPicker.getByRole("button", { name: "Emoji", exact: true }).click();
+  await folderIconPicker.getByRole("button", { name: "使用 📚", exact: true }).click();
+  assert.equal(await closedPreview.locator("text").textContent(), "📚");
+  assert.equal(await openPreview.locator("text").textContent(), "📚");
+  assert.equal(await gold.getAttribute("aria-pressed"), "true");
   await page.setViewportSize(fullSize);
-  assert.deepEqual(await folderOutline(closedGlyph), closedOutline);
-  assert.deepEqual(await folderOutline(openGlyph), openOutline);
-  assert.equal(await closedGlyph.getAttribute("stroke"), presetStroke);
-  assert.equal(await openGlyph.getAttribute("stroke"), presetStroke);
-  assert.equal(await dataFolder.getAttribute("aria-pressed"), "true");
-  await page.screenshot({ path: join(output, "folder-icon-presets.png") });
-  await folderIconPicker
-    .getByRole("button", { name: "保存", exact: true })
-    .click();
+  await page.screenshot({ path: join(output, "folder-icon-composed-emoji.png") });
+  await saveIcon.click();
   await folderIconPicker.waitFor({ state: "hidden" });
   await nameDialog("文件夹名称", "Renamed folder");
   const folderIconValue = await poll(
-    async () =>
-      (await projectData()).folders.find((folder) => folder.id === folderB.id)
-        ?.icon,
+    readSavedIcon,
     (icon) => /^data:image\/png;base64,/.test(icon ?? ""),
-    "folder preset PNG",
+    "composed folder icon PNG",
   );
   await choose(folderB.id, "置顶");
   await poll(
@@ -667,51 +665,42 @@ try {
     "Renamed folder",
   );
   assert.equal(await row(folderB.id).getAttribute("data-pinned"), "true");
-  assert.deepEqual(await folderOutline(sidebarFolderIcon), sidebarOpenOutline);
-  assert.equal(await sidebarFolderIcon.getAttribute("stroke"), presetStroke);
+  assert.equal(await sidebarFolderIcon.locator("text").textContent(), "📚");
+  const styledOpenPath = (await folderOutline(sidebarFolderIcon)).path;
   await folderToggle.click();
-  assert.deepEqual(await folderOutline(sidebarFolderIcon), sidebarClosedOutline);
-  assert.equal(await sidebarFolderIcon.getAttribute("stroke"), presetStroke);
+  assert.notEqual((await folderOutline(sidebarFolderIcon)).path, styledOpenPath);
+  assert.equal(await sidebarFolderIcon.locator("text").textContent(), "📚");
   await expand(folderB.id);
+
   await choose(folderB.id, "重命名");
   await openFolderIconPicker();
-  assert.equal(await presets.count(), 19);
-  assert.deepEqual(await folderOutline(closedGlyph), closedOutline);
-  assert.deepEqual(await folderOutline(openGlyph), openOutline);
-  assert.equal(await closedGlyph.getAttribute("stroke"), presetStroke);
-  assert.equal(await openGlyph.getAttribute("stroke"), presetStroke);
-  assert.equal(await dataFolder.getAttribute("aria-pressed"), "true");
-  await folderIconPicker
-    .getByRole("button", { name: "Emoji", exact: true })
-    .click();
-  await folderIconPicker
-    .getByRole("button", { name: "使用 📚", exact: true })
-    .click();
-  await folderIconPicker
-    .getByRole("button", { name: "默认", exact: true })
-    .click();
-  const saveIcon = folderIconPicker.getByRole("button", {
-    name: "保存",
-    exact: true,
-  });
-  assert.equal(await saveIcon.isEnabled(), false);
+  assert.equal(await gold.getAttribute("aria-pressed"), "true");
+  assert.equal(await closedPreview.locator("text").textContent(), "📚");
+  await standaloneMode.click();
+  assert.equal(await closedPreview.count(), 0);
+  assert.equal(await openPreview.count(), 0);
+  assert.equal(await singlePreview.locator("text").textContent(), "📚");
+  assert.equal(await gold.count(), 0);
+  await page.screenshot({ path: join(output, "folder-icon-standalone.png") });
+  await saveFolder();
+  await poll(readSavedIcon, (icon) => icon === "📚", "standalone folder emoji");
+  assert.equal((await folderToggle.locator(".page-icon").textContent())?.trim(), "📚");
+  await folderToggle.click();
+  assert.equal((await folderToggle.locator(".page-icon").textContent())?.trim(), "📚");
+  await expand(folderB.id);
+
+  await choose(folderB.id, "重命名");
+  await openFolderIconPicker();
+  assert.equal(await standaloneMode.getAttribute("aria-pressed"), "true");
+  await folderMode.click();
+  await folderIconPicker.getByRole("button", { name: "图形", exact: true }).click();
+  await folderIconPicker.getByRole("button", { name: "无图标" }).click();
   await defaultColor.click();
-  assert.equal(await defaultColor.getAttribute("aria-pressed"), "true");
-  assert.equal(await closedGlyph.locator(":scope > g").count(), 0);
-  assert.equal(await closedGlyph.getAttribute("stroke"), "currentColor");
-  await saveIcon.click();
-  await folderIconPicker.waitFor({ state: "hidden" });
-  await folderSettings.getByRole("button", { name: "保存", exact: true }).click();
-  await folderSettings.waitFor({ state: "hidden" });
-  await poll(
-    projectData,
-    ({ folders }) =>
-      folders.find((folder) => folder.id === folderB.id)?.icon === "",
-    "system default folder icon restored",
-  );
-  assert.equal(await folderToggle.locator("svg").count(), 1);
+  await saveFolder();
+  await poll(readSavedIcon, (icon) => icon === "", "system default folder icon restored");
+  assert.deepEqual(await folderOutline(sidebarFolderIcon), sidebarOpenOutline);
   result.checks.push(
-    "Folder presets keep the same size when the picker wraps, match the default outline, persist, and can be cleared",
+    "Folder colors and icons combine independently, composed icons persist across reload, and standalone emoji render without a folder frame",
   );
   assert.equal(
     await row(nested.id).locator(".studio-tree-title").innerText(),
