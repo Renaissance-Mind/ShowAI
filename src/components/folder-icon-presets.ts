@@ -1,3 +1,5 @@
+export const defaultFolderColor = "#a8b0bd";
+
 export const folderColors = [
   { value: "", name: "defaultColor" },
   { value: "#7c8492", name: "preset.graphite" },

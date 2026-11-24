@@ -1,3 +1,7 @@
+.studio-modal-shade:has(> .folder-icon-dialog) {
+  z-index: 245;
+}
+
 .studio-modal.folder-icon-dialog {
   --folder-composer-pad: 22px;
   width: min(748px, 100%);
@@ -231,27 +235,7 @@
   background: var(--accent-soft);
 }
 
-.folder-icon-badge-options {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin-top: 3px;
-}
-
-.folder-icon-badge-options > span {
-  color: var(--muted);
-  font-size: 12px;
-  font-weight: 550;
-}
-
-.folder-icon-badge-backgrounds i {
-  width: 12px;
-  height: 12px;
-  flex: none;
-  border: 1px solid var(--line);
-  border-radius: 4px;
+.folder-icon-badge-backgrounds > button > span {
   background: conic-gradient(
       var(--line) 25%,
       var(--paper) 0 50%,

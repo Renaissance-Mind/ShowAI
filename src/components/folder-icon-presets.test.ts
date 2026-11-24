@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  defaultFolderColor,
   folderColors,
   folderSymbols,
   readFolderIconStyle,
@@ -13,9 +14,10 @@ const png =
 describe("folder icon styles", () => {
   it("offers unique colors and symbols independently", () => {
     expect(folderColors[0].value).toBe("");
-    expect(new Set(folderColors.map(({ value }) => value)).size).toBe(
-      folderColors.length,
+    const swatchColors = folderColors.map(
+      ({ value }) => value || defaultFolderColor,
     );
+    expect(new Set(swatchColors).size).toBe(folderColors.length);
     expect(new Set(folderSymbols).size).toBe(folderSymbols.length);
   });
 

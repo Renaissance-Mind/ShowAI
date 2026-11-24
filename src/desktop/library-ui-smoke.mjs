@@ -561,6 +561,7 @@ try {
     folderSettings.getByRole("button", { name: "设置文件夹图标" }).click();
   const folderIconPicker = page.getByRole("dialog", { name: "文件夹图标" });
   const defaultColor = folderIconPicker.getByRole("button", { name: "默认色" });
+  const graphite = folderIconPicker.getByRole("button", { name: "石墨色" });
   const blue = folderIconPicker.getByRole("button", { name: "蓝色", exact: true });
   const gold = folderIconPicker.getByRole("button", { name: "黄色", exact: true });
   const customColor = folderIconPicker.getByLabel("自定义颜色");
@@ -602,13 +603,39 @@ try {
   );
   assert.equal(await closedPreview.count(), 1);
   assert.equal(await openPreview.count(), 1);
-  await blue.click();
+  const swatchColor = (button) =>
+    button
+      .locator("span")
+      .evaluate((chip) => getComputedStyle(chip).backgroundColor);
+  assert.notEqual(await swatchColor(defaultColor), await swatchColor(graphite));
+
   await chart.click();
+  const folderFills = () =>
+    Promise.all(
+      [closedPreview, openPreview].map((preview) =>
+        preview.locator("svg > path").getAttribute("fill"),
+      ),
+    );
+  const defaultFills = await folderFills();
+  await graphite.click();
+  assert.equal(await graphite.getAttribute("aria-pressed"), "true");
+  const graphiteFills = await folderFills();
+  for (const [index, fill] of defaultFills.entries()) {
+    assert.notEqual(fill, graphiteFills[index]);
+  }
+
+  await blue.click();
   assert.equal(await blue.getAttribute("aria-pressed"), "true");
   assert.equal(await chart.getAttribute("aria-pressed"), "true");
   await gold.click();
   assert.equal(await chart.getAttribute("aria-pressed"), "true");
   assert.equal(await gold.getAttribute("aria-pressed"), "true");
+  const backgroundSwatches = iconBackground.getByRole("button");
+  assert.equal(await backgroundSwatches.count(), 3);
+  const swatchRows = await backgroundSwatches.evaluateAll((buttons) =>
+    buttons.map((button) => button.getBoundingClientRect().top),
+  );
+  assert.equal(new Set(swatchRows).size, 1);
   assert.equal(
     await iconBackground
       .getByRole("button", { name: "透明" })
@@ -772,7 +799,7 @@ try {
   await poll(readSavedIcon, (icon) => icon === "", "system default folder icon restored");
   assert.deepEqual(await folderOutline(sidebarFolderIcon), sidebarOpenOutline);
   result.checks.push(
-    "Custom folder color and adaptive icon backing persist across reload, and artwork stays attached to the folder face",
+    "Default and graphite folders render distinct colors, and backing swatches and custom colors work across reload",
   );
   assert.equal(
     await row(nested.id).locator(".studio-tree-title").innerText(),

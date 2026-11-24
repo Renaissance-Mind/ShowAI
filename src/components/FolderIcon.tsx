@@ -1,6 +1,7 @@
 import PageIcon from "./PageIcon";
 import { Folder, FolderOpen } from "../ui/icons";
 import {
+  defaultFolderColor,
   readFolderIconStyle,
   type FolderBadge,
   type FolderBadgeBackground,
@@ -127,7 +128,6 @@ type FolderIconAppearance = {
   strokeWidth?: number;
 };
 
-const neutral = "#7c8492";
 const emojiFont =
   "Apple Color Emoji, Segoe UI Emoji, Noto Color Emoji, sans-serif";
 const segmenter = new Intl.Segmenter(undefined, { granularity: "grapheme" });
@@ -147,7 +147,7 @@ export function folderBadgeFill(
 ) {
   if (background === "white") return "#fffaf3";
   if (background === "adaptive")
-    return `color-mix(in srgb, ${color || neutral}, white 84%)`;
+    return `color-mix(in srgb, ${color || defaultFolderColor}, white 84%)`;
   return undefined;
 }
 
@@ -225,7 +225,7 @@ export function FolderIconGlyph({
 }: FolderIconAppearance & {
   composition?: FolderIconStyle;
 }) {
-  const paint = composition?.color || neutral;
+  const paint = composition?.color || defaultFolderColor;
   const ink = `color-mix(in srgb, ${paint}, #1f2937 50%)`;
   if (composition?.mode === "standalone" && composition.badge) {
     return (
