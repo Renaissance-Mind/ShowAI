@@ -7,16 +7,22 @@ import commonMessages from "../i18n/messages/common";
 import folderIconMessages from "../i18n/messages/folderIcons";
 import studioMessages from "../i18n/messages/studio";
 import { isImageIcon, validatePageIcon } from "../lib/page-icon.mjs";
-import { FolderBadgeGlyph, FolderIconGlyph } from "./FolderIcon";
+import {
+  folderBadgeFill,
+  FolderBadgeGlyph,
+  FolderIconGlyph,
+} from "./FolderIcon";
 import IconImageOptions from "./IconImageOptions";
 import PageIcon from "./PageIcon";
 import { iconEmoji } from "./PageIconDialog";
 import {
+  folderBadgeBackgrounds,
   folderColors,
   folderSymbols,
   rasterizeFolderIcon,
   readFolderIconStyle,
   type FolderBadge,
+  type FolderBadgeBackground,
   type FolderIconStyle,
 } from "./folder-icon-presets";
 import "./folder-icon-dialog.css";
@@ -42,6 +48,9 @@ export default function FolderIconDialog({
     initial?.mode ?? (value ? "standalone" : "folder"),
   );
   const [color, setColor] = useState(initial?.color ?? "");
+  const [badgeBackground, setBadgeBackground] = useState<FolderBadgeBackground>(
+    initial?.badgeBackground ?? "transparent",
+  );
   const [icon, setIcon] = useState<SelectedIcon | null>(() =>
     initial
       ? initial.badge
@@ -62,14 +71,19 @@ export default function FolderIconDialog({
       : icon?.kind === "emoji" && icon.value.trim()
         ? { kind: "emoji", value: icon.value.trim() }
         : null;
-  const composition: FolderIconStyle = { mode, color, badge };
+  const composition: FolderIconStyle = {
+    mode,
+    color,
+    badge,
+    ...(mode === "folder" && badge && badgeBackground !== "transparent"
+      ? { badgeBackground }
+      : {}),
+  };
   const showColor =
     mode === "folder" ||
     icon?.kind === "symbol" ||
     (!icon && source === "symbol");
-  const colors = folderColors.some((swatch) => swatch.value === color)
-    ? folderColors
-    : [...folderColors, { value: color, name: "currentColor" as const }];
+  const isCustomColor = !folderColors.some((swatch) => swatch.value === color);
   const canSave =
     !busy &&
     (mode === "folder" ||
@@ -129,6 +143,7 @@ export default function FolderIconDialog({
       title={title}
       className="folder-icon-dialog"
       dismissible={!busy}
+      initialFocus="container"
       onClose={onClose}
     >
       <form
@@ -221,7 +236,7 @@ export default function FolderIconDialog({
                 <section className="folder-icon-colors">
                   <h3>{t("color")}</h3>
                   <div className="folder-icon-swatches">
-                    {colors.map((swatch) => (
+                    {folderColors.map((swatch) => (
                       <button
                         key={swatch.value}
                         type="button"
@@ -241,6 +256,22 @@ export default function FolderIconDialog({
                         )}
                       </button>
                     ))}
+                    <label
+                      className="folder-icon-custom-color"
+                      data-selected={isCustomColor || undefined}
+                      title={t("customColor")}
+                    >
+                      <span aria-hidden="true">
+                        {isCustomColor && <i style={{ background: color }} />}
+                      </span>
+                      <input
+                        type="color"
+                        aria-label={t("customColor")}
+                        value={color || "#8b93a0"}
+                        disabled={busy}
+                        onInput={(event) => setColor(event.currentTarget.value)}
+                      />
+                    </label>
                   </div>
                 </section>
               )}
@@ -361,6 +392,35 @@ export default function FolderIconDialog({
                       select({ kind: "image", value: next.trim() });
                     }}
                   />
+                )}
+                {mode === "folder" && badge && (
+                  <div className="folder-icon-badge-options">
+                    <span>{t("badgeBackground")}</span>
+                    <div
+                      className="folder-icon-sources folder-icon-badge-backgrounds"
+                      role="group"
+                      aria-label={t("badgeBackground")}
+                    >
+                      {folderBadgeBackgrounds.map((background) => {
+                        const fill = folderBadgeFill(background, color);
+                        return (
+                          <button
+                            key={background}
+                            type="button"
+                            aria-pressed={badgeBackground === background}
+                            disabled={busy}
+                            onClick={() => setBadgeBackground(background)}
+                          >
+                            <i
+                              aria-hidden="true"
+                              style={fill ? { background: fill } : undefined}
+                            />
+                            {t(`background.${background}`)}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
                 )}
               </section>
             </div>

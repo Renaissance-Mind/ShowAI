@@ -128,10 +128,10 @@
   gap: 5px;
 }
 
-.folder-icon-swatches > button {
+.folder-icon-swatches > :is(button, .folder-icon-custom-color) {
   display: grid;
   place-items: center;
-  width: 34px;
+  width: 32px;
   height: 34px;
   padding: 0;
   border: 1px solid transparent;
@@ -139,11 +139,57 @@
   color: var(--muted);
 }
 
-.folder-icon-swatches > button > span {
+.folder-icon-swatches > :is(button, .folder-icon-custom-color) > span {
   width: 21px;
   height: 21px;
   border: 1px solid color-mix(in srgb, var(--text) 12%, transparent);
   border-radius: 50%;
+}
+
+.folder-icon-custom-color {
+  position: relative;
+  cursor: pointer;
+}
+
+.folder-icon-custom-color > span {
+  display: grid;
+  place-items: center;
+  background: conic-gradient(
+    #cf6464,
+    #d5a541,
+    #75965e,
+    #4fae9c,
+    #5b8def,
+    #9274c0,
+    #cf6464
+  );
+}
+
+.folder-icon-custom-color > span > i {
+  width: 11px;
+  height: 11px;
+  border: 1px solid var(--paper);
+  border-radius: 50%;
+}
+
+.folder-icon-custom-color > input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  opacity: 0;
+  cursor: inherit;
+}
+
+.folder-icon-custom-color:has(input:focus-visible) {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.folder-icon-custom-color:has(input:disabled) {
+  cursor: default;
+  opacity: 0.5;
 }
 
 .folder-icon-picker-heading {
@@ -173,15 +219,46 @@
   line-height: 1;
 }
 
-.folder-icon-swatches > button:hover,
+.folder-icon-swatches > :is(button, .folder-icon-custom-color):hover,
 .folder-icon-choices > button:hover {
   background: var(--hover);
 }
 
 .folder-icon-swatches > button[aria-pressed="true"],
+.folder-icon-custom-color[data-selected],
 .folder-icon-choices > button[aria-pressed="true"] {
   border-color: color-mix(in srgb, var(--text) 30%, var(--paper));
   background: var(--accent-soft);
+}
+
+.folder-icon-badge-options {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 3px;
+}
+
+.folder-icon-badge-options > span {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 550;
+}
+
+.folder-icon-badge-backgrounds i {
+  width: 12px;
+  height: 12px;
+  flex: none;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: conic-gradient(
+      var(--line) 25%,
+      var(--paper) 0 50%,
+      var(--line) 0 75%,
+      var(--paper) 0
+    )
+    0 0 / 6px 6px;
 }
 
 .folder-icon-form button:focus-visible {

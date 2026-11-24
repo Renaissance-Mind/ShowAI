@@ -563,11 +563,22 @@ try {
   const defaultColor = folderIconPicker.getByRole("button", { name: "默认色" });
   const blue = folderIconPicker.getByRole("button", { name: "蓝色", exact: true });
   const gold = folderIconPicker.getByRole("button", { name: "黄色", exact: true });
+  const customColor = folderIconPicker.getByLabel("自定义颜色");
+  const iconBackground = folderIconPicker.getByRole("group", {
+    name: "图标底色",
+  });
+  const whiteBackground = iconBackground.getByRole("button", { name: "白色" });
+  const adaptiveBackground = iconBackground.getByRole("button", {
+    name: "自适应",
+  });
+  const customHue = "#6f4ccb";
+  const adaptiveFill = `color-mix(in srgb, ${customHue}, white 84%)`;
   const chart = folderIconPicker.getByRole("button", { name: "使用数据图标" });
   const folderMode = folderIconPicker.getByRole("button", { name: "文件夹", exact: true });
   const standaloneMode = folderIconPicker.getByRole("button", { name: "独立图标" });
   const closedPreview = folderIconPicker.locator('[data-folder-state="closed"]');
   const openPreview = folderIconPicker.locator('[data-folder-state="open"]');
+  const badgeBacking = (preview) => preview.locator("[data-folder-badge] > rect");
   const singlePreview = folderIconPicker.locator('[data-folder-state="standalone"]');
   const saveIcon = folderIconPicker.getByRole("button", { name: "保存", exact: true });
   const saveFolder = async () => {
@@ -581,6 +592,14 @@ try {
 
   await openFolderIconPicker();
   assert.equal(await defaultColor.getAttribute("aria-pressed"), "true");
+  assert.equal(
+    await customColor.evaluate(
+      (input) =>
+        input.parentElement ===
+        input.closest(".folder-icon-swatches").lastElementChild,
+    ),
+    true,
+  );
   assert.equal(await closedPreview.count(), 1);
   assert.equal(await openPreview.count(), 1);
   await blue.click();
@@ -590,6 +609,14 @@ try {
   await gold.click();
   assert.equal(await chart.getAttribute("aria-pressed"), "true");
   assert.equal(await gold.getAttribute("aria-pressed"), "true");
+  assert.equal(
+    await iconBackground
+      .getByRole("button", { name: "透明" })
+      .getAttribute("aria-pressed"),
+    "true",
+  );
+  assert.equal(await badgeBacking(closedPreview).count(), 0);
+  await whiteBackground.click();
   const openFace = openPreview.locator("[data-folder-face]");
   const rectangleCenter = (locator) =>
     locator.evaluate((rect) => {
@@ -600,7 +627,8 @@ try {
   const openSkew = await openFace.evaluate((face) => face.getCTM().c);
   assert.ok(openSkew < 0);
   for (const preview of [closedPreview, openPreview]) {
-    const backing = preview.locator("[data-folder-badge] > rect");
+    const backing = badgeBacking(preview);
+    assert.equal(await backing.getAttribute("fill"), "#fffaf3");
     assert.deepEqual(await rectangleCenter(backing), faceCenter);
     assert.equal(
       await backing.evaluate((rect) => rect.getCTM().c),
@@ -624,11 +652,17 @@ try {
   assert.deepEqual(await chartCenter(openPreview), faceCenter);
   await page.screenshot({ path: join(output, "folder-icon-composed-chart.png") });
 
+  await adaptiveBackground.click();
+  await customColor.fill(customHue);
+  for (const preview of [closedPreview, openPreview]) {
+    assert.equal(await badgeBacking(preview).getAttribute("fill"), adaptiveFill);
+  }
   await standaloneMode.click();
   assert.equal(await singlePreview.count(), 1);
   assert.equal(await closedPreview.count(), 0);
   assert.equal(await openPreview.count(), 0);
-  assert.equal(await gold.getAttribute("aria-pressed"), "true");
+  assert.equal(await customColor.inputValue(), customHue);
+  assert.equal(await iconBackground.count(), 0);
   await folderMode.click();
 
   await page.setViewportSize({ width: 360, height: 700 });
@@ -645,7 +679,8 @@ try {
     assert.equal(Number(await emoji.getAttribute("x")), faceCenter[0]);
     assert.equal(Number(await emoji.getAttribute("y")), faceCenter[1] + 1);
   }
-  assert.equal(await gold.getAttribute("aria-pressed"), "true");
+  assert.equal(await customColor.inputValue(), customHue);
+  assert.equal(await adaptiveBackground.getAttribute("aria-pressed"), "true");
   await page.setViewportSize(fullSize);
   await page.screenshot({ path: join(output, "folder-icon-composed-emoji.png") });
   await saveIcon.click();
@@ -709,7 +744,9 @@ try {
 
   await choose(folderB.id, "重命名");
   await openFolderIconPicker();
-  assert.equal(await gold.getAttribute("aria-pressed"), "true");
+  assert.equal(await customColor.inputValue(), customHue);
+  assert.equal(await adaptiveBackground.getAttribute("aria-pressed"), "true");
+  assert.equal(await badgeBacking(closedPreview).getAttribute("fill"), adaptiveFill);
   assert.equal(await closedPreview.locator("text").textContent(), "📚");
   await standaloneMode.click();
   assert.equal(await closedPreview.count(), 0);
@@ -735,7 +772,7 @@ try {
   await poll(readSavedIcon, (icon) => icon === "", "system default folder icon restored");
   assert.deepEqual(await folderOutline(sidebarFolderIcon), sidebarOpenOutline);
   result.checks.push(
-    "Folder icon backing and artwork stay centered on the folder face as it opens, persist across reload, and support standalone display",
+    "Custom folder color and adaptive icon backing persist across reload, and artwork stays attached to the folder face",
   );
   assert.equal(
     await row(nested.id).locator(".studio-tree-title").innerText(),

@@ -3,6 +3,7 @@ import { Folder, FolderOpen } from "../ui/icons";
 import {
   readFolderIconStyle,
   type FolderBadge,
+  type FolderBadgeBackground,
   type FolderIconStyle,
 } from "./folder-icon-presets";
 
@@ -140,6 +141,16 @@ const faceBottom = folderFace.y + folderFace.height;
 // Anchor the opening face at its lower-left corner so the badge moves with it.
 const openFaceTransform = `translate(${folderFace.x} ${faceBottom}) matrix(.86 0 -.28 .78 0 0) translate(${-folderFace.x} ${-faceBottom})`;
 
+export function folderBadgeFill(
+  background: FolderBadgeBackground | undefined,
+  color: string,
+) {
+  if (background === "white") return "#fffaf3";
+  if (background === "adaptive")
+    return `color-mix(in srgb, ${color || neutral}, white 84%)`;
+  return undefined;
+}
+
 function BadgeArtwork({
   badge,
   color,
@@ -232,6 +243,7 @@ export function FolderIconGlyph({
 
   const face = `color-mix(in srgb, ${paint}, white 40%)`;
   const back = `color-mix(in srgb, ${paint}, white 20%)`;
+  const badgeFill = folderBadgeFill(composition.badgeBackground, paint);
   return (
     <svg
       xmlns="http://www.w3.org/2000/svg"
@@ -249,14 +261,16 @@ export function FolderIconGlyph({
           {open && <rect {...folderFace} fill={face} />}
           {composition.badge && (
             <g data-folder-badge="">
-              <rect
-                x={faceCenter.x - badgeSize / 2}
-                y={faceCenter.y - badgeSize / 2}
-                width={badgeSize}
-                height={badgeSize}
-                rx={13}
-                fill="#fffaf3"
-              />
+              {badgeFill && (
+                <rect
+                  x={faceCenter.x - badgeSize / 2}
+                  y={faceCenter.y - badgeSize / 2}
+                  width={badgeSize}
+                  height={badgeSize}
+                  rx={13}
+                  fill={badgeFill}
+                />
+              )}
               <BadgeArtwork
                 badge={composition.badge}
                 color={ink}

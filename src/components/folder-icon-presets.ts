@@ -29,10 +29,18 @@ export type FolderSymbol = (typeof folderSymbols)[number];
 export type FolderBadge =
   { kind: "symbol"; value: FolderSymbol } | { kind: "emoji"; value: string };
 
+export const folderBadgeBackgrounds = [
+  "transparent",
+  "white",
+  "adaptive",
+] as const;
+export type FolderBadgeBackground = (typeof folderBadgeBackgrounds)[number];
+
 export type FolderIconStyle = {
   mode: "folder" | "standalone";
   color: string;
   badge: FolderBadge | null;
+  badgeBackground?: FolderBadgeBackground;
 };
 
 const legacyColors: Record<string, string> = {
@@ -85,6 +93,10 @@ function isFolderStyle(value: unknown): value is FolderIconStyle {
     (style.mode === "folder" || style.mode === "standalone") &&
     typeof style.color === "string" &&
     (style.color === "" || /^#[\da-f]{6}$/i.test(style.color)) &&
+    (style.badgeBackground === undefined ||
+      folderBadgeBackgrounds.some(
+        (background) => background === style.badgeBackground,
+      )) &&
     (style.badge === null || isBadge(style.badge))
   );
 }

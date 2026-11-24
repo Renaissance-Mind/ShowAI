@@ -20,7 +20,18 @@ describe("folder icon styles", () => {
   });
 
   it.each([
-    { mode: "folder", color: "#5b8def", badge: { kind: "emoji", value: "👩🏽‍💻" } },
+    {
+      mode: "folder",
+      color: "#5b8def",
+      badge: { kind: "emoji", value: "👩🏽‍💻" },
+      badgeBackground: "adaptive",
+    },
+    {
+      mode: "folder",
+      color: "#6f4ccb",
+      badge: { kind: "symbol", value: "chart" },
+      badgeBackground: "white",
+    },
     { mode: "folder", color: "#d47f50", badge: null },
     {
       mode: "standalone",
