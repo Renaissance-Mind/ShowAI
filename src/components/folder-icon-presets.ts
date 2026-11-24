@@ -129,67 +129,6 @@ export const folderIconGroups: {
   },
 ];
 
-function symbolMarkup(symbol: FolderIconPreset["symbol"]): string {
-  const common =
-    'fill="none" stroke="white" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"';
-  switch (symbol) {
-    case "briefcase":
-      return `<rect x="32" y="43" width="32" height="27" rx="4" ${common}/><path d="M40 43v-6h16v6M32 53c9 5 23 5 32 0M48 52v5" ${common}/>`;
-    case "code":
-      return `<path d="m42 44-9 11 9 11M54 44l9 11-9 11M51 40l-6 30" ${common}/>`;
-    case "chart":
-      return `<path d="M31 70h36M35 66V55M48 66V43M61 66V51" ${common}/>`;
-    case "book":
-      return `<path d="M28 42c8-3 15-1 20 4v27c-5-5-12-7-20-4V42Zm40 0c-8-3-15-1-20 4v27c5-5 12-7 20-4V42Z" ${common}/>`;
-    case "flask":
-      return `<path d="M41 39h14M44 39v13L33 67c-2 4 1 7 5 7h20c4 0 7-3 5-7L52 52V39M39 61h18" ${common}/>`;
-    case "camera":
-      return `<path d="M29 48h9l4-7h13l4 7h9v25H29V48Z" ${common}/><circle cx="48" cy="59" r="8" ${common}/>`;
-    case "star":
-      return '<path d="m48 35 7 14 16 2-12 11 3 16-14-8-14 8 3-16-12-11 16-2 7-14Z" fill="white"/>';
-    case "heart":
-      return '<path d="M48 75S27 63 27 49c0-12 15-16 21-6 6-10 21-6 21 6 0 14-21 26-21 26Z" fill="white"/>';
-    case "bookmark":
-      return `<path d="M37 36h22v39L48 66l-11 9V36Z" ${common}/>`;
-    case "flag":
-      return `<path d="M34 76V36M37 39h28l-7 11 7 11H37" ${common}/>`;
-    case "bolt":
-      return '<path d="m53 33-21 28h14l-3 19 22-31H51l2-16Z" fill="white"/>';
-    case "globe":
-      return `<circle cx="48" cy="56" r="21" ${common}/><path d="M27 56h42M48 35c8 8 11 15 11 21s-3 13-11 21c-8-8-11-15-11-21s3-13 11-21Z" ${common}/>`;
-    default:
-      return "";
-  }
-}
-
-const closedFolder =
-  '<path d="M10 28a10 10 0 0 1 10-10h21l10 11h25a10 10 0 0 1 10 10v35a10 10 0 0 1-10 10H20A10 10 0 0 1 10 74V28Z" fill="url(#folder)"/>';
-// The front face shares the same lower edge as the filled outer silhouette.
-const openFolderBase = "a6 6 0 0 1 6 8l-8 25a10 10 0 0 1-9 7H17a9 9 0 0 1-9-9";
-const openFolder = [
-  `<path d="M8 28a9 9 0 0 1 9-9h18l10 11h26a9 9 0 0 1 9 9v5h3${openFolderBase}V28Z" fill="url(#folder)"/>`,
-  '<path d="M8 35h67a9 9 0 0 1 5 9H8Z" fill="#172132" fill-opacity=".15"/>',
-  `<path d="M23 44h60${openFolderBase}l7-24a9 9 0 0 1 8-7Z" fill="white" fill-opacity=".12"/>`,
-].join("");
-
-export function folderPresetSvg(
-  preset: FolderIconPreset,
-  open = false,
-): string {
-  const symbol = symbolMarkup(preset.symbol);
-  const badge = symbol
-    ? `<g transform="translate(48 61) scale(.72) translate(-48 -56)">${symbol}</g>`
-    : "";
-  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 96"><defs><linearGradient id="folder" x1="18" y1="18" x2="78" y2="82" gradientUnits="userSpaceOnUse"><stop stop-color="${preset.color}"/><stop offset="1" stop-color="${preset.color}" stop-opacity=".78"/></linearGradient></defs>${open ? openFolder : closedFolder}${badge}</svg>`;
-}
-
-export function folderPresetSource(
-  preset: FolderIconPreset,
-  open = false,
-): string {
-  return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(folderPresetSvg(preset, open))}`;
-}
-
 const pngPrefix = "data:image/png;base64,";
 // The PNG signature and IHDR chunk are 33 bytes, or 44 base64 characters.
 const pngMetadataStart = pngPrefix.length + 44;
@@ -238,9 +177,11 @@ export function tagFolderPresetIcon(
 
 export async function rasterizeFolderPreset(
   preset: FolderIconPreset,
+  glyph: SVGSVGElement,
 ): Promise<string> {
   const image = new Image();
-  image.src = folderPresetSource(preset);
+  const markup = new XMLSerializer().serializeToString(glyph);
+  image.src = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(markup)}`;
   await image.decode();
   const canvas = document.createElement("canvas");
   canvas.width = 128;

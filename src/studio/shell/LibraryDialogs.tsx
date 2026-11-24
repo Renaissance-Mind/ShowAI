@@ -3,6 +3,7 @@ import { Folder, Loader2, Plus } from "../../ui/icons";
 import type { ProjectGroup, ProjectSummary } from "../../core/model";
 import type { LibraryTarget } from "../LibraryNavigation";
 import Dialog from "../../ui/Dialog";
+import FolderIcon from "../../components/FolderIcon";
 import PageIcon from "../../components/PageIcon";
 import folderIconPicker from "../../components/FolderIconDefaults";
 import PageIconDialog, {
@@ -362,7 +363,11 @@ function DirectoryDialog({
             onClick={() => setChoosingIcon(true)}
             aria-label={iconButtonLabel}
           >
-            <PageIcon value={icon} size={28} fallback={<Folder size={28} />} />
+            {iconPresets ? (
+              <FolderIcon value={icon} size={28} strokeWidth={2} />
+            ) : (
+              <PageIcon value={icon} size={28} fallback={<Folder size={28} />} />
+            )}
             <span>{t("setIconButton")}</span>
           </button>
           {children}

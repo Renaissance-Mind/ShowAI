@@ -19,6 +19,7 @@ import {
   type LibraryMenuPoint,
 } from "../ui/LibraryContextMenu";
 import PageIcon from "../components/PageIcon";
+import FolderIcon from "../components/FolderIcon";
 import { isContextMenuShortcut } from "./keyboard-shortcuts";
 import {
   currentEntry,
@@ -421,6 +422,8 @@ export default function WorkspaceTabs({
   const tabIcon = (tab: (typeof tabs)[number]) => {
     const entry = currentEntry(tab);
     const view = entry.location.view;
+    if (view === "project" && entry.location.folderId)
+      return <FolderIcon value={entry.icon} size={15} strokeWidth={2} />;
     const Icon =
       view === "projects"
         ? History

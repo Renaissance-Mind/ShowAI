@@ -30,14 +30,10 @@
   border-color: color-mix(in srgb, var(--text) 24%, var(--paper));
   background: var(--accent-soft);
 }
-.folder-icon-grid img {
-  width: min(100%, 44px);
-  aspect-ratio: 1;
+.folder-icon-grid svg {
+  max-width: 100%;
+  height: auto;
 }
 .folder-icon-standard {
   color: var(--muted);
-}
-.folder-icon-standard .page-icon,
-.folder-icon-standard svg {
-  max-width: 100%;
 }

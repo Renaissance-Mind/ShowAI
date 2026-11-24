@@ -1,12 +1,11 @@
 import type { ComponentProps } from "react";
-import FolderIcon from "./FolderIcon";
+import FolderIcon, { FolderIconGlyph } from "./FolderIcon";
 import { useTranslator } from "../i18n/react";
 import folderIconMessages from "../i18n/messages/folderIcons";
 import type { IconPresetPicker } from "./PageIconDialog";
 import {
   folderIconGroups,
   folderPresetFromIcon,
-  folderPresetSource,
   rasterizeFolderPreset,
 } from "./folder-icon-presets";
 import "./folder-icon-defaults.css";
@@ -19,6 +18,7 @@ function FolderIconDefaults({
 }: ComponentProps<IconPresetPicker["Options"]>) {
   const t = useTranslator(folderIconMessages);
   const selectedPreset = folderPresetFromIcon(value)?.id;
+  const iconSize = 30;
   return (
     <div className="folder-icon-defaults">
       {folderIconGroups.map((group) => (
@@ -35,7 +35,7 @@ function FolderIconDefaults({
                 disabled={busy}
                 onClick={onDefault}
               >
-                <FolderIcon size={30} />
+                <FolderIconGlyph size={iconSize} />
               </button>
             )}
             {group.presets.map((preset) => {
@@ -48,13 +48,12 @@ function FolderIconDefaults({
                   aria-label={t("useFolder", { icon: label })}
                   aria-pressed={selectedPreset === preset.id}
                   disabled={busy}
-                  onClick={() => onChoose(() => rasterizeFolderPreset(preset))}
+                  onClick={(event) => {
+                    const glyph = event.currentTarget.querySelector("svg")!;
+                    onChoose(() => rasterizeFolderPreset(preset, glyph));
+                  }}
                 >
-                  <img
-                    src={folderPresetSource(preset)}
-                    alt=""
-                    draggable={false}
-                  />
+                  <FolderIconGlyph size={iconSize} preset={preset} />
                 </button>
               );
             })}

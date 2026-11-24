@@ -10,7 +10,6 @@ import {
   Check,
   ChevronRight,
   FileDiff,
-  Folder,
   FolderOpen,
   History,
   LayoutTemplate,
@@ -36,6 +35,7 @@ import commonMessages from "../../i18n/messages/common";
 import navigationMessages from "../../i18n/messages/navigation";
 import studioMessages from "../../i18n/messages/studio";
 import syncMessages from "../../i18n/messages/sync";
+import FolderIcon from "../../components/FolderIcon";
 import PageIcon from "../../components/PageIcon";
 import ExpandableSearch from "../../components/ExpandableSearch";
 import { EditorHistoryButtons } from "../../surface/EditorControls";
@@ -319,11 +319,7 @@ export function StudioTopbar({
                     openTargetClick(folderTarget(item, selectedProject!), event)
                   }
                 >
-                  <PageIcon
-                    value={item.icon}
-                    size={16}
-                    fallback={<Folder size={16} />}
-                  />
+                  <FolderIcon value={item.icon} size={16} strokeWidth={2} />
                   <span>{item.name}</span>
                 </button>
               </span>

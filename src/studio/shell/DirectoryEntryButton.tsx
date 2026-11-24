@@ -1,6 +1,6 @@
 import type { ComponentPropsWithoutRef } from "react";
+import FolderIcon from "../../components/FolderIcon";
 import PageIcon from "../../components/PageIcon";
-import { Folder } from "../../ui/icons";
 
 export default function DirectoryEntryButton({
   title,
@@ -19,11 +19,11 @@ export default function DirectoryEntryButton({
     <button type="button" className="studio-page-list-open" {...button}>
       {thumbnail && <span className="studio-thumbnail-space" />}
       <span className="studio-page-list-icon">
-        <PageIcon
-          value={icon}
-          size={19}
-          fallback={folder ? <Folder size={19} /> : undefined}
-        />
+        {folder ? (
+          <FolderIcon value={icon} size={19} strokeWidth={2} />
+        ) : (
+          <PageIcon value={icon} size={19} />
+        )}
       </span>
       <strong>{title}</strong>
       {children}

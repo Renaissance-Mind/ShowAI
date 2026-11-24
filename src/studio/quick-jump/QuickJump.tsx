@@ -8,11 +8,11 @@ import {
   type ReactNode,
 } from "react";
 import PageIcon from "../../components/PageIcon";
+import FolderIcon from "../../components/FolderIcon";
 import {
   Blocks,
   ChevronRight,
   FileText,
-  Folder,
   Layers,
   Search,
 } from "../../ui/icons";
@@ -57,10 +57,9 @@ export const quickJumpSources = new QuickJumpRegistry<QuickJumpContext>(
   builtinSources,
 );
 
-const icons: Record<QuickJumpIcon, ReactNode> = {
+const icons: Record<Exclude<QuickJumpIcon, "folder">, ReactNode> = {
   page: <FileText size={16} />,
   board: <FileText size={16} />,
-  folder: <Folder size={16} />,
   project: <Layers size={16} />,
   content: <Search size={16} />,
   command: <ChevronRight size={16} />,
@@ -314,7 +313,13 @@ export default function QuickJump({
                     onClick={() => run(row)}
                   >
                     <span className="quick-jump-icon" aria-hidden="true">
-                      {row.item.emoji ? (
+                      {row.item.icon === "folder" ? (
+                        <FolderIcon
+                          value={row.item.emoji}
+                          size={16}
+                          strokeWidth={2}
+                        />
+                      ) : row.item.emoji ? (
                         <PageIcon
                           value={row.item.emoji}
                           size={16}

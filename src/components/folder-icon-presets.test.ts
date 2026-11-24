@@ -2,7 +2,6 @@ import { describe, expect, it } from "vitest";
 import {
   folderIconGroups,
   folderPresetFromIcon,
-  folderPresetSource,
   tagFolderPresetIcon,
 } from "./folder-icon-presets";
 import { validatePageIcon } from "../lib/page-icon.mjs";
@@ -17,11 +16,9 @@ describe("folder icon presets", () => {
     const presets = folderIconGroups.flatMap((group) => group.presets);
     expect(presets).toHaveLength(18);
     expect(new Set(presets.map((preset) => preset.id)).size).toBe(18);
-    for (const preset of presets)
-      expect(folderPresetSource(preset)).toContain("data:image/svg+xml");
   });
 
-  it("retains the closed PNG and identifies the corresponding open preset", () => {
+  it("preserves the PNG and identifies its folder preset", () => {
     const png =
       "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=";
     const preset = folderIconGroups[1].presets[0];
@@ -38,8 +35,5 @@ describe("folder icon presets", () => {
     expect(validatePageIcon(tagged)).toBe(tagged);
     expect(folderPresetFromIcon(tagged)).toBe(preset);
     expect(folderPresetFromIcon(png)).toBeUndefined();
-    expect(folderPresetSource(preset, true)).not.toBe(
-      folderPresetSource(preset),
-    );
   });
 });
