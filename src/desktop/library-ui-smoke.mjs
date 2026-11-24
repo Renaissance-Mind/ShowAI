@@ -533,7 +533,7 @@ try {
   const sidebarFolderIcon = folderToggle.locator("svg");
   const folderOutline = (glyph) =>
     glyph.evaluate((svg) => {
-      const { width, height } = svg.getBoundingClientRect();
+      const { width, height } = getComputedStyle(svg);
       return {
         width,
         height,
