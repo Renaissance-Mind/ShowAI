@@ -18,7 +18,7 @@ function FolderIconDefaults({
 }: ComponentProps<IconPresetPicker["Options"]>) {
   const t = useTranslator(folderIconMessages);
   const selectedPreset = folderPresetFromIcon(value)?.id;
-  const iconSize = 30;
+  const iconSize = 34;
   return (
     <div className="folder-icon-defaults">
       {folderIconGroups.map((group) => (
@@ -66,13 +66,14 @@ function FolderIconDefaults({
 
 function FolderIconPreview({ value }: { value: string }) {
   const presetValue = folderPresetFromIcon(value) ? value : undefined;
+  const iconSize = 52;
   return (
     <>
       <div className="page-icon-preview-tile" data-folder-state="closed">
-        <FolderIcon value={presetValue} size={48} />
+        <FolderIcon value={presetValue} size={iconSize} />
       </div>
       <div className="page-icon-preview-tile" data-folder-state="open">
-        <FolderIcon value={presetValue} size={48} open />
+        <FolderIcon value={presetValue} size={iconSize} open />
       </div>
     </>
   );
