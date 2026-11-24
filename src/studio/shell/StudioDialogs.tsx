@@ -1,6 +1,7 @@
 import {
   ArrowUpRight,
   FileText,
+  Folder,
   LayoutTemplate,
   Presentation,
 } from "../../ui/icons";
@@ -454,6 +455,23 @@ export function StudioDialogs({
           onClose={closeDialog}
           onDelete={async () => {
             await deleteTarget(dialog.target, { close: closeDialog });
+          }}
+        />
+      )}
+      {dialog?.type === "projectIcon" && (
+        <PageIconDialog
+          title={t("projectIcon")}
+          value={dialog.project.icon ?? ""}
+          fallback={<Folder size={56} />}
+          onClose={closeDialog}
+          onSave={(icon) => {
+            const project =
+              projects.find((item) => item.id === dialog.project.id) ??
+              dialog.project;
+            return updateTarget(projectTarget(project), {
+              name: project.name,
+              icon,
+            });
           }}
         />
       )}

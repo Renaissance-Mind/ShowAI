@@ -4,7 +4,10 @@ import type { ProjectGroup, ProjectSummary } from "../../core/model";
 import type { LibraryTarget } from "../LibraryNavigation";
 import Dialog from "../../ui/Dialog";
 import PageIcon from "../../components/PageIcon";
-import PageIconDialog from "../../components/PageIconDialog";
+import FolderIconDefaults from "../../components/FolderIconDefaults";
+import PageIconDialog, {
+  type IconPresetPicker,
+} from "../../components/PageIconDialog";
 import { desktop, errorMessage } from "../../host/bridge";
 import { useTranslator } from "../../i18n/react";
 import accountFlowMessages from "../../i18n/messages/accountFlow";
@@ -282,6 +285,7 @@ export function FolderDialog({
       inputLabel={t("folderName")}
       iconButtonLabel={t("setFolderIcon")}
       iconDialogTitle={t("folderIcon")}
+      iconPresets={FolderIconDefaults}
       submitLabel={folder ? tc("save") : tc("create")}
       initialName={folder?.title}
       initialIcon={folder?.icon}
@@ -297,6 +301,7 @@ function DirectoryDialog({
   placeholder,
   iconButtonLabel,
   iconDialogTitle,
+  iconPresets,
   submitLabel,
   initialName = "",
   initialIcon = "",
@@ -310,6 +315,7 @@ function DirectoryDialog({
   placeholder?: string;
   iconButtonLabel: string;
   iconDialogTitle: string;
+  iconPresets?: IconPresetPicker;
   submitLabel: string;
   initialName?: string;
   initialIcon?: string;
@@ -383,6 +389,7 @@ function DirectoryDialog({
         <PageIconDialog
           title={iconDialogTitle}
           value={icon}
+          presets={iconPresets}
           fallback={<Folder size={56} />}
           onClose={() => setChoosingIcon(false)}
           onSave={async (next) => {

@@ -561,6 +561,11 @@ async function compileReader(archivePath, archive, kinds, omits = []) {
               "export default function PageIconDialog() { return null; }",
             loader: "tsx",
           };
+        if (args.path === "src/ui/LibraryContextMenu.tsx")
+          return {
+            contents: "export function LibraryContextMenu() { return null; }",
+            loader: "tsx",
+          };
         if (args.path === "src/components/rich-text/RichTextEditor.tsx")
           return {
             contents:

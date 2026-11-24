@@ -356,8 +356,11 @@ try {
       "在新标签页打开",
       "在新窗口打开",
       "重命名",
+      "设置图标…",
       "删除",
       "置顶",
+      "视图",
+      "排序",
       "移到分组…",
       "项目上移",
       "项目下移",
@@ -434,6 +437,44 @@ try {
     "Project menu fits viewport; initial focus, arrows, End, Escape restoration, Tab and outside click work",
   );
 
+  const viewItem = (await openMenu(project.id)).getByRole("menuitem", {
+    name: "视图",
+    exact: true,
+  });
+  await viewItem.press("ArrowRight");
+  const viewSubmenu = page.getByRole("menu", { name: "视图", exact: true });
+  await viewSubmenu.waitFor();
+  assert.equal(await viewSubmenu.getByRole("menuitemradio").count(), 4);
+  await page.keyboard.press("ArrowLeft");
+  await viewSubmenu.waitFor({ state: "hidden" });
+  assert.equal(
+    await viewItem.evaluate((item) => item === document.activeElement),
+    true,
+  );
+  await page.keyboard.press("Escape");
+  await page.getByRole("menu").waitFor({ state: "hidden" });
+  await choose(project.id, "设置图标…");
+  const projectIconPicker = page.getByRole("dialog", { name: "项目图标" });
+  assert.equal(
+    await projectIconPicker.locator(".page-icon-tabs button").count(),
+    2,
+  );
+  await projectIconPicker
+    .getByRole("button", { name: "使用 🎯", exact: true })
+    .click();
+  await projectIconPicker
+    .getByRole("button", { name: "保存", exact: true })
+    .click();
+  await projectIconPicker.waitFor({ state: "hidden" });
+  await poll(
+    projectData,
+    (data) => data.icon === "🎯",
+    "project icon persistence",
+  );
+  result.checks.push(
+    "Project submenu keyboard navigation and direct icon editing work",
+  );
+
   await choose(project.id, "重命名");
   await nameDialog("项目名称", "Renamed project");
   const checkSectionHeading = async (sectionId) => {
@@ -501,6 +542,36 @@ try {
   await nameDialog("名称", "Renamed page");
   await choose(nested.id, "置顶");
   await choose(folderB.id, "重命名");
+  const folderSettings = page.getByRole("dialog", { name: "文件夹设置" });
+  const openFolderIconPicker = () =>
+    folderSettings.getByRole("button", { name: "设置文件夹图标" }).click();
+  const folderIconPicker = page.getByRole("dialog", { name: "文件夹图标" });
+  const marks = folderIconPicker.getByRole("switch", { name: "标记图标组" });
+  const presets = folderIconPicker.locator(".folder-icon-grid button");
+  await openFolderIconPicker();
+  assert.equal(await presets.count(), 18);
+  await marks.press("Space");
+  assert.equal(await presets.count(), 12);
+  await folderIconPicker.getByRole("switch", { name: "颜色图标组" }).uncheck();
+  await folderIconPicker.getByRole("switch", { name: "用途图标组" }).uncheck();
+  assert.equal(await presets.count(), 0);
+  await folderIconPicker.getByRole("button", { name: "显示全部图标组" }).click();
+  assert.equal(await presets.count(), 18);
+  await marks.uncheck();
+  const blueFolder = folderIconPicker.getByRole("button", {
+    name: "使用蓝色文件夹",
+  });
+  await blueFolder.click();
+  const iconPreview = folderIconPicker.locator(".page-icon-preview img");
+  await iconPreview.waitFor();
+  const folderIconValue = await iconPreview.getAttribute("src");
+  assert.match(folderIconValue, /^data:image\/png;base64,/);
+  assert.equal(await blueFolder.getAttribute("aria-pressed"), "true");
+  await page.screenshot({ path: join(output, "folder-icon-presets.png") });
+  await folderIconPicker
+    .getByRole("button", { name: "保存", exact: true })
+    .click();
+  await folderIconPicker.waitFor({ state: "hidden" });
   await nameDialog("文件夹名称", "Renamed folder");
   await choose(folderB.id, "置顶");
   await poll(
@@ -519,6 +590,7 @@ try {
         (folder) =>
           folder.id === folderB.id &&
           folder.name === "Renamed folder" &&
+          folder.icon === folderIconValue &&
           folder.pinned,
       ),
     "folder rename and pin",
@@ -545,6 +617,24 @@ try {
     "Renamed folder",
   );
   assert.equal(await row(folderB.id).getAttribute("data-pinned"), "true");
+  assert.equal(
+    await row(folderB.id)
+      .locator(".studio-tree-folder-toggle img")
+      .getAttribute("src"),
+    folderIconValue,
+  );
+  await choose(folderB.id, "重命名");
+  await openFolderIconPicker();
+  assert.equal(await marks.isChecked(), false);
+  assert.equal(await presets.count(), 12);
+  assert.equal(await iconPreview.getAttribute("src"), folderIconValue);
+  await folderIconPicker
+    .getByRole("button", { name: "取消", exact: true })
+    .click();
+  await folderSettings.getByRole("button", { name: "取消", exact: true }).click();
+  result.checks.push(
+    "Folder icon groups toggle and restore, and the saved preset and group preferences survive reload",
+  );
   assert.equal(
     await row(nested.id).locator(".studio-tree-title").innerText(),
     "Renamed page",

@@ -15,6 +15,7 @@ import {
   FolderPlus,
   Globe,
   Link2,
+  LayoutGrid,
   ListOrdered,
   Presentation,
   Sparkles,
@@ -58,7 +59,7 @@ export function useMenuItems({
   },
   route: { view, selectedFolder, workspaceReady, routing },
   dialogs: { setDialog },
-  menus: { directoryViewControl },
+  menus: { directoryView, viewOptions, viewIcon, chooseDirectoryView },
   directory: { project, currentFolder },
   router: { openTargetWindow },
   pageActions: {
@@ -89,7 +90,10 @@ export function useMenuItems({
     "view" | "selectedFolder" | "workspaceReady" | "routing"
   >;
   dialogs: Pick<DialogControl, "setDialog">;
-  menus: Pick<MenuState, "directoryViewControl">;
+  menus: Pick<
+    MenuState,
+    "directoryView" | "viewOptions" | "viewIcon" | "chooseDirectoryView"
+  >;
   directory: Pick<DirectoryState, "project" | "currentFolder">;
   router: Pick<StudioRouter, "openTargetWindow">;
   pageActions: Pick<
@@ -391,19 +395,27 @@ export function useMenuItems({
         : []),
     ];
     return [
-      directoryViewControl(),
-      ...options.map((option, index) => ({
-        label: t(`sort.${option.value}`),
-        checked: option.value === sortBy,
-        icon:
-          option.value === sortBy ? (
-            <Check size={15} />
-          ) : (
-            <ListOrdered size={15} />
-          ),
-        separatorBefore: index === 0,
-        onSelect: action(() => changeDirectorySort(target, option.value)),
-      })),
+      {
+        label: t("directoryView"),
+        icon: <LayoutGrid size={15} />,
+        separatorBefore: true,
+        items: viewOptions.map((mode) => ({
+          label: t(`view.${mode}`),
+          icon: viewIcon(mode),
+          checked: directoryView === mode,
+          onSelect: () => chooseDirectoryView(mode),
+        })),
+      },
+      {
+        label: t("directorySort"),
+        icon: <ListOrdered size={15} />,
+        items: options.map((option) => ({
+          label: t(`sort.${option.value}`),
+          checked: option.value === sortBy,
+          icon: option.value === sortBy ? <Check size={15} /> : null,
+          onSelect: action(() => changeDirectorySort(target, option.value)),
+        })),
+      },
     ];
   }
   function projectOrderMenuItems(target: LibraryTarget) {

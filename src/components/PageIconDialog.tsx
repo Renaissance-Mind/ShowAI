@@ -1,4 +1,4 @@
-import { useRef, useState, type ReactNode } from "react";
+import { useRef, useState, type ComponentType, type ReactNode } from "react";
 import PageIcon from "./PageIcon";
 import {
   isImageIcon,
@@ -6,7 +6,7 @@ import {
   validatePageIcon,
 } from "../lib/page-icon.mjs";
 import Dialog from "../ui/Dialog";
-
+import { Image as ImageIcon, Upload } from "../ui/icons";
 import { errorMessage } from "../host/bridge";
 import "./page-icon.css";
 import { translator } from "../i18n";
@@ -15,6 +15,12 @@ import commonMessages from "../i18n/messages/common";
 import studioMessages from "../i18n/messages/studio";
 
 const translate = translator(studioMessages);
+
+export type IconPresetPicker = ComponentType<{
+  busy: boolean;
+  selectedPreset: string;
+  onChoose: (id: string, load: () => Promise<string>) => void;
+}>;
 
 const emoji = [
   "📄",
@@ -79,11 +85,13 @@ export default function PageIconDialog({
   onClose,
   title,
   fallback,
+  presets: Presets,
 }: {
   value: string;
   title?: string;
   fallback?: ReactNode;
-  onSave: (value: string) => Promise<unknown>;
+  presets?: IconPresetPicker;
+  onSave: (value: string) => Promise<void | boolean>;
   onClose: () => void;
 }) {
   const t = useTranslator(studioMessages);
@@ -91,31 +99,40 @@ export default function PageIconDialog({
   const [selected, setSelected] = useState(value);
   const [text, setText] = useState(isImageIcon(value) ? "" : value);
   const [url, setUrl] = useState(/^https?:/i.test(value) ? value : "");
+  const [mode, setMode] = useState<"default" | "emoji" | "image">(
+    Presets ? "default" : isImageIcon(value) ? "image" : "emoji",
+  );
+  const [selectedPreset, setSelectedPreset] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  const [dragging, setDragging] = useState(false);
   const file = useRef<HTMLInputElement>(null);
   const generation = useRef(0);
   const preview =
     isImageIcon(selected) || selected.length <= 64 ? selected : "";
   const save = async (next: string) => {
+    if (busy) return;
     setBusy(true);
     setError("");
     try {
-      await onSave(validatePageIcon(next.trim()));
-      onClose();
+      const saved = await onSave(validatePageIcon(next.trim()));
+      if (saved !== false) onClose();
     } catch (reason) {
       setError(errorMessage(reason));
     } finally {
       setBusy(false);
     }
   };
-  const upload = async (image: File) => {
+  const selectImage = async (load: () => Promise<string>, presetId = "") => {
     const ticket = ++generation.current;
     setBusy(true);
     setError("");
     try {
-      const result = await readIcon(image);
-      if (ticket === generation.current) setSelected(result);
+      const result = await load();
+      if (ticket === generation.current) {
+        setSelected(result);
+        setSelectedPreset(presetId);
+      }
     } catch (reason) {
       if (ticket === generation.current) setError(errorMessage(reason));
     } finally {
@@ -123,7 +140,12 @@ export default function PageIconDialog({
     }
   };
   return (
-    <Dialog title={title ?? t("icon.pageIcon")} onClose={onClose}>
+    <Dialog
+      title={title ?? t("icon.pageIcon")}
+      className="page-icon-dialog"
+      dismissible={!busy}
+      onClose={onClose}
+    >
       <form
         className="page-icon-form studio-dialog-body studio-dialog-form"
         onSubmit={(event) => {
@@ -131,78 +153,149 @@ export default function PageIconDialog({
           void save(selected);
         }}
       >
-        <div className="page-icon-preview">
-          <PageIcon value={preview} size={56} fallback={fallback} />
+        <div className="page-icon-preview" aria-label={t("icon.preview")}>
+          <div className="page-icon-preview-tile">
+            <PageIcon value={preview} size={48} fallback={fallback} />
+          </div>
         </div>
-        <label>
-          {t("icon.text")}
-          <input
-            className="showai-input"
-            aria-label={t("icon.text")}
-            value={text}
-            maxLength={64}
-            disabled={busy}
-            onChange={(event) => {
-              setText(event.target.value);
-              setSelected(event.target.value);
-              setError("");
-            }}
-          />
-        </label>
-        <div className="page-icon-emoji" aria-label={t("icon.common")}>
-          {emoji.map((item) => (
+        <div
+          className="page-icon-tabs"
+          data-count={Presets ? 3 : 2}
+          role="group"
+          aria-label={t("icon.mode")}
+        >
+          {Presets && (
             <button
               type="button"
-              key={item}
-              aria-label={t("icon.use", { icon: item })}
-              aria-pressed={selected === item}
+              aria-pressed={mode === "default"}
               disabled={busy}
-              onClick={() => {
-                setSelected(item);
-                setText(item);
-                setError("");
+              onClick={() => setMode("default")}
+            >
+              {t("icon.default")}
+            </button>
+          )}
+          <button
+            type="button"
+            aria-pressed={mode === "emoji"}
+            disabled={busy}
+            onClick={() => setMode("emoji")}
+          >
+            {t("icon.emoji")}
+          </button>
+          <button
+            type="button"
+            aria-pressed={mode === "image"}
+            disabled={busy}
+            onClick={() => setMode("image")}
+          >
+            {t("icon.image")}
+          </button>
+        </div>
+        {mode === "default" && Presets ? (
+          <Presets
+            busy={busy}
+            selectedPreset={selectedPreset}
+            onChoose={(id, load) => void selectImage(load, id)}
+          />
+        ) : mode === "emoji" ? (
+          <div className="page-icon-panel">
+            <label>
+              {t("icon.text")}
+              <input
+                className="showai-input"
+                aria-label={t("icon.text")}
+                placeholder={t("icon.textPlaceholder")}
+                value={text}
+                maxLength={64}
+                disabled={busy}
+                onChange={(event) => {
+                  setText(event.target.value);
+                  setSelected(event.target.value);
+                  setSelectedPreset("");
+                  setError("");
+                }}
+              />
+            </label>
+            <div className="page-icon-emoji" aria-label={t("icon.common")}>
+              {emoji.map((item) => (
+                <button
+                  type="button"
+                  key={item}
+                  aria-label={t("icon.use", { icon: item })}
+                  aria-pressed={selected === item}
+                  disabled={busy}
+                  onClick={() => {
+                    setSelected(item);
+                    setText(item);
+                    setSelectedPreset("");
+                    setError("");
+                  }}
+                >
+                  {item}
+                </button>
+              ))}
+            </div>
+          </div>
+        ) : (
+          <div className="page-icon-panel">
+            <input
+              ref={file}
+              type="file"
+              accept="image/png,image/jpeg,image/gif,image/webp,image/avif"
+              hidden
+              onChange={(event) => {
+                const image = event.target.files?.[0];
+                event.target.value = "";
+                if (image && !busy) void selectImage(() => readIcon(image));
+              }}
+            />
+            <button
+              className="page-icon-upload"
+              type="button"
+              data-dragging={dragging || undefined}
+              disabled={busy}
+              onClick={() => file.current?.click()}
+              onDragEnter={(event) => {
+                event.preventDefault();
+                if (!busy) setDragging(true);
+              }}
+              onDragOver={(event) => event.preventDefault()}
+              onDragLeave={() => setDragging(false)}
+              onDrop={(event) => {
+                event.preventDefault();
+                setDragging(false);
+                const image = event.dataTransfer.files[0];
+                if (image && !busy) void selectImage(() => readIcon(image));
               }}
             >
-              {item}
+              <span className="page-icon-upload-icon">
+                {busy ? <Upload size={22} /> : <ImageIcon size={22} />}
+              </span>
+              <strong>
+                {busy ? t("icon.processing") : t("icon.chooseImage")}
+              </strong>
+              <small>{t("icon.dropImage")}</small>
             </button>
-          ))}
-        </div>
-        <input
-          ref={file}
-          type="file"
-          accept="image/png,image/jpeg,image/gif,image/webp,image/avif"
-          hidden
-          onChange={(event) => {
-            const image = event.target.files?.[0];
-            event.target.value = "";
-            if (image) void upload(image);
-          }}
-        />
-        <button
-          className="studio-button"
-          type="button"
-          disabled={busy}
-          onClick={() => file.current?.click()}
-        >
-          {t("icon.upload")}
-        </button>
-        <p className="page-icon-help">{t("icon.help")}</p>
-        <label>
-          {t("icon.url")}
-          <input
-            className="showai-input"
-            inputMode="url"
-            aria-label={t("icon.urlAria")}
-            placeholder="https://…"
-            value={url}
-            disabled={busy}
-            onChange={(event) => {
-              setUrl(event.target.value);
-              setSelected(event.target.value.trim());
-              setError("");
-            }}
-          />
-        </label>
+            <label>
+              {t("icon.url")}
+              <input
+                className="showai-input"
+                inputMode="url"
+                aria-label={t("icon.urlAria")}
+                placeholder="https://…"
+                value={url}
+                disabled={busy}
+                onChange={(event) => {
+                  setUrl(event.target.value);
+                  setSelected(event.target.value.trim());
+                  setSelectedPreset("");
+                  setError("");
+                }}
+              />
+            </label>
+            <p className="page-icon-help">{t("icon.help")}</p>
+          </div>
+        )}
         {error && (
           <p className="studio-error" role="alert">
             {error}
@@ -211,9 +304,15 @@ export default function PageIconDialog({
         <footer className="studio-dialog-actions">
           <button
             type="button"
-            className="studio-button"
-            disabled={busy || !value}
-            onClick={() => void save("")}
+            className="studio-button page-icon-remove"
+            disabled={busy || (!value && !selected)}
+            onClick={() => {
+              setSelected("");
+              setText("");
+              setUrl("");
+              setSelectedPreset("");
+              setError("");
+            }}
           >
             {t("icon.remove")}
           </button>
@@ -231,7 +330,7 @@ export default function PageIconDialog({
             disabled={busy}
             type="submit"
           >
-            {busy ? t("icon.processing") : tc("save")}
+            {tc("save")}
           </button>
         </footer>
       </form>

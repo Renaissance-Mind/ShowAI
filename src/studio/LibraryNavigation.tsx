@@ -88,7 +88,11 @@ function LibraryRowView({
         cloud={cloud}
       />
     ) : target.kind === "folder" ? (
-      <FolderIcon size={15} strokeWidth={1.7} aria-hidden="true" />
+      <PageIcon
+        value={target.icon}
+        size={15}
+        fallback={<FolderIcon size={15} strokeWidth={1.7} aria-hidden="true" />}
+      />
     ) : (
       <PageIcon value={target.icon} size={15} />
     );

@@ -46,7 +46,7 @@ import type { MenuItems } from "./useMenuItems";
 
 export function LibraryItemMenu({
   feedback: { notifyWithUndo, setNotice, action },
-  library: { info, capabilities, organization, refreshProjects },
+  library: { info, capabilities, projects, organization, refreshProjects },
   route: {
     workspaceReady,
     routing,
@@ -208,6 +208,21 @@ export function LibraryItemMenu({
                           !editorControls.nested
                             ? editorControls.setIcon
                             : action(() => beginPageIcon(contextMenu.target)),
+                      },
+                    ]
+                  : []),
+                ...(contextMenu.target.kind === "project"
+                  ? [
+                      {
+                        label: t("setIcon"),
+                        icon: <Folder size={15} />,
+                        onSelect: () => {
+                          const project = projects.find(
+                            (item) => item.id === contextMenu.target.projectId,
+                          );
+                          if (project)
+                            setDialog({ type: "projectIcon", project });
+                        },
                       },
                     ]
                   : []),

@@ -5,6 +5,21 @@
   font-size: 11px;
   white-space: nowrap;
 }
+.studio-context-menu-submenu-mark {
+  display: grid;
+  place-items: center;
+  margin-left: auto;
+  padding-left: 16px;
+  color: var(--muted);
+}
+.studio-context-menu-item[aria-expanded="true"] {
+  background: var(--hover);
+}
+.studio-context-menu.studio-context-submenu {
+  z-index: 301;
+  min-width: min(180px, calc(100vw - 16px));
+  transform-origin: top left;
+}
 .studio-context-menu-control {
   padding: 8px;
   min-width: 0;

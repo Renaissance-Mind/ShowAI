@@ -1,16 +1,9 @@
 import { useRef, useState } from "react";
 import { Grid2X2, LayoutGrid, LayoutList } from "../../../ui/icons";
 import type { ProjectGroup } from "../../../core/model";
-import type {
-  LibraryContextMenuItem,
-  LibraryMenuPoint,
-  LibraryTarget,
-} from "../../LibraryNavigation";
-import { useTranslator } from "../../../i18n/react";
-import studioMessages from "../../../i18n/messages/studio";
+import type { LibraryMenuPoint, LibraryTarget } from "../../LibraryNavigation";
 
 export function useMenuState() {
-  const t = useTranslator(studioMessages);
   const [groupMenu, setGroupMenu] = useState<{
     group: ProjectGroup;
     anchor: HTMLElement;
@@ -37,30 +30,6 @@ export function useMenuState() {
     setDirectoryView(mode);
     localStorage.setItem("showai:directory-view", mode);
   };
-  const directoryViewControl = (): LibraryContextMenuItem => ({
-    label: t("directoryView"),
-    icon: <LayoutGrid size={15} />,
-    control: (
-      <div
-        className="directory-view-switch"
-        role="group"
-        aria-label={t("directoryView")}
-      >
-        {viewOptions.map((mode) => (
-          <button
-            key={mode}
-            type="button"
-            title={t(`view.${mode}`)}
-            aria-label={t(`view.${mode}`)}
-            aria-pressed={directoryView === mode}
-            onClick={() => chooseDirectoryView(mode)}
-          >
-            {viewIcon(mode)}
-          </button>
-        ))}
-      </div>
-    ),
-  });
   const [contextMenu, setContextMenu] = useState<{
     target: LibraryTarget;
     anchor: HTMLElement;
@@ -99,7 +68,6 @@ export function useMenuState() {
     viewOptions,
     viewIcon,
     chooseDirectoryView,
-    directoryViewControl,
     contextMenu,
     setContextMenu,
     projectsMenu,

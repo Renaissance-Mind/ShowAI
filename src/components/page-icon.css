@@ -1,67 +1,176 @@
+.studio-modal.page-icon-dialog {
+  width: min(440px, 100%);
+}
 .page-icon-form {
   display: flex;
   flex-direction: column;
   gap: 16px;
-  padding: 20px 24px;
+  padding: 12px 20px 20px;
 }
 .page-icon-preview {
   display: grid;
   place-items: center;
-  min-height: 80px;
+}
+.page-icon-preview-tile {
+  display: grid;
+  place-items: center;
+  width: 80px;
+  height: 80px;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  background: var(--surface);
+  box-shadow: inset 0 0 0 5px color-mix(in srgb, var(--paper) 45%, transparent);
+}
+.page-icon-preview-tile .page-icon {
+  flex-shrink: 0;
+}
+.page-icon-tabs {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 3px;
+  padding: 3px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: var(--surface);
+}
+.page-icon-tabs[data-count="3"] {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+.page-icon-tabs button {
+  min-height: 32px;
+  border-radius: 6px;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 550;
+}
+.page-icon-tabs button[aria-pressed="true"] {
+  background: var(--paper);
+  color: var(--text);
+  box-shadow: 0 1px 4px color-mix(in srgb, var(--text) 10%, transparent);
+}
+.page-icon-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-height: 218px;
 }
 .page-icon-form label {
   display: flex;
   flex-direction: column;
   gap: 7px;
   font-size: 13px;
+  font-weight: 550;
 }
-.page-icon-form input:not([type="file"]) {
+.page-icon-form input:not([type="file"], [type="checkbox"]) {
   width: 100%;
-  padding: 9px 11px;
-  border: 1px solid var(--line, #ddd);
+  min-height: 36px;
+  padding: 8px 11px;
+  border: 1px solid var(--line);
   border-radius: 7px;
-  background: var(--bg, white);
-  color: var(--text, #252525);
+  background: var(--paper);
+  color: var(--text);
+  font-weight: 400;
 }
 .page-icon-emoji {
   display: grid;
-  grid-template-columns: repeat(8, 1fr);
+  grid-template-columns: repeat(8, minmax(0, 1fr));
   gap: 5px;
 }
 .page-icon-emoji button {
-  font-size: 23px;
-  min-height: 37px;
+  min-width: 0;
+  min-height: 40px;
   border: 1px solid transparent;
-  border-radius: 6px;
+  border-radius: 8px;
+  font-size: 23px;
+  line-height: 1;
 }
-.page-icon-emoji button:hover,
+.page-icon-emoji button:hover {
+  background: var(--hover);
+}
 .page-icon-emoji button[aria-pressed="true"] {
-  background: var(--hover, #f1f1f1);
-  border-color: var(--line, #ddd);
+  border-color: color-mix(in srgb, var(--text) 20%, var(--paper));
+  background: var(--accent-soft);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--text) 5%, transparent);
+}
+.page-icon-upload {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  min-height: 104px;
+  padding: 14px;
+  border: 1px dashed color-mix(in srgb, var(--text) 22%, var(--paper));
+  border-radius: 10px;
+  background: var(--surface);
+  color: var(--text);
+}
+.page-icon-upload:hover:enabled,
+.page-icon-upload[data-dragging] {
+  border-color: var(--text);
+  background: var(--hover);
+}
+.page-icon-upload > * {
+  pointer-events: none;
+}
+.page-icon-upload-icon {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  margin-bottom: 3px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: var(--paper);
+  color: var(--muted);
+}
+.page-icon-upload strong {
+  font-size: 13px;
+  font-weight: 600;
+}
+.page-icon-upload small {
+  color: var(--muted);
+  font-size: 12px;
 }
 .page-icon-help {
-  font-size: 12px;
-  color: var(--muted, #777);
-  margin: -8px 0 0;
+  margin: -5px 0 0;
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.5;
+  text-align: center;
 }
 .page-icon-form footer {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
-  padding-top: 12px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
 }
 .page-icon-form footer > span {
   flex: 1;
 }
+.page-icon-remove {
+  color: var(--muted);
+}
 .page-icon-form button:focus-visible {
-  outline: 2px solid var(--accent, #5b66d8);
+  outline: 2px solid var(--accent);
   outline-offset: 2px;
 }
 @media (max-width: 420px) {
   .page-icon-form {
-    padding: 16px;
+    padding: 10px 16px 16px;
   }
   .page-icon-emoji {
-    grid-template-columns: repeat(6, 1fr);
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+  }
+  .page-icon-panel {
+    min-height: 0;
+  }
+  .page-icon-form footer > span {
+    display: none;
+  }
+  .page-icon-remove {
+    margin-right: auto;
   }
 }

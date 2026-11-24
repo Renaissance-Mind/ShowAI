@@ -49,6 +49,7 @@ export type DialogState =
       then?: CreationChoice;
     }
   | { type: "group"; group?: ProjectGroup; projectId?: string }
+  | { type: "projectIcon"; project: ProjectSummary }
   | { type: "moveProject"; projectId: string }
   | {
       type: "batchPages";
