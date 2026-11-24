@@ -163,12 +163,13 @@ function symbolMarkup(symbol: FolderIconPreset["symbol"]): string {
 }
 
 const closedFolder =
-  '<path d="M10 28a10 10 0 0 1 10-10h21l10 11h25a10 10 0 0 1 10 10v35a10 10 0 0 1-10 10H20A10 10 0 0 1 10 74V28Z" fill="url(#folder)"/><path d="M11 40h74" stroke="white" stroke-opacity=".22" stroke-width="2"/>';
+  '<path d="M10 28a10 10 0 0 1 10-10h21l10 11h25a10 10 0 0 1 10 10v35a10 10 0 0 1-10 10H20A10 10 0 0 1 10 74V28Z" fill="url(#folder)"/>';
+// The front face shares the same lower edge as the filled outer silhouette.
+const openFolderBase = "a6 6 0 0 1 6 8l-8 25a10 10 0 0 1-9 7H17a9 9 0 0 1-9-9";
 const openFolder = [
-  '<path d="M8 27a8 8 0 0 1 8-8h18l10 11h26a9 9 0 0 1 9 9v37H8V27Z" fill="var(--folder-color)"/>',
-  '<path d="M8 36h63a8 8 0 0 1 8 8v32H8V36Z" fill="#172132" fill-opacity=".15"/>',
-  '<path d="M23 44h60a6 6 0 0 1 6 8l-8 25a10 10 0 0 1-9 7H17a8 8 0 0 1-8-10l6-24a9 9 0 0 1 8-6Z" fill="url(#folder)"/>',
-  '<path d="M24 45h58" stroke="white" stroke-opacity=".35" stroke-width="2" stroke-linecap="round"/>',
+  `<path d="M8 28a9 9 0 0 1 9-9h18l10 11h26a9 9 0 0 1 9 9v5h3${openFolderBase}V28Z" fill="url(#folder)"/>`,
+  '<path d="M8 35h67a9 9 0 0 1 5 9H8Z" fill="#172132" fill-opacity=".15"/>',
+  `<path d="M23 44h60${openFolderBase}l7-24a9 9 0 0 1 8-7Z" fill="white" fill-opacity=".12"/>`,
 ].join("");
 
 export function folderPresetSvg(
@@ -179,7 +180,7 @@ export function folderPresetSvg(
   const badge = symbol
     ? `<g transform="translate(48 61) scale(.72) translate(-48 -56)">${symbol}</g>`
     : "";
-  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 96" style="--folder-color:${preset.color}"><defs><linearGradient id="folder" x1="18" y1="18" x2="78" y2="82" gradientUnits="userSpaceOnUse"><stop stop-color="${preset.color}"/><stop offset="1" stop-color="${preset.color}" stop-opacity=".78"/></linearGradient></defs>${open ? openFolder : closedFolder}${badge}</svg>`;
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 96"><defs><linearGradient id="folder" x1="18" y1="18" x2="78" y2="82" gradientUnits="userSpaceOnUse"><stop stop-color="${preset.color}"/><stop offset="1" stop-color="${preset.color}" stop-opacity=".78"/></linearGradient></defs>${open ? openFolder : closedFolder}${badge}</svg>`;
 }
 
 export function folderPresetSource(
