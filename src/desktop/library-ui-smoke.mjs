@@ -590,7 +590,27 @@ try {
   await gold.click();
   assert.equal(await chart.getAttribute("aria-pressed"), "true");
   assert.equal(await gold.getAttribute("aria-pressed"), "true");
-  assert.equal(await closedPreview.locator("g rect").count(), 5);
+  const openFace = openPreview.locator("[data-folder-face]");
+  const faceCenter = await openFace.locator(":scope > rect").evaluate((rect) => {
+    const { x, y, width, height } = rect.getBBox();
+    return [x + width / 2, y + height / 2];
+  });
+  assert.ok(await openFace.evaluate((face) => face.getCTM().c < 0));
+  const chartCenter = (preview) =>
+    preview.locator("[data-folder-face] > g").evaluate((artwork) => {
+      const { x, y, width, height } = artwork.getBBox();
+      const local = artwork.parentElement
+        .getCTM()
+        .inverse()
+        .multiply(artwork.getCTM());
+      const point = new DOMPoint(
+        x + width / 2,
+        y + height / 2,
+      ).matrixTransform(local);
+      return [point.x, point.y].map((value) => Number(value.toFixed(2)));
+    });
+  assert.deepEqual(await chartCenter(closedPreview), faceCenter);
+  assert.deepEqual(await chartCenter(openPreview), faceCenter);
   await page.screenshot({ path: join(output, "folder-icon-composed-chart.png") });
 
   await standaloneMode.click();
@@ -608,8 +628,12 @@ try {
   );
   await folderIconPicker.getByRole("button", { name: "Emoji", exact: true }).click();
   await folderIconPicker.getByRole("button", { name: "使用 📚", exact: true }).click();
-  assert.equal(await closedPreview.locator("text").textContent(), "📚");
-  assert.equal(await openPreview.locator("text").textContent(), "📚");
+  for (const preview of [closedPreview, openPreview]) {
+    const emoji = preview.locator("[data-folder-face] > text");
+    assert.equal(await emoji.textContent(), "📚");
+    assert.equal(Number(await emoji.getAttribute("x")), faceCenter[0]);
+    assert.equal(Number(await emoji.getAttribute("y")), faceCenter[1] + 1);
+  }
   assert.equal(await gold.getAttribute("aria-pressed"), "true");
   await page.setViewportSize(fullSize);
   await page.screenshot({ path: join(output, "folder-icon-composed-emoji.png") });
@@ -700,7 +724,7 @@ try {
   await poll(readSavedIcon, (icon) => icon === "", "system default folder icon restored");
   assert.deepEqual(await folderOutline(sidebarFolderIcon), sidebarOpenOutline);
   result.checks.push(
-    "Folder colors and icons combine independently, composed icons persist across reload, and standalone emoji render without a folder frame",
+    "Folder graphics and emoji stay centered on the folder face as it opens, persist across reload, and support standalone display",
   );
   assert.equal(
     await row(nested.id).locator(".studio-tree-title").innerText(),

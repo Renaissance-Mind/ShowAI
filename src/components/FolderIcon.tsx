@@ -130,6 +130,10 @@ const neutral = "#7c8492";
 const emojiFont =
   "Apple Color Emoji, Segoe UI Emoji, Noto Color Emoji, sans-serif";
 const segmenter = new Intl.Segmenter(undefined, { granularity: "grapheme" });
+const folderFace = { x: 8, y: 25, width: 82, height: 57, rx: 9 };
+const faceBottom = folderFace.y + folderFace.height;
+// Anchor the opening face at its lower-left corner so the badge moves with it.
+const openFaceTransform = `translate(${folderFace.x} ${faceBottom}) matrix(.86 0 -.28 .78 0 0) translate(${-folderFace.x} ${-faceBottom})`;
 
 function BadgeArtwork({
   badge,
@@ -231,42 +235,22 @@ export function FolderIconGlyph({
       viewBox="0 0 96 96"
       aria-hidden="true"
     >
-      {open ? (
-        <>
-          <path
-            d="M8 24a9 9 0 0 1 9-9h17a10 10 0 0 1 7 3l7 7h27a9 9 0 0 1 9 9v39a9 9 0 0 1-9 9H17a9 9 0 0 1-9-9Z"
-            fill={back}
-          />
-          <path
-            d="M23 38h64a7 7 0 0 1 7 9l-8 28a10 10 0 0 1-10 7H17a9 9 0 0 1-9-11l7-27a8 8 0 0 1 8-6Z"
-            fill={face}
-          />
-        </>
-      ) : (
-        <path
-          d="M8 24a9 9 0 0 1 9-9h17a10 10 0 0 1 7 3l7 7h33a9 9 0 0 1 9 9v39a9 9 0 0 1-9 9H17a9 9 0 0 1-9-9Z"
-          fill={face}
-        />
-      )}
-      {composition.badge && (
-        <g>
-          <rect
-            x="43"
-            y="40"
-            width="46"
-            height="46"
-            rx="13"
-            fill={ink}
-            opacity={0.2}
-          />
-          <rect x="43" y="37" width="46" height="46" rx="13" fill="#fffaf3" />
-          <BadgeArtwork
-            badge={composition.badge}
-            color={ink}
-            x={66}
-            y={60}
-            scale={0.72}
-          />
+      <path
+        d={`M8 24a9 9 0 0 1 9-9h17a10 10 0 0 1 7 3l7 7h${open ? 21 : 33}a9 9 0 0 1 9 9v39a9 9 0 0 1-9 9H17a9 9 0 0 1-9-9Z`}
+        fill={open ? back : face}
+      />
+      {(open || composition.badge) && (
+        <g data-folder-face="" transform={open ? openFaceTransform : undefined}>
+          {open && <rect {...folderFace} fill={face} />}
+          {composition.badge && (
+            <BadgeArtwork
+              badge={composition.badge}
+              color={ink}
+              x={folderFace.x + folderFace.width / 2}
+              y={folderFace.y + folderFace.height / 2}
+              scale={0.86}
+            />
+          )}
         </g>
       )}
     </svg>
