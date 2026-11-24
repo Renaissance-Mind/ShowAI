@@ -21,8 +21,10 @@ export type IconPresetPicker = {
     busy: boolean;
     value: string;
     onChoose: (load: () => Promise<string>) => void;
+    onDefault: () => void;
   }>;
   Preview: ComponentType<{ value: string }>;
+  isPreset: (value: string) => boolean;
 };
 
 const emoji = [
@@ -102,8 +104,13 @@ export default function PageIconDialog({
   const [selected, setSelected] = useState(value);
   const [text, setText] = useState(isImageIcon(value) ? "" : value);
   const [url, setUrl] = useState(/^https?:/i.test(value) ? value : "");
+  const isDefaultChoice = (icon: string) => !icon || !!presets?.isPreset(icon);
   const [mode, setMode] = useState<"default" | "emoji" | "image">(
-    presets ? "default" : isImageIcon(value) ? "image" : "emoji",
+    presets && isDefaultChoice(value)
+      ? "default"
+      : isImageIcon(value)
+        ? "image"
+        : "emoji",
   );
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
@@ -112,8 +119,16 @@ export default function PageIconDialog({
   const generation = useRef(0);
   const preview =
     isImageIcon(selected) || selected.length <= 64 ? selected : "";
+  const canSave = !busy && (mode !== "default" || isDefaultChoice(selected));
+  const clearIcon = () => {
+    setSelected("");
+    setText("");
+    setUrl("");
+    setError("");
+    if (presets) setMode("default");
+  };
   const save = async (next: string) => {
-    if (busy) return;
+    if (!canSave) return;
     setBusy(true);
     setError("");
     try {
@@ -199,6 +214,7 @@ export default function PageIconDialog({
             busy={busy}
             value={selected}
             onChoose={selectImage}
+            onDefault={clearIcon}
           />
         ) : mode === "emoji" ? (
           <div className="page-icon-panel">
@@ -302,19 +318,16 @@ export default function PageIconDialog({
           </p>
         )}
         <footer className="studio-dialog-actions">
-          <button
-            type="button"
-            className="studio-button page-icon-remove"
-            disabled={busy || (!value && !selected)}
-            onClick={() => {
-              setSelected("");
-              setText("");
-              setUrl("");
-              setError("");
-            }}
-          >
-            {t("icon.remove")}
-          </button>
+          {mode !== "default" && (
+            <button
+              type="button"
+              className="studio-button page-icon-remove"
+              disabled={busy || (!value && !selected)}
+              onClick={clearIcon}
+            >
+              {t("icon.remove")}
+            </button>
+          )}
           <span />
           <button
             className="studio-button"
@@ -326,7 +339,7 @@ export default function PageIconDialog({
           </button>
           <button
             className="studio-button primary"
-            disabled={busy}
+            disabled={!canSave}
             type="submit"
           >
             {tc("save")}

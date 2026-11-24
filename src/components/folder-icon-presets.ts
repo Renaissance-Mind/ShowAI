@@ -3,9 +3,6 @@ import type folderIconMessages from "../i18n/messages/folderIcons";
 
 type FolderIconMessageKey = MessageKey<typeof folderIconMessages>;
 
-export type FolderIconGroupId = "color" | "work" | "mark";
-export type FolderIconGroupPreferences = Record<FolderIconGroupId, boolean>;
-
 export interface FolderIconPreset {
   id: string;
   nameKey: FolderIconMessageKey;
@@ -26,7 +23,7 @@ export interface FolderIconPreset {
 }
 
 export const folderIconGroups: {
-  id: FolderIconGroupId;
+  id: "color" | "work" | "mark";
   nameKey: FolderIconMessageKey;
   presets: FolderIconPreset[];
 }[] = [
@@ -132,27 +129,6 @@ export const folderIconGroups: {
   },
 ];
 
-export function defaultFolderIconGroups(): FolderIconGroupPreferences {
-  return { color: true, work: true, mark: true };
-}
-
-export function parseFolderIconGroups(
-  source: string | null,
-): FolderIconGroupPreferences {
-  const preferences = defaultFolderIconGroups();
-  if (!source) return preferences;
-  try {
-    const value = JSON.parse(source) as Record<string, unknown>;
-    for (const group of folderIconGroups) {
-      const visible = value[group.id];
-      if (typeof visible === "boolean") preferences[group.id] = visible;
-    }
-  } catch {
-    return preferences;
-  }
-  return preferences;
-}
-
 function symbolMarkup(symbol: FolderIconPreset["symbol"]): string {
   const common =
     'fill="none" stroke="white" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"';
@@ -190,9 +166,9 @@ const closedFolder =
   '<path d="M10 28a10 10 0 0 1 10-10h21l10 11h25a10 10 0 0 1 10 10v35a10 10 0 0 1-10 10H20A10 10 0 0 1 10 74V28Z" fill="url(#folder)"/><path d="M11 40h74" stroke="white" stroke-opacity=".22" stroke-width="2"/>';
 const openFolder = [
   '<path d="M8 27a8 8 0 0 1 8-8h18l10 11h26a9 9 0 0 1 9 9v37H8V27Z" fill="var(--folder-color)"/>',
-  '<path d="M8 36h63a8 8 0 0 1 8 8v32H8V36Z" fill="#172132" fill-opacity=".32"/>',
-  '<path d="M23 47h60a6 6 0 0 1 6 8l-8 22a10 10 0 0 1-9 7H17a8 8 0 0 1-8-10l6-21a9 9 0 0 1 8-6Z" fill="url(#folder)"/>',
-  '<path d="M24 48h58" stroke="white" stroke-opacity=".35" stroke-width="2" stroke-linecap="round"/>',
+  '<path d="M8 36h63a8 8 0 0 1 8 8v32H8V36Z" fill="#172132" fill-opacity=".15"/>',
+  '<path d="M23 44h60a6 6 0 0 1 6 8l-8 25a10 10 0 0 1-9 7H17a8 8 0 0 1-8-10l6-24a9 9 0 0 1 8-6Z" fill="url(#folder)"/>',
+  '<path d="M24 45h58" stroke="white" stroke-opacity=".35" stroke-width="2" stroke-linecap="round"/>',
 ].join("");
 
 export function folderPresetSvg(
@@ -201,7 +177,7 @@ export function folderPresetSvg(
 ): string {
   const symbol = symbolMarkup(preset.symbol);
   const badge = symbol
-    ? `<g transform="translate(48 64) scale(.72) translate(-48 -56)">${symbol}</g>`
+    ? `<g transform="translate(48 61) scale(.72) translate(-48 -56)">${symbol}</g>`
     : "";
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 96" style="--folder-color:${preset.color}"><defs><linearGradient id="folder" x1="18" y1="18" x2="78" y2="82" gradientUnits="userSpaceOnUse"><stop stop-color="${preset.color}"/><stop offset="1" stop-color="${preset.color}" stop-opacity=".78"/></linearGradient></defs>${open ? openFolder : closedFolder}${badge}</svg>`;
 }

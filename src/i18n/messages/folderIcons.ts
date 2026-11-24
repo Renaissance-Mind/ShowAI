@@ -2,10 +2,8 @@ import { defineMessages } from "..";
 
 export default defineMessages("folderIcons", {
   "zh-CN": {
-    toggleGroup: "{group}图标组",
+    defaultColor: "默认色",
     useFolder: "使用{icon}文件夹",
-    groupsHidden: "默认图标组已全部隐藏",
-    showAllGroups: "显示全部图标组",
     "group.color": "颜色",
     "group.work": "用途",
     "group.mark": "标记",
@@ -29,10 +27,8 @@ export default defineMessages("folderIcons", {
     "preset.globe": "全球",
   },
   en: {
-    toggleGroup: "{group} icon group",
+    defaultColor: "Default color",
     useFolder: "Use {icon} folder",
-    groupsHidden: "All default icon groups are hidden",
-    showAllGroups: "Show all icon groups",
     "group.color": "Colors",
     "group.work": "Uses",
     "group.mark": "Marks",

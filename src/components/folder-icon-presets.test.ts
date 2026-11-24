@@ -1,10 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
-  defaultFolderIconGroups,
   folderIconGroups,
   folderPresetFromIcon,
   folderPresetSource,
-  parseFolderIconGroups,
   tagFolderPresetIcon,
 } from "./folder-icon-presets";
 import { validatePageIcon } from "../lib/page-icon.mjs";
@@ -21,18 +19,6 @@ describe("folder icon presets", () => {
     expect(new Set(presets.map((preset) => preset.id)).size).toBe(18);
     for (const preset of presets)
       expect(folderPresetSource(preset)).toContain("data:image/svg+xml");
-  });
-
-  it("reads group switches and ignores malformed or unknown values", () => {
-    expect(parseFolderIconGroups(null)).toEqual(defaultFolderIconGroups());
-    expect(parseFolderIconGroups("not-json")).toEqual(
-      defaultFolderIconGroups(),
-    );
-    expect(
-      parseFolderIconGroups(
-        JSON.stringify({ color: false, work: "false", unknown: false }),
-      ),
-    ).toEqual({ color: false, work: true, mark: true });
   });
 
   it("retains the closed PNG and identifies the corresponding open preset", () => {

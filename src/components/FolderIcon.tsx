@@ -14,11 +14,11 @@ export default function FolderIcon({
   open?: boolean;
   size?: number;
 }) {
-  const preset = open ? folderPresetFromIcon(value) : undefined;
+  const preset = folderPresetFromIcon(value);
   if (preset)
     return (
       <img
-        src={folderPresetSource(preset, true)}
+        src={folderPresetSource(preset, open)}
         width={size}
         height={size}
         alt=""
