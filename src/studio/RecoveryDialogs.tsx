@@ -20,6 +20,8 @@ import { useTranslator } from "../i18n/react";
 import recoveryMessages from "../i18n/messages/recovery";
 import type { WorkspaceConflict } from "../core/workspace-conflicts";
 import type { recoverExternalPackage } from "../core/package-recovery";
+import { usePageHoverPreview } from "./PageHoverPreview";
+import { searchResultPagePreview } from "./page-hover-preview";
 export type PackageRecoveryResult = Awaited<
   ReturnType<typeof recoverExternalPackage>
 >;
@@ -290,6 +292,7 @@ export function LibrarySearchResults({
   ) => void;
 }) {
   const t = useTranslator(recoveryMessages);
+  const pagePreview = usePageHoverPreview();
   const [kind, setKind] = useState(""),
     [results, setResults] = useState<SearchResult[]>([]),
     [cursor, setCursor] = useState<string | null>(null),
@@ -346,12 +349,13 @@ export function LibrarySearchResults({
     [projectId, query, kind],
   );
   useEffect(() => {
+    pagePreview.hide();
     const timer = setTimeout(() => void find(), 180);
     return () => {
       clearTimeout(timer);
       request.current++;
     };
-  }, [find]);
+  }, [find, pagePreview.hide]);
   async function openResult(
     result: SearchResult,
     event: MouseEvent<HTMLButtonElement>,
@@ -384,7 +388,7 @@ export function LibrarySearchResults({
           {error}
         </p>
       )}
-      <div className="history-search-results">
+      <div className="history-search-results" onScroll={pagePreview.hide}>
         <p className="history-search-count">
           {busy
             ? t("searching")
@@ -393,20 +397,33 @@ export function LibrarySearchResults({
               : t("typeToSearch")}
         </p>
         {results.map((result) => {
-          const page = result.path.match(
-            /^projects\/([^/]+)\/pages\/([^/]+)\.json$/,
-          );
+          const page = searchResultPagePreview(result);
           return (
             <button
               key={result.id}
               className="history-search-result"
-              onClick={(event) => void openResult(result, event)}
+              onMouseEnter={(event) =>
+                pagePreview.show(page, {
+                  x: event.clientX,
+                  y: event.clientY,
+                })
+              }
+              onMouseMove={(event) =>
+                pagePreview.move({ x: event.clientX, y: event.clientY })
+              }
+              onMouseLeave={pagePreview.hide}
+              onClick={(event) => {
+                pagePreview.hide();
+                void openResult(result, event);
+              }}
               onAuxClick={(event) => {
                 if (event.button !== 1) return;
                 event.preventDefault();
+                pagePreview.hide();
                 void openResult(result, event);
               }}
               onContextMenu={(event) => {
+                pagePreview.hide();
                 if (!page && result.kind !== "project") return;
                 event.preventDefault();
                 onMenu(result, event.currentTarget, {
@@ -447,6 +464,7 @@ export function LibrarySearchResults({
             {t("moreResults")}
           </button>
         )}
+        {pagePreview.element}
       </div>
     </section>
   );

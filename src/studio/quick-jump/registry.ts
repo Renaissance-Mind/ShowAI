@@ -1,4 +1,5 @@
 import { titleScore } from "../../components/title-match";
+import type { PageHoverPreviewTarget } from "../page-hover-preview";
 
 export type QuickJumpIcon =
   | "page"
@@ -20,6 +21,7 @@ export interface QuickJumpItem<D = unknown> {
   icon: QuickJumpIcon;
   emoji?: string;
   disabled?: boolean;
+  preview?: PageHoverPreviewTarget;
   data: D;
 }
 

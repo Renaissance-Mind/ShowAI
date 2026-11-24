@@ -232,6 +232,12 @@ describe("built-in sources", () => {
       ["Reading notes", "Research / Papers / Drafts"],
       ["Roadmap 2027", "Research"],
     ]);
+    expect(rows[0].item.preview).toEqual({
+      projectId: "p1",
+      pageId: "b",
+      updatedAt: time(9),
+      hash: "b",
+    });
     await pagesSource.run(rows[0].item, ctx);
     expect(ctx.openPage).toHaveBeenCalledWith({
       projectId: "p1",
@@ -265,6 +271,12 @@ describe("built-in sources", () => {
     });
     const items = await contentSource.search("gantt", ctx);
     expect(items.map((entry) => entry.key)).toEqual(["p1/a/block-1"]);
+    expect(items[0].preview).toEqual({
+      projectId: "p1",
+      pageId: "a",
+      updatedAt: time(5),
+      hash: "a",
+    });
     await contentSource.run(items[0], ctx);
     expect(ctx.openPage).toHaveBeenCalledWith({
       projectId: "p1",

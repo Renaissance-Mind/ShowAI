@@ -339,6 +339,22 @@ try {
   await opened.keyboard.press("ControlOrMeta+k");
   await query.fill("Other page");
   const shortcutResult = await match.innerText();
+  await match.hover();
+  await query.hover();
+  await opened.waitForTimeout(160);
+  assert.equal(await opened.locator("[data-page-hover-preview]").count(), 0);
+  await match.hover();
+  const jumpPreview = opened.locator("[data-page-hover-preview]");
+  await jumpPreview.waitFor();
+  const matchBox = await match.boundingBox();
+  const jumpPreviewBox = await jumpPreview.boundingBox();
+  assert.ok(jumpPreviewBox.x > matchBox.x + matchBox.width / 2);
+  await jumpPreview
+    .locator(".studio-page-thumbnail img, .studio-page-thumbnail-content")
+    .first()
+    .waitFor();
+  await query.hover();
+  await jumpPreview.waitFor({ state: "detached" });
   await query.press("Escape");
   await jump.waitFor({ state: "detached" });
   await sidebarSearch.click();
@@ -353,8 +369,32 @@ try {
       "Other page",
   );
   assert.equal(await title(source).inputValue(), "Target page");
+  await opened
+    .getByRole("button", { name: "搜索内容库", exact: true })
+    .click();
+  const libraryQuery = opened.getByRole("searchbox", {
+    name: "搜索内容库",
+    exact: true,
+  });
+  await libraryQuery.fill("Target page");
+  const libraryMatch = opened
+    .locator(".history-search-result")
+    .filter({ hasText: "Target page" })
+    .first();
+  await libraryMatch.waitFor();
+  await libraryMatch.hover();
+  const libraryPreview = opened.locator("[data-page-hover-preview]");
+  await libraryPreview.waitFor();
+  await libraryPreview
+    .locator(".studio-page-thumbnail img, .studio-page-thumbnail-content")
+    .first()
+    .waitFor();
+  await libraryQuery.hover();
+  await libraryPreview.waitFor({ state: "detached" });
+  await libraryQuery.press("Escape");
   result.checks.push(
     "Sidebar search above New and the keyboard shortcut open the same focused Quick Jump and find the same page",
+    "Quick Jump and full library search show an asynchronous page preview beside a hovered result and dismiss it on mouse leave",
     "The new window can navigate to a search result while the source keeps its original page",
   );
 

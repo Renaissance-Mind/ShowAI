@@ -137,6 +137,12 @@ export const pagesSource: QuickJumpSource<QuickJumpContext, PageData> = {
           updatedAt: page.updatedAt,
           icon: "page",
           ...(page.icon ? { emoji: page.icon } : {}),
+          preview: {
+            projectId: project.id,
+            pageId: page.id,
+            updatedAt: page.updatedAt,
+            hash: page.hash,
+          },
           data: { projectId: project.id, pageId: page.id },
         });
       }
@@ -236,6 +242,12 @@ export const contentSource: QuickJumpSource<QuickJumpContext, PageData> = {
         path: location.path,
         icon: "content",
         ...(page.icon ? { emoji: page.icon } : {}),
+        preview: {
+          projectId,
+          pageId,
+          updatedAt: page.updatedAt,
+          hash: page.hash,
+        },
         data: {
           projectId,
           pageId,

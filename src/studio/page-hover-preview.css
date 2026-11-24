@@ -1,0 +1,33 @@
+.page-hover-preview {
+  position: fixed;
+  z-index: 210;
+  box-sizing: border-box;
+  overflow: hidden;
+  pointer-events: none;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--paper);
+  box-shadow: var(--shadow-dialog);
+}
+.page-hover-preview .studio-page-thumbnail {
+  position: relative;
+  inset: auto;
+  width: 100%;
+  height: 100%;
+  aspect-ratio: auto;
+  border: 0;
+  content-visibility: visible;
+}
+.page-hover-preview .studio-page-thumbnail-loading {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  color: var(--muted);
+  background: var(--paper);
+}
+@media (prefers-reduced-motion: reduce) {
+  .page-hover-preview .studio-spin {
+    animation: none;
+  }
+}

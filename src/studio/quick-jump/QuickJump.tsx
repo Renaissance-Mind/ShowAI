@@ -49,6 +49,7 @@ import {
   type QuickJumpContext,
   type WorkbenchCommand,
 } from "./sources";
+import { usePageHoverPreview } from "../PageHoverPreview";
 import "../../ui/dialog.css";
 import "./quick-jump.css";
 
@@ -86,6 +87,7 @@ export default function QuickJump({
   const t = useTranslator(messages);
   const tc = useTranslator(commonMessages);
   const catalog = useComponentCatalog(true);
+  const pagePreview = usePageHoverPreview();
   const listId = useId();
   const [query, setQuery] = useState("");
   const [groups, setGroups] = useState<QuickJumpGroup[]>([]);
@@ -190,7 +192,10 @@ export default function QuickJump({
       ),
     [query, context],
   );
-  useEffect(() => setSelected(0), [query]);
+  useEffect(() => {
+    setSelected(0);
+    pagePreview.hide();
+  }, [query, pagePreview.hide]);
   const rows = flattenGroups(groups);
   const current = rows[Math.min(selected, rows.length - 1)];
   useEffect(() => {
@@ -221,6 +226,7 @@ export default function QuickJump({
         aria-label={t("dialog")}
         className="studio-modal quick-jump"
         onKeyDown={(event) => {
+          pagePreview.hide();
           if (event.nativeEvent.isComposing || event.keyCode === 229) return;
           if (
             event.key === "Escape" ||
@@ -271,6 +277,7 @@ export default function QuickJump({
           role="listbox"
           aria-label={t("results")}
           className="quick-jump-results"
+          onScroll={pagePreview.hide}
         >
           {!rows.length && query.trim() && (
             <p className="quick-jump-empty">{t("none")}</p>
@@ -292,9 +299,17 @@ export default function QuickJump({
                     aria-selected={active}
                     aria-disabled={row.item.disabled || undefined}
                     className={`quick-jump-row${active ? " is-selected" : ""}`}
-                    onMouseMove={() => {
+                    onMouseEnter={(event) =>
+                      pagePreview.show(row.item.preview, {
+                        x: event.clientX,
+                        y: event.clientY,
+                      })
+                    }
+                    onMouseMove={(event) => {
                       if (!active) setSelected(position);
+                      pagePreview.move({ x: event.clientX, y: event.clientY });
                     }}
+                    onMouseLeave={pagePreview.hide}
                     onMouseDown={(event) => event.preventDefault()}
                     onClick={() => run(row)}
                   >
@@ -328,6 +343,7 @@ export default function QuickJump({
             </div>
           ))}
         </div>
+        {pagePreview.element}
       </div>
     </div>
   );

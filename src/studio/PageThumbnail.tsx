@@ -1,7 +1,8 @@
 import { memo, startTransition, useEffect, useRef, useState } from "react";
 import { desktop, errorMessage } from "../host/bridge";
-import { ImageOff } from "../ui/icons";
+import { ImageOff, Loader2 } from "../ui/icons";
 import { useTranslator } from "../i18n/react";
+import { useDelayedFlag } from "../ui/delayed-flag";
 import messages from "../i18n/messages/catalog";
 import "./component-catalog.css";
 import type { LoadedPage } from "./usePage";
@@ -17,6 +18,7 @@ interface ThumbnailProps {
   updatedAt: string;
   hash?: string;
   padding?: number;
+  showLoading?: boolean;
 }
 
 export const LivePageThumbnail = memo(function LivePageThumbnail({
@@ -24,6 +26,7 @@ export const LivePageThumbnail = memo(function LivePageThumbnail({
   pageId,
   updatedAt,
   padding,
+  showLoading = false,
 }: ThumbnailProps) {
   const t = useTranslator(messages);
   const host = useRef<HTMLSpanElement>(null);
@@ -33,6 +36,7 @@ export const LivePageThumbnail = memo(function LivePageThumbnail({
   const [error, setError] = useState("");
   const loadedKey = useRef("");
   const key = `${projectId}:${pageId}:${updatedAt}`;
+  const loading = useDelayedFlag(showLoading && !record && !error);
   useEffect(() => {
     const observer = new IntersectionObserver(
       ([entry]) => {
@@ -85,6 +89,10 @@ export const LivePageThumbnail = memo(function LivePageThumbnail({
           <ImageOff size={18} aria-hidden />
           {t("previewUnavailable")}
         </span>
+      ) : loading ? (
+        <span className="studio-page-thumbnail-loading">
+          <Loader2 size={22} className="studio-spin" aria-hidden="true" />
+        </span>
       ) : (
         record &&
         visible && (
@@ -105,6 +113,7 @@ function RasterPageThumbnail({
   hash,
   updatedAt,
   padding = 10,
+  showLoading = false,
 }: ThumbnailProps) {
   const t = useTranslator(messages);
   const host = useRef<HTMLSpanElement>(null);
@@ -123,6 +132,7 @@ function RasterPageThumbnail({
     ...size,
     generation,
   });
+  const loading = useDelayedFlag(showLoading && !image && !error);
   useEffect(() => {
     let current = true;
     const release = window.showai?.onPageThumbnail?.((reference) => {
@@ -276,6 +286,10 @@ function RasterPageThumbnail({
         <span className="component-preview-error" title={error}>
           <ImageOff size={18} aria-hidden />
           {t("previewUnavailable")}
+        </span>
+      ) : loading ? (
+        <span className="studio-page-thumbnail-loading">
+          <Loader2 size={22} className="studio-spin" aria-hidden="true" />
         </span>
       ) : null}
     </span>
