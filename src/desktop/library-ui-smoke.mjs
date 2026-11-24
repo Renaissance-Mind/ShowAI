@@ -603,7 +603,7 @@ try {
   const presetStroke = await dataFolder.locator("svg").getAttribute("stroke");
   assert.match(presetStroke, /^#[\da-f]{6}$/i);
   await dataFolder.click();
-  await closedGlyph.locator("g").waitFor();
+  await closedGlyph.locator(":scope > g").waitFor();
   await page.setViewportSize(fullSize);
   assert.deepEqual(await folderOutline(closedGlyph), closedOutline);
   assert.deepEqual(await folderOutline(openGlyph), openOutline);
@@ -697,7 +697,7 @@ try {
   assert.equal(await saveIcon.isEnabled(), false);
   await defaultColor.click();
   assert.equal(await defaultColor.getAttribute("aria-pressed"), "true");
-  assert.equal(await closedGlyph.locator("g").count(), 0);
+  assert.equal(await closedGlyph.locator(":scope > g").count(), 0);
   assert.equal(await closedGlyph.getAttribute("stroke"), "currentColor");
   await saveIcon.click();
   await folderIconPicker.waitFor({ state: "hidden" });
