@@ -19,6 +19,7 @@
   place-items: center;
   min-width: 0;
   height: 54px;
+  padding: 0;
   border: 1px solid transparent;
   border-radius: 9px;
 }
