@@ -1,3 +1,10 @@
+.studio-modal.page-icon-dialog.page-icon-dialog-with-presets {
+  width: min(576px, 100%);
+}
+.page-icon-preview-tile[data-folder-state] {
+  width: 96px;
+  height: 96px;
+}
 .folder-icon-defaults {
   display: flex;
   flex-direction: column;
@@ -11,14 +18,14 @@
 }
 .folder-icon-grid {
   display: grid;
-  grid-template-columns: repeat(7, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(min(62px, 100%), 1fr));
   gap: 6px;
 }
 .folder-icon-grid button {
   display: grid;
   place-items: center;
   min-width: 0;
-  height: 54px;
+  height: 66px;
   padding: 0;
   border: 1px solid transparent;
   border-radius: 9px;

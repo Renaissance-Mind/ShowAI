@@ -569,6 +569,8 @@ try {
   await openFolderIconPicker();
   const closedOutline = await folderOutline(closedGlyph);
   const openOutline = await folderOutline(openGlyph);
+  assert.equal(closedOutline.width, "64px");
+  assert.equal(openOutline.width, closedOutline.width);
   assert.notEqual(closedOutline.path, openOutline.path);
   assert.equal(await presets.count(), 19);
   assert.equal(await folderIconPicker.getByRole("switch").count(), 0);
@@ -577,14 +579,32 @@ try {
   const dataFolder = folderIconPicker.getByRole("button", {
     name: "使用数据文件夹",
   });
+  const paletteOutline = await folderOutline(defaultColor.locator("svg"));
+  assert.equal(paletteOutline.width, "48px");
   assert.deepEqual(
     await folderOutline(dataFolder.locator("svg")),
+    paletteOutline,
+  );
+  await page.setViewportSize({ width: 360, height: 700 });
+  const colorGrid = folderIconPicker.locator(".folder-icon-grid").first();
+  assert.ok(
+    await colorGrid.evaluate(
+      (grid) => getComputedStyle(grid).gridTemplateColumns.split(" ").length < 7,
+    ),
+  );
+  assert.deepEqual(
+    await folderOutline(dataFolder.locator("svg")),
+    paletteOutline,
+  );
+  assert.deepEqual(
     await folderOutline(defaultColor.locator("svg")),
+    paletteOutline,
   );
   const presetStroke = await dataFolder.locator("svg").getAttribute("stroke");
   assert.match(presetStroke, /^#[\da-f]{6}$/i);
   await dataFolder.click();
   await closedGlyph.locator("g").waitFor();
+  await page.setViewportSize(fullSize);
   assert.deepEqual(await folderOutline(closedGlyph), closedOutline);
   assert.deepEqual(await folderOutline(openGlyph), openOutline);
   assert.equal(await closedGlyph.getAttribute("stroke"), presetStroke);
@@ -691,7 +711,7 @@ try {
   );
   assert.equal(await folderToggle.locator("svg").count(), 1);
   result.checks.push(
-    "Folder presets match the default outline and size across the picker and sidebar, persist, and can be cleared",
+    "Folder presets keep the same size when the picker wraps, match the default outline, persist, and can be cleared",
   );
   assert.equal(
     await row(nested.id).locator(".studio-tree-title").innerText(),

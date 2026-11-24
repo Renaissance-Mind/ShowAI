@@ -156,7 +156,11 @@ export default function PageIconDialog({
   return (
     <Dialog
       title={title ?? t("icon.pageIcon")}
-      className="page-icon-dialog"
+      className={
+        presets
+          ? "page-icon-dialog page-icon-dialog-with-presets"
+          : "page-icon-dialog"
+      }
       dismissible={!busy}
       onClose={onClose}
     >

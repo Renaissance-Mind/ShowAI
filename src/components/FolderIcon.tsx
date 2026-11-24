@@ -8,27 +8,74 @@ import {
 const badges = {
   briefcase: (
     <>
-      <rect x="32" y="43" width="32" height="27" rx="4" />
-      <path d="M40 43v-6h16v6M32 53c9 5 23 5 32 0M48 52v5" />
+      <rect
+        x="29"
+        y="45"
+        width="38"
+        height="27"
+        rx="4"
+        fill="currentColor"
+        fillOpacity={0.16}
+      />
+      <path d="M39 45v-5h18v5M29 55c10 5 28 5 38 0" />
+      <rect
+        x="44"
+        y="54"
+        width="8"
+        height="8"
+        rx="2"
+        fill="currentColor"
+        stroke="none"
+      />
     </>
   ),
-  code: <path d="m42 44-9 11 9 11M54 44l9 11-9 11M51 40l-6 30" />,
-  chart: <path d="M31 70h36M35 66V55M48 66V43M61 66V51" />,
+  code: <path d="m41 44-11 12 11 12m14-24 11 12-11 12m-4-28-6 32" />,
+  chart: (
+    <>
+      <path d="M27 73h42" />
+      <g fill="currentColor" stroke="none">
+        <rect x="29" y="55" width="10" height="12" rx="2" opacity={0.56} />
+        <rect x="43" y="39" width="10" height="28" rx="2" />
+        <rect x="57" y="47" width="10" height="20" rx="2" opacity={0.78} />
+      </g>
+    </>
+  ),
   book: (
-    <path d="M28 42c8-3 15-1 20 4v27c-5-5-12-7-20-4V42Zm40 0c-8-3-15-1-20 4v27c5-5 12-7 20-4V42Z" />
+    <>
+      <path
+        d="M27 42c9-3 16-1 21 4v27c-5-5-12-7-21-4V42Zm42 0c-9-3-16-1-21 4v27c5-5 12-7 21-4V42Z"
+        fill="currentColor"
+        fillOpacity={0.16}
+      />
+      <path d="m33 51 9 3m-9 5 9 3m12-8 9-3m-9 11 9-3" strokeWidth={3} />
+    </>
   ),
   flask: (
-    <path d="M41 39h14M44 39v13L33 67c-2 4 1 7 5 7h20c4 0 7-3 5-7L52 52V39M39 61h18" />
+    <>
+      <path
+        d="M37 62h22l4 6c2 4-1 6-5 6H38c-4 0-7-2-5-6Z"
+        fill="currentColor"
+        fillOpacity={0.3}
+        stroke="none"
+      />
+      <path d="M41 39h14M44 39v13L33 67c-2 4 1 7 5 7h20c4 0 7-3 5-7L52 52V39M37 62h22" />
+      <circle cx="48" cy="56" r="2" fill="currentColor" stroke="none" />
+    </>
   ),
   camera: (
     <>
-      <path d="M29 48h9l4-7h13l4 7h9v25H29V48Z" />
-      <circle cx="48" cy="59" r="8" />
+      <path
+        d="M27 49h10l5-7h12l5 7h10v23H27Z"
+        fill="currentColor"
+        fillOpacity={0.16}
+      />
+      <circle cx="48" cy="60" r="7.5" />
+      <path d="M59 54h4" strokeWidth={3} />
     </>
   ),
   star: (
     <path
-      d="m48 35 7 14 16 2-12 11 3 16-14-8-14 8 3-16-12-11 16-2 7-14Z"
+      d="m48 36 7 13 15 2-11 10 3 14-14-7-14 7 3-14-11-10 15-2 7-13Z"
       fill="currentColor"
       stroke="none"
     />
@@ -40,19 +87,34 @@ const badges = {
       stroke="none"
     />
   ),
-  bookmark: <path d="M37 36h22v39L48 66l-11 9V36Z" />,
-  flag: <path d="M34 76V36M37 39h28l-7 11 7 11H37" />,
+  bookmark: (
+    <path
+      d="M36 39h24v35L48 67l-12 7Z"
+      fill="currentColor"
+      fillOpacity={0.26}
+    />
+  ),
+  flag: (
+    <>
+      <path d="M33 74V40" />
+      <path
+        d="M33 40h33l-8 10 8 10H33Z"
+        fill="currentColor"
+        fillOpacity={0.3}
+      />
+    </>
+  ),
   bolt: (
     <path
-      d="m53 33-21 28h14l-3 19 22-31H51l2-16Z"
+      d="m54 36-23 24h15l-3 15 23-26H51l3-13Z"
       fill="currentColor"
       stroke="none"
     />
   ),
   globe: (
     <>
-      <circle cx="48" cy="56" r="21" />
-      <path d="M27 56h42M48 35c8 8 11 15 11 21s-3 13-11 21c-8-8-11-15-11-21s3-13 11-21Z" />
+      <circle cx="48" cy="56" r="18" fill="currentColor" fillOpacity={0.16} />
+      <path d="M30 56h36M48 38c6 5 9 11 9 18s-3 13-9 18c-6-5-9-11-9-18s3-13 9-18Z" />
     </>
   ),
 };
@@ -81,7 +143,7 @@ export function FolderIconGlyph({
     >
       {preset?.symbol && (
         <g
-          transform="translate(12 15.25) scale(.18) translate(-48 -56)"
+          transform="translate(12.5 15) scale(.19) translate(-48 -56)"
           color={preset.color}
           strokeWidth={4}
         >
