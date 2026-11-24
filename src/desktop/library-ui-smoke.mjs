@@ -591,13 +591,24 @@ try {
   assert.equal(await chart.getAttribute("aria-pressed"), "true");
   assert.equal(await gold.getAttribute("aria-pressed"), "true");
   const openFace = openPreview.locator("[data-folder-face]");
-  const faceCenter = await openFace.locator(":scope > rect").evaluate((rect) => {
-    const { x, y, width, height } = rect.getBBox();
-    return [x + width / 2, y + height / 2];
-  });
-  assert.ok(await openFace.evaluate((face) => face.getCTM().c < 0));
+  const rectangleCenter = (locator) =>
+    locator.evaluate((rect) => {
+      const { x, y, width, height } = rect.getBBox();
+      return [x + width / 2, y + height / 2];
+    });
+  const faceCenter = await rectangleCenter(openFace.locator(":scope > rect"));
+  const openSkew = await openFace.evaluate((face) => face.getCTM().c);
+  assert.ok(openSkew < 0);
+  for (const preview of [closedPreview, openPreview]) {
+    const backing = preview.locator("[data-folder-badge] > rect");
+    assert.deepEqual(await rectangleCenter(backing), faceCenter);
+    assert.equal(
+      await backing.evaluate((rect) => rect.getCTM().c),
+      preview === openPreview ? openSkew : 0,
+    );
+  }
   const chartCenter = (preview) =>
-    preview.locator("[data-folder-face] > g").evaluate((artwork) => {
+    preview.locator("[data-folder-badge] > g").evaluate((artwork) => {
       const { x, y, width, height } = artwork.getBBox();
       const local = artwork.parentElement
         .getCTM()
@@ -629,7 +640,7 @@ try {
   await folderIconPicker.getByRole("button", { name: "Emoji", exact: true }).click();
   await folderIconPicker.getByRole("button", { name: "使用 📚", exact: true }).click();
   for (const preview of [closedPreview, openPreview]) {
-    const emoji = preview.locator("[data-folder-face] > text");
+    const emoji = preview.locator("[data-folder-badge] > text");
     assert.equal(await emoji.textContent(), "📚");
     assert.equal(Number(await emoji.getAttribute("x")), faceCenter[0]);
     assert.equal(Number(await emoji.getAttribute("y")), faceCenter[1] + 1);
@@ -724,7 +735,7 @@ try {
   await poll(readSavedIcon, (icon) => icon === "", "system default folder icon restored");
   assert.deepEqual(await folderOutline(sidebarFolderIcon), sidebarOpenOutline);
   result.checks.push(
-    "Folder graphics and emoji stay centered on the folder face as it opens, persist across reload, and support standalone display",
+    "Folder icon backing and artwork stay centered on the folder face as it opens, persist across reload, and support standalone display",
   );
   assert.equal(
     await row(nested.id).locator(".studio-tree-title").innerText(),

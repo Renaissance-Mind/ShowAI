@@ -131,6 +131,11 @@ const emojiFont =
   "Apple Color Emoji, Segoe UI Emoji, Noto Color Emoji, sans-serif";
 const segmenter = new Intl.Segmenter(undefined, { granularity: "grapheme" });
 const folderFace = { x: 8, y: 25, width: 82, height: 57, rx: 9 };
+const faceCenter = {
+  x: folderFace.x + folderFace.width / 2,
+  y: folderFace.y + folderFace.height / 2,
+};
+const badgeSize = 46;
 const faceBottom = folderFace.y + folderFace.height;
 // Anchor the opening face at its lower-left corner so the badge moves with it.
 const openFaceTransform = `translate(${folderFace.x} ${faceBottom}) matrix(.86 0 -.28 .78 0 0) translate(${-folderFace.x} ${-faceBottom})`;
@@ -243,13 +248,23 @@ export function FolderIconGlyph({
         <g data-folder-face="" transform={open ? openFaceTransform : undefined}>
           {open && <rect {...folderFace} fill={face} />}
           {composition.badge && (
-            <BadgeArtwork
-              badge={composition.badge}
-              color={ink}
-              x={folderFace.x + folderFace.width / 2}
-              y={folderFace.y + folderFace.height / 2}
-              scale={0.86}
-            />
+            <g data-folder-badge="">
+              <rect
+                x={faceCenter.x - badgeSize / 2}
+                y={faceCenter.y - badgeSize / 2}
+                width={badgeSize}
+                height={badgeSize}
+                rx={13}
+                fill="#fffaf3"
+              />
+              <BadgeArtwork
+                badge={composition.badge}
+                color={ink}
+                x={faceCenter.x}
+                y={faceCenter.y}
+                scale={0.86}
+              />
+            </g>
           )}
         </g>
       )}
