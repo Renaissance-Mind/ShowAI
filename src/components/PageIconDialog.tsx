@@ -16,11 +16,14 @@ import studioMessages from "../i18n/messages/studio";
 
 const translate = translator(studioMessages);
 
-export type IconPresetPicker = ComponentType<{
-  busy: boolean;
-  selectedPreset: string;
-  onChoose: (id: string, load: () => Promise<string>) => void;
-}>;
+export type IconPresetPicker = {
+  Options: ComponentType<{
+    busy: boolean;
+    value: string;
+    onChoose: (load: () => Promise<string>) => void;
+  }>;
+  Preview: ComponentType<{ value: string }>;
+};
 
 const emoji = [
   "📄",
@@ -85,7 +88,7 @@ export default function PageIconDialog({
   onClose,
   title,
   fallback,
-  presets: Presets,
+  presets,
 }: {
   value: string;
   title?: string;
@@ -100,9 +103,8 @@ export default function PageIconDialog({
   const [text, setText] = useState(isImageIcon(value) ? "" : value);
   const [url, setUrl] = useState(/^https?:/i.test(value) ? value : "");
   const [mode, setMode] = useState<"default" | "emoji" | "image">(
-    Presets ? "default" : isImageIcon(value) ? "image" : "emoji",
+    presets ? "default" : isImageIcon(value) ? "image" : "emoji",
   );
-  const [selectedPreset, setSelectedPreset] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [dragging, setDragging] = useState(false);
@@ -123,16 +125,13 @@ export default function PageIconDialog({
       setBusy(false);
     }
   };
-  const selectImage = async (load: () => Promise<string>, presetId = "") => {
+  const selectImage = async (load: () => Promise<string>) => {
     const ticket = ++generation.current;
     setBusy(true);
     setError("");
     try {
       const result = await load();
-      if (ticket === generation.current) {
-        setSelected(result);
-        setSelectedPreset(presetId);
-      }
+      if (ticket === generation.current) setSelected(result);
     } catch (reason) {
       if (ticket === generation.current) setError(errorMessage(reason));
     } finally {
@@ -154,17 +153,21 @@ export default function PageIconDialog({
         }}
       >
         <div className="page-icon-preview" aria-label={t("icon.preview")}>
-          <div className="page-icon-preview-tile">
-            <PageIcon value={preview} size={48} fallback={fallback} />
-          </div>
+          {mode === "default" && presets ? (
+            <presets.Preview value={preview} />
+          ) : (
+            <div className="page-icon-preview-tile">
+              <PageIcon value={preview} size={48} fallback={fallback} />
+            </div>
+          )}
         </div>
         <div
           className="page-icon-tabs"
-          data-count={Presets ? 3 : 2}
+          data-count={presets ? 3 : 2}
           role="group"
           aria-label={t("icon.mode")}
         >
-          {Presets && (
+          {presets && (
             <button
               type="button"
               aria-pressed={mode === "default"}
@@ -191,11 +194,11 @@ export default function PageIconDialog({
             {t("icon.image")}
           </button>
         </div>
-        {mode === "default" && Presets ? (
-          <Presets
+        {mode === "default" && presets ? (
+          <presets.Options
             busy={busy}
-            selectedPreset={selectedPreset}
-            onChoose={(id, load) => void selectImage(load, id)}
+            value={selected}
+            onChoose={selectImage}
           />
         ) : mode === "emoji" ? (
           <div className="page-icon-panel">
@@ -211,7 +214,6 @@ export default function PageIconDialog({
                 onChange={(event) => {
                   setText(event.target.value);
                   setSelected(event.target.value);
-                  setSelectedPreset("");
                   setError("");
                 }}
               />
@@ -227,7 +229,6 @@ export default function PageIconDialog({
                   onClick={() => {
                     setSelected(item);
                     setText(item);
-                    setSelectedPreset("");
                     setError("");
                   }}
                 >
@@ -288,7 +289,6 @@ export default function PageIconDialog({
                 onChange={(event) => {
                   setUrl(event.target.value);
                   setSelected(event.target.value.trim());
-                  setSelectedPreset("");
                   setError("");
                 }}
               />
@@ -310,7 +310,6 @@ export default function PageIconDialog({
               setSelected("");
               setText("");
               setUrl("");
-              setSelectedPreset("");
               setError("");
             }}
           >

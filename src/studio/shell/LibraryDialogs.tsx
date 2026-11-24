@@ -4,7 +4,7 @@ import type { ProjectGroup, ProjectSummary } from "../../core/model";
 import type { LibraryTarget } from "../LibraryNavigation";
 import Dialog from "../../ui/Dialog";
 import PageIcon from "../../components/PageIcon";
-import FolderIconDefaults from "../../components/FolderIconDefaults";
+import folderIconPicker from "../../components/FolderIconDefaults";
 import PageIconDialog, {
   type IconPresetPicker,
 } from "../../components/PageIconDialog";
@@ -285,7 +285,7 @@ export function FolderDialog({
       inputLabel={t("folderName")}
       iconButtonLabel={t("setFolderIcon")}
       iconDialogTitle={t("folderIcon")}
-      iconPresets={FolderIconDefaults}
+      iconPresets={folderIconPicker}
       submitLabel={folder ? tc("save") : tc("create")}
       initialName={folder?.title}
       initialIcon={folder?.icon}

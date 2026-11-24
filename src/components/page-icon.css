@@ -8,8 +8,9 @@
   padding: 12px 20px 20px;
 }
 .page-icon-preview {
-  display: grid;
-  place-items: center;
+  display: flex;
+  justify-content: center;
+  gap: 12px;
 }
 .page-icon-preview-tile {
   display: grid;

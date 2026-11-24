@@ -5,8 +5,9 @@ import {
   isRenameShortcut,
 } from "./keyboard-shortcuts";
 import { memo, useRef, type KeyboardEvent, type MouseEvent } from "react";
-import { Folder, FolderOpen, MoreHorizontal, Pin } from "../ui/icons";
+import { MoreHorizontal, Pin } from "../ui/icons";
 import "./library-row.css";
+import FolderIcon from "../components/FolderIcon";
 import PageIcon from "../components/PageIcon";
 import ProjectIcon from "./ProjectIcon";
 import type { LibraryMenuPoint } from "../ui/LibraryContextMenu";
@@ -78,7 +79,6 @@ function LibraryRowView({
       : target.kind === "folder"
         ? t("newFolder")
         : t("untitledProject"));
-  const FolderIcon = expanded ? FolderOpen : Folder;
   const icon =
     target.kind === "project" ? (
       <ProjectIcon
@@ -88,11 +88,7 @@ function LibraryRowView({
         cloud={cloud}
       />
     ) : target.kind === "folder" ? (
-      <PageIcon
-        value={target.icon}
-        size={15}
-        fallback={<FolderIcon size={15} strokeWidth={1.7} aria-hidden="true" />}
-      />
+      <FolderIcon value={target.icon} size={15} open={expanded} />
     ) : (
       <PageIcon value={target.icon} size={15} />
     );

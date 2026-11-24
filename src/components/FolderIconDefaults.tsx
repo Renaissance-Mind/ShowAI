@@ -1,10 +1,12 @@
 import { useState, type ComponentProps } from "react";
+import FolderIcon from "./FolderIcon";
 import { useTranslator } from "../i18n/react";
 import folderIconMessages from "../i18n/messages/folderIcons";
 import type { IconPresetPicker } from "./PageIconDialog";
 import {
   defaultFolderIconGroups,
   folderIconGroups,
+  folderPresetFromIcon,
   folderPresetSource,
   parseFolderIconGroups,
   rasterizeFolderPreset,
@@ -14,12 +16,13 @@ import "./folder-icon-defaults.css";
 
 const storageKey = "showai:folder-icon-groups";
 
-export default function FolderIconDefaults({
+function FolderIconDefaults({
   busy,
-  selectedPreset,
+  value,
   onChoose,
-}: ComponentProps<IconPresetPicker>) {
+}: ComponentProps<IconPresetPicker["Options"]>) {
   const t = useTranslator(folderIconMessages);
+  const selectedPreset = folderPresetFromIcon(value)?.id;
   const [enabled, setEnabled] = useState(() =>
     parseFolderIconGroups(localStorage.getItem(storageKey)),
   );
@@ -58,7 +61,7 @@ export default function FolderIconDefaults({
                     aria-pressed={selectedPreset === preset.id}
                     disabled={busy}
                     onClick={() =>
-                      onChoose(preset.id, () => rasterizeFolderPreset(preset))
+                      onChoose(() => rasterizeFolderPreset(preset))
                     }
                   >
                     <img
@@ -93,3 +96,22 @@ export default function FolderIconDefaults({
     </div>
   );
 }
+
+function FolderIconPreview({ value }: { value: string }) {
+  const presetValue = folderPresetFromIcon(value) ? value : undefined;
+  return (
+    <>
+      <div className="page-icon-preview-tile" data-folder-state="closed">
+        <FolderIcon value={presetValue} size={48} />
+      </div>
+      <div className="page-icon-preview-tile" data-folder-state="open">
+        <FolderIcon value={presetValue} size={48} open />
+      </div>
+    </>
+  );
+}
+
+export default {
+  Options: FolderIconDefaults,
+  Preview: FolderIconPreview,
+} satisfies IconPresetPicker;

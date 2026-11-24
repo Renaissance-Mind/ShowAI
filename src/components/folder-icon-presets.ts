@@ -186,12 +186,77 @@ function symbolMarkup(symbol: FolderIconPreset["symbol"]): string {
   }
 }
 
-export function folderPresetSvg(preset: FolderIconPreset): string {
-  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 96"><defs><linearGradient id="folder" x1="18" y1="18" x2="78" y2="82" gradientUnits="userSpaceOnUse"><stop stop-color="${preset.color}"/><stop offset="1" stop-color="${preset.color}" stop-opacity=".78"/></linearGradient></defs><path d="M10 28a10 10 0 0 1 10-10h21l10 11h25a10 10 0 0 1 10 10v35a10 10 0 0 1-10 10H20A10 10 0 0 1 10 74V28Z" fill="url(#folder)"/><path d="M11 40h74" stroke="white" stroke-opacity=".22" stroke-width="2"/>${symbolMarkup(preset.symbol)}</svg>`;
+const closedFolder =
+  '<path d="M10 28a10 10 0 0 1 10-10h21l10 11h25a10 10 0 0 1 10 10v35a10 10 0 0 1-10 10H20A10 10 0 0 1 10 74V28Z" fill="url(#folder)"/><path d="M11 40h74" stroke="white" stroke-opacity=".22" stroke-width="2"/>';
+const openFolder = [
+  '<path d="M8 27a8 8 0 0 1 8-8h18l10 11h26a9 9 0 0 1 9 9v37H8V27Z" fill="var(--folder-color)"/>',
+  '<path d="M8 36h63a8 8 0 0 1 8 8v32H8V36Z" fill="#172132" fill-opacity=".32"/>',
+  '<path d="M23 47h60a6 6 0 0 1 6 8l-8 22a10 10 0 0 1-9 7H17a8 8 0 0 1-8-10l6-21a9 9 0 0 1 8-6Z" fill="url(#folder)"/>',
+  '<path d="M24 48h58" stroke="white" stroke-opacity=".35" stroke-width="2" stroke-linecap="round"/>',
+].join("");
+
+export function folderPresetSvg(
+  preset: FolderIconPreset,
+  open = false,
+): string {
+  const symbol = symbolMarkup(preset.symbol);
+  const badge = symbol
+    ? `<g transform="translate(48 64) scale(.72) translate(-48 -56)">${symbol}</g>`
+    : "";
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 96" style="--folder-color:${preset.color}"><defs><linearGradient id="folder" x1="18" y1="18" x2="78" y2="82" gradientUnits="userSpaceOnUse"><stop stop-color="${preset.color}"/><stop offset="1" stop-color="${preset.color}" stop-opacity=".78"/></linearGradient></defs>${open ? openFolder : closedFolder}${badge}</svg>`;
 }
 
-export function folderPresetSource(preset: FolderIconPreset): string {
-  return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(folderPresetSvg(preset))}`;
+export function folderPresetSource(
+  preset: FolderIconPreset,
+  open = false,
+): string {
+  return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(folderPresetSvg(preset, open))}`;
+}
+
+const pngPrefix = "data:image/png;base64,";
+// The PNG signature and IHDR chunk are 33 bytes, or 44 base64 characters.
+const pngMetadataStart = pngPrefix.length + 44;
+
+function presetPngChunk(id: string): string {
+  const text = `ShowAI Folder Preset\0${id}`;
+  // Keep the chunk on a base64 boundary when inserting it after IHDR.
+  const data = text.padEnd(Math.ceil(text.length / 3) * 3);
+  const body = new TextEncoder().encode("tEXt" + data);
+  let checksum = 0xffffffff;
+  for (const byte of body) {
+    checksum ^= byte;
+    for (let bit = 0; bit < 8; bit++)
+      checksum = (checksum >>> 1) ^ (checksum & 1 ? 0xedb88320 : 0);
+  }
+  const chunk = new Uint8Array(body.length + 8);
+  const header = new DataView(chunk.buffer);
+  header.setUint32(0, data.length);
+  chunk.set(body, 4);
+  header.setUint32(chunk.length - 4, checksum ^ 0xffffffff);
+  return btoa(String.fromCharCode(...chunk));
+}
+
+const taggedPresets = folderIconGroups.flatMap((group) =>
+  group.presets.map((preset) => ({ preset, chunk: presetPngChunk(preset.id) })),
+);
+
+export function folderPresetFromIcon(
+  value?: string,
+): FolderIconPreset | undefined {
+  if (!value?.startsWith(pngPrefix + "iVBORw0KGgo")) return undefined;
+  return taggedPresets.find(({ chunk }) =>
+    value.startsWith(chunk, pngMetadataStart),
+  )?.preset;
+}
+
+export function tagFolderPresetIcon(
+  value: string,
+  preset: FolderIconPreset,
+): string {
+  const chunk = presetPngChunk(preset.id);
+  return (
+    value.slice(0, pngMetadataStart) + chunk + value.slice(pngMetadataStart)
+  );
 }
 
 export async function rasterizeFolderPreset(
@@ -204,5 +269,5 @@ export async function rasterizeFolderPreset(
   canvas.width = 128;
   canvas.height = 128;
   canvas.getContext("2d")!.drawImage(image, 0, 0, 128, 128);
-  return canvas.toDataURL("image/png");
+  return tagFolderPresetIcon(canvas.toDataURL("image/png"), preset);
 }
