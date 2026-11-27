@@ -1,5 +1,5 @@
-import PageIcon from "../components/PageIcon";
-import { Cloud, Folder, FolderOpen } from "../ui/icons";
+import FolderIcon from "../components/FolderIcon";
+import { Cloud } from "../ui/icons";
 import "./project-icon.css";
 
 export default function ProjectIcon({
@@ -13,7 +13,6 @@ export default function ProjectIcon({
   expanded?: boolean;
   cloud?: boolean;
 }) {
-  const Icon = expanded ? FolderOpen : Folder;
   return (
     <span
       className="studio-project-icon"
@@ -21,10 +20,11 @@ export default function ProjectIcon({
       style={{ width: size, height: size }}
       aria-hidden="true"
     >
-      <PageIcon
+      <FolderIcon
         value={value}
         size={size}
-        fallback={<Icon size={size} strokeWidth={1.75} />}
+        open={expanded}
+        strokeWidth={1.75}
       />
       {cloud && (
         <span className="studio-project-icon-cloud">

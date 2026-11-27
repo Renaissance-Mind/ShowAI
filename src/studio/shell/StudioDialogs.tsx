@@ -1,7 +1,6 @@
 import {
   ArrowUpRight,
   FileText,
-  Folder,
   LayoutTemplate,
   Presentation,
 } from "../../ui/icons";
@@ -19,6 +18,7 @@ import navigationMessages from "../../i18n/messages/navigation";
 import studioMessages from "../../i18n/messages/studio";
 import Dialog from "../../ui/Dialog";
 import PageIconDialog from "../../components/PageIconDialog";
+import FolderIconDialog from "../../components/FolderIconDialog";
 import MergeDialog from "../MergeDialog";
 import ImportDialog from "../ImportDialog";
 import { PackagingDialog } from "../PackagingDialog";
@@ -459,10 +459,9 @@ export function StudioDialogs({
         />
       )}
       {dialog?.type === "projectIcon" && (
-        <PageIconDialog
+        <FolderIconDialog
           title={t("projectIcon")}
           value={dialog.project.icon ?? ""}
-          fallback={<Folder size={56} />}
           onClose={closeDialog}
           onSave={(icon) => {
             const project =

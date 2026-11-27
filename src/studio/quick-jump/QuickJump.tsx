@@ -313,7 +313,8 @@ export default function QuickJump({
                     onClick={() => run(row)}
                   >
                     <span className="quick-jump-icon" aria-hidden="true">
-                      {row.item.icon === "folder" ? (
+                      {row.item.icon === "folder" ||
+                      (row.item.icon === "project" && row.item.emoji) ? (
                         <FolderIcon
                           value={row.item.emoji}
                           size={16}

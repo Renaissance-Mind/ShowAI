@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
-import { Folder, Loader2, Trash2 } from "../ui/icons";
+import { Loader2, Trash2 } from "../ui/icons";
 import Dialog from "../ui/Dialog";
+import FolderIcon from "../components/FolderIcon";
 import PageIcon from "../components/PageIcon";
 import { desktop, errorMessage } from "../host/bridge";
 import { getLocale } from "../i18n";
@@ -73,11 +74,7 @@ function RestoreList({
           <li key={item.key}>
             <span className="navigation-restore-icon">
               {item.folder ? (
-                <PageIcon
-                  value={item.icon}
-                  size={17}
-                  fallback={<Folder size={17} />}
-                />
+                <FolderIcon value={item.icon} size={17} strokeWidth={2} />
               ) : (
                 <PageIcon value={item.icon} size={17} />
               )}
@@ -391,11 +388,7 @@ export function HiddenProjectsDialog({
               {projects.map((project) => (
                 <li key={project.id}>
                   <span className="navigation-restore-icon">
-                    <PageIcon
-                      value={project.icon}
-                      size={17}
-                      fallback={<Folder size={17} />}
-                    />
+                    <FolderIcon value={project.icon} size={17} strokeWidth={2} />
                   </span>
                   <span className="navigation-restore-text">
                     <strong>{project.name}</strong>

@@ -422,7 +422,7 @@ export default function WorkspaceTabs({
   const tabIcon = (tab: (typeof tabs)[number]) => {
     const entry = currentEntry(tab);
     const view = entry.location.view;
-    if (view === "project" && entry.location.folderId)
+    if (view === "project")
       return <FolderIcon value={entry.icon} size={15} strokeWidth={2} />;
     const Icon =
       view === "projects"

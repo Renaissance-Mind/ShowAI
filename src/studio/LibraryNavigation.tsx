@@ -82,7 +82,7 @@ function LibraryRowView({
   const icon =
     target.kind === "project" ? (
       <ProjectIcon
-        value={expanded ? undefined : target.icon}
+        value={target.icon}
         size={15}
         expanded={expanded}
         cloud={cloud}

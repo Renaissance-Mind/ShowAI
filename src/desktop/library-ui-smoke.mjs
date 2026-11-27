@@ -102,6 +102,18 @@ try {
     .getByRole("button", { name: "新建项目", exact: true })
     .first()
     .click();
+  const projectIconPicker = page.getByRole("dialog", { name: "项目图标" });
+  await page.getByRole("button", { name: "设置项目图标" }).click();
+  assert.equal(
+    await projectIconPicker.locator('[data-folder-state="closed"]').count(),
+    1,
+  );
+  assert.equal(
+    await projectIconPicker.locator('[data-folder-state="open"]').count(),
+    1,
+  );
+  await projectIconPicker.getByRole("button", { name: "取消" }).click();
+  await projectIconPicker.waitFor({ state: "hidden" });
   await page
     .getByRole("textbox", { name: "项目名称", exact: true })
     .fill(projectName);
@@ -454,29 +466,91 @@ try {
   await page.keyboard.press("Escape");
   await page.getByRole("menu").waitFor({ state: "hidden" });
   await choose(project.id, "设置图标…");
-  const projectIconPicker = page.getByRole("dialog", { name: "项目图标" });
-  assert.equal(
-    await projectIconPicker.locator(".page-icon-tabs button").count(),
-    2,
+  const projectBlue = projectIconPicker.getByRole("button", {
+    name: "蓝色",
+    exact: true,
+  });
+  const projectBackground = projectIconPicker.getByRole("group", {
+    name: "图标底色",
+  });
+  const projectSaveIcon = projectIconPicker.getByRole("button", {
+    name: "保存",
+    exact: true,
+  });
+  const projectClosed = projectIconPicker.locator(
+    '[data-folder-state="closed"]',
   );
+  const projectOpen = projectIconPicker.locator('[data-folder-state="open"]');
+  assert.equal(await projectClosed.count(), 1);
+  assert.equal(await projectOpen.count(), 1);
+  await projectBlue.click();
+  await projectIconPicker
+    .getByRole("button", { name: "Emoji", exact: true })
+    .click();
   await projectIconPicker
     .getByRole("button", { name: "使用 🎯", exact: true })
     .click();
-  await projectIconPicker
-    .getByRole("button", { name: "保存", exact: true })
-    .click();
+  await projectBackground.getByRole("button", { name: "自适应" }).click();
+  for (const preview of [projectClosed, projectOpen]) {
+    assert.equal(
+      await preview.locator("[data-folder-badge] > text").textContent(),
+      "🎯",
+    );
+    assert.equal(
+      await preview.locator("[data-folder-badge] > rect").getAttribute("fill"),
+      "color-mix(in srgb, #5b8def, white 84%)",
+    );
+  }
+  await page.screenshot({ path: join(output, "project-icon-composer.png") });
+  await projectSaveIcon.click();
   await projectIconPicker.waitFor({ state: "hidden" });
-  await poll(
-    projectData,
-    (data) => data.icon === "🎯",
-    "project icon persistence",
+  const initialProjectIcon = await poll(
+    async () => (await projectData()).icon,
+    (icon) => /^data:image\/png;base64,/.test(icon ?? ""),
+    "composed project icon persistence",
   );
+  const projectToggle = row(project.id).locator(
+    "button.studio-tree-folder-toggle",
+  );
+  const projectFace = projectToggle.locator("[data-folder-face]");
+  await expand(project.id);
+  assert.ok(await projectFace.getAttribute("transform"));
+  assert.equal(
+    await projectFace.locator("[data-folder-badge] > text").textContent(),
+    "🎯",
+  );
+  await projectToggle.click();
+  assert.equal(await projectFace.getAttribute("transform"), null);
+  assert.equal(
+    await projectFace.locator("[data-folder-badge] > text").textContent(),
+    "🎯",
+  );
+  await expand(project.id);
   result.checks.push(
-    "Project submenu keyboard navigation and direct icon editing work",
+    "Project creation and context menu share the folder icon editor and preserve artwork on both folder states",
   );
 
   await choose(project.id, "重命名");
+  const projectSettings = page.getByRole("dialog", { name: "项目设置" });
+  await projectSettings.getByRole("button", { name: "设置项目图标" }).click();
+  assert.equal(await projectBlue.getAttribute("aria-pressed"), "true");
+  assert.equal(
+    await projectBackground
+      .getByRole("button", { name: "自适应" })
+      .getAttribute("aria-pressed"),
+    "true",
+  );
+  assert.equal(await projectClosed.locator("text").textContent(), "🎯");
+  await projectBackground.getByRole("button", { name: "白色" }).click();
+  await projectSaveIcon.click();
+  await projectIconPicker.waitFor({ state: "hidden" });
   await nameDialog("项目名称", "Renamed project");
+  const projectIconValue = await poll(
+    async () => (await projectData()).icon,
+    (icon) =>
+      /^data:image\/png;base64,/.test(icon ?? "") && icon !== initialProjectIcon,
+    "project settings icon persistence",
+  );
   const checkSectionHeading = async (sectionId) => {
     const section = sidebar.locator(`[data-project-section="${sectionId}"]`);
     await poll(
@@ -755,6 +829,34 @@ try {
   assert.equal(await row(project.id).getAttribute("data-pinned"), "true");
   await row(project.id).locator(".studio-tree-main").click();
   await expand(project.id);
+  assert.equal((await projectData()).icon, projectIconValue);
+  assert.equal(await projectFace.locator("text").textContent(), "🎯");
+  assert.equal(
+    await projectFace.locator("[data-folder-badge] > rect").getAttribute("fill"),
+    "#fffaf3",
+  );
+  await choose(project.id, "设置图标…");
+  await projectIconPicker.getByRole("button", { name: "独立图标" }).click();
+  assert.equal(
+    await projectIconPicker
+      .locator('[data-folder-state="standalone"] text')
+      .textContent(),
+    "🎯",
+  );
+  await projectSaveIcon.click();
+  await projectIconPicker.waitFor({ state: "hidden" });
+  await poll(
+    projectData,
+    (data) => data.icon === "🎯",
+    "standalone project icon persistence",
+  );
+  assert.equal(await projectToggle.locator(".page-icon").textContent(), "🎯");
+  await projectToggle.click();
+  assert.equal(await projectToggle.locator(".page-icon").textContent(), "🎯");
+  await expand(project.id);
+  result.checks.push(
+    "Project settings preserve badge style across reload and standalone project icons stay visible when expanded",
+  );
   await expand(folderA.id);
   await expand(folderB.id);
   assert.equal(
