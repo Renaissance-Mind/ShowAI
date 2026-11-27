@@ -2,6 +2,8 @@ ShowAI — interactive pages shared by people and Agents.
 
 Local browser workbench (same files as the desktop app and CLI):
   serve [--home PATH] [--port PORT] [--no-open]
+  workbench url [--surface t3-code] [--project PROJECT --page PAGE [--block BLOCK]]
+  workbench open-desktop --project PROJECT --page PAGE [--block BLOCK]
 
 Independent presentation (no personal project or synchronization required):
   public list [--kind component|template] [--query TEXT] [--view compact|detailed]

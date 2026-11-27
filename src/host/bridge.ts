@@ -6,7 +6,7 @@ import type {
   DesktopAppearance,
   DesktopChange,
   DesktopWindowState,
-  MenuCommand,
+  DesktopWindowCommand,
   TabCommand,
 } from "./protocol";
 import type { Locale } from "../i18n";
@@ -39,7 +39,7 @@ export interface DesktopBridge {
   onChange(listener: (change: DesktopChange) => void): () => void;
   onTabCommand?(listener: (command: TabCommand) => void): () => void;
   onRefreshPage?(listener: () => void): () => void;
-  onMenuCommand?(listener: (command: MenuCommand) => void): () => void;
+  onMenuCommand?(listener: (command: DesktopWindowCommand) => void): () => void;
   onAppUpdate?(listener: (state: AppUpdateState) => void): () => void;
   logPath?(): Promise<string>;
   openLogFolder?(): Promise<void>;
@@ -55,6 +55,7 @@ export interface DesktopBridge {
     source?: CloseSource,
   ): () => void;
   setDirty?(dirty: boolean): void;
+  prepareClose?(): Promise<boolean>;
   prepareReload?(): Promise<boolean>;
   prepareReloadReport?(): Promise<CloseReport>;
 }
@@ -93,7 +94,7 @@ export const desktop = {
   onRefreshPage(listener: () => void) {
     return window.showai?.onRefreshPage?.(listener) ?? (() => {});
   },
-  onMenuCommand(listener: (command: MenuCommand) => void) {
+  onMenuCommand(listener: (command: DesktopWindowCommand) => void) {
     return window.showai?.onMenuCommand?.(listener) ?? (() => {});
   },
   onAppUpdate(listener: (state: AppUpdateState) => void) {

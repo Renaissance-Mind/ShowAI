@@ -26,6 +26,13 @@ async function credential(
 
 const loadBrowser = () => import("../../browser/launch");
 
+function workbenchPage(args: Arguments) {
+  const projectId = option(args, "project", true)!;
+  const pageId = option(args, "page", true)!;
+  const blockId = option(args, "block");
+  return { projectId, pageId, ...(blockId && { blockId }) };
+}
+
 const sync = (
   actions: string[],
   options: CommandDeclaration["options"],
@@ -40,6 +47,38 @@ const sync = (
 });
 
 export const connectionCommands: CommandDeclaration[] = [
+  {
+    command: "workbench",
+    actions: ["url"],
+    options: { surface: text, page: text, block: text },
+    access: "read",
+    help: ["workbench url [--surface t3-code] [--project PROJECT --page PAGE [--block BLOCK]]"],
+    async run(args, { service }) {
+      requireCount(args, 2);
+      const surface = option(args, "surface");
+      if (surface && surface !== "t3-code") throw new Error("Use --surface t3-code.");
+      const target = args.options.project || args.options.page || args.options.block
+        ? workbenchPage(args) : undefined;
+      const { workbenchDestination } = await import("../linked-workbench");
+      const { startLinkedWorkbenchBrowser } = await loadBrowser();
+      return workbenchDestination(service, () => startLinkedWorkbenchBrowser(service.store.root), target, surface === "t3-code");
+    },
+  },
+  {
+    command: "workbench",
+    actions: ["open-desktop"],
+    options: { page: text, block: text },
+    access: "read",
+    help: ["workbench open-desktop --project PROJECT --page PAGE [--block BLOCK]"],
+    async run(args, { service }) {
+      requireCount(args, 2);
+      const target = workbenchPage(args);
+      const { readCodexPageTarget } = await import("../codex-page-reference");
+      await readCodexPageTarget(service, target);
+      const { openDesktopPage } = await import("../desktop-page");
+      return { ...target, url: await openDesktopPage(service.store.root, target) };
+    },
+  },
   {
     command: "serve",
     options: { port: text, "no-open": flag, "dsh-origin": hiddenText, "linked-workbench": hiddenText, "detach-workbench": hiddenFlag },

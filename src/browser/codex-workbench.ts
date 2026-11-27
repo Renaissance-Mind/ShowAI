@@ -95,6 +95,19 @@ export function codexWorkbenchPageOpener() {
   return window.__SHOWAI_CODEX_HOST__?.openWorkbench;
 }
 
+export function openT3PageTab(projectId: string, pageId: string, blockIds: string[] = []) {
+  const host = window.__SHOWAI_LOCAL__;
+  if (!host?.t3Page && !host?.t3Workbench) return false;
+  const current = new URL(location.href);
+  if (host.t3Page && current.searchParams.get("project") === projectId &&
+    current.searchParams.get("page") === pageId) return false;
+  const url = new URL("/", current);
+  url.search = new URLSearchParams({ project: projectId, page: pageId, t3Page: "1" }).toString();
+  if (blockIds.length) url.searchParams.set("blocks", blockIds.join(","));
+  window.open(url.href, "_blank");
+  return true;
+}
+
 export async function openCodexPageTab(target: CodexPageTarget) {
   const open = window.__SHOWAI_CODEX_HOST__?.openPageTab;
   if (!open) throw new Error(t("cannotOpenPageTab"));

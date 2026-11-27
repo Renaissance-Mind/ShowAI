@@ -64,6 +64,7 @@ export async function publishInstance(home, details) {
       : null,
     ...(details.url ? { url: details.url } : {}),
     ...(details.developmentUrl ? { developmentUrl: details.developmentUrl } : {}),
+    ...(details.desktopPageChannel ? { desktopPageChannel: details.desktopPageChannel } : {}),
     ...(details.logs ? { logs: details.logs } : {}),
     ...(details.userData ? { userData: details.userData } : {}),
     home: resolve(home),

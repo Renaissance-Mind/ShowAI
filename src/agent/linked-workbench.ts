@@ -39,7 +39,7 @@ function editorUrl(base: string, target?: CodexPageTarget, t3 = false) {
     url.searchParams.set("page", target.pageId);
     if (target.blockId) url.searchParams.set("blocks", target.blockId);
     if (t3) url.searchParams.set("t3Page", "1");
-  }
+  } else if (t3) url.searchParams.set("t3Workbench", "1");
   return url;
 }
 
@@ -57,6 +57,20 @@ function browserDestination(url: URL, t3: boolean) {
   };
 }
 
+export async function workbenchDestination(
+  service: AgentService,
+  open: () => Promise<{ url: string }>,
+  target?: CodexPageTarget,
+  t3 = false,
+) {
+  const page = target && await readCodexPageTarget(service, target);
+  return {
+    ...target,
+    ...(t3 && page && { title: page.title }),
+    ...browserDestination(editorUrl((await open()).url, target, t3), t3),
+  };
+}
+
 export function registerBrowserWorkbenchTools(
   server: McpServer,
   service: AgentService,
@@ -71,10 +85,7 @@ export function registerBrowserWorkbenchTools(
     _meta: { ui: { visibility: ["model", "app"] } },
   }, async ({ surface, ...target }) => {
     try {
-      await readCodexPageTarget(service, target);
-      const t3 = surface === "t3-code";
-      const url = editorUrl((await open()).url, target, t3);
-      const data = { ...target, ...browserDestination(url, t3) };
+      const data = await workbenchDestination(service, open, target, surface === "t3-code");
       return { ...mcpSuccess(data), _meta: { showaiWorkbenchData: data } };
     } catch (error) {
       return mcpFailure(error);
@@ -86,8 +97,7 @@ export function registerBrowserWorkbenchTools(
     inputSchema: { surface }, annotations: readOnly,
   }, async ({ surface }) => {
     try {
-      const t3 = surface === "t3-code";
-      return mcpSuccess(browserDestination(editorUrl((await open()).url, undefined, t3), t3));
+      return mcpSuccess(await workbenchDestination(service, open, undefined, surface === "t3-code"));
     } catch (error) {
       return mcpFailure(error);
     }

@@ -7,7 +7,7 @@ const SECTIONS: readonly {
 }[] = [
   {
     title: "Local browser workbench (same files as the desktop app and CLI):",
-    commands: ["serve"],
+    commands: ["serve", "workbench url", "workbench open-desktop"],
   },
   {
     title:

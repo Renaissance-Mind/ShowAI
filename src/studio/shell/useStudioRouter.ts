@@ -1,4 +1,4 @@
-import { browserSearch, codexWorkbench, openCodexPageTab } from "../../browser/codex-workbench";
+import { browserSearch, codexWorkbench, openCodexPageTab, openT3PageTab } from "../../browser/codex-workbench";
 import { findVisibleBlock, flashBlocks } from "../ExternalChangeNotice";
 import {
   useEffect,
@@ -7,7 +7,7 @@ import {
   type RefObject,
 } from "react";
 import { flushSync } from "react-dom";
-import type { DesktopInfo } from "../../host/protocol";
+import type { DesktopInfo, OpenPageTabCommand } from "../../host/protocol";
 import { desktop } from "../../host/bridge";
 import {
   PACKAGING_EVENT,
@@ -459,6 +459,7 @@ export function useStudioRouter({
       (page.projectId !== projectId || page.draft.id !== pageId);
   }
   function openPage(id: string, projectId = selectedProject) {
+    if (projectId && openT3PageTab(projectId, id)) return Promise.resolve(true);
     if (projectId && opensInCodexTab(projectId, id))
       return openCodexPageTab({ projectId, pageId: id });
     const workspace = workspaceRef.current;
@@ -511,6 +512,7 @@ export function useStudioRouter({
     const pageId = target.pageId ?? page.draft?.id;
     if (!projectId || !pageId) return;
     const ids = target.blockIds;
+    if (openT3PageTab(projectId, pageId, ids)) return;
     if (opensInCodexTab(projectId, pageId)) {
       await openCodexPageTab({ projectId, pageId, blockId: ids[0] });
       return;
@@ -556,6 +558,7 @@ export function useStudioRouter({
     projectId = page.projectId ?? selectedProject,
     animate = false,
   ) {
+    if (projectId && openT3PageTab(projectId, pageId, ids)) return;
     if (projectId && opensInCodexTab(projectId, pageId)) {
       await openCodexPageTab({ projectId, pageId, blockId: ids[0] });
       return;
@@ -624,6 +627,14 @@ export function useStudioRouter({
     }
     return false;
   }
+  async function openDesktopPageTab({ projectId, pageId, title, blockIds }: OpenPageTabCommand) {
+    const opened = await workspaceRef.current.open({
+      location: { view: "page", projectId, pageId, folderId: null },
+      title: title || tc("untitled"),
+      scrollTop: 0,
+    });
+    if (opened) revealPageBlocks(blockIds, true);
+  }
   async function openTargetWindow(target: {
     projectId: string;
     pageId?: string;
@@ -650,6 +661,7 @@ export function useStudioRouter({
     disposition: OpenDisposition = "current",
   ) {
     if (!workspaceReady) return false;
+    if (target.kind === "page" && openT3PageTab(target.projectId, target.id)) return true;
     if (disposition === "window" && capabilities.windows)
       return openTargetWindow({
         projectId: target.projectId,
@@ -780,6 +792,7 @@ export function useStudioRouter({
     followPageLink,
     locateAssistantTarget,
     openTarget,
+    openDesktopPageTab,
     openTargetWindow,
     openTargetClick,
     openDoc,

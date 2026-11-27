@@ -76,6 +76,7 @@ import { versionedLibrary } from "../core/library-runtime";
 import type { LoadedPage } from "../studio/usePage";
 import { BackgroundWorker } from "../core/background-worker";
 import { registerRuntimeOnStartup } from "../agent/runtime";
+import { listenForDesktopPages } from "../host/desktop-page-channel";
 import {
   publishInstance,
   type InstanceHandle,
@@ -116,6 +117,7 @@ import type {
   DesktopChange,
   DesktopInfo,
   DesktopResponse,
+  DesktopWindowCommand,
   MenuCommand,
   UnsavedPage,
 } from "../host/protocol";
@@ -124,6 +126,7 @@ const t = translator(desktopMessages);
 const directory = dirname(fileURLToPath(import.meta.url));
 const repository = resolve(directory, "..");
 const windows = new Set<BrowserWindow>();
+let lastFocusedWindow: BrowserWindow | undefined;
 const presentation = new DesktopPresentation(
   process.env.SHOWAI_BACKGROUND === "1" ||
     (!!process.env.SHOWAI_DEV_URL && process.env.SHOWAI_BACKGROUND !== "0"),
@@ -133,7 +136,7 @@ const presentation = new DesktopPresentation(
       process.send?.({ type: "presentation", presentation: state });
   },
 );
-const menuCommands = new MenuCommandQueue<BrowserWindow, MenuCommand>(
+const menuCommands = new MenuCommandQueue<BrowserWindow, DesktopWindowCommand>(
   (window, command) => {
     if (!window.isDestroyed())
       window.webContents.send("showai:menu-command", command);
@@ -153,9 +156,10 @@ let sources: ReturnType<typeof watchDatasetSources> | undefined;
 let maintenance: MaintenanceScheduler | undefined;
 let notification: ReturnType<typeof setTimeout> | undefined;
 const ownWrites = new OwnWrites();
-let pendingDeepLink = process.argv.find((argument) =>
+let startupLinks: string[] | undefined = process.argv.filter((argument) =>
   argument.startsWith("showai://"),
 );
+let deepLinkQueue = Promise.resolve();
 interface CloseReply {
   allow: boolean;
   pages: UnsavedPage[];
@@ -182,6 +186,7 @@ const closeRequests = new Map<
 let checkingQuit = false;
 let allowedQuit = false;
 let presence: InstanceHandle | undefined;
+let desktopPageChannel: Awaited<ReturnType<typeof listenForDesktopPages>> | undefined;
 
 app.setName("ShowAI");
 const pinnedLocale = languageOverride();
@@ -410,6 +415,19 @@ async function useHome(home?: string): Promise<void> {
     app.isPackaged ? "packaged" : "development",
   );
   await presence?.remove();
+  desktopPageChannel ??= await listenForDesktopPages(async (home, url) => {
+    if (!parsePageLink(url)) throw new TypeError("Invalid ShowAI page URL.");
+    if (store.root !== home || checkingQuit || allowedQuit) return false;
+    await dispatchDeepLink(url);
+    if (process.env.SHOWAI_DEV_URL) {
+      const window = existingWorkbenchWindow();
+      if (window) presentation.show(window, true);
+    }
+    return true;
+  }).catch((error) => {
+    console.error("ShowAI desktop page channel:", error);
+    return undefined;
+  });
   presence = await publishInstance(store.root, {
     mode: "desktop",
     channel: app.isPackaged ? "packaged" : "development",
@@ -418,6 +436,7 @@ async function useHome(home?: string): Promise<void> {
     cli: info().cli,
     logs: mainLog.directory,
     userData: app.getPath("userData"),
+    desktopPageChannel: desktopPageChannel?.id,
     ...(process.env.SHOWAI_DEV_URL
       ? { developmentUrl: process.env.SHOWAI_DEV_URL }
       : {}),
@@ -519,13 +538,16 @@ async function saveSettings(update: DesktopSettings): Promise<void> {
   await atomicRename(temporary, path);
 }
 
-async function menuWindow(target?: unknown): Promise<BrowserWindow> {
-  if (target instanceof BrowserWindow && windows.has(target)) return target;
+function existingWorkbenchWindow(): BrowserWindow | undefined {
   const focused = BrowserWindow.getFocusedWindow();
   if (focused && windows.has(focused)) return focused;
-  const first = [...windows].find((window) => !window.isDestroyed());
-  if (first) return first;
-  return createWindow();
+  if (lastFocusedWindow && !lastFocusedWindow.isDestroyed()) return lastFocusedWindow;
+  return [...windows].find((window) => !window.isDestroyed());
+}
+
+async function menuWindow(target?: unknown): Promise<BrowserWindow> {
+  if (target instanceof BrowserWindow && windows.has(target)) return target;
+  return existingWorkbenchWindow() ?? createWindow();
 }
 
 function showWindowError(title: string, error: unknown) {
@@ -986,6 +1008,7 @@ const pagePreviewWorker = new BackgroundWorker(15000, {
   },
 });
 app.on("will-quit", () => {
+  desktopPageChannel?.close();
   void pagePreviewWorker.close();
 });
 configurePageThumbnails({
@@ -1503,6 +1526,7 @@ async function createWindow(page?: WindowTarget): Promise<BrowserWindow> {
     nativeTheme.shouldUseDarkColors ? "dark" : "light",
   );
   window.on("focus", () => {
+    lastFocusedWindow = window;
     app.dock?.setIcon(iconForAppearance(windowAppearances.get(window)!));
   });
   window.webContents.on("before-input-event", (event, input) => {
@@ -1544,6 +1568,7 @@ async function createWindow(page?: WindowTarget): Promise<BrowserWindow> {
       .get(windowId)
       ?.resolve({ allow: true, pages: [], blockers: [], reason: "" });
     windows.delete(window);
+    if (lastFocusedWindow === window) lastFocusedWindow = undefined;
     void quitRecord.delete(windowId);
   });
   window.webContents.setWindowOpenHandler(({ url }) => {
@@ -1565,7 +1590,7 @@ async function createWindow(page?: WindowTarget): Promise<BrowserWindow> {
       ).catch((error) => showWindowError(t("openPageFailed"), error));
       return { action: "deny" };
     }
-    if (parsePageLink(url)) void handleDeepLink(url);
+    if (parsePageLink(url)) void dispatchDeepLink(url);
     else if (/^https?:\/\//i.test(url)) void shell.openExternal(url);
     return { action: "deny" };
   });
@@ -1575,7 +1600,7 @@ async function createWindow(page?: WindowTarget): Promise<BrowserWindow> {
   window.webContents.on("will-navigate", (event) => {
     if (isWorkbenchLocation(event.url)) return;
     event.preventDefault();
-    if (parsePageLink(event.url)) void handleDeepLink(event.url);
+    if (parsePageLink(event.url)) void dispatchDeepLink(event.url);
     else if (/^https?:\/\//i.test(event.url))
       void shell.openExternal(event.url);
   });
@@ -1602,6 +1627,16 @@ class DeepLinkPageMissing extends Error {
   ) {
     super(message);
   }
+}
+
+function dispatchDeepLink(source: string): Promise<void> {
+  if (startupLinks) {
+    if (!startupLinks.includes(source)) startupLinks.push(source);
+    return Promise.resolve();
+  }
+  const opened = deepLinkQueue.then(() => handleDeepLink(source));
+  deepLinkQueue = opened.catch((error) => console.error("ShowAI link dispatch:", error));
+  return opened;
 }
 
 async function handleDeepLink(source: string): Promise<void> {
@@ -1694,9 +1729,17 @@ async function openDeepLink(source: string): Promise<void> {
     .filter(Boolean)
     .slice(0, 100)
     .map(assertId);
-  await store.readPage(project, page).catch((error) => {
+  const { document } = await store.readPage(project, page).catch((error) => {
     throw new DeepLinkPageMissing(errorResult(error).message, error);
   });
+  const window = existingWorkbenchWindow();
+  if (window) {
+    menuCommands.send(window, {
+      type: "openPageTab", projectId: project, pageId: page, title: document.title, blockIds: blocks,
+    });
+    presentation.show(window, !presentation.background);
+    return;
+  }
   await createWindow({
     projectId: project,
     pageId: page,
@@ -1896,8 +1939,8 @@ else {
       ) {
         void (async () => {
           if ("url" in message && typeof message.url === "string")
-            await handleDeepLink(message.url);
-          const window = [...windows].at(-1) ?? (await createWindow());
+            await dispatchDeepLink(message.url);
+          const window = existingWorkbenchWindow() ?? (await createWindow());
           presentation.show(window, true);
         })().catch((error) =>
           console.error("ShowAI development show failed:", error),
@@ -1918,14 +1961,14 @@ else {
   ]);
   app.on("open-url", (event, url) => {
     event.preventDefault();
-    if (!app.isReady()) pendingDeepLink = url;
-    else void handleDeepLink(url);
+    void dispatchDeepLink(url);
   });
   app.on("second-instance", (_event, argv) => {
-    const link = argv.find((argument) => argument.startsWith("showai://"));
-    if (link) void handleDeepLink(link);
-    else {
-      const window = [...windows][0];
+    const links = argv.filter((argument) => argument.startsWith("showai://"));
+    if (links.length) {
+      for (const link of links) void dispatchDeepLink(link);
+    } else {
+      const window = existingWorkbenchWindow();
       if (window) presentation.show(window);
     }
   });
@@ -2237,8 +2280,10 @@ else {
           }
         },
       );
-      if (pendingDeepLink) await handleDeepLink(pendingDeepLink);
-      else await createWindow({ restoreTabs: true });
+      const links = startupLinks ?? [];
+      if (!links.length) await createWindow({ restoreTabs: true });
+      startupLinks = undefined;
+      await Promise.all(links.map(dispatchDeepLink));
       if (!app.isPackaged && process.env.SHOWAI_DEV_URL)
         process.send?.({ type: "ready", home: store.root });
       presentation.report();

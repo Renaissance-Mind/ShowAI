@@ -81,6 +81,16 @@ export type MenuCommand =
   | "findNext"
   | "findPrevious";
 
+export interface OpenPageTabCommand {
+  type: "openPageTab";
+  projectId: string;
+  pageId: string;
+  blockIds: string[];
+  title: string;
+}
+
+export type DesktopWindowCommand = MenuCommand | OpenPageTabCommand;
+
 export interface UnsavedPage {
   projectId: string;
   pageId: string;
@@ -177,7 +187,7 @@ export interface ShowAIBridge {
   onChange(listener: (change: DesktopChange) => void): () => void;
   onTabCommand?(listener: (command: TabCommand) => void): () => void;
   onRefreshPage?(listener: () => void): () => void;
-  onMenuCommand?(listener: (command: MenuCommand) => void): () => void;
+  onMenuCommand?(listener: (command: DesktopWindowCommand) => void): () => void;
   onAppUpdate?(listener: (state: AppUpdateState) => void): () => void;
   logPath?(): Promise<string>;
   openLogFolder?(): Promise<void>;

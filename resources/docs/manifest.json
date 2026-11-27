@@ -331,7 +331,7 @@
      "title": "CLI 与 MCP 参考",
      "icon": "⌨️",
      "file": "zh-CN/projects/a23f1819-edaf-4c0c-824b-7662cb670a52/pages/c207d0b8-8aa9-5290-95a5-2a6c4484456c.json",
-     "sha256": "7da8a5223e290c5c13da1b8ddb93c9025fd687d8888f756c9f05755be63516c6",
+     "sha256": "19b0d9fbd5220da3796ad5d1047b3d741dc9595e32109d1385c173aec2f4ff3b",
      "components": [
       "zh-CN/projects/a23f1819-edaf-4c0c-824b-7662cb670a52/packages/components/doc-hero/1.0.0/compiled.json",
       "zh-CN/projects/a23f1819-edaf-4c0c-824b-7662cb670a52/packages/components/doc-commands/1.0.0/compiled.json",
@@ -732,7 +732,7 @@
      "title": "CLI & MCP Reference",
      "icon": "⌨️",
      "file": "en/projects/a23f1819-edaf-4c0c-824b-7662cb670a52/pages/c207d0b8-8aa9-5290-95a5-2a6c4484456c.json",
-     "sha256": "c1504947f858103e8a1e7d533313d9e5b10fdcd1c28ee0a080a53805d12dc7c0",
+     "sha256": "4d2dc6d240cfe0ff1785bf03c635b2eb10258c1a6e992b4d678314f25bea3ac5",
      "components": [
       "en/projects/a23f1819-edaf-4c0c-824b-7662cb670a52/packages/components/doc-hero/1.0.0/compiled.json",
       "en/projects/a23f1819-edaf-4c0c-824b-7662cb670a52/packages/components/doc-commands/1.0.0/compiled.json",

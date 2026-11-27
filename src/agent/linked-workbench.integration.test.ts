@@ -1,4 +1,6 @@
 import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { execFile } from "node:child_process";
+import { promisify } from "node:util";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
@@ -71,6 +73,46 @@ test.each(["mcp-app", "model-html", "fragment-file", "t3-html"])(
           const link = await list.getByRole("textbox", { name: "网页编辑链接" }).inputValue();
           expect(new URL(link).searchParams.get("page")).toBe(target.pageId);
           expect(await list.getByRole("button", { name: "复制网页编辑链接" }).isVisible()).toBe(true);
+
+          const second = (await call("page_create", { projectId, title: "Second page" }))
+            .structuredContent as { data: { document: { id: string } } };
+          const cli = join(process.cwd(), "dist-agent/cli.mjs");
+          const args = [cli, "workbench", "url", "--surface", "t3-code", "--home", home, "--json"];
+          const run = promisify(execFile);
+          const whole = JSON.parse((await run(process.execPath, args)).stdout).data;
+          const first = JSON.parse((await run(process.execPath, [...args, "--project", projectId, "--page", target.pageId])).stdout).data;
+          expect(first.title).toBe(title);
+          expect(whole.previewTarget.port).toBe(first.previewTarget.port);
+          await expect(run(process.execPath, [...args, "--project", projectId, "--page", target.pageId, "--block", "missing"])).rejects.toThrow();
+          await expect(run(process.execPath, [...args, "--block", "missing"])).rejects.toThrow();
+          const workbench = await browser.newPage();
+          await workbench.addInitScript(() => localStorage.setItem("showai:sidebar-locked", "true"));
+          await workbench.goto(whole.url);
+          await workbench.locator('[data-library-id="' + projectId + '"] .studio-tree-main').click();
+          const openFromList = async (id: string) => {
+            const [tab] = await Promise.all([
+              workbench.waitForEvent("popup"),
+              workbench.locator('.studio-sidebar [data-open-page="' + id + '"]').click(),
+            ]);
+            await tab.locator(".studio-page-title-input").waitFor();
+            expect(new URL(tab.url()).searchParams.get("page")).toBe(id);
+            expect(await tab.locator(".studio-window-topbar [role=tablist]").count()).toBe(0);
+            return tab;
+          };
+          const firstTab = await openFromList(target.pageId);
+          const secondTab = await openFromList(second.data.document.id);
+          expect(await firstTab.locator(".studio-page-title-input").inputValue()).toBe(title);
+          expect(await secondTab.locator(".studio-page-title-input").inputValue()).toBe("Second page");
+          const [backToLibrary] = await Promise.all([
+            firstTab.waitForEvent("popup"),
+            firstTab.getByRole("button", { name: /ShowAI.*工作台|ShowAI Workbench/ }).click(),
+          ]);
+          await backToLibrary.waitForURL(whole.url);
+          await firstTab.locator(".studio-page-title-input").fill("Saved before closing");
+          expect(await firstTab.evaluate(() => window.showai!.prepareClose!())).toBe(true);
+          await firstTab.close();
+          const saved = await call("page_read", target);
+          expect(saved.structuredContent).toMatchObject({ data: { document: { title: "Saved before closing" } } });
         } finally {
           await browser.close();
         }
@@ -139,5 +181,5 @@ test.each(["mcp-app", "model-html", "fragment-file", "t3-html"])(
       await rm(home, { recursive: true, force: true });
     }
   },
-  30_000,
+  60_000,
 );

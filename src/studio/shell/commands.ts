@@ -1,5 +1,5 @@
 import { useEffect, useRef } from "react";
-import type { MenuCommand, TabCommand } from "../../host/protocol";
+import type { DesktopWindowCommand, MenuCommand, TabCommand } from "../../host/protocol";
 import { desktop } from "../../host/bridge";
 import type { useAppearancePreference } from "../../design/appearance-preference";
 import {
@@ -57,7 +57,7 @@ export function useStudioCommands({
   },
   dialogs: { setDialog, dialogRef },
   menus: { setContextMenu, setExportMenu, exportSiteButton },
-  router: { navigate, openDoc },
+  router: { navigate, openDoc, openDesktopPageTab },
   pageActions: {
     importers,
     loadImporters,
@@ -92,7 +92,7 @@ export function useStudioCommands({
     MenuState,
     "setContextMenu" | "setExportMenu" | "exportSiteButton"
   >;
-  router: Pick<StudioRouter, "navigate" | "openDoc">;
+  router: Pick<StudioRouter, "navigate" | "openDoc" | "openDesktopPageTab">;
   pageActions: Pick<
     PageActions,
     "importers" | "loadImporters" | "beginNewPage" | "importPage" | "exportPage"
@@ -262,7 +262,8 @@ export function useStudioCommands({
       window.removeEventListener("keydown", key, true);
     };
   }, [workspace, workspaceReady, report, capabilities.tabs, info?.mode]);
-  const menuCommand = useRef<(command: MenuCommand) => void>(() => {});
+  const menuCommand = useRef<(command: DesktopWindowCommand) => void>(() => {});
+  const pageTabQueue = useRef(Promise.resolve());
   const helpDoc = (slug: string) => {
     const url = `https://showai.renaissancemind.ai/doc${slug ? `/${slug}` : ""}`;
     const link = builtinDocLink(url);
@@ -303,6 +304,10 @@ export function useStudioCommands({
     };
   }, []);
   menuCommand.current = (command) => {
+    if (typeof command === "object") {
+      pageTabQueue.current = pageTabQueue.current.then(() => openDesktopPageTab(command)).catch(report);
+      return;
+    }
     const doc = helpDoc;
     const unhandled = (name: string, detail?: unknown) =>
       window.dispatchEvent(new CustomEvent(name, { cancelable: true, detail }));
@@ -360,8 +365,8 @@ export function useStudioCommands({
     void Promise.resolve(operations[command]?.()).catch(report);
   };
   useEffect(
-    () => desktop.onMenuCommand((command) => menuCommand.current(command)),
-    [],
+    () => workspaceReady ? desktop.onMenuCommand((command) => menuCommand.current(command)) : undefined,
+    [workspaceReady],
   );
   function quickJumpCommands(): WorkbenchCommand[] {
     const fromMenu = (items: LibraryContextMenuItem[]) =>

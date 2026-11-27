@@ -8,6 +8,7 @@ export interface InstanceDetails {
   cli?: { command: string; args: string[] };
   url?: string;
   developmentUrl?: string;
+  desktopPageChannel?: string;
   logs?: string;
   userData?: string;
 }
@@ -25,6 +26,7 @@ export interface InstanceRecord extends Required<
   cli: { command: string; args: string[] } | null;
   url?: string;
   developmentUrl?: string;
+  desktopPageChannel?: string;
   logs?: string;
   userData?: string;
   home: string;

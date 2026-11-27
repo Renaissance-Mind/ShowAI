@@ -3,7 +3,7 @@
   "profile": "kimi",
   "declaredHostDisplay": "fragment-file",
   "commonVersion": "0.31.0",
-  "commonSha256": "5c4b7b81b9c11ccde18d9d690c3991b387d1fa8d08319a2f37e4b50be8937a12",
+  "commonSha256": "680df9de5ad44448df000112e73a853a712106fe001e2fba82bb471e9d858e40",
   "commonFiles": {
     "collaborate-canvas/SKILL.md": "b3fc2445b3889916915a82cd11706c8741a387bf0f4a756b796e85392d71b728",
     "create-component/references/component-authoring.md": "3debe9a4e5ca925c9336b9c296abd55c65bffdd38a1a7027bc99baaab7c4e037",
@@ -38,7 +38,7 @@
     "use-showai/references/formats/template-extraction.json": "10dc131b782790c8356e583150d16b934ccdeb151b8e4fef10648e2e11bfd1c9",
     "use-showai/references/formats/versions.json": "d1ebcb8538935a66e4419a6f6665ee58f823a5d06c3409e5f0c8d6b6d01bebdd",
     "use-showai/references/formats/whiteboard.json": "b55528af26186934dd6a7c3e426ad9ef0e88ad1fb62c950c28fb6cff62221a02",
-    "use-showai/references/host-display.md": "28ea60f62baca378e6bfa14fd32efebf1ae2a4a63bdc0b72edef636606c4558a",
+    "use-showai/references/host-display.md": "0c0dc167f849e4c9f6960ad4cb98bdedb30ec7e3a5296389f540acb75eca11ac",
     "use-showai/references/import.md": "85db66e3c7a8abe16599e638e3caea53e666c85d72630ef23095d722d065a51c",
     "use-showai/references/integration.md": "babc50ff994a59bbf3b7e874cbefbbc3ed6787ddb6ff2d1376cf27b9c10c6522",
     "use-showai/references/page-reading.md": "8dcd64578d5a0f8917dede99b8d96b03f990490d61fd443b5ec3fae6b1651291",

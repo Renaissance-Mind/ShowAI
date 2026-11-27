@@ -1,5 +1,5 @@
 import { SettingsSearch } from "../Settings";
-import { codexWorkbench, codexWorkbenchPageOpener } from "../../browser/codex-workbench";
+import { codexWorkbench, codexWorkbenchPageOpener, openT3PageTab } from "../../browser/codex-workbench";
 import { appIconForTheme } from "../../design/app-icon";
 import { useAppearanceTheme } from "../../design/useAppearanceTheme";
 import codexWorkbenchMessages from "../../i18n/messages/codex-workbench";
@@ -170,6 +170,7 @@ export function StudioTopbar({
   } = route;
   const singlePage = view === "page" && capabilities.singlePage;
   const codexPage = singlePage && codexWorkbench()?.mode === "thread";
+  const t3Page = window.__SHOWAI_LOCAL__?.t3Page === true;
   const {
     showTemplateVersions,
     setShowTemplateVersions,
@@ -208,6 +209,11 @@ export function StudioTopbar({
     result: SearchResult,
     event: ReactMouseEvent<HTMLButtonElement>,
   ) {
+    const match = result.path.match(/^projects\/([^/]+)\/pages\/([^/]+)\.json$/);
+    if (match && openT3PageTab(match[1], match[2], result.blockId ? [result.blockId] : [])) {
+      event.preventDefault();
+      return;
+    }
     const target = searchTarget(result);
     const disposition = capabilities.tabs
       ? clickDisposition(event, info?.platform === "darwin")
@@ -226,9 +232,6 @@ export function StudioTopbar({
       : result.path.startsWith("packages/published/")
         ? "published"
         : "global";
-    const match = result.path.match(
-      /^projects\/([^/]+)\/pages\/([^/]+)\.json$/,
-    );
     if (match) {
       if (singlePage)
         await locateAssistantTarget(match[2], result.blockId ? [result.blockId] : [], match[1]);
@@ -343,14 +346,18 @@ export function StudioTopbar({
             )}
             {view === "page" && (
               <>
-                {codexPage && !capabilities.remote ? (
+                {(codexPage || t3Page) && !capabilities.remote ? (
                   <button
                     type="button"
                     className="studio-codex-workbench-link"
                     aria-label={tcodex("openWorkbench")}
                     title={tcodex("openWorkbench")}
-                    disabled={!openWorkbench || !page.projectId || !page.draft}
+                    disabled={(!openWorkbench && !t3Page) || !page.projectId || !page.draft}
                     onClick={action(async () => {
+                      if (t3Page) {
+                        window.open(new URL("/?t3Workbench=1", location.href).href, "_blank");
+                        return;
+                      }
                       if (!openWorkbench || !page.projectId || !page.draft) return;
                       if (!(await page.flushOrDefer())) return draftHeld();
                       await openWorkbench(page.projectId, page.draft.id);

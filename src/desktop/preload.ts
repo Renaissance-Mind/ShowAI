@@ -6,7 +6,7 @@ import {
   type DesktopChange,
   type DesktopResponse,
   type DesktopWindowState,
-  type MenuCommand,
+  type DesktopWindowCommand,
   type ShowAIBridge,
   type TabCommand,
 } from "../host/protocol";
@@ -146,7 +146,7 @@ if (process.isMainFrame) {
     onMenuCommand(listener) {
       const receive = (
         _event: Electron.IpcRendererEvent,
-        command: MenuCommand,
+        command: DesktopWindowCommand,
       ) => listener(command);
       ipcRenderer.on("showai:menu-command", receive);
       ipcRenderer.send("showai:menu-ready");

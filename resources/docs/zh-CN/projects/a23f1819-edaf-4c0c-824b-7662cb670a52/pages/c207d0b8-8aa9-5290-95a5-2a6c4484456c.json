@@ -10,7 +10,7 @@
     "favorite": false,
     "archived": false,
     "createdAt": "2026-10-15T06:42:05.786Z",
-    "updatedAt": "2026-11-22T14:00:23.396Z",
+    "updatedAt": "2026-11-27T20:19:26.071Z",
     "content": {
       "type": "surface",
       "attrs": {
@@ -34,7 +34,7 @@
                 "facts": [
                   {
                     "label": "CLI 命令族",
-                    "value": "20"
+                    "value": "21"
                   },
                   {
                     "label": "本机内容库工具",
@@ -594,7 +594,7 @@
               "content": [
                 {
                   "type": "text",
-                  "text": "boards read\n\ncatalog describe\ncatalog fork\ncatalog import\ncatalog list\ncatalog merge\ncatalog promote\ncatalog remove\ncatalog save\n\ndatasets apply\ndatasets create\ndatasets delete\ndatasets link\ndatasets list\ndatasets read\ndatasets transform\n\nexport\n\nguide\n\nimport\n\nimporters list\nimporters remove\nimporters save\n\nlibrary activate\nlibrary archive\nlibrary cleanup\nlibrary cleanup-plan\nlibrary compact\nlibrary import\nlibrary imports\nlibrary init\nlibrary migrate\nlibrary policy\nlibrary rebuild-index\nlibrary stats\nlibrary verify\nlibrary verify-archive\n\nmcp\nmcp serve\n\npages apply\npages create\npages delete\npages deleted\npages diff\npages duplicate\npages list\npages pin\npages read\npages restore\npages save\npages unpin\n\nprojects bind\nprojects create\nprojects current\nprojects list\n\npublic describe\npublic list\n\npublish list\npublish prepare\npublish register\npublish verify\n\nrender\n\nruntime info\nruntime register\n\nsearch\n\nserve\n\nsync account\nsync attach\nsync conflict\nsync connect\nsync dashboard\nsync default\nsync detach\nsync disconnect\nsync join\nsync projects\nsync resolve\nsync retained\nsync run\nsync status\nsync subscribe\n\ntemplate apply\ntemplate context\ntemplate export\ntemplate import\ntemplate instantiate\ntemplate save\n\nworkspace conflict\nworkspace conflicts\nworkspace merge\nworkspace recover-package\nworkspace resolve"
+                  "text": "boards read\n\ncatalog describe\ncatalog fork\ncatalog import\ncatalog list\ncatalog merge\ncatalog promote\ncatalog remove\ncatalog save\n\ndatasets apply\ndatasets create\ndatasets delete\ndatasets link\ndatasets list\ndatasets read\ndatasets transform\n\nexport\n\nguide\n\nimport\n\nimporters list\nimporters remove\nimporters save\n\nlibrary activate\nlibrary archive\nlibrary cleanup\nlibrary cleanup-plan\nlibrary compact\nlibrary import\nlibrary imports\nlibrary init\nlibrary migrate\nlibrary policy\nlibrary rebuild-index\nlibrary stats\nlibrary verify\nlibrary verify-archive\n\nmcp\nmcp serve\n\npages apply\npages create\npages delete\npages deleted\npages diff\npages duplicate\npages list\npages pin\npages read\npages restore\npages save\npages unpin\n\nprojects bind\nprojects create\nprojects current\nprojects list\n\npublic describe\npublic list\n\npublish list\npublish prepare\npublish register\npublish verify\n\nrender\n\nruntime info\nruntime register\n\nsearch\n\nserve\n\nsync account\nsync attach\nsync conflict\nsync connect\nsync dashboard\nsync default\nsync detach\nsync disconnect\nsync join\nsync projects\nsync resolve\nsync retained\nsync run\nsync status\nsync subscribe\n\ntemplate apply\ntemplate context\ntemplate export\ntemplate import\ntemplate instantiate\ntemplate save\n\nworkbench open-desktop\nworkbench url\n\nworkspace conflict\nworkspace conflicts\nworkspace merge\nworkspace recover-package\nworkspace resolve"
                 }
               ]
             }

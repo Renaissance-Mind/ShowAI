@@ -873,6 +873,8 @@ export async function startBrowserServer(options: BrowserServerOptions) {
           token,
           ...(options.linkedWorkbench && !preview && url.searchParams.get("t3Page") === "1" &&
             url.searchParams.has("project") && url.searchParams.has("page") && { t3Page: true }),
+          ...(options.linkedWorkbench && !preview && url.searchParams.get("t3Workbench") === "1" &&
+            !url.searchParams.has("page") && { t3Workbench: true }),
           ...(codexOrigin && embedded ? { apiOrigin: origin, search: url.search } : {}),
           ...(embedded && dsh && !preview ? {
             dshWorkbench: {

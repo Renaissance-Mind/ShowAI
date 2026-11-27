@@ -51,6 +51,7 @@ declare global {
     __SHOWAI_LOCAL__?: {
       token: string;
       t3Page?: boolean;
+      t3Workbench?: boolean;
       codexWorkbench?: CodexWorkbenchConnection;
       dshWorkbench?: { parentOrigin: string; session: boolean; instance: string };
       apiOrigin?: string;
@@ -62,6 +63,7 @@ declare global {
 export function installBrowserBridge() {
   const config = window.__SHOWAI_LOCAL__;
   if (!config || window.showai) return;
+  const t3 = config.t3Page || config.t3Workbench;
   if (window.__SHOWAI_CODEX_HOST__)
     window.__SHOWAI_CODEX_HOST__.createWorker = (kind) =>
       kind === "source" ? new SourceRuntimeWorker() : new CubicInputWorker();
@@ -389,7 +391,12 @@ export function installBrowserBridge() {
     setDirty(value) {
       dirty = value;
     },
-    ...(import.meta.env.DEV
+    ...(t3 && {
+      async prepareClose() {
+        return (await report([...closeListeners, ...reloadListeners])).allow;
+      },
+    }),
+    ...((import.meta.env.DEV || t3)
       ? {
           onBeforeReload(
             listener: () => Promise<CloseResult>,
@@ -401,6 +408,10 @@ export function installBrowserBridge() {
               reloadListeners.delete(entry);
             };
           },
+        }
+      : {}),
+    ...(import.meta.env.DEV
+      ? {
           async prepareReload() {
             return (await report([...closeListeners, ...reloadListeners]))
               .allow;

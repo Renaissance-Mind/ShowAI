@@ -1,5 +1,7 @@
 import { desktopTestEnvironment } from "../../scripts/desktop-test-env.mjs";
 import assert from "node:assert/strict";
+import { execFile } from "node:child_process";
+import { promisify } from "node:util";
 import { mkdir, mkdtemp, writeFile } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -212,6 +214,38 @@ try {
   await otherTab.waitFor({ state: "detached" });
   assert.equal(await title(source).inputValue(), "Target page");
   result.checks.push("A background page tab exposes page actions and opens and closes the intended page");
+
+  const workspaceTabs = source.getByRole("tablist", { name: "工作区标签页" }).getByRole("tab");
+  const previousTabs = await workspaceTabs.evaluateAll(items => items.map(item => item.id));
+  const priorActive = await source.getByRole("tab", { selected: true }).getAttribute("id");
+  const workbenchWindows = () => application.windows().filter(view => !view.url().includes("thumbnailCapture"));
+  const previousWindows = workbenchWindows();
+  const run = promisify(execFile);
+  await title(source).fill("Draft during external open");
+  const desktopReceipt = await run(process.execPath, [
+    join(repository, "dist-agent/cli.mjs"), "workbench", "open-desktop", "--home", env.SHOWAI_HOME,
+    "--project", target.project, "--page", target.other, "--json",
+  ], { cwd: repository, env, timeout: 15000 });
+  assert.equal(JSON.parse(desktopReceipt.stdout).data.pageId, target.other);
+  await workspaceTabs.nth(previousTabs.length).and(otherTab).and(source.getByRole("tab", { selected: true })).waitFor();
+  await source.locator("#" + priorActive).click();
+  assert.equal(await title(source).inputValue(), "Draft during external open");
+  await title(source).fill("Target page");
+  await title(source).press("Tab");
+  const firstLink = "showai://project/" + target.project + "/page/" + target.page;
+  const secondLink = "showai://project/" + target.project + "/page/" + target.other;
+  await run(electron, [repository, firstLink, secondLink], { cwd: repository, env, timeout: 15000 });
+  await workspaceTabs.nth(previousTabs.length + 2).and(otherTab).and(source.getByRole("tab", { selected: true })).waitFor();
+  assert.equal(await workspaceTabs.nth(previousTabs.length + 1).and(targetTab).count(), 1);
+  assert.deepEqual(await workspaceTabs.evaluateAll((items, count) => items.slice(0, count).map(item => item.id), previousTabs.length), previousTabs);
+  assert.deepEqual(workbenchWindows(), previousWindows);
+  await source.locator(".studio-window-topbar").screenshot({ path: join(output, "opened-page-tabs.png") });
+  for (const index of [previousTabs.length + 2, previousTabs.length + 1, previousTabs.length]) {
+    await workspaceTabs.nth(index).click({ button: "right" });
+    await source.getByRole("menuitem", { name: "关闭标签页", exact: true }).click();
+    await workspaceTabs.nth(index).waitFor({ state: "detached" });
+  }
+  result.checks.push("A CLI handoff preserves the active page edit; a second Electron launch appends both links in order to the same window");
 
   await row(source, target.page).hover();
   await row(source, target.page).locator(".studio-row-menu").click();

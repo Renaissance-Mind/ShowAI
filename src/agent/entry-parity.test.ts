@@ -69,6 +69,8 @@ const CLI_ONLY = [
   "template export",
   "template import",
   "template save",
+  "workbench open-desktop",
+  "workbench url",
   "workspace conflict",
   "workspace conflicts",
   "workspace merge",

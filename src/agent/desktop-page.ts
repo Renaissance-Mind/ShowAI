@@ -1,12 +1,18 @@
 import { readInstances } from "../core/instance-presence.mjs";
 import { pageLink } from "../document/page-link.mjs";
 import { openSystemUrl } from "../host/local-system";
+import { sendToRunningDesktop } from "../host/desktop-page-channel";
 import type { CodexPageTarget } from "./codex-page-reference";
 
 export async function openDesktopPage(home: string, target: CodexPageTarget): Promise<string> {
   const url = pageLink({ ...target, blockIds: target.blockId ? [target.blockId] : [] });
   const { instances } = await readInstances(home);
   const desktops = instances.filter(instance => instance.mode === "desktop" && instance.home === home);
+  desktops.sort((a, b) => Number(b.channel === "packaged") - Number(a.channel === "packaged"));
+  for (const desktop of desktops) {
+    if (desktop.desktopPageChannel && await sendToRunningDesktop(desktop.desktopPageChannel, home, url))
+      return url;
+  }
   const instance = desktops.length === 1 ? desktops[0] : undefined;
   if (instance?.channel !== "development" || !instance.developmentUrl) {
     await openSystemUrl(url);
