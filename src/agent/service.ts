@@ -172,7 +172,6 @@ const REF_NEUTRAL_OPERATIONS = new Set<string>([
   "diagram.arrange",
 ]);
 
-
 export class AgentService extends CatalogService {
   declare readonly store: FileStore;
   readonly datasets: DatasetService;
@@ -1201,77 +1200,79 @@ export class AgentService extends CatalogService {
   }
 }
 
-const AGENT_GUIDANCE: Record<string, { nextStep: string; userMessage: string }> =
-  {
-    CONFLICT: {
-      nextStep:
-        "Re-read the current version (page_read, dataset_read or the matching read tool), apply your change to it and retry with the new baseHash/baseRevision. Never resend the unchanged request.",
-      userMessage:
-        "The content changed after it was read, so ShowAI did not overwrite it. Nothing was lost.",
-    },
-    NOT_FOUND: {
-      nextStep:
-        "List what exists (projects_list, pages_list or library_search) and retry with an ID from that result.",
-      userMessage:
-        "ShowAI could not find that project or page in the connected library.",
-    },
-    INVALID_DATA: {
-      nextStep:
-        "Correct the input described in message and call the same tool again; read the installed ShowAI Skill reference for the expected format.",
-      userMessage:
-        "ShowAI rejected part of the request as invalid. Nothing was saved.",
-    },
-    INVALID_PATH: {
-      nextStep:
-        "Use an absolute path on this machine, or an ID returned by ShowAI tools, and call again.",
-      userMessage: "ShowAI could not use the given file or folder path.",
-    },
-    LOCKED: {
-      nextStep:
-        "Another ShowAI operation holds the library. Wait a few seconds and retry the same call once.",
-      userMessage:
-        "ShowAI is finishing another operation on this library. Nothing was changed.",
-    },
-    SNAPSHOT_EXPIRED: {
-      nextStep: "Read the page again to get a new snapshotId, then continue.",
-      userMessage: "The page view ShowAI returned earlier has expired.",
-    },
-    MISSING_BASELINE: {
-      nextStep:
-        "Read the current version with page_read and compare it directly; the earlier baseline is no longer kept.",
-      userMessage:
-        "ShowAI no longer keeps the earlier version needed for this comparison.",
-    },
-    SOURCE_UNAVAILABLE: {
-      nextStep:
-        "Ask the user to make the linked file available on this device, or work with the stored copy.",
-      userMessage:
-        "A file linked to this data cannot be read on this device. The stored copy is unchanged.",
-    },
-    READ_ONLY: {
-      nextStep:
-        "This data is read-only in ShowAI (online data, an .xlsx file, or the last value read while its source is unavailable). Tell the user to change it at its source; copy it into the library with dataset_write(action:link, path:null) only if they want to edit it in ShowAI.",
-      userMessage:
-        "This data comes from a read-only source, so ShowAI did not change it.",
-    },
-    CONFIRMATION_REQUIRED: {
-      nextStep:
-        "Ask the user to decide as described in details, then call again with their decision.",
-      userMessage: "ShowAI needs your decision before it continues.",
-    },
-    IN_USE: {
-      nextStep:
-        "Tell the user where it is used (details.uses: pages with blockIds, packages, publications). Move those blocks to another revision with page_apply component.ref.set, or remove them, then remove again; deleted pages count until their blocks change.",
-      userMessage:
-        "This is still used, so ShowAI did not remove it. Nothing was changed.",
-    },
-    CAPACITY_EXCEEDED: {
-      nextStep:
-        "Reduce the content below the limit in message (split the page, link large files instead of embedding) and retry.",
-      userMessage:
-        "The content is larger than ShowAI allows for this step. Nothing was changed.",
-    },
-  };
+const AGENT_GUIDANCE: Record<
+  string,
+  { nextStep: string; userMessage: string }
+> = {
+  CONFLICT: {
+    nextStep:
+      "Re-read the current version (page_read, dataset_read or the matching read tool), apply your change to it and retry with the new baseHash/baseRevision. Never resend the unchanged request.",
+    userMessage:
+      "The content changed after it was read, so ShowAI did not overwrite it. Nothing was lost.",
+  },
+  NOT_FOUND: {
+    nextStep:
+      "List what exists (projects_list, pages_list or library_search) and retry with an ID from that result.",
+    userMessage:
+      "ShowAI could not find that project or page in the connected library.",
+  },
+  INVALID_DATA: {
+    nextStep:
+      "Correct the input described in message and call the same tool again; read the installed ShowAI Skill reference for the expected format.",
+    userMessage:
+      "ShowAI rejected part of the request as invalid. Nothing was saved.",
+  },
+  INVALID_PATH: {
+    nextStep:
+      "Use an absolute path on this machine, or an ID returned by ShowAI tools, and call again.",
+    userMessage: "ShowAI could not use the given file or folder path.",
+  },
+  LOCKED: {
+    nextStep:
+      "Another ShowAI operation holds the library. Wait a few seconds and retry the same call once.",
+    userMessage:
+      "ShowAI is finishing another operation on this library. Nothing was changed.",
+  },
+  SNAPSHOT_EXPIRED: {
+    nextStep: "Read the page again to get a new snapshotId, then continue.",
+    userMessage: "The page view ShowAI returned earlier has expired.",
+  },
+  MISSING_BASELINE: {
+    nextStep:
+      "Read the current version with page_read and compare it directly; the earlier baseline is no longer kept.",
+    userMessage:
+      "ShowAI no longer keeps the earlier version needed for this comparison.",
+  },
+  SOURCE_UNAVAILABLE: {
+    nextStep:
+      "Ask the user to make the linked file available on this device, or work with the stored copy.",
+    userMessage:
+      "A file linked to this data cannot be read on this device. The stored copy is unchanged.",
+  },
+  READ_ONLY: {
+    nextStep:
+      "This data is read-only in ShowAI (online data, an .xlsx file, or the last value read while its source is unavailable). Tell the user to change it at its source; copy it into the library with dataset_write(action:link, path:null) only if they want to edit it in ShowAI.",
+    userMessage:
+      "This data comes from a read-only source, so ShowAI did not change it.",
+  },
+  CONFIRMATION_REQUIRED: {
+    nextStep:
+      "Ask the user to decide as described in details, then call again with their decision.",
+    userMessage: "ShowAI needs your decision before it continues.",
+  },
+  IN_USE: {
+    nextStep:
+      "Tell the user where it is used (details.uses: pages with blockIds, packages, publications). Move those blocks to another revision with page_apply component.ref.set, or remove them, then remove again; deleted pages count until their blocks change.",
+    userMessage:
+      "This is still used, so ShowAI did not remove it. Nothing was changed.",
+  },
+  CAPACITY_EXCEEDED: {
+    nextStep:
+      "Reduce the content below the limit in message (split the page, link large files instead of embedding) and retry.",
+    userMessage:
+      "The content is larger than ShowAI allows for this step. Nothing was changed.",
+  },
+};
 
 export type FailedOperation = "save" | "export" | "present";
 export const failedOperation = new AsyncLocalStorage<FailedOperation>();
@@ -1315,7 +1316,8 @@ export function errorResult(
   const guidance =
     error instanceof PluginInstallError
       ? undefined
-      : (AGENT_GUIDANCE[code] ?? (code === "ERROR" ? UNRECOVERABLE_GUIDANCE : undefined));
+      : (AGENT_GUIDANCE[code] ??
+        (code === "ERROR" ? UNRECOVERABLE_GUIDANCE : undefined));
   return {
     code,
     message,
@@ -1324,6 +1326,9 @@ export function errorResult(
       ? { details: { connectionId: error.connectionId } }
       : {}),
     ...(guidance ?? {}),
+    ...(error instanceof CoreError && error.userMessage
+      ? { userMessage: error.userMessage }
+      : {}),
     ...(operation ? OPERATION_GUIDANCE[code]?.[operation] : undefined),
     ...(error instanceof PluginInstallError && error.details
       ? { details: error.details }

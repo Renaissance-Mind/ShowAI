@@ -27,6 +27,18 @@
 .sb-block.sv-block .sv-figure .showai-note {
   cursor: help;
 }
+.sb-block.sv-block .sv-figure g[data-showai-note] {
+  text-decoration: none;
+}
+@media screen {
+  .sb-block.sv-block .sv-figure g[data-showai-note] > text:first-of-type {
+    text-decoration-line: underline;
+    text-decoration-style: dotted;
+    text-decoration-color: currentColor;
+    text-decoration-thickness: 1.5px;
+    text-underline-offset: 0.22em;
+  }
+}
 .sb-block.sv-block .sv-figure .showai-note:focus-visible {
   outline: 2px solid var(--sb-accent);
 }

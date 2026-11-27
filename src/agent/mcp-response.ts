@@ -72,6 +72,9 @@ export function compactData(data: unknown, profile: ResponseProfile): unknown {
     "references",
     "warnings",
     "changedBlocks",
+    "blockCount",
+    "offset",
+    "nextOffset",
     "omitted",
     "migration",
     "out",
@@ -79,6 +82,8 @@ export function compactData(data: unknown, profile: ResponseProfile): unknown {
   const selected = Object.fromEntries(
     fields.filter((key) => key in record).map((key) => [key, record[key]]),
   );
+  const outlineOrMarkdown =
+    record.format === "outline" || record.format === "markdown";
   if (
     record.document &&
     typeof record.document === "object" &&
@@ -87,10 +92,17 @@ export function compactData(data: unknown, profile: ResponseProfile): unknown {
     const document = record.document as Record<string, unknown>;
     selected.pageId ??= document.id;
     selected.title ??= document.title;
-    if (profile === "source") selected.document = document;
+    if (profile === "source" && !outlineOrMarkdown)
+      selected.document = document;
   }
-  if (profile === "source" && Array.isArray(record.bindings))
-    selected.bindings = record.bindings;
+  if (profile === "source") {
+    if (!outlineOrMarkdown && Array.isArray(record.bindings))
+      selected.bindings = record.bindings;
+    if (outlineOrMarkdown && Array.isArray(record.outline))
+      selected.outline = record.outline;
+    if (record.format === "markdown" && typeof record.markdown === "string")
+      selected.markdown = record.markdown;
+  }
   selected.response = profile;
   return selected;
 }

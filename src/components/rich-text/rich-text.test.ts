@@ -281,4 +281,96 @@ describe("shared rich-text component", () => {
     expect(compiled.inline!.script).toContain("rich-text-component");
     expect(compiled.inline!.script.length).toBeLessThan(2200000);
   }, 60000);
+
+  it("parses CJK-adjacent bold around annotations, links, quotes and masked inline extensions without regressing CommonMark rules", () => {
+    const schema = getSchema(createExtensions());
+    const prose = markdownToRichText(
+      [
+        "A2UI 是面向 AI Agent 的**[服务端驱动 UI]{由服务端声明组件结构}传输协议**，支持**“渐进渲染”**与**[官方文档](https://example.org/a**b)**验证。",
+        "补充罕见汉字 𠀀**[词条]{解释}**𠀀、括号（**重点**）、嵌套 **外层（**内层**）**、以及 *中文**， 与 foo_bar_baz 和 a**b**c。",
+        "内部含星号：**[术语]{注：a**b 与 a * b}后文**、**前 $a**b$ 后**、**前 \\(c**d\\) 后**、**前 `code $a**b$` 后**。",
+        "| 维度 | 说明 |\n| --- | --- |\n| 协议 | 的**[服务端驱动 UI]{表内注释}**支持 |",
+      ].join("\n\n"),
+    );
+    schema.nodeFromJSON(prose).check();
+    expect(() =>
+      validateDocument({ ...blankDocument(), content: prose }),
+    ).not.toThrow();
+
+    const p0 = prose.content?.[0].content ?? [];
+    expect(p0.map((n) => n.text).join("")).not.toContain("**");
+    expect(p0).toContainEqual({
+      type: "text",
+      text: "服务端驱动 UI",
+      marks: [
+        { type: "bold" },
+        { type: "annotation", attrs: { note: "由服务端声明组件结构" } },
+      ],
+    });
+    expect(p0).toContainEqual({
+      type: "text",
+      text: "传输协议",
+      marks: [{ type: "bold" }],
+    });
+    expect(p0).toContainEqual({
+      type: "text",
+      text: "“渐进渲染”",
+      marks: [{ type: "bold" }],
+    });
+    expect(p0).toContainEqual({
+      type: "text",
+      text: "官方文档",
+      marks: [
+        { type: "bold" },
+        { type: "link", attrs: { href: "https://example.org/a**b" } },
+      ],
+    });
+
+    const p1 = prose.content?.[1].content ?? [];
+    expect(p1).toContainEqual({
+      type: "text",
+      text: "词条",
+      marks: [
+        { type: "bold" },
+        { type: "annotation", attrs: { note: "解释" } },
+      ],
+    });
+    expect(p1).toContainEqual({
+      type: "text",
+      text: "中文",
+      marks: [{ type: "italic" }],
+    });
+    expect(p1.map((n) => n.text).join("")).toContain("*，");
+    expect(p1.map((n) => n.text).join("")).toContain("foo_bar_baz");
+
+    const p2 = prose.content?.[2].content ?? [];
+    expect(p2).toContainEqual({
+      type: "text",
+      text: "术语",
+      marks: [
+        { type: "bold" },
+        { type: "annotation", attrs: { note: "注：a**b 与 a * b" } },
+      ],
+    });
+    expect(
+      p2.filter((n) => n.type === "mathInline").map((n) => n.attrs?.latex),
+    ).toEqual(["a**b", "c**d"]);
+    expect(p2).toContainEqual({
+      type: "text",
+      text: "code $a**b$",
+      marks: [{ type: "code" }],
+    });
+
+    const tableCell =
+      prose.content?.[3].content?.[1].content?.[1].content?.[0].content ?? [];
+    expect(tableCell.map((n) => n.text).join("")).not.toContain("**");
+    expect(tableCell).toContainEqual({
+      type: "text",
+      text: "服务端驱动 UI",
+      marks: [
+        { type: "bold" },
+        { type: "annotation", attrs: { note: "表内注释" } },
+      ],
+    });
+  });
 });

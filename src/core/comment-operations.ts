@@ -12,7 +12,12 @@ import {
   type PageComment,
 } from "./comments";
 import { changeContext } from "./history-context";
-import { CoreError, type PageOperation, type ShowDocument } from "./model";
+import {
+  CoreError,
+  missingReferenceError,
+  type PageOperation,
+  type ShowDocument,
+} from "./model";
 
 type CommentOperation = Extract<PageOperation, { type: "comment" }>;
 
@@ -34,10 +39,16 @@ function anchorFor(
   if (blockId === undefined && quote === undefined) return undefined;
   const blocks = blockIndex(document);
   if (blockId !== undefined && !blocks.has(blockId))
-    throw new CoreError("NOT_FOUND", `Block ${blockId} does not exist.`);
+    throw missingReferenceError(
+      "block",
+      `Block ${blockId} does not exist.`,
+      "Read the current page with page_read to inspect existing block IDs, then retry.",
+    );
   if (!quote) return { blockId: blockId! };
   const candidates =
-    blockId !== undefined ? [[blockId, blocks.get(blockId)!] as const] : [...blocks];
+    blockId !== undefined
+      ? [[blockId, blocks.get(blockId)!] as const]
+      : [...blocks];
   for (const [id, entry] of candidates) {
     if (!isTextBlock(entry.node)) continue;
     const text = textBlockText(entry.node);
@@ -61,7 +72,10 @@ export function applyCommentOperation(
     if (value !== undefined && typeof value !== "string")
       throw new CoreError("INVALID_DATA", `comment ${key} must be a string.`);
   if (resolved !== undefined && typeof resolved !== "boolean")
-    throw new CoreError("INVALID_DATA", "comment resolved must be true or false.");
+    throw new CoreError(
+      "INVALID_DATA",
+      "comment resolved must be true or false.",
+    );
   try {
     if (threadId !== undefined) {
       if (blockId !== undefined || quote !== undefined)
@@ -76,11 +90,15 @@ export function applyCommentOperation(
         );
       let next = comments;
       if (text !== undefined) next = addReply(next, { threadId, text, author });
-      if (resolved !== undefined) next = setThreadResolved(next, threadId, resolved);
+      if (resolved !== undefined)
+        next = setThreadResolved(next, threadId, resolved);
       return next;
     }
     if (resolved !== undefined)
-      throw new CoreError("INVALID_DATA", "resolved needs the threadId of the thread.");
+      throw new CoreError(
+        "INVALID_DATA",
+        "resolved needs the threadId of the thread.",
+      );
     if (text === undefined)
       throw new CoreError("INVALID_DATA", "A new comment needs text.");
     return addThread(comments, {

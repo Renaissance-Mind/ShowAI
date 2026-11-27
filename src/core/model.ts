@@ -312,6 +312,7 @@ export class CoreError extends Error {
   readonly conflictId?: string;
   details?: Record<string, unknown>;
   nextStep?: string;
+  userMessage?: string;
   saveFailed?: boolean;
   recovery?: {
     action: "read-compare-save";
@@ -338,9 +339,25 @@ export class CoreError extends Error {
   }
 }
 
-export type IntegrityProblem = "database" | "content" | "history" | "repository";
+export type IntegrityProblem =
+  "database" | "content" | "history" | "repository";
 export function integrityError(kind: IntegrityProblem, message: string) {
   const error = new CoreError("INVALID_DATA", message);
   error.details = { integrity: kind };
+  return error;
+}
+
+export type MissingReferenceKind = "block" | "anchor" | "comment" | "component";
+
+export function missingReferenceError(
+  kind: MissingReferenceKind,
+  message: string,
+  nextStep: string,
+) {
+  const error = new CoreError("NOT_FOUND", message);
+  error.details = { missing: kind };
+  error.nextStep = nextStep;
+  error.userMessage =
+    "ShowAI could not find one of the items referenced in this change. Nothing was saved.";
   return error;
 }

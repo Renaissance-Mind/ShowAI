@@ -8,6 +8,7 @@ import {
   componentWidgetData,
   importComponent,
   lockDocumentComponents,
+  prepareComponentOperations,
   saveComponent,
 } from "./catalog";
 import { validateDocument } from "../portable/validation.mjs";
@@ -152,5 +153,28 @@ describe("lockDocumentComponents", () => {
     await expect(
       lockDocumentComponents(home, document, projectId),
     ).rejects.toThrow("Page outline renderer does not implement protocol 1.");
+
+    document.content.attrs!.outline.renderer = {
+      componentId: "missing-outline",
+      version: "1.0.0",
+      integrity: "sha256-" + "0".repeat(64),
+      props: {},
+    };
+    const repaired = await prepareComponentOperations(
+      home,
+      document,
+      [
+        {
+          type: "block.attrs.set",
+          blockId: document.id,
+          attrs: { outline: null },
+        },
+      ],
+      projectId,
+    );
+    expect(repaired.operations[0]).toMatchObject({
+      type: "block.attrs.set",
+      attrs: { outline: null },
+    });
   });
 });

@@ -75,7 +75,7 @@ React 入口接收以下数据与操作：
 
 组件可以自行设计列表、树或图形导航，在给定空间中绘制，保持键盘、触屏、当前章节与分支展开状态可达。宿主校验条目身份并执行导航；只读页面也保留这些操作。作者参数、生成的目录树和个人分支状态分别管理。整体收起控件由宿主提供。动作协议同时支持独立沙箱阅读器和对话内联阅读器。
 
-`examples/page-outline-index` 与 `examples/page-outline-path` 是两份完整的可导入实现。例如执行 `showai catalog import --project PROJECT --input examples/page-outline-index --json`，再到 Page 目录设置中选用。Agent 可通过当前 hash / revision 下的 `block.attrs.set` 修改 Page 目录属性。
+`examples/page-outline-index` 与 `examples/page-outline-path` 是两份完整的可导入实现。例如执行 `showai catalog import --project PROJECT --input examples/page-outline-index --json`，再到 Page 目录设置中选用。Agent 可通过当前 hash / revision 下的 `block.attrs.set`（传入根 Page surface 的 `document.content.attrs.id`，或无歧义时直接传入 Page ID）修改 Page 目录属性。
 
 ## 交互
 

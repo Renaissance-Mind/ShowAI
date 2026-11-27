@@ -82,10 +82,7 @@ import {
 } from "../portable/template-bundle.mjs";
 import { builtinComponentCatalog } from "../contract/catalog";
 import { validateComponentDocumentation } from "../contract/documentation";
-import {
-  commandProps,
-  validateContributions,
-} from "../contract/contributions";
+import { commandProps, validateContributions } from "../contract/contributions";
 
 import { builtinSources, builtinExports } from "./builtin-sources";
 import { componentSdkSource } from "./component-sdk-source";
@@ -1099,23 +1096,31 @@ async function saveTemplateImpl(
       ...(bundle.document ?? {}),
       title: bundle.metadata.name,
     });
-    walk(skeleton.content, (node) => {
-      const data = node.attrs?.data;
-      if ((node.type === "widget" || node.type === "inlineWidget") && node.attrs?.kind === "custom" && data) {
-        const binding = componentBindings.find(
-          (item) => item.id === data.componentId,
-        );
-        if (binding) {
-          const { scope: _scope, ...portable } = data;
-          node.attrs!.data = {
-            ...portable,
-            componentId: binding.ref.id,
-            version: binding.ref.version,
-            integrity: binding.ref.integrity,
-          };
+    walk(
+      skeleton.content,
+      (node) => {
+        const data = node.attrs?.data;
+        if (
+          (node.type === "widget" || node.type === "inlineWidget") &&
+          node.attrs?.kind === "custom" &&
+          data
+        ) {
+          const binding = componentBindings.find(
+            (item) => item.id === data.componentId,
+          );
+          if (binding) {
+            const { scope: _scope, ...portable } = data;
+            node.attrs!.data = {
+              ...portable,
+              componentId: binding.ref.id,
+              version: binding.ref.version,
+              integrity: binding.ref.integrity,
+            };
+          }
         }
-      }
-    }, { scope: "content" });
+      },
+      { scope: "content" },
+    );
     input = { ...input, ...bundle.metadata, document: skeleton };
   }
   const id = input.id ?? `template-${randomUUID()}`,
@@ -1749,8 +1754,16 @@ export async function compilePackage(
   manifest.examples.forEach((example) =>
     assertProps(schema, example.data, manifest.documentation),
   );
-  if (/\.html$/i.test(manifest.entry) && !manifest.examples.some(example => canonicalJson(example.data) !== canonicalJson(manifest.defaultData)))
-    throw new Error("Registering an HTML visual requires a second example dataset different from defaultData.");
+  if (
+    /\.html$/i.test(manifest.entry) &&
+    !manifest.examples.some(
+      (example) =>
+        canonicalJson(example.data) !== canonicalJson(manifest.defaultData),
+    )
+  )
+    throw new Error(
+      "Registering an HTML visual requires a second example dataset different from defaultData.",
+    );
   if (manifest.contract)
     for (const data of [
       manifest.defaultData,
@@ -1781,7 +1794,9 @@ export async function compilePackage(
     if (issues.length)
       throw new Error(
         `contributes.commands[${index}].run.insert.props (command '${command.id}') ` +
-          issues.map((issue) => `${issue.path || "props"} ${issue.message}`).join("; "),
+          issues
+            .map((issue) => `${issue.path || "props"} ${issue.message}`)
+            .join("; "),
       );
   }
   const root = await realpath(directory);
@@ -2080,8 +2095,17 @@ export default function Nested({data=defaults,onChange,readOnly=true}){check(dat
         if (!contents)
           return { errors: [{ text: `Missing package file: ${file}` }] };
         const extension = extname(file).slice(1);
-        if (extension.toLowerCase() === "html" && file === owner.manifest.entry.replace(/^\.\//, ""))
-          return { contents: htmlVisualModule(contents.toString(), owner.manifest.name), loader: "tsx" };
+        if (
+          extension.toLowerCase() === "html" &&
+          file === owner.manifest.entry.replace(/^\.\//, "")
+        )
+          return {
+            contents: htmlVisualModule(
+              contents.toString(),
+              owner.manifest.name,
+            ),
+            loader: "tsx",
+          };
         return {
           contents,
           loader: ["tsx", "ts", "jsx", "js", "json", "css"].includes(extension)
@@ -3031,12 +3055,19 @@ export async function resolveDocumentComponents(
   const refs = collectCustomComponentRefs(document);
   const required = new Set<string>();
   const custom: ShowDocument["content"][] = [];
-  walk(document.content, (node) => {
-    if ((node.type === "widget" || node.type === "inlineWidget") && node.attrs?.kind === "custom") {
-      custom.push(node);
-      required.add(key(readCustomBlockData(node.attrs.data)));
-    }
-  }, { scope: "content" });
+  walk(
+    document.content,
+    (node) => {
+      if (
+        (node.type === "widget" || node.type === "inlineWidget") &&
+        node.attrs?.kind === "custom"
+      ) {
+        custom.push(node);
+        required.add(key(readCustomBlockData(node.attrs.data)));
+      }
+    },
+    { scope: "content" },
+  );
   const resolved = await Promise.all(
     refs.map(async (ref) => {
       const component = await getComponent(
@@ -3210,7 +3241,10 @@ export async function lockDocumentComponents(
   home: string,
   document: ShowDocument,
   projectId?: string,
-  options: { validate?: boolean } = {},
+  options: {
+    validate?: boolean;
+    skipOutlineSurfaceIds?: ReadonlySet<string>;
+  } = {},
 ): Promise<ShowDocument> {
   const copy = JSON.parse(JSON.stringify(document)) as ShowDocument;
   const selected = new Map<string, Promise<CompiledComponent>>();
@@ -3245,21 +3279,59 @@ export async function lockDocumentComponents(
         ...(component.contract ? { contract: component.contract } : {}),
       };
     }
-    if (node.attrs?.outline?.enabled && node.attrs.outline.renderer) {
-      const ref = readCustomBlockData(node.attrs.outline.renderer);
-      const component = await getComponent(
-        home,
-        ref.componentId,
-        ref.version,
-        projectId,
-        { integrity: ref.integrity, scope: ref.scope },
-      );
+    if (
+      node.attrs?.outline?.enabled &&
+      node.attrs.outline.renderer &&
+      !options.skipOutlineSurfaceIds?.has(String(node.attrs?.id ?? ""))
+    ) {
+      let ref;
+      try {
+        ref = readCustomBlockData(node.attrs.outline.renderer);
+      } catch (error) {
+        throw new CoreError(
+          "INVALID_DATA",
+          `Page outline renderer: ${error instanceof Error ? error.message : String(error)}`,
+        );
+      }
+      let component: CompiledComponent;
+      try {
+        component = await getComponent(
+          home,
+          ref.componentId,
+          ref.version,
+          projectId,
+          { integrity: ref.integrity, scope: ref.scope },
+        );
+      } catch (error) {
+        if (error instanceof CoreError && error.code === "NOT_FOUND") {
+          error.details = { ...error.details, missing: "component" };
+          error.nextStep =
+            "List available outline components with catalog_list and retry with an exact componentId, version and integrity, or remove/disable outline.renderer.";
+          error.userMessage =
+            "ShowAI could not find one of the items referenced in this change. Nothing was saved.";
+          throw error;
+        }
+        throw new CoreError(
+          "INVALID_DATA",
+          error instanceof Error ? error.message : String(error),
+        );
+      }
       if (
         component.role !== "page-outline" ||
         component.pageOutlineProtocol !== 1
       )
-        throw new Error("Page outline renderer does not implement protocol 1.");
-      assertProps(component.schema, ref.props, component.documentation);
+        throw new CoreError(
+          "INVALID_DATA",
+          "Page outline renderer does not implement protocol 1.",
+        );
+      try {
+        assertProps(component.schema, ref.props, component.documentation);
+      } catch (error) {
+        throw new CoreError(
+          "INVALID_DATA",
+          error instanceof Error ? error.message : String(error),
+        );
+      }
     }
   };
   const visit = async (
@@ -3368,8 +3440,39 @@ export async function prepareComponentOperations(
   operations: PageOperation[],
   projectId: string,
 ) {
+  const skipOutlineSurfaceIds = new Set<string>();
+  const innerIds = new Set<string>();
+  walk(
+    document.content,
+    (child, { parent }) => {
+      if (parent && typeof child.attrs?.id === "string")
+        innerIds.add(child.attrs.id);
+    },
+    { scope: "content" },
+  );
+  for (const operation of Array.isArray(operations) ? operations : []) {
+    if (
+      operation?.type === "block.attrs.set" &&
+      operation.attrs &&
+      typeof operation.attrs === "object" &&
+      !Array.isArray(operation.attrs) &&
+      Object.hasOwn(operation.attrs, "outline") &&
+      typeof operation.blockId === "string"
+    ) {
+      skipOutlineSurfaceIds.add(operation.blockId);
+      if (
+        isResource(document) &&
+        document.content.type === "surface" &&
+        operation.blockId === document.id &&
+        typeof document.content.attrs?.id === "string" &&
+        !innerIds.has(operation.blockId)
+      )
+        skipOutlineSurfaceIds.add(document.content.attrs.id);
+    }
+  }
   const prepared = await lockDocumentComponents(home, document, projectId, {
     validate: false,
+    ...(skipOutlineSurfaceIds.size ? { skipOutlineSurfaceIds } : {}),
   });
   const nodes = new Map<string, ShowDocument["content"]>();
   const index = (node: ShowDocument["content"]) =>
@@ -3457,10 +3560,16 @@ export async function prepareComponentOperations(
             { integrity: operation.integrity },
           );
         } catch (error) {
-          throw new CoreError(
+          const failure = new CoreError(
             "NOT_FOUND",
             `component.ref.set on ${operation.blockId}: ${error instanceof Error ? error.message : String(error)} Use the exact componentId/version/integrity of a component_save or catalog_list receipt.`,
           );
+          failure.details = { missing: "component" };
+          failure.nextStep =
+            "List available components with catalog_list and retry with an exact componentId, version and integrity from that result.";
+          failure.userMessage =
+            "ShowAI could not find one of the items referenced in this change. Nothing was saved.";
+          throw failure;
         }
         operation.contract = selected.contract ?? null;
         nodes.set(operation.blockId, {
@@ -3507,10 +3616,14 @@ export async function instantiateTemplateRecord(
     const active = new Set(ancestors).add(identity);
     const documents: ShowDocument[] = [];
     const count = (root: ShowDocument["content"]) =>
-      walk(root, () => {
-        if (++expandedNodes > 12000)
-          throw new Error("Expanded template exceeds 12000 nodes.");
-      }, { scope: "tree" });
+      walk(
+        root,
+        () => {
+          if (++expandedNodes > 12000)
+            throw new Error("Expanded template exceeds 12000 nodes.");
+        },
+        { scope: "tree" },
+      );
     if (!template.composition) {
       count(template.document.content);
       return structuredClone(template.document);

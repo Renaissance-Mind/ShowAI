@@ -1,4 +1,7 @@
 import { describe, expect, it } from "vitest";
+import { createResource, createSurface } from "../document/containers.mjs";
+import { defaultPageOutline } from "../document/page-outline.mjs";
+import { blankDocument } from "./catalog";
 import {
   applyOperations,
   canonicalJson,
@@ -59,15 +62,22 @@ describe("semantic page changes", () => {
     delete input.content.content![1].attrs!.id;
     delete input.content.content![2].attrs!.id;
     const saved = normalizeDocument(input, before);
-    expect([...indexBlocks(saved).keys()]).toEqual(["second", "first", "third"]);
+    expect([...indexBlocks(saved).keys()]).toEqual([
+      "second",
+      "first",
+      "third",
+    ]);
     expect(before.content.content.map((node) => node.attrs!.id)).toEqual([
-      "first", "second", "third",
+      "first",
+      "second",
+      "third",
     ]);
     expect(input.content.content![1].attrs!.id).toBeUndefined();
   });
 
   it("repairs duplicate and missing IDs while preserving a shared prior document", () => {
-    const before = document(), original = structuredClone(before);
+    const before = document(),
+      original = structuredClone(before);
     const input = {
       ...before,
       content: {
@@ -75,7 +85,10 @@ describe("semantic page changes", () => {
         content: [
           ...before.content.content!,
           structuredClone(before.content.content![0]),
-          { type: "paragraph", content: [{ type: "text", text: "New evidence" }] },
+          {
+            type: "paragraph",
+            content: [{ type: "text", text: "New evidence" }],
+          },
         ],
       },
     };
@@ -93,15 +106,29 @@ describe("semantic page changes", () => {
     for (const sharedDocument of [true, false]) {
       const before = document();
       before.content.content!.push(
-        { ...structuredClone(before.content.content![0]), attrs: { id: "summary" } },
+        {
+          ...structuredClone(before.content.content![0]),
+          attrs: { id: "summary" },
+        },
         { ...structuredClone(before.content.content![1]), attrs: {} },
       );
-      const input = sharedDocument ? before : {
-        ...before,
-        content: { ...before.content, content: [...before.content.content!] },
-      };
-      const expected = normalizeDocument(structuredClone(input), structuredClone(before), { validated: true });
-      expect(normalizeDocument(input, before, { validated: true })).toEqual(expected);
+      const input = sharedDocument
+        ? before
+        : {
+            ...before,
+            content: {
+              ...before.content,
+              content: [...before.content.content!],
+            },
+          };
+      const expected = normalizeDocument(
+        structuredClone(input),
+        structuredClone(before),
+        { validated: true },
+      );
+      expect(normalizeDocument(input, before, { validated: true })).toEqual(
+        expected,
+      );
       expect(new Set([...indexBlocks(expected).keys()]).size).toBe(4);
     }
   });
@@ -296,5 +323,93 @@ describe("semantic page changes", () => {
         fields: [{ field: "attrs.backgroundColor", before: null }],
       },
     ]);
+  });
+
+  it("updates root Page attributes safely via surface ID or unambiguous Page ID while rejecting collisions and invalid surface keys", () => {
+    const page = createResource({
+      ...blankDocument(),
+      id: "page-doc-id",
+      title: "Outline target",
+    });
+    const rootSurfaceId = String(page.content.attrs!.id);
+    expect(rootSurfaceId).not.toBe(page.id);
+
+    const withOutline = applyOperations(page, [
+      {
+        type: "block.attrs.set",
+        blockId: page.id,
+        attrs: { outline: defaultPageOutline(), widthMode: "wide" },
+      },
+    ]);
+    expect(withOutline.content.attrs?.outline).toEqual(defaultPageOutline());
+    expect(withOutline.content.attrs?.widthMode).toBe("wide");
+
+    const cleared = applyOperations(withOutline, [
+      {
+        type: "block.attrs.set",
+        blockId: rootSurfaceId,
+        attrs: { outline: null, widthMode: null },
+      },
+    ]);
+    expect(cleared.content.attrs?.outline).toBeUndefined();
+    expect(cleared.content.attrs?.widthMode).toBeUndefined();
+
+    expect(() =>
+      applyOperations(page, [{ type: "block.remove", blockId: rootSurfaceId }]),
+    ).toThrow("does not exist");
+    expect(() =>
+      applyOperations(page, [
+        {
+          type: "block.attrs.set",
+          blockId: rootSurfaceId,
+          attrs: { kind: "board" },
+        },
+      ]),
+    ).toThrow("Unsupported page container attribute");
+    expect(() =>
+      applyOperations(page, [
+        {
+          type: "block.attrs.set",
+          blockId: rootSurfaceId,
+          attrs: { icon: "📘" },
+        },
+      ]),
+    ).toThrow("page.set");
+
+    const nestedPage = createSurface("page", "Nested", page.id);
+    const collided = applyOperations(page, [
+      { type: "block.insert", node: nestedPage },
+    ]);
+    expect(() =>
+      applyOperations(collided, [
+        {
+          type: "block.attrs.set",
+          blockId: page.id,
+          attrs: { outline: defaultPageOutline() },
+        },
+      ]),
+    ).toThrow(`pass the root surface ID ${rootSurfaceId}`);
+    const resolvedExplicitly = applyOperations(collided, [
+      {
+        type: "block.attrs.set",
+        blockId: rootSurfaceId,
+        attrs: { outline: defaultPageOutline() },
+      },
+    ]);
+    expect(resolvedExplicitly.content.attrs?.outline).toEqual(
+      defaultPageOutline(),
+    );
+
+    const board = createResource(blankDocument(), "board");
+    const boardRootId = String(board.content.attrs!.id);
+    expect(() =>
+      applyOperations(board, [
+        {
+          type: "block.attrs.set",
+          blockId: boardRootId,
+          attrs: { outline: null },
+        },
+      ]),
+    ).toThrow("Unsupported board container attribute");
   });
 });

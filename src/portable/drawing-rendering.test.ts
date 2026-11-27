@@ -44,13 +44,23 @@ it("renders two svg figures with separate ids, themed text and hover notes", asy
   const doc = blankDocument();
   doc.title = "Figures";
   const figure = example("svg");
+  const cardFigure = {
+    alt: "分组注释下划线与打印测试",
+    source:
+      '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 420 140">' +
+      '<g id="card-note" data-note="整卡悬停注释"><rect class="paper stroke-blue" x="16" y="16" width="180" height="72" rx="10"/><text id="card-title" class="ink-blue" x="106" y="46" text-anchor="middle" font-size="16" font-weight="600">主标题</text><text id="card-sub" class="ink-muted" x="106" y="70" text-anchor="middle" font-size="13">次要说明不加下划线</text></g>' +
+      '<g id="nested-note" data-note="嵌套分组注释"><g><text id="nested-a" x="250" y="44" font-size="14">分支 A</text></g><g><text id="nested-b" x="250" y="70" font-size="14">分支 B</text></g></g>' +
+      '<text id="direct-note" x="250" y="110" font-size="14" data-note="直接文字注释">独立术语</text>' +
+      "</svg>",
+  };
   doc.content.content = [
     { type: "widget", attrs: { kind: "svg", data: figure } },
     { type: "widget", attrs: { kind: "svg", data: figure } },
+    { type: "widget", attrs: { kind: "svg", data: cardFigure } },
   ];
   await open(await buildPageHtml(doc), async (page) => {
     const figures = page.locator(".sv-figure");
-    await expect.poll(() => figures.count()).toBe(2);
+    await expect.poll(() => figures.count()).toBe(3);
     const markers = await page
       .locator(".sv-figure marker")
       .evaluateAll((items) => items.map((item) => item.id));
@@ -94,6 +104,23 @@ it("renders two svg figures with separate ids, themed text and hover notes", asy
     ).toBe("");
     const box = await figures.first().boundingBox();
     expect(box!.width).toBeGreaterThan(500);
+
+    const decorationLine = (suffix: string) =>
+      figures
+        .nth(2)
+        .locator(`[id$="-${suffix}"]`)
+        .evaluate((el) => getComputedStyle(el).textDecorationLine);
+    expect(await decorationLine("card-note")).toBe("none");
+    expect(await decorationLine("card-title")).toBe("underline");
+    expect(await decorationLine("card-sub")).toBe("none");
+    expect(await decorationLine("nested-note")).toBe("none");
+    expect(await decorationLine("nested-a")).toBe("none");
+    expect(await decorationLine("nested-b")).toBe("none");
+    expect(await decorationLine("direct-note")).toBe("underline");
+
+    await page.emulateMedia({ media: "print" });
+    expect(await decorationLine("card-title")).toBe("none");
+    expect(await decorationLine("direct-note")).toBe("none");
   });
 }, 60000);
 

@@ -4,6 +4,7 @@ import {
   NOTE_MAX,
   annotateLatex,
   invalidNoteMark,
+  matchNote,
   noteMarkdownExtension,
 } from "./note-markup.mjs";
 import { parsePageLink } from "./page-link.mjs";
@@ -24,6 +25,196 @@ const highlightExtension = {
       };
   },
 };
+const CJK_SOURCE =
+  "[\\p{Script=Han}\\p{Script=Hiragana}\\p{Script=Katakana}\\p{Script=Hangul}\\p{Script=Bopomofo}\\u3005-\\u3007\\u303b\\ufe30-\\ufe4f]";
+const CJK_CHAR = new RegExp(`^${CJK_SOURCE}$`, "u");
+const CJK_R_DELIM_AST = new RegExp(
+  "^[^_*]*?__[^_*]*?\\*[^_*]*?(?=__)" +
+    "|[^*]+(?=[^*])" +
+    `|(?!\\*)(?!~)(?:[\\p{P}\\p{S}](?=\\*+(?:[\\s]|$))|(?![\\p{Ps}\\p{Pi}])[\\p{P}\\p{S}](?=\\*+(?!\\*)${CJK_SOURCE}))(\\*+)` +
+    "|(?:[^\\s\\p{P}\\p{S}]|~)(\\*+)(?!\\*)(?=(?!~)[\\s\\p{P}\\p{S}]|$)" +
+    "|(?!\\*)(?!~)[\\s\\p{P}\\p{S}](\\*+)(?=(?:[^\\s\\p{P}\\p{S}]|~))" +
+    "|[\\s](\\*+)(?!\\*)(?=(?!~)[\\p{P}\\p{S}])" +
+    "|(?!\\*)(?!~)[\\p{P}\\p{S}](\\*+)(?!\\*)(?=(?!~)[\\p{P}\\p{S}])" +
+    "|(?:[^\\s\\p{P}\\p{S}]|~)(\\*+)(?=(?:[^\\s\\p{P}\\p{S}]|~))",
+  "gu",
+);
+const mathInlineTokenizer = mathExtensions.find(
+  (extension) => extension.name === "mathInline",
+)?.tokenizer;
+
+function matchInlineComponent(source) {
+  const head = /^@\[([a-z][a-z0-9-]*)\](?=\{)/.exec(source);
+  if (!head) return null;
+  const line = source.slice(head[0].length).split("\n")[0];
+  for (
+    let end = line.indexOf("}");
+    end >= 0;
+    end = line.indexOf("}", end + 1)
+  ) {
+    let data;
+    try {
+      data = JSON.parse(line.slice(0, end + 1));
+    } catch {
+      continue;
+    }
+    if (!data || typeof data !== "object" || Array.isArray(data)) return null;
+    return {
+      raw: head[0] + line.slice(0, end + 1),
+      kind: head[1],
+      data,
+    };
+  }
+  return null;
+}
+
+function unescapedAt(source, index) {
+  let count = 0;
+  for (let i = index - 1; i >= 0 && source[i] === "\\"; i--) count++;
+  return count % 2 === 0;
+}
+
+function maskInlineExtensions(source, maskedTail, fromIndex) {
+  let out = maskedTail;
+  let pos = fromIndex;
+  while (pos < source.length) {
+    const ch = source[pos];
+    if (
+      mathInlineTokenizer &&
+      ch === "\\" &&
+      (source[pos + 1] === "(" || source[pos + 1] === "[") &&
+      unescapedAt(source, pos) &&
+      out.slice(pos, pos + 2) === "++"
+    ) {
+      const math = mathInlineTokenizer(source.slice(pos));
+      if (math && math.raw.length > 2) {
+        out =
+          out.slice(0, pos) +
+          "(" +
+          "a".repeat(math.raw.length - 2) +
+          ")" +
+          out.slice(pos + math.raw.length);
+        pos += math.raw.length;
+        continue;
+      }
+    }
+    if (out[pos] !== source[pos]) {
+      pos++;
+      continue;
+    }
+    if (ch === "[") {
+      const note = matchNote(source, pos);
+      if (note && note.raw.length > 2) {
+        out =
+          out.slice(0, pos + 1) +
+          "a".repeat(note.raw.length - 2) +
+          out.slice(pos + note.raw.length - 1);
+        pos += note.raw.length;
+        continue;
+      }
+    } else if (ch === "$" && mathInlineTokenizer) {
+      const math = mathInlineTokenizer(source.slice(pos));
+      if (math && math.raw.length > 2) {
+        out =
+          out.slice(0, pos + 1) +
+          "a".repeat(math.raw.length - 2) +
+          out.slice(pos + math.raw.length - 1);
+        pos += math.raw.length;
+        continue;
+      }
+    } else if (ch === "@") {
+      const component = matchInlineComponent(source.slice(pos));
+      if (component && component.raw.length > 2) {
+        out =
+          out.slice(0, pos + 1) +
+          "a".repeat(component.raw.length - 2) +
+          out.slice(pos + component.raw.length - 1);
+        pos += component.raw.length;
+        continue;
+      }
+    }
+    pos++;
+  }
+  return out;
+}
+
+function cjkEmStrong(src, maskedSrc, prevChar = "") {
+  if (src[0] !== "*") return false;
+  const match = this.rules.inline.emStrongLDelim.exec(src);
+  if (!match || (!match[1] && !match[2])) return false;
+  let prev = prevChar;
+  if (prev && /^[\udc00-\udfff]$/.test(prev)) {
+    const prefix = maskedSrc.slice(0, maskedSrc.length - src.length);
+    prev = [...prefix].at(-1) ?? prev;
+  }
+  const canOpen =
+    !match[1] ||
+    !prev ||
+    Boolean(this.rules.inline.punctuation.exec(prev)) ||
+    CJK_CHAR.test(prev);
+  if (!canOpen) return false;
+
+  const delimLen = [...match[0]].length - 1;
+  let rLength;
+  let rCount;
+  let delimTotal = delimLen;
+  let midDelimTotal = 0;
+  const maskedTail = maskInlineExtensions(
+    src,
+    maskedSrc.slice(-1 * src.length),
+    delimLen,
+  );
+  const scanTarget = maskedTail.slice(delimLen);
+  CJK_R_DELIM_AST.lastIndex = 0;
+  let rMatch;
+  while ((rMatch = CJK_R_DELIM_AST.exec(scanTarget)) !== null) {
+    rLength =
+      rMatch[1] ||
+      rMatch[2] ||
+      rMatch[3] ||
+      rMatch[4] ||
+      rMatch[5] ||
+      rMatch[6];
+    if (!rLength) continue;
+    rCount = [...rLength].length;
+    if (rMatch[3] || rMatch[4]) {
+      delimTotal += rCount;
+      continue;
+    } else if (rMatch[5] || rMatch[6]) {
+      if (delimLen % 3 && !((delimLen + rCount) % 3)) {
+        midDelimTotal += rCount;
+        continue;
+      }
+      if (prev === "*") break;
+    }
+    delimTotal -= rCount;
+    if (delimTotal > 0) continue;
+    rCount = Math.min(rCount, rCount + delimTotal + midDelimTotal);
+    const leadCharUtf16Len = [...rMatch[0]][0].length;
+    const raw = src.slice(
+      0,
+      delimLen + rMatch.index + leadCharUtf16Len + rCount,
+    );
+    if (Math.min(delimLen, rCount) % 2) {
+      const text = raw.slice(1, -1);
+      return {
+        type: "em",
+        raw,
+        text,
+        tokens: this.lexer.inlineTokens(text),
+      };
+    }
+    const text = raw.slice(2, -2);
+    return {
+      type: "strong",
+      raw,
+      text,
+      tokens: this.lexer.inlineTokens(text),
+    };
+  }
+  return false;
+}
+
 const inlineComponentExtension = {
   name: "inlineComponent",
   level: "inline",
@@ -32,24 +223,8 @@ const inlineComponentExtension = {
     return index < 0 ? undefined : index;
   },
   tokenizer(source) {
-    const head = /^@\[([a-z][a-z0-9-]*)\](?=\{)/.exec(source);
-    if (!head) return;
-    const line = source.slice(head[0].length).split("\n")[0];
-    for (let end = line.indexOf("}"); end >= 0; end = line.indexOf("}", end + 1)) {
-      let data;
-      try {
-        data = JSON.parse(line.slice(0, end + 1));
-      } catch {
-        continue;
-      }
-      if (!data || typeof data !== "object" || Array.isArray(data)) return;
-      return {
-        type: "inlineComponent",
-        raw: head[0] + line.slice(0, end + 1),
-        kind: head[1],
-        data,
-      };
-    }
+    const matched = matchInlineComponent(source);
+    if (matched) return { type: "inlineComponent", ...matched };
   },
 };
 const markdownImport = new Marked({
@@ -59,6 +234,9 @@ const markdownImport = new Marked({
     ...(noteMarkdownExtension ? [noteMarkdownExtension] : []),
     highlightExtension,
   ],
+  tokenizer: {
+    emStrong: cjkEmStrong,
+  },
 });
 
 export const richTextFormats = [
@@ -101,6 +279,10 @@ const decodeText = (value) =>
   );
 const textNode = (text, marks = []) =>
   text ? [{ type: "text", text, ...(marks.length ? { marks } : {}) }] : [];
+const appendMark = (marks, next) =>
+  marks.some((existing) => existing.type === next.type)
+    ? marks
+    : [...marks, next];
 export function markdownToRichText(
   source,
   { allowComponentBlocks = false } = {},
@@ -116,24 +298,26 @@ export function markdownToRichText(
       }[t.type];
       if (mark)
         return t.type === "codespan"
-          ? textNode(t.text, [...marks, { type: mark }])
-          : inline(t.tokens, [...marks, { type: mark }]);
+          ? textNode(t.text, [{ type: "code" }])
+          : inline(t.tokens, appendMark(marks, { type: mark }));
       if (t.type === "annotation")
-        return inline(t.tokens, [
-          ...marks,
-          { type: "annotation", attrs: { note: t.note } },
-        ]);
+        return inline(
+          t.tokens,
+          appendMark(marks, { type: "annotation", attrs: { note: t.note } }),
+        );
       if (t.type === "link")
-        return inline(t.tokens, [
-          ...marks,
-          {
+        return inline(
+          t.tokens,
+          appendMark(marks, {
             type: "link",
             attrs: { href: t.href, ...(t.title ? { title: t.title } : {}) },
-          },
-        ]);
+          }),
+        );
       if (t.type === "br") return [{ type: "hardBreak" }];
       if (t.type === "inlineComponent")
-        return [{ type: "inlineWidget", attrs: { kind: t.kind, data: t.data } }];
+        return [
+          { type: "inlineWidget", attrs: { kind: t.kind, data: t.data } },
+        ];
       if (t.type === "mathInline" || t.type === "mathBlock") {
         const note = [...marks]
           .reverse()

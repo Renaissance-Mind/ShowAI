@@ -10608,7 +10608,7 @@
         },
         {
           "path": "source data-note",
-          "meaning": "任意元素加 data-note=\"解释\"，读者悬停、聚焦或轻点时显示这段注释，适合解释图中的术语或对象。"
+          "meaning": "给 <text> 或 <tspan> 加 data-note=\"解释\" 为该处文字显示虚线下划线与悬停注释；加在 <g> 上可让整块节点（含底框图形）在悬停、聚焦或轻点时触发注释，并在屏幕阅读时仅给组内首个直接子级 <text> 标题显示虚线提示。"
         },
         {
           "path": "alt",
@@ -10887,7 +10887,9 @@
       "architecture": [
         "目录条目声明 contributes.mention: {prop:\"date\", input:\"date\"}，@ 菜单据此列出今天、明天与输入的日期；这与自定义组件在 manifest 中的声明相同。"
       ],
-      "extensionPoints": ["其他可提及的内容按同一 contributes.mention 声明做成组件。"],
+      "extensionPoints": [
+        "其他可提及的内容按同一 contributes.mention 声明做成组件。"
+      ],
       "invariants": ["日期按 UTC 日历日格式化，各时区显示同一天。"],
       "verification": [
         "在正文输入 @ 插入今天的日期，刷新后仍显示同一天；导出后检查显示。"
@@ -11047,9 +11049,7 @@
         "block.move、surface.layout.set仍可操作原生region；页面、导出、预览采用同一布局规则。"
       ],
       "editing": {
-        "data": [
-          "布局参数通过component.props.set；结构通过原生子节点操作。"
-        ],
+        "data": ["布局参数通过component.props.set；结构通过原生子节点操作。"],
         "implementation": [
           "共享regionGridStyle决定CSS布局；SurfaceContent渲染，SurfaceObject不显示region标题条。"
         ]
@@ -11066,15 +11066,9 @@
           "purpose": "标准组件入口转换成原生region，复用子组件插入。"
         }
       ],
-      "architecture": [
-        "保留现有原生region，父级保存外框，容器保存子节点。"
-      ],
-      "extensionPoints": [
-        "复用原生布局和设置菜单，不增加独立工具栏。"
-      ],
-      "invariants": [
-        "不改变子内容顺序或稳定ID；只读布局不写入。"
-      ],
+      "architecture": ["保留现有原生region，父级保存外框，容器保存子节点。"],
+      "extensionPoints": ["复用原生布局和设置菜单，不增加独立工具栏。"],
+      "invariants": ["不改变子内容顺序或稳定ID；只读布局不写入。"],
       "verification": [
         "真实组件插入、保存重读、桌面与窄屏、嵌套容器、离线导出。"
       ]
@@ -11127,9 +11121,7 @@
           "opaque": true,
           "omission": {
             "behavior": "fallback",
-            "computedFrom": [
-              "levels[].component"
-            ],
+            "computedFrom": ["levels[].component"],
             "description": "仅使用 component 简写时生成包含该组件的单节点 doc。"
           }
         },
@@ -11159,10 +11151,7 @@
           "meaning": "本层 content 内发出事件的组件块 attrs.id。多个组件时必须明确指定。",
           "omission": {
             "behavior": "fallback",
-            "computedFrom": [
-              "levels[].content",
-              "levels[].component"
-            ],
+            "computedFrom": ["levels[].content", "levels[].component"],
             "description": "本层只有一个组件时使用其块 ID；有多个组件时拒绝省略。"
           }
         },
@@ -11248,9 +11237,7 @@
         "视图不直接嵌套另一个 multi-level-view，使用 levels 表达多层关系。"
       ],
       "editing": {
-        "data": [
-          "替换完整 levels 树、原生组件 props 与绑定。"
-        ],
+        "data": ["替换完整 levels 树、原生组件 props 与绑定。"],
         "implementation": [
           "为新的对象事件接入 ComponentInteractions；自定义组件通过 onActivate(target) 发出事件，并用 activationTargets 判断已绑定目标。"
         ]

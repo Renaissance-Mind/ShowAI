@@ -22,8 +22,16 @@ import { readCustomBlockData } from "../contract/contract";
 import { validateDocument } from "../portable/validation.mjs";
 import { rebaseCommentAnchors, validateComments } from "./comments";
 import { applyCommentOperation } from "./comment-operations";
-import { CoreError, PAGE_OPERATION_FIELDS } from "./model";
-import { isSurface, reconcileSurface, fillSurfaceLayout } from "../document/document.mjs";
+import {
+  CoreError,
+  missingReferenceError,
+  PAGE_OPERATION_FIELDS,
+} from "./model";
+import {
+  isSurface,
+  reconcileSurface,
+  fillSurfaceLayout,
+} from "../document/document.mjs";
 import { walk } from "../document/walk.mjs";
 import { addressNode, mapNodes, updateNode } from "../document/update.mjs";
 import {
@@ -44,17 +52,21 @@ export { canonicalJson } from "./canonical";
 import { canonicalJson } from "./canonical";
 
 function assertBindings(document: ShowDocument) {
-  walk(document.content, (node) => {
-    if (node.type !== "widget" || !readBinding(node.attrs?.data)) return;
-    try {
-      compileBinding(readBinding(node.attrs!.data));
-    } catch (error) {
-      throw new CoreError(
-        "INVALID_DATA",
-        `Block ${node.attrs?.id ?? ""} $binding: ${error instanceof Error ? error.message : String(error)}`,
-      );
-    }
-  }, { scope: "content" });
+  walk(
+    document.content,
+    (node) => {
+      if (node.type !== "widget" || !readBinding(node.attrs?.data)) return;
+      try {
+        compileBinding(readBinding(node.attrs!.data));
+      } catch (error) {
+        throw new CoreError(
+          "INVALID_DATA",
+          `Block ${node.attrs?.id ?? ""} $binding: ${error instanceof Error ? error.message : String(error)}`,
+        );
+      }
+    },
+    { scope: "content" },
+  );
 }
 
 export function documentHash(document: ShowDocument): string {
@@ -97,17 +109,21 @@ export function normalizeDocument(
   };
   const previousIds = () => {
     if (!indexedPrevious && previous)
-      walk(previous.content, (node) => {
-        if (
-          node.type !== "doc" &&
-          node.type !== "surface" &&
-          node.type !== "text" &&
-          typeof node.attrs?.id === "string"
-        ) {
-          const key = signature(node);
-          oldIds.set(key, [...(oldIds.get(key) ?? []), node.attrs.id]);
-        }
-      }, { scope: "tree" });
+      walk(
+        previous.content,
+        (node) => {
+          if (
+            node.type !== "doc" &&
+            node.type !== "surface" &&
+            node.type !== "text" &&
+            typeof node.attrs?.id === "string"
+          ) {
+            const key = signature(node);
+            oldIds.set(key, [...(oldIds.get(key) ?? []), node.attrs.id]);
+          }
+        },
+        { scope: "tree" },
+      );
     indexedPrevious = true;
     return oldIds;
   };
@@ -302,6 +318,23 @@ export function diffDocuments(
   return changes;
 }
 
+const MISSING_BLOCK_STEP =
+  "Read the current page with page_read to inspect existing block IDs (for root Page attributes such as outline, pass the root surface ID or unambiguous pageId to block.attrs.set), then retry.";
+const PAGE_SURFACE_ATTRS = new Set([
+  "name",
+  "icon",
+  "widthMode",
+  "frameless",
+  "outline",
+]);
+const ROOT_PAGE_SURFACE_ATTRS = new Set([
+  "name",
+  "widthMode",
+  "frameless",
+  "outline",
+]);
+const BOARD_SURFACE_ATTRS = new Set(["name", "icon"]);
+const ROOT_BOARD_SURFACE_ATTRS = new Set(["name"]);
 const GEOMETRY_OPERATIONS = new Set<string>([
   "component.insert",
   "diagram.insert",
@@ -343,7 +376,11 @@ export function applyOperations(
       state ??= batchState(current);
       fresh = false;
     }
-    if (state && incrementalCandidate(operation) && applyIncrementally(state, operation)) {
+    if (
+      state &&
+      incrementalCandidate(operation) &&
+      applyIncrementally(state, operation)
+    ) {
       current = state.document;
       continue;
     }
@@ -440,11 +477,20 @@ function applyOperation(
         "INVALID_DATA",
         `Block ${id} is nested in the content of ${nestedLabel(inner)}. This operation works on blocks of the page tree; change the nested block itself with block.replace, block.remove, block.attrs.set, block.text.set, component.props.set or component.ref.set, or change ${String(inner.owner?.attrs?.id ?? "")} as a whole.`,
       );
-    throw new CoreError("NOT_FOUND", `Block ${id} does not exist.`);
+    throw missingReferenceError(
+      "block",
+      `Block ${id} does not exist.`,
+      MISSING_BLOCK_STEP,
+    );
   };
   const target = (id: string): JSONContent => {
     const found = inTree(id) ?? nested(id);
-    if (!found) throw new CoreError("NOT_FOUND", `Block ${id} does not exist.`);
+    if (!found)
+      throw missingReferenceError(
+        "block",
+        `Block ${id} does not exist.`,
+        MISSING_BLOCK_STEP,
+      );
     return found.node;
   };
   const edit = (id: string, change: (node: JSONContent) => JSONContent) => {
@@ -454,7 +500,11 @@ function applyOperation(
       return;
     }
     if (!nested(id))
-      throw new CoreError("NOT_FOUND", `Block ${id} does not exist.`);
+      throw missingReferenceError(
+        "block",
+        `Block ${id} does not exist.`,
+        MISSING_BLOCK_STEP,
+      );
     draft.content = updateNode(draft.content, id, change, { scope: "content" });
   };
   const viewOwner = (id?: string) => {
@@ -492,9 +542,10 @@ function applyOperation(
         (child) => child.attrs?.id === afterId,
       );
       if (sibling < 0)
-        throw new CoreError(
-          "NOT_FOUND",
+        throw missingReferenceError(
+          "anchor",
           `Insertion anchor ${afterId} does not belong to this parent.`,
+          MISSING_BLOCK_STEP,
         );
       index = sibling + 1;
     }
@@ -699,9 +750,13 @@ function applyOperation(
         for (const id of operation.view.targets) locate(id);
         const owner = viewOwner(operation.surfaceId),
           targets = new Set<string>();
-        walk(owner, (node) => {
-          if (node !== owner && node.attrs?.id) targets.add(node.attrs.id);
-        }, { scope: "tree" });
+        walk(
+          owner,
+          (node) => {
+            if (node !== owner && node.attrs?.id) targets.add(node.attrs.id);
+          },
+          { scope: "tree" },
+        );
         if (operation.view.targets.some((id) => !targets.has(id)))
           throw new CoreError(
             "INVALID_DATA",
@@ -814,7 +869,9 @@ function applyOperation(
             node === inner.parent
               ? {
                   ...node,
-                  content: node.content!.filter((child) => child !== inner.node),
+                  content: node.content!.filter(
+                    (child) => child !== inner.node,
+                  ),
                 }
               : node,
           { scope: "content" },
@@ -838,9 +895,13 @@ function applyOperation(
       case "block.move": {
         const target = locate(operation.blockId);
         const inside = new Set<unknown>();
-        walk(target.node, (node) => {
-          inside.add(node.attrs?.id);
-        }, { scope: "tree" });
+        walk(
+          target.node,
+          (node) => {
+            inside.add(node.attrs?.id);
+          },
+          { scope: "tree" },
+        );
         if (
           (operation.parentId && inside.has(operation.parentId)) ||
           operation.afterId === operation.blockId
@@ -864,12 +925,63 @@ function applyOperation(
             "INVALID_DATA",
             "Block attributes cannot change a stable id.",
           );
-        edit(operation.blockId, (node) => {
-          const attrs = { ...node.attrs, ...operation.attrs };
+        const rootSurface =
+          isResource(draft) && draft.content.type === "surface"
+            ? draft.content
+            : undefined;
+        const rootId = rootSurface?.attrs?.id;
+        const childMatch =
+          inTree(operation.blockId)?.node ?? nested(operation.blockId)?.node;
+        if (
+          rootSurface &&
+          operation.blockId === draft.id &&
+          operation.blockId !== rootId &&
+          childMatch
+        )
+          throw new CoreError(
+            "INVALID_DATA",
+            `Block ID ${operation.blockId} matches both the Page ID and an inner node; pass the root surface ID ${String(rootId)} to update root container attributes.`,
+          );
+        const isRootSurface =
+          !childMatch &&
+          !!rootSurface &&
+          (operation.blockId === rootId || operation.blockId === draft.id);
+        const node = isRootSurface ? rootSurface! : target(operation.blockId);
+        if (node.type === "surface") {
+          if (Object.hasOwn(operation.attrs, "title"))
+            throw new CoreError(
+              "INVALID_DATA",
+              "Use page.set to change the Page title, or attrs.name for a container label.",
+            );
+          if (isRootSurface && Object.hasOwn(operation.attrs, "icon"))
+            throw new CoreError(
+              "INVALID_DATA",
+              "Use page.set to change the root Page icon; attrs.icon on block.attrs.set only applies to nested containers.",
+            );
+          const allowed =
+            node.attrs?.kind === "page"
+              ? isRootSurface
+                ? ROOT_PAGE_SURFACE_ATTRS
+                : PAGE_SURFACE_ATTRS
+              : isRootSurface
+                ? ROOT_BOARD_SURFACE_ATTRS
+                : BOARD_SURFACE_ATTRS;
+          for (const key of Object.keys(operation.attrs)) {
+            if (!allowed.has(key))
+              throw new CoreError(
+                "INVALID_DATA",
+                `Unsupported ${String(node.attrs?.kind ?? "surface")} container attribute in block.attrs.set: ${key}.`,
+              );
+          }
+        }
+        const applyAttrs = (current: JSONContent): JSONContent => {
+          const attrs = { ...current.attrs, ...operation.attrs };
           for (const [key, value] of Object.entries(operation.attrs))
             if (value === null) delete attrs[key];
-          return { ...node, attrs };
-        });
+          return { ...current, attrs };
+        };
+        if (isRootSurface) draft.content = applyAttrs(draft.content);
+        else edit(operation.blockId, applyAttrs);
         break;
       }
       case "component.props.set": {
@@ -1016,47 +1128,48 @@ function applyOperation(
     }
   };
   const finish = (): ShowDocument => {
-  completeDraftDrawings();
-  const structural =
-    removedPlaceholder ||
-    operations.some(
-      (operation) =>
-        (operation.type === "surface.layout.set" &&
-          Object.hasOwn(operation.layout, "mode")) ||
-        (operation.type === "component.props.set" && Object.hasOwn(operation.props, "mode")) ||
-        [
-          "block.remove",
-          "block.replace",
-          "block.move",
-          "block.insert",
-          "surface.create",
-          "surface.wrap",
-          "diagram.insert",
-          "diagram.arrange",
-        ].includes(operation.type),
-    );
-  if (isSurface(draft) && structural) draft = reconcileSurface(draft);
-  const index = indexSurfaceTree(draft.content);
-  const arrows = [...transformedIds]
-    .map((id) => index.get(id)?.node)
-    .filter(
-      (node) =>
-        node?.type === "drawing" &&
-        node.attrs?.tool === "arrow" &&
-        node.attrs.bindings,
-    );
-  if (arrows.length) {
-    validateDocument(draft);
-    for (const node of arrows) {
-      const bindings = transformedBindings(
-        node!.attrs!.bindings,
-        transformedIds,
+    completeDraftDrawings();
+    const structural =
+      removedPlaceholder ||
+      operations.some(
+        (operation) =>
+          (operation.type === "surface.layout.set" &&
+            Object.hasOwn(operation.layout, "mode")) ||
+          (operation.type === "component.props.set" &&
+            Object.hasOwn(operation.props, "mode")) ||
+          [
+            "block.remove",
+            "block.replace",
+            "block.move",
+            "block.insert",
+            "surface.create",
+            "surface.wrap",
+            "diagram.insert",
+            "diagram.arrange",
+          ].includes(operation.type),
       );
-      if (Object.keys(bindings).length) node!.attrs!.bindings = bindings;
-      else delete node!.attrs!.bindings;
+    if (isSurface(draft) && structural) draft = reconcileSurface(draft);
+    const index = indexSurfaceTree(draft.content);
+    const arrows = [...transformedIds]
+      .map((id) => index.get(id)?.node)
+      .filter(
+        (node) =>
+          node?.type === "drawing" &&
+          node.attrs?.tool === "arrow" &&
+          node.attrs.bindings,
+      );
+    if (arrows.length) {
+      validateDocument(draft);
+      for (const node of arrows) {
+        const bindings = transformedBindings(
+          node!.attrs!.bindings,
+          transformedIds,
+        );
+        if (Object.keys(bindings).length) node!.attrs!.bindings = bindings;
+        else delete node!.attrs!.bindings;
+      }
     }
-  }
-  return rebaseCommentAnchors(document, normalizeDocument(draft, document));
+    return rebaseCommentAnchors(document, normalizeDocument(draft, document));
   };
   try {
     applyOne(operation);

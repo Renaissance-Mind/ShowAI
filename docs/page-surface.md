@@ -67,7 +67,7 @@ The React entry receives:
 
 Layouts can implement their own lists, trees or visual navigation. Render within the provided container, retain keyboard and touch access, and expose current and expanded states. The host validates item IDs and performs navigation; read-only Pages retain these actions. Author parameters are separate from the generated tree and personal branch state. The host always supplies the overall collapse control. Component actions work in sandboxed readers and conversation inline readers.
 
-`examples/page-outline-index` and `examples/page-outline-path` are complete independently importable implementations. For example, import with `showai catalog import --project PROJECT --input examples/page-outline-index --json`, then select it in Page outline settings. Agents can use `block.attrs.set` on the Page ID to configure the native feature with the current base hash/revision.
+`examples/page-outline-index` and `examples/page-outline-path` are complete independently importable implementations. For example, import with `showai catalog import --project PROJECT --input examples/page-outline-index --json`, then select it in Page outline settings. Agents can use `block.attrs.set` on the root Page surface ID (`document.content.attrs.id`, or the Page ID when unambiguous) to configure the native feature with the current base hash/revision.
 
 ## Interaction
 
@@ -88,19 +88,19 @@ Click a Board object to select; drag it to move. Click selected text again or pr
 
 The toolbar docks at any canvas edge and saves its position locally. Object actions include duplicate, layer order, alignment/distribution, locking and deletion; shape style controls include label size. With two or more objects connected by arrows selected, the alignment menu can also arrange them along the arrows, left to right or top to bottom. Edge-dragging and wheel input during a drag pan the canvas. Double-click blank space or use the text tool to type. Drawing keeps the current tool active. Existing regions can be ungrouped; their empty interior allows interaction with underlying content. Full-page Boards offer a minimap with click/drag navigation.
 
-| Shortcut                                         | Action                                                                                    |
-| ------------------------------------------------ | ----------------------------------------------------------------------------------------- |
-| V / P / H / R / E (or O) / A / M / X / L / T     | Select, pen, highlighter, rectangle, ellipse, arrow, pan, ink eraser, lasso, text         |
-| 1–6, 8, 9                                        | Select through arrow, then pan and ink eraser                                             |
-| Shift+1 / Shift+2 / Shift+0                      | Fit all / fit selection / 100%                                                            |
-| + / -                                            | Zoom; Cmd/Ctrl combinations remain application zoom                                       |
-| Cmd/Ctrl+C / X / V / D                           | Copy / cut / paste / duplicate                                                            |
-| ] / [ and Shift+] / Shift+[                      | Raise/lower and front/back                                                                |
-| Alt+A / H / D / W / V / S                        | Align left/center/right/top/middle/bottom                                                 |
-| Alt+Shift+H / V                                  | Distribute horizontally/vertically                                                        |
-| Shift+Cmd/Ctrl+G                                 | Ungroup a region                                                                          |
-| Shift+Cmd/Ctrl+L                                 | Lock / unlock                                                                             |
-| Arrows; Shift for ×10                            | Nudge; continuous keypress is one undo step                                               |
+| Shortcut                                     | Action                                                                            |
+| -------------------------------------------- | --------------------------------------------------------------------------------- |
+| V / P / H / R / E (or O) / A / M / X / L / T | Select, pen, highlighter, rectangle, ellipse, arrow, pan, ink eraser, lasso, text |
+| 1–6, 8, 9                                    | Select through arrow, then pan and ink eraser                                     |
+| Shift+1 / Shift+2 / Shift+0                  | Fit all / fit selection / 100%                                                    |
+| + / -                                        | Zoom; Cmd/Ctrl combinations remain application zoom                               |
+| Cmd/Ctrl+C / X / V / D                       | Copy / cut / paste / duplicate                                                    |
+| ] / [ and Shift+] / Shift+[                  | Raise/lower and front/back                                                        |
+| Alt+A / H / D / W / V / S                    | Align left/center/right/top/middle/bottom                                         |
+| Alt+Shift+H / V                              | Distribute horizontally/vertically                                                |
+| Shift+Cmd/Ctrl+G                             | Ungroup a region                                                                  |
+| Shift+Cmd/Ctrl+L                             | Lock / unlock                                                                     |
+| Arrows; Shift for ×10                        | Nudge; continuous keypress is one undo step                                       |
 
 A locked object stores `layout[id].locked: true`: it cannot drag, resize or enter a marquee, but can be clicked and unlocked.
 
