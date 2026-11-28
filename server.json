@@ -1,0 +1,19 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.Renaissance-Mind/showai",
+  "title": "ShowAI",
+  "description": "Agents create, edit, and continue interactive ShowAI pages over MCP.",
+  "repository": {
+    "url": "https://github.com/Renaissance-Mind/ShowAI",
+    "source": "github",
+    "id": "1402780619"
+  },
+  "version": "0.12.0",
+  "websiteUrl": "https://showai.renaissancemind.ai",
+  "remotes": [
+    {
+      "type": "streamable-http",
+      "url": "https://agent.showai.renaissancemind.ai/mcp"
+    }
+  ]
+}
